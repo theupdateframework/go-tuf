@@ -1,4 +1,4 @@
-package tuf
+package data
 
 import (
 	"encoding/hex"

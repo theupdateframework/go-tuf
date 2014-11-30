@@ -5,6 +5,9 @@ import (
 	"errors"
 	"io"
 	"time"
+
+	"github.com/flynn/tuf/data"
+	"github.com/flynn/tuf/keys"
 )
 
 var (
@@ -23,12 +26,12 @@ type RemoteStore interface {
 }
 
 type Repo struct {
-	rootKey *Key
+	rootKey *keys.Key
 	local   LocalStore
 	remote  RemoteStore
 }
 
-func NewRepo(rootKey *Key, local LocalStore, remote RemoteStore) *Repo {
+func NewRepo(rootKey *keys.Key, local LocalStore, remote RemoteStore) *Repo {
 	return &Repo{
 		rootKey: rootKey,
 		local:   local,
@@ -75,7 +78,7 @@ func (r *Repo) Version() int {
 	return 0
 }
 
-func (r *Repo) Files() Files {
+func (r *Repo) Files() data.Files {
 	return nil
 }
 

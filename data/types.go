@@ -1,11 +1,17 @@
-package tuf
+package data
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"time"
+
+	"github.com/tent/canonical-json-go"
 )
 
-type SignedJSON struct {
+const KeyIDLength = sha256.Size * 2
+
+type Signed struct {
 	Signed     json.RawMessage `json:"signed"`
 	Signatures []Signature     `json:"signatures"`
 }
@@ -21,17 +27,23 @@ type Key struct {
 	Value KeyValue `json:"keyval"`
 }
 
+func (k *Key) ID() string {
+	data, _ := cjson.Marshal(k)
+	digest := sha256.Sum256(data)
+	return hex.EncodeToString(digest[:])
+}
+
 type KeyValue struct {
 	Public  HexBytes `json:"public"`
 	Private HexBytes `json:"-"`
 }
 
 type Root struct {
-	Type    string         `json:"_type"`
-	Version int            `json:"version"`
-	Expires time.Time      `json:"expires"`
-	Keys    map[string]Key `json:"keys"`
-	Roles   []Role         `json:"role"`
+	Type    string          `json:"_type"`
+	Version int             `json:"version"`
+	Expires time.Time       `json:"expires"`
+	Keys    map[string]Key  `json:"keys"`
+	Roles   map[string]Role `json:"role"`
 
 	ConsistentSnapshot bool `json:"consistent_snapshot"`
 }
