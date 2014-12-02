@@ -13,13 +13,13 @@ import (
 var (
 	ErrMissingKey    = errors.New("tuf: missing key")
 	ErrNoSignatures  = errors.New("tuf: data has no signatures")
-	ErrInvalid       = errors.New("tuf: signature verificate failed")
+	ErrInvalid       = errors.New("tuf: signature verification failed")
 	ErrWrongMethod   = errors.New("tuf: invalid signature type")
 	ErrUnknownRole   = errors.New("tuf: unknown role")
 	ErrRoleThreshold = errors.New("tuf: valid signatures did not meet threshold")
 )
 
-func VerifySigned(db *keys.DB, s *data.Signed, role string) error {
+func VerifySigned(s *data.Signed, role string, db *keys.DB) error {
 	if len(s.Signatures) == 0 {
 		return ErrNoSignatures
 	}

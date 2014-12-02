@@ -1,6 +1,7 @@
 package keys
 
 import (
+	"crypto/rand"
 	"errors"
 
 	"github.com/agl/ed25519"
@@ -17,8 +18,30 @@ var (
 	ErrInvalidThreshold = errors.New("tuf: invalid role threshold")
 )
 
+func NewKey() (*Key, error) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	k := &Key{
+		Public:  *pub,
+		Private: priv,
+	}
+	k.ID = k.Serialize().ID()
+	return k, nil
+}
+
 type Key struct {
-	Public [ed25519.PublicKeySize]byte
+	ID      string
+	Public  [ed25519.PublicKeySize]byte
+	Private *[ed25519.PrivateKeySize]byte
+}
+
+func (k *Key) Serialize() *data.Key {
+	return &data.Key{
+		Type:  "ed25519",
+		Value: data.KeyValue{Public: k.Public[:]},
+	}
 }
 
 type Role struct {
@@ -56,6 +79,7 @@ func (db *DB) AddKey(id string, k *data.Key) error {
 
 	var key Key
 	copy(key.Public[:], k.Value.Public)
+	key.ID = id
 	db.keys[id] = &key
 	return nil
 }

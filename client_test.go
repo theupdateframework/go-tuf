@@ -32,7 +32,7 @@ type FakeFile struct {
 	Size int64
 }
 
-func (*ClientSuite) TestFirstUpdate(c *C) {
+func (ClientSuite) TestFirstUpdate(c *C) {
 	remote := make(FakeRemoteStore)
 	r := NewRepo(nil, MemoryLocalStore(), remote)
 	_ = r

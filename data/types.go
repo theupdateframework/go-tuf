@@ -34,8 +34,7 @@ func (k *Key) ID() string {
 }
 
 type KeyValue struct {
-	Public  HexBytes `json:"public"`
-	Private HexBytes `json:"-"`
+	Public HexBytes `json:"public"`
 }
 
 type Root struct {
