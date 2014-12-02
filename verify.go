@@ -67,3 +67,10 @@ func VerifySigned(s *data.Signed, role string, db *keys.DB) error {
 	}
 	return nil
 }
+
+func UnmarshalSigned(s *data.Signed, v interface{}, role string, db *keys.DB) error {
+	if err := VerifySigned(s, role, db); err != nil {
+		return err
+	}
+	return json.Unmarshal(s.Signed, v)
+}

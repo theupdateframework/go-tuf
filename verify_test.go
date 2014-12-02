@@ -120,8 +120,7 @@ func (VerifySuite) Test(c *C) {
 		}
 		if t.keys == nil && t.s == nil {
 			k, _ := keys.NewKey()
-			t.s = &data.Signed{Signed: []byte(`{}`)}
-			Sign(t.s, k)
+			t.s, _ = MarshalSigned(&struct{}{}, k)
 			t.keys = []*data.Key{k.Serialize()}
 		}
 		if t.roles == nil {
