@@ -1,12 +1,17 @@
-package tuf
+package signed
 
 import (
+	"testing"
+
 	"github.com/agl/ed25519"
 	"github.com/flynn/tuf/data"
 	"github.com/flynn/tuf/keys"
 
 	. "gopkg.in/check.v1"
 )
+
+// Hook up gocheck into the "go test" runner.
+func Test(t *testing.T) { TestingT(t) }
 
 type VerifySuite struct{}
 
@@ -120,7 +125,7 @@ func (VerifySuite) Test(c *C) {
 		}
 		if t.keys == nil && t.s == nil {
 			k, _ := keys.NewKey()
-			t.s, _ = MarshalSigned(&struct{}{}, k)
+			t.s, _ = Marshal(&struct{}{}, k)
 			t.keys = []*data.Key{k.Serialize()}
 		}
 		if t.roles == nil {
@@ -145,7 +150,7 @@ func (VerifySuite) Test(c *C) {
 			c.Assert(err, IsNil)
 		}
 
-		err := VerifySigned(t.s, t.role, db)
+		err := Verify(t.s, t.role, db)
 		c.Assert(err, Equals, t.err, Commentf("name = %s", t.name))
 	}
 }

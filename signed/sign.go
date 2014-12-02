@@ -1,4 +1,4 @@
-package tuf
+package signed
 
 import (
 	"github.com/agl/ed25519"
@@ -16,7 +16,7 @@ func Sign(s *data.Signed, k *keys.Key) {
 	})
 }
 
-func MarshalSigned(v interface{}, keys ...*keys.Key) (*data.Signed, error) {
+func Marshal(v interface{}, keys ...*keys.Key) (*data.Signed, error) {
 	b, err := cjson.Marshal(v)
 	if err != nil {
 		return nil, err

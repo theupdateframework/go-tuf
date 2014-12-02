@@ -1,4 +1,4 @@
-package tuf
+package signed
 
 import (
 	"encoding/json"
@@ -19,7 +19,7 @@ var (
 	ErrRoleThreshold = errors.New("tuf: valid signatures did not meet threshold")
 )
 
-func VerifySigned(s *data.Signed, role string, db *keys.DB) error {
+func Verify(s *data.Signed, role string, db *keys.DB) error {
 	if len(s.Signatures) == 0 {
 		return ErrNoSignatures
 	}
@@ -68,8 +68,8 @@ func VerifySigned(s *data.Signed, role string, db *keys.DB) error {
 	return nil
 }
 
-func UnmarshalSigned(s *data.Signed, v interface{}, role string, db *keys.DB) error {
-	if err := VerifySigned(s, role, db); err != nil {
+func Unmarshal(s *data.Signed, v interface{}, role string, db *keys.DB) error {
+	if err := Verify(s, role, db); err != nil {
 		return err
 	}
 	return json.Unmarshal(s.Signed, v)
