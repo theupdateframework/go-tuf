@@ -38,11 +38,11 @@ type KeyValue struct {
 }
 
 type Root struct {
-	Type    string          `json:"_type"`
-	Version int             `json:"version"`
-	Expires time.Time       `json:"expires"`
-	Keys    map[string]Key  `json:"keys"`
-	Roles   map[string]Role `json:"role"`
+	Type    string           `json:"_type"`
+	Version int              `json:"version"`
+	Expires time.Time        `json:"expires"`
+	Keys    map[string]*Key  `json:"keys"`
+	Roles   map[string]*Role `json:"role"`
 
 	ConsistentSnapshot bool `json:"consistent_snapshot"`
 }

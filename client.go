@@ -8,12 +8,16 @@ import (
 
 	"github.com/flynn/tuf/data"
 	"github.com/flynn/tuf/keys"
+	"github.com/flynn/tuf/signed"
 )
 
 var (
-	ErrLatest    = errors.New("tuf: the current version is the latest")
-	ErrNotFound  = errors.New("tuf: file not found")
-	ErrWrongSize = errors.New("tuf: unexpected file size")
+	ErrLatest     = errors.New("tuf: the current version is the latest")
+	ErrNotFound   = errors.New("tuf: file not found")
+	ErrWrongSize  = errors.New("tuf: unexpected file size")
+	ErrNoRootKeys = errors.New("tuf: no root keys found in local meta store")
+	ErrLowVersion = errors.New("tuf: version is lower than current version")
+	ErrWrongType  = errors.New("tuf: meta file has wrong type")
 )
 
 type LocalStore interface {
@@ -26,27 +30,207 @@ type RemoteStore interface {
 }
 
 type Repo struct {
-	rootKey *keys.Key
-	local   LocalStore
-	remote  RemoteStore
+	local  LocalStore
+	remote RemoteStore
+
+	db   *keys.DB
+	meta map[string]json.RawMessage
+
+	root      *data.Root
+	snapshot  *data.Snapshot
+	targets   *data.Targets
+	timestamp *data.Timestamp
 }
 
-func NewRepo(rootKey *keys.Key, local LocalStore, remote RemoteStore) *Repo {
+func NewRepo(local LocalStore, remote RemoteStore) *Repo {
 	return &Repo{
-		rootKey: rootKey,
-		local:   local,
-		remote:  remote,
+		local:  local,
+		remote: remote,
+		db:     keys.NewDB(),
 	}
 }
 
+func (r *Repo) getLocalMeta() error {
+	if r.meta == nil {
+		var err error
+		r.meta, err = r.local.GetMeta()
+		if err != nil {
+			return err
+		}
+	}
+
+	// root keys
+	if rootKeyJSON, ok := r.meta["root-keys"]; ok {
+		var rootKeys []*data.Key
+		if err := json.Unmarshal(rootKeyJSON, &rootKeys); err != nil {
+			return err
+		}
+		if len(rootKeys) == 0 {
+			return ErrNoRootKeys
+		}
+
+		rootKeyIDs := make([]string, len(rootKeys))
+		for i, k := range rootKeys {
+			id := k.ID()
+			rootKeyIDs[i] = id
+			if err := r.db.AddKey(id, k); err != nil {
+				return err
+			}
+		}
+		r.db.AddRole("root", &data.Role{Threshold: 1, KeyIDs: rootKeyIDs})
+	} else {
+		return ErrNoRootKeys
+	}
+
+	if rootJSON, ok := r.meta["root"]; ok {
+		s := &data.Signed{}
+		if err := json.Unmarshal(rootJSON, s); err != nil {
+			return err
+		}
+		if err := r.decodeRoot(s); err != nil {
+			return err
+		}
+	}
+
+	if snapshotJSON, ok := r.meta["snapshot"]; ok {
+		s := &data.Signed{}
+		if err := json.Unmarshal(snapshotJSON, s); err != nil {
+			return err
+		}
+		if err := r.decodeSnapshot(s); err != nil {
+			return err
+		}
+	}
+
+	if targetsJSON, ok := r.meta["targets"]; ok {
+		s := &data.Signed{}
+		if err := json.Unmarshal(targetsJSON, s); err != nil {
+			return err
+		}
+		if err := r.decodeTargets(s); err != nil {
+			return err
+		}
+	}
+
+	if timestampJSON, ok := r.meta["timestamp"]; ok {
+		s := &data.Signed{}
+		if err := json.Unmarshal(timestampJSON, s); err != nil {
+			return err
+		}
+		if err := r.decodeTimestamp(s); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *Repo) decodeRoot(s *data.Signed) error {
+	root := &data.Root{}
+	if err := signed.Unmarshal(s, root, "root", r.db); err != nil {
+		return err
+	}
+	if root.Type != "root" {
+		return ErrWrongType
+	}
+	if err := checkExpires(root.Expires); err != nil {
+		return err
+	}
+	if r.root != nil && root.Version < r.root.Version {
+		return ErrLowVersion
+	}
+
+	for id, k := range root.Keys {
+		if err := r.db.AddKey(id, k); err != nil {
+			return err
+		}
+	}
+	for name, role := range root.Roles {
+		if err := r.db.AddRole(name, role); err != nil {
+			return err
+		}
+	}
+	r.root = root
+	return nil
+}
+
+func (r *Repo) decodeSnapshot(s *data.Signed) error {
+	snapshot := &data.Snapshot{}
+	if err := signed.Unmarshal(s, snapshot, "snapshot", r.db); err != nil {
+		return err
+	}
+	if snapshot.Type != "snapshot" {
+		return ErrWrongType
+	}
+	if err := checkExpires(snapshot.Expires); err != nil {
+		return err
+	}
+	if err := r.checkVersion(snapshot.Version); err != nil {
+		return err
+	}
+	r.snapshot = snapshot
+	return nil
+}
+
+func (r *Repo) decodeTargets(s *data.Signed) error {
+	targets := &data.Targets{}
+	if err := signed.Unmarshal(s, targets, "targets", r.db); err != nil {
+		return err
+	}
+	if targets.Type != "targets" {
+		return ErrWrongType
+	}
+	if err := checkExpires(targets.Expires); err != nil {
+		return err
+	}
+	if err := r.checkVersion(targets.Version); err != nil {
+		return err
+	}
+	r.targets = targets
+	return nil
+}
+
+func (r *Repo) decodeTimestamp(s *data.Signed) error {
+	timestamp := &data.Timestamp{}
+	if err := signed.Unmarshal(s, timestamp, "timestamp", r.db); err != nil {
+		return err
+	}
+	if timestamp.Type != "timestamp" {
+		return ErrWrongType
+	}
+	if err := checkExpires(timestamp.Expires); err != nil {
+		return err
+	}
+	if err := r.checkVersion(timestamp.Version); err != nil {
+		return err
+	}
+	r.timestamp = timestamp
+	return nil
+}
+
+func checkExpires(t time.Time) error {
+	return nil
+}
+
+func (r *Repo) checkVersion(v int) error {
+	if v < r.root.Version {
+		return ErrLowVersion
+	}
+	return nil
+}
+
 func (r *Repo) Update() error {
-	// get current meta if not decoded yet
-	// fully check all signatures
+	if err := r.getLocalMeta(); err != nil {
+		return err
+	}
+	// check for root keys
+
 	// if no meta, get root.json
 	// if meta, get timestamp.json
 	// if new, get snapshot.json
 	// if new root.json, restart
 	// if new targets.json update
+	// fully check all signatures
 
 	/*
 		If at any point in the following process there is a problem (e.g., only expired

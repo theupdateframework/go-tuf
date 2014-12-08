@@ -34,6 +34,6 @@ type FakeFile struct {
 
 func (ClientSuite) TestFirstUpdate(c *C) {
 	remote := make(FakeRemoteStore)
-	r := NewRepo(nil, MemoryLocalStore(), remote)
+	r := NewRepo(MemoryLocalStore(), remote)
 	_ = r
 }
