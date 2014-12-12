@@ -16,8 +16,6 @@ var (
 	ErrNotFound   = errors.New("tuf: file not found")
 	ErrWrongSize  = errors.New("tuf: unexpected file size")
 	ErrNoRootKeys = errors.New("tuf: no root keys found in local meta store")
-	ErrLowVersion = errors.New("tuf: version is lower than current version")
-	ErrWrongType  = errors.New("tuf: meta file has wrong type")
 )
 
 type LocalStore interface {
@@ -59,7 +57,6 @@ func (r *Repo) getLocalMeta() error {
 		}
 	}
 
-	// root keys
 	if rootKeyJSON, ok := r.meta["root-keys"]; ok {
 		var rootKeys []*data.Key
 		if err := json.Unmarshal(rootKeyJSON, &rootKeys); err != nil {
@@ -126,18 +123,13 @@ func (r *Repo) getLocalMeta() error {
 }
 
 func (r *Repo) decodeRoot(s *data.Signed) error {
+	var minVer int
+	if r.root != nil {
+		minVer = r.root.Version
+	}
 	root := &data.Root{}
-	if err := signed.Unmarshal(s, root, "root", r.db); err != nil {
+	if err := signed.Unmarshal(s, root, "root", minVer, r.db); err != nil {
 		return err
-	}
-	if root.Type != "root" {
-		return ErrWrongType
-	}
-	if err := checkExpires(root.Expires); err != nil {
-		return err
-	}
-	if r.root != nil && root.Version < r.root.Version {
-		return ErrLowVersion
 	}
 
 	for id, k := range root.Keys {
@@ -156,16 +148,7 @@ func (r *Repo) decodeRoot(s *data.Signed) error {
 
 func (r *Repo) decodeSnapshot(s *data.Signed) error {
 	snapshot := &data.Snapshot{}
-	if err := signed.Unmarshal(s, snapshot, "snapshot", r.db); err != nil {
-		return err
-	}
-	if snapshot.Type != "snapshot" {
-		return ErrWrongType
-	}
-	if err := checkExpires(snapshot.Expires); err != nil {
-		return err
-	}
-	if err := r.checkVersion(snapshot.Version); err != nil {
+	if err := signed.Unmarshal(s, snapshot, "snapshot", r.root.Version, r.db); err != nil {
 		return err
 	}
 	r.snapshot = snapshot
@@ -174,16 +157,7 @@ func (r *Repo) decodeSnapshot(s *data.Signed) error {
 
 func (r *Repo) decodeTargets(s *data.Signed) error {
 	targets := &data.Targets{}
-	if err := signed.Unmarshal(s, targets, "targets", r.db); err != nil {
-		return err
-	}
-	if targets.Type != "targets" {
-		return ErrWrongType
-	}
-	if err := checkExpires(targets.Expires); err != nil {
-		return err
-	}
-	if err := r.checkVersion(targets.Version); err != nil {
+	if err := signed.Unmarshal(s, targets, "targets", r.root.Version, r.db); err != nil {
 		return err
 	}
 	r.targets = targets
@@ -192,30 +166,10 @@ func (r *Repo) decodeTargets(s *data.Signed) error {
 
 func (r *Repo) decodeTimestamp(s *data.Signed) error {
 	timestamp := &data.Timestamp{}
-	if err := signed.Unmarshal(s, timestamp, "timestamp", r.db); err != nil {
-		return err
-	}
-	if timestamp.Type != "timestamp" {
-		return ErrWrongType
-	}
-	if err := checkExpires(timestamp.Expires); err != nil {
-		return err
-	}
-	if err := r.checkVersion(timestamp.Version); err != nil {
+	if err := signed.Unmarshal(s, timestamp, "timestamp", r.root.Version, r.db); err != nil {
 		return err
 	}
 	r.timestamp = timestamp
-	return nil
-}
-
-func checkExpires(t time.Time) error {
-	return nil
-}
-
-func (r *Repo) checkVersion(v int) error {
-	if v < r.root.Version {
-		return ErrLowVersion
-	}
 	return nil
 }
 

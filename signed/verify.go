@@ -3,6 +3,7 @@ package signed
 import (
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/agl/ed25519"
 	"github.com/flynn/tuf/data"
@@ -17,9 +18,17 @@ var (
 	ErrWrongMethod   = errors.New("tuf: invalid signature type")
 	ErrUnknownRole   = errors.New("tuf: unknown role")
 	ErrRoleThreshold = errors.New("tuf: valid signatures did not meet threshold")
+	ErrLowVersion    = errors.New("tuf: version is lower than current version")
+	ErrWrongType     = errors.New("tuf: meta file has wrong type")
 )
 
-func Verify(s *data.Signed, role string, db *keys.DB) error {
+type signedMeta struct {
+	Type    string    `json:"_type"`
+	Expires time.Time `json:"expires"`
+	Version int       `json:"version"`
+}
+
+func Verify(s *data.Signed, role string, minVersion int, db *keys.DB) error {
 	if len(s.Signatures) == 0 {
 		return ErrNoSignatures
 	}
@@ -65,11 +74,30 @@ func Verify(s *data.Signed, role string, db *keys.DB) error {
 	if len(valid) < roleData.Threshold {
 		return ErrRoleThreshold
 	}
+
+	sm := &signedMeta{}
+	if err := json.Unmarshal(s.Signed, sm); err != nil {
+		return err
+	}
+	if sm.Type != role {
+		return ErrWrongType
+	}
+	if err := checkExpires(sm.Expires); err != nil {
+		return err
+	}
+	if sm.Version < minVersion {
+		return ErrLowVersion
+	}
+
 	return nil
 }
 
-func Unmarshal(s *data.Signed, v interface{}, role string, db *keys.DB) error {
-	if err := Verify(s, role, db); err != nil {
+var checkExpires = func(t time.Time) error {
+	return nil
+}
+
+func Unmarshal(s *data.Signed, v interface{}, role string, minVersion int, db *keys.DB) error {
+	if err := Verify(s, role, minVersion, db); err != nil {
 		return err
 	}
 	return json.Unmarshal(s.Signed, v)
