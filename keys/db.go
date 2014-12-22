@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/agl/ed25519"
-	"github.com/flynn/tuf/data"
+	"github.com/flynn/go-tuf/data"
 )
 
 var (

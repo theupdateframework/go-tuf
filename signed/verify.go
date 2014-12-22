@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/agl/ed25519"
-	"github.com/flynn/tuf/data"
-	"github.com/flynn/tuf/keys"
+	"github.com/flynn/go-tuf/data"
+	"github.com/flynn/go-tuf/keys"
 	"github.com/tent/canonical-json-go"
 )
 

@@ -6,9 +6,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/flynn/tuf/data"
-	"github.com/flynn/tuf/keys"
-	"github.com/flynn/tuf/signed"
+	"github.com/flynn/go-tuf/data"
+	"github.com/flynn/go-tuf/keys"
+	"github.com/flynn/go-tuf/signed"
 )
 
 var (
