@@ -47,6 +47,16 @@ type Root struct {
 	ConsistentSnapshot bool `json:"consistent_snapshot"`
 }
 
+func NewRoot() *Root {
+	return &Root{
+		Type:    "root",
+		Version: 1,
+		Expires: time.Now().AddDate(1, 0, 0),
+		Keys:    make(map[string]*Key),
+		Roles:   make(map[string]*Role),
+	}
+}
+
 type Role struct {
 	KeyIDs    []string `json:"keyids"`
 	Threshold int      `json:"threshold"`
@@ -59,6 +69,15 @@ type Snapshot struct {
 	Version int       `json:"version"`
 	Expires time.Time `json:"expires"`
 	Meta    Files     `json:"meta"`
+}
+
+func NewSnapshot() *Snapshot {
+	return &Snapshot{
+		Type:    "snapshot",
+		Version: 1,
+		Expires: time.Now().AddDate(0, 0, 7),
+		Meta:    make(Files),
+	}
 }
 
 type FileMeta struct {
@@ -74,9 +93,27 @@ type Targets struct {
 	Targets Files     `json:"targets"`
 }
 
+func NewTargets() *Targets {
+	return &Targets{
+		Type:    "targets",
+		Version: 1,
+		Expires: time.Now().AddDate(0, 3, 0),
+		Targets: make(Files),
+	}
+}
+
 type Timestamp struct {
 	Type    string    `json:"_type"`
 	Version int       `json:"version"`
 	Expires time.Time `json:"expires"`
 	Meta    Files     `json:"meta"`
+}
+
+func NewTimestamp() *Timestamp {
+	return &Timestamp{
+		Type:    "timestamp",
+		Version: 1,
+		Expires: time.Now().AddDate(0, 0, 1),
+		Meta:    make(Files),
+	}
 }

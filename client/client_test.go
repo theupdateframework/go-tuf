@@ -1,9 +1,10 @@
-package tuf
+package client
 
 import (
 	"io"
 	"testing"
 
+	"github.com/flynn/go-tuf"
 	. "gopkg.in/check.v1"
 )
 
@@ -34,6 +35,7 @@ type FakeFile struct {
 
 func (ClientSuite) TestFirstUpdate(c *C) {
 	remote := make(FakeRemoteStore)
-	r := NewRepo(MemoryLocalStore(), remote)
+	r, err := NewClient(tuf.MemoryStore(nil, nil), remote)
+	c.Assert(err, IsNil)
 	_ = r
 }
