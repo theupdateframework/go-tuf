@@ -1,0 +1,98 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"os"
+
+	"github.com/flynn/go-docopt"
+	"github.com/flynn/go-tuf"
+)
+
+var dir string
+
+func main() {
+	log.SetFlags(0)
+
+	usage := `usage: tuf [-h|--help] [-d|--dir=<dir>] <command> [<args>...]
+
+Options:
+  -h, --help
+  -d, --dir=<dir>
+
+Commands:
+  help         Show usage for a specific command
+  gen-key      Generate a new signing key for a specific manifest
+  add          Add a target file
+  remove       Remove a target file
+  snapshot     Update the snapshot manifest
+  timestamp    Update the timestamp manifest
+  sign         Sign a manifest
+  commit       Commit staged files to the repository
+  regenerate   Recreate the targets manifest
+  clean        Remove all staged manifests
+
+See "tuf help <command>" for more information on a specific command
+`
+
+	args, _ := docopt.Parse(usage, nil, true, "", true)
+	cmd := args.String["<command>"]
+	cmdArgs := args.All["<args>"].([]string)
+
+	if cmd == "help" {
+		if len(cmdArgs) == 0 { // `flynn help`
+			fmt.Println(usage)
+			return
+		} else { // `flynn help <command>`
+			cmd = cmdArgs[0]
+			cmdArgs = []string{"--help"}
+		}
+	}
+
+	dir = args.String["--tuf-dir"]
+	if dir == "" {
+		var err error
+		dir, err = os.Getwd()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if err := runCommand(cmd, cmdArgs); err != nil {
+		log.Fatal(err)
+	}
+}
+
+type cmdFunc func(*docopt.Args, *tuf.Repo) error
+
+type command struct {
+	usage string
+	f     cmdFunc
+}
+
+var commands = make(map[string]*command)
+
+func register(name string, f cmdFunc, usage string) {
+	commands[name] = &command{usage: usage, f: f}
+}
+
+func runCommand(name string, args []string) error {
+	argv := make([]string, 1, 1+len(args))
+	argv[0] = name
+	argv = append(argv, args...)
+
+	cmd, ok := commands[name]
+	if !ok {
+		return fmt.Errorf("%s is not a tuf command. See 'tuf help'", name)
+	}
+
+	parsedArgs, err := docopt.Parse(cmd.usage, argv, true, "", true)
+	if err != nil {
+		return err
+	}
+	repo, err := tuf.NewRepo(tuf.FileSystemStore(dir))
+	if err != nil {
+		return err
+	}
+	return cmd.f(parsedArgs, repo)
+}
