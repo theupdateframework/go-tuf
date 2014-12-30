@@ -171,7 +171,7 @@ func (r *Repo) GenKey(keyRole string) error {
 	role.KeyIDs = append(role.KeyIDs, key.ID)
 
 	root.Keys[key.ID] = key.Serialize()
-	root.Expires = time.Now().AddDate(1, 0, 0)
+	root.Expires = time.Now().AddDate(1, 0, 0).UTC()
 
 	return r.setMeta("root.json", root)
 }
@@ -259,7 +259,7 @@ func (r *Repo) AddTarget(path string, custom map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	t.Expires = time.Now().AddDate(0, 3, 0)
+	t.Expires = time.Now().AddDate(0, 3, 0).UTC()
 	return r.setMeta("targets.json", t)
 }
 
@@ -295,7 +295,7 @@ func (r *Repo) Snapshot(t CompressionType) error {
 			return err
 		}
 	}
-	snapshot.Expires = time.Now().AddDate(0, 0, 7)
+	snapshot.Expires = time.Now().AddDate(0, 0, 7).UTC()
 	return r.setMeta("snapshot.json", snapshot)
 }
 
@@ -315,7 +315,7 @@ func (r *Repo) Timestamp() error {
 	if err != nil {
 		return err
 	}
-	timestamp.Expires = time.Now().AddDate(0, 0, 1)
+	timestamp.Expires = time.Now().AddDate(0, 0, 1).UTC()
 	return r.setMeta("timestamp.json", timestamp)
 }
 

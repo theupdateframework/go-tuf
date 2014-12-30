@@ -51,7 +51,7 @@ func NewRoot() *Root {
 	return &Root{
 		Type:    "root",
 		Version: 1,
-		Expires: time.Now().AddDate(1, 0, 0),
+		Expires: time.Now().AddDate(1, 0, 0).UTC(),
 		Keys:    make(map[string]*Key),
 		Roles:   make(map[string]*Role),
 	}
@@ -75,7 +75,7 @@ func NewSnapshot() *Snapshot {
 	return &Snapshot{
 		Type:    "snapshot",
 		Version: 1,
-		Expires: time.Now().AddDate(0, 0, 7),
+		Expires: time.Now().AddDate(0, 0, 7).UTC(),
 		Meta:    make(Files),
 	}
 }
@@ -97,7 +97,7 @@ func NewTargets() *Targets {
 	return &Targets{
 		Type:    "targets",
 		Version: 1,
-		Expires: time.Now().AddDate(0, 3, 0),
+		Expires: time.Now().AddDate(0, 3, 0).UTC(),
 		Targets: make(Files),
 	}
 }
@@ -113,7 +113,7 @@ func NewTimestamp() *Timestamp {
 	return &Timestamp{
 		Type:    "timestamp",
 		Version: 1,
-		Expires: time.Now().AddDate(0, 0, 1),
+		Expires: time.Now().AddDate(0, 0, 1).UTC(),
 		Meta:    make(Files),
 	}
 }
