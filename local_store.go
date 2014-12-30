@@ -126,7 +126,7 @@ func (f *fileSystemStore) SetMeta(name string, meta json.RawMessage) error {
 }
 
 func (f *fileSystemStore) createDirs() error {
-	for _, dir := range []string{"keys", "repository", "staged"} {
+	for _, dir := range []string{"keys", "repository", "staged/targets"} {
 		if err := os.MkdirAll(filepath.Join(f.dir, dir), 0755); err != nil {
 			return err
 		}
