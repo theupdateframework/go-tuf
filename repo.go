@@ -146,6 +146,10 @@ func (r *Repo) timestamp() (*data.Timestamp, error) {
 }
 
 func (r *Repo) GenKey(keyRole string) error {
+	if !keys.ValidRole(keyRole) {
+		return ErrInvalidRole{keyRole}
+	}
+
 	root, err := r.root()
 	if err != nil {
 		return err
@@ -191,8 +195,9 @@ func (r *Repo) setMeta(name string, meta interface{}) error {
 
 // TODO: Ensure only one signature per key ID
 func (r *Repo) Sign(name string) error {
-	if !validManifest(name) {
-		return fmt.Errorf("tuf: invalid manifest %s, must be one of %s", name, topLevelManifests)
+	role := strings.TrimSuffix(name, ".json")
+	if !keys.ValidRole(role) {
+		return ErrInvalidRole{role}
 	}
 
 	s, err := r.signedMeta(name)
@@ -200,7 +205,7 @@ func (r *Repo) Sign(name string) error {
 		return err
 	}
 
-	keys, err := r.local.GetKeys(strings.TrimSuffix(name, ".json"))
+	keys, err := r.local.GetKeys(role)
 	if err != nil {
 		return err
 	}

@@ -34,3 +34,11 @@ type ErrInsufficientSignatures struct {
 func (e ErrInsufficientSignatures) Error() string {
 	return fmt.Sprintf("tuf: insufficient signatures for %s: %s", e.Name, e.Err)
 }
+
+type ErrInvalidRole struct {
+	Role string
+}
+
+func (e ErrInvalidRole) Error() string {
+	return fmt.Sprintf("tuf: invalid role %s", e.Role)
+}
