@@ -41,8 +41,8 @@ type LocalStore interface {
 	SetMeta(string, json.RawMessage) error
 	GetStagedTarget(string) (io.ReadCloser, error)
 	Commit(map[string]json.RawMessage, data.Files) error
-	GetKeys(string) ([]*keys.Key, error)
-	SaveKey(string, *keys.Key) error
+	GetKeys(string) ([]*data.Key, error)
+	SaveKey(string, *data.Key) error
 	Clean() error
 }
 
@@ -159,7 +159,7 @@ func (r *Repo) GenKey(keyRole string) error {
 	if err != nil {
 		return err
 	}
-	if err := r.local.SaveKey(keyRole, key); err != nil {
+	if err := r.local.SaveKey(keyRole, key.Serialize()); err != nil {
 		return err
 	}
 

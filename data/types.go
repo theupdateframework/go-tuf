@@ -28,13 +28,18 @@ type Key struct {
 }
 
 func (k *Key) ID() string {
-	data, _ := cjson.Marshal(k)
+	// create a copy so the private key is not included
+	data, _ := cjson.Marshal(&Key{
+		Type:  k.Type,
+		Value: KeyValue{Public: k.Value.Public},
+	})
 	digest := sha256.Sum256(data)
 	return hex.EncodeToString(digest[:])
 }
 
 type KeyValue struct {
-	Public HexBytes `json:"public"`
+	Public  HexBytes `json:"public"`
+	Private HexBytes `json:"private,omitempty"`
 }
 
 type Root struct {

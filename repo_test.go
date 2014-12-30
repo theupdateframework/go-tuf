@@ -133,7 +133,7 @@ func (RepoSuite) TestGenKey(c *C) {
 	localKeys, err := local.GetKeys("root")
 	c.Assert(err, IsNil)
 	c.Assert(localKeys, HasLen, 1)
-	c.Assert(localKeys[0].ID, Equals, keyID)
+	c.Assert(localKeys[0].ID(), Equals, keyID)
 
 	// generate two targets keys
 	c.Assert(r.GenKey("targets"), IsNil)
@@ -172,7 +172,7 @@ func (RepoSuite) TestGenKey(c *C) {
 	for _, key := range localKeys {
 		found := false
 		for _, id := range targetsRole.KeyIDs {
-			if id == key.ID {
+			if id == key.ID() {
 				found = true
 			}
 		}
@@ -209,7 +209,7 @@ func (RepoSuite) TestSign(c *C) {
 
 	key, err := keys.NewKey()
 	c.Assert(err, IsNil)
-	c.Assert(local.SaveKey("root", key), IsNil)
+	c.Assert(local.SaveKey("root", key.Serialize()), IsNil)
 	c.Assert(r.Sign("root.json"), IsNil)
 }
 

@@ -10,21 +10,20 @@ import (
 	"strings"
 
 	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/keys"
 )
 
 func MemoryStore(meta map[string]json.RawMessage, files map[string][]byte) LocalStore {
 	return &memoryStore{
 		meta:  meta,
 		files: files,
-		keys:  make(map[string][]*keys.Key),
+		keys:  make(map[string][]*data.Key),
 	}
 }
 
 type memoryStore struct {
 	meta  map[string]json.RawMessage
 	files map[string][]byte
-	keys  map[string][]*keys.Key
+	keys  map[string][]*data.Key
 }
 
 func (m *memoryStore) GetMeta() (map[string]json.RawMessage, error) {
@@ -56,13 +55,13 @@ func (m *memoryStore) Commit(meta map[string]json.RawMessage, targets data.Files
 	return nil
 }
 
-func (m *memoryStore) GetKeys(role string) ([]*keys.Key, error) {
+func (m *memoryStore) GetKeys(role string) ([]*data.Key, error) {
 	return m.keys[role], nil
 }
 
-func (m *memoryStore) SaveKey(role string, key *keys.Key) error {
+func (m *memoryStore) SaveKey(role string, key *data.Key) error {
 	if _, ok := m.keys[role]; !ok {
-		m.keys[role] = make([]*keys.Key, 0)
+		m.keys[role] = make([]*data.Key, 0)
 	}
 	m.keys[role] = append(m.keys[role], key)
 	return nil
@@ -202,12 +201,12 @@ func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, targets data.F
 	return f.Clean()
 }
 
-func (f *fileSystemStore) GetKeys(role string) ([]*keys.Key, error) {
+func (f *fileSystemStore) GetKeys(role string) ([]*data.Key, error) {
 	files, err := ioutil.ReadDir(filepath.Join(f.dir, "keys"))
 	if err != nil {
 		return nil, err
 	}
-	signingKeys := make([]*keys.Key, 0, len(files))
+	signingKeys := make([]*data.Key, 0, len(files))
 	for _, file := range files {
 		if !strings.HasPrefix(file.Name(), role) {
 			continue
@@ -216,7 +215,7 @@ func (f *fileSystemStore) GetKeys(role string) ([]*keys.Key, error) {
 		if err != nil {
 			return nil, err
 		}
-		key := &keys.Key{}
+		key := &data.Key{}
 		if err := json.NewDecoder(s).Decode(key); err != nil {
 			return nil, err
 		}
@@ -225,15 +224,15 @@ func (f *fileSystemStore) GetKeys(role string) ([]*keys.Key, error) {
 	return signingKeys, nil
 }
 
-func (f *fileSystemStore) SaveKey(role string, key *keys.Key) error {
+func (f *fileSystemStore) SaveKey(role string, key *data.Key) error {
 	if err := f.createDirs(); err != nil {
 		return err
 	}
-	data, err := json.Marshal(key)
+	data, err := json.MarshalIndent(key, "", "  ")
 	if err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(filepath.Join(f.dir, "keys", role+"-"+key.ID+".json"), data, 0600); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(f.dir, "keys", role+"-"+key.ID()+".json"), append(data, '\n'), 0600); err != nil {
 		return err
 	}
 	return nil

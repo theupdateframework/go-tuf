@@ -32,15 +32,18 @@ func NewKey() (*Key, error) {
 }
 
 type Key struct {
-	ID      string                        `json:"id"`
-	Public  [ed25519.PublicKeySize]byte   `json:"public"`
-	Private *[ed25519.PrivateKeySize]byte `json:"private,omitempty"`
+	ID      string
+	Public  [ed25519.PublicKeySize]byte
+	Private *[ed25519.PrivateKeySize]byte
 }
 
 func (k *Key) Serialize() *data.Key {
 	return &data.Key{
-		Type:  "ed25519",
-		Value: data.KeyValue{Public: k.Public[:]},
+		Type: "ed25519",
+		Value: data.KeyValue{
+			Public:  k.Public[:],
+			Private: k.Private[:],
+		},
 	}
 }
 
