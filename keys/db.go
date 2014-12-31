@@ -39,8 +39,11 @@ type Key struct {
 
 func (k *Key) Serialize() *data.Key {
 	return &data.Key{
-		Type:  "ed25519",
-		Value: data.KeyValue{Public: k.Public[:]},
+		Type: "ed25519",
+		Value: data.KeyValue{
+			Public:  k.Public[:],
+			Private: k.Private[:],
+		},
 	}
 }
 
@@ -91,8 +94,13 @@ var validRoles = map[string]struct{}{
 	"timestamp": {},
 }
 
+func ValidRole(name string) bool {
+	_, ok := validRoles[name]
+	return ok
+}
+
 func (db *DB) AddRole(name string, r *data.Role) error {
-	if _, ok := validRoles[name]; !ok {
+	if !ValidRole(name) {
 		return ErrInvalidRole
 	}
 	if r.Threshold < 1 {

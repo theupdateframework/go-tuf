@@ -28,13 +28,18 @@ type Key struct {
 }
 
 func (k *Key) ID() string {
-	data, _ := cjson.Marshal(k)
+	// create a copy so the private key is not included
+	data, _ := cjson.Marshal(&Key{
+		Type:  k.Type,
+		Value: KeyValue{Public: k.Value.Public},
+	})
 	digest := sha256.Sum256(data)
 	return hex.EncodeToString(digest[:])
 }
 
 type KeyValue struct {
-	Public HexBytes `json:"public"`
+	Public  HexBytes `json:"public"`
+	Private HexBytes `json:"private,omitempty"`
 }
 
 type Root struct {
@@ -45,6 +50,16 @@ type Root struct {
 	Roles   map[string]*Role `json:"role"`
 
 	ConsistentSnapshot bool `json:"consistent_snapshot"`
+}
+
+func NewRoot() *Root {
+	return &Root{
+		Type:    "root",
+		Version: 1,
+		Expires: time.Now().AddDate(1, 0, 0).UTC(),
+		Keys:    make(map[string]*Key),
+		Roles:   make(map[string]*Role),
+	}
 }
 
 type Role struct {
@@ -61,6 +76,15 @@ type Snapshot struct {
 	Meta    Files     `json:"meta"`
 }
 
+func NewSnapshot() *Snapshot {
+	return &Snapshot{
+		Type:    "snapshot",
+		Version: 1,
+		Expires: time.Now().AddDate(0, 0, 7).UTC(),
+		Meta:    make(Files),
+	}
+}
+
 type FileMeta struct {
 	Length int64                  `json:"length"`
 	Hashes map[string]HexBytes    `json:"hashes"`
@@ -74,9 +98,27 @@ type Targets struct {
 	Targets Files     `json:"targets"`
 }
 
+func NewTargets() *Targets {
+	return &Targets{
+		Type:    "targets",
+		Version: 1,
+		Expires: time.Now().AddDate(0, 3, 0).UTC(),
+		Targets: make(Files),
+	}
+}
+
 type Timestamp struct {
 	Type    string    `json:"_type"`
 	Version int       `json:"version"`
 	Expires time.Time `json:"expires"`
 	Meta    Files     `json:"meta"`
+}
+
+func NewTimestamp() *Timestamp {
+	return &Timestamp{
+		Type:    "timestamp",
+		Version: 1,
+		Expires: time.Now().AddDate(0, 0, 1).UTC(),
+		Meta:    make(Files),
+	}
 }

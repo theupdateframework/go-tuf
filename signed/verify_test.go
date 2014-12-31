@@ -23,11 +23,14 @@ func (VerifySuite) Test(c *C) {
 		keys  []*data.Key
 		roles map[string]*data.Role
 		s     *data.Signed
+		ver   int
+		typ   string
 		role  string
 		err   error
 		mut   func(*test)
 	}
 
+	minVer := 10
 	tests := []test{
 		{
 			name: "no signatures",
@@ -118,14 +121,30 @@ func (VerifySuite) Test(c *C) {
 			},
 			err: ErrRoleThreshold,
 		},
+		{
+			name: "wrong type",
+			typ:  "bar",
+			err:  ErrWrongType,
+		},
+		{
+			name: "low version",
+			ver:  minVer - 1,
+			err:  ErrLowVersion,
+		},
 	}
 	for _, t := range tests {
 		if t.role == "" {
 			t.role = "root"
 		}
+		if t.ver == 0 {
+			t.ver = minVer
+		}
+		if t.typ == "" {
+			t.typ = t.role
+		}
 		if t.keys == nil && t.s == nil {
 			k, _ := keys.NewKey()
-			t.s, _ = Marshal(&struct{}{}, k)
+			t.s, _ = Marshal(&signedMeta{Type: t.typ, Version: t.ver}, k)
 			t.keys = []*data.Key{k.Serialize()}
 		}
 		if t.roles == nil {
@@ -150,7 +169,7 @@ func (VerifySuite) Test(c *C) {
 			c.Assert(err, IsNil)
 		}
 
-		err := Verify(t.s, t.role, db)
+		err := Verify(t.s, t.role, minVer, db)
 		c.Assert(err, Equals, t.err, Commentf("name = %s", t.name))
 	}
 }
