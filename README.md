@@ -1,4 +1,4 @@
-# go-tuf
+# go-tuf [![Build Status](https://travis-ci.org/flynn/go-tuf.svg?branch=master)](https://travis-ci.org/flynn/go-tuf)
 
 This is a Go implementation of [The Update Framework (TUF)](http://theupdateframework.com/),
 a framework for securing software update systems.
