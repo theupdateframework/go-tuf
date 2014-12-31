@@ -11,11 +11,11 @@ func (e ErrMissingMetadata) Error() string {
 }
 
 type ErrFileNotFound struct {
-	path string
+	Path string
 }
 
 func (e ErrFileNotFound) Error() string {
-	return fmt.Sprintf("tuf: file not found %s", e.path)
+	return fmt.Sprintf("tuf: file not found %s", e.Path)
 }
 
 type ErrInsufficientKeys struct {
