@@ -159,7 +159,7 @@ func (r *Repo) GenKey(keyRole string) error {
 	if err != nil {
 		return err
 	}
-	if err := r.local.SaveKey(keyRole, key.Serialize()); err != nil {
+	if err := r.local.SaveKey(keyRole, key.SerializePrivate()); err != nil {
 		return err
 	}
 

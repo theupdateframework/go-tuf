@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/agl/ed25519"
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/keys"
 	"github.com/flynn/go-tuf/signed"
@@ -115,10 +116,13 @@ func (RepoSuite) TestGenKey(c *C) {
 	}
 	c.Assert(rootRole.KeyIDs, HasLen, 1)
 	keyID := rootRole.KeyIDs[0]
-	_, ok = root.Keys[keyID]
+	k, ok := root.Keys[keyID]
 	if !ok {
 		c.Fatal("missing key")
 	}
+	c.Assert(k.ID(), Equals, keyID)
+	c.Assert(k.Value.Public, HasLen, ed25519.PublicKeySize)
+	c.Assert(k.Value.Private, IsNil)
 
 	// check root key + role are in db
 	db, err := r.db()

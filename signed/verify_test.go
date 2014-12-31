@@ -74,9 +74,8 @@ func (VerifySuite) Test(c *C) {
 			name: "more than enough signatures",
 			mut: func(t *test) {
 				k, _ := keys.NewKey()
-				key := k.Serialize()
-				Sign(t.s, key)
-				t.keys = append(t.keys, key)
+				Sign(t.s, k.SerializePrivate())
+				t.keys = append(t.keys, k.Serialize())
 				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, k.ID)
 			},
 		},
@@ -145,9 +144,8 @@ func (VerifySuite) Test(c *C) {
 		}
 		if t.keys == nil && t.s == nil {
 			k, _ := keys.NewKey()
-			key := k.Serialize()
-			t.s, _ = Marshal(&signedMeta{Type: t.typ, Version: t.ver}, key)
-			t.keys = []*data.Key{key}
+			t.s, _ = Marshal(&signedMeta{Type: t.typ, Version: t.ver}, k.SerializePrivate())
+			t.keys = []*data.Key{k.Serialize()}
 		}
 		if t.roles == nil {
 			t.roles = map[string]*data.Role{

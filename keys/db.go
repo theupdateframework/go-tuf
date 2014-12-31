@@ -39,6 +39,13 @@ type Key struct {
 
 func (k *Key) Serialize() *data.Key {
 	return &data.Key{
+		Type:  "ed25519",
+		Value: data.KeyValue{Public: k.Public[:]},
+	}
+}
+
+func (k *Key) SerializePrivate() *data.Key {
+	return &data.Key{
 		Type: "ed25519",
 		Value: data.KeyValue{
 			Public:  k.Public[:],
