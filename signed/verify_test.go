@@ -74,8 +74,9 @@ func (VerifySuite) Test(c *C) {
 			name: "more than enough signatures",
 			mut: func(t *test) {
 				k, _ := keys.NewKey()
-				Sign(t.s, k)
-				t.keys = append(t.keys, k.Serialize())
+				key := k.Serialize()
+				Sign(t.s, key)
+				t.keys = append(t.keys, key)
 				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, k.ID)
 			},
 		},
@@ -91,14 +92,14 @@ func (VerifySuite) Test(c *C) {
 			name: "unknown key",
 			mut: func(t *test) {
 				k, _ := keys.NewKey()
-				Sign(t.s, k)
+				Sign(t.s, k.Serialize())
 			},
 		},
 		{
 			name: "unknown key below threshold",
 			mut: func(t *test) {
 				k, _ := keys.NewKey()
-				Sign(t.s, k)
+				Sign(t.s, k.Serialize())
 				t.roles["root"].Threshold = 2
 			},
 			err: ErrRoleThreshold,
@@ -107,7 +108,7 @@ func (VerifySuite) Test(c *C) {
 			name: "unknown keys in db",
 			mut: func(t *test) {
 				k, _ := keys.NewKey()
-				Sign(t.s, k)
+				Sign(t.s, k.Serialize())
 				t.keys = append(t.keys, k.Serialize())
 			},
 		},
@@ -115,7 +116,7 @@ func (VerifySuite) Test(c *C) {
 			name: "unknown keys in db below threshold",
 			mut: func(t *test) {
 				k, _ := keys.NewKey()
-				Sign(t.s, k)
+				Sign(t.s, k.Serialize())
 				t.keys = append(t.keys, k.Serialize())
 				t.roles["root"].Threshold = 2
 			},
@@ -144,8 +145,9 @@ func (VerifySuite) Test(c *C) {
 		}
 		if t.keys == nil && t.s == nil {
 			k, _ := keys.NewKey()
-			t.s, _ = Marshal(&signedMeta{Type: t.typ, Version: t.ver}, k)
-			t.keys = []*data.Key{k.Serialize()}
+			key := k.Serialize()
+			t.s, _ = Marshal(&signedMeta{Type: t.typ, Version: t.ver}, key)
+			t.keys = []*data.Key{key}
 		}
 		if t.roles == nil {
 			t.roles = map[string]*data.Role{
