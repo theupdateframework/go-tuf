@@ -176,6 +176,26 @@ func (r *Repo) GenKey(keyRole string) error {
 	return r.setMeta("root.json", root)
 }
 
+func (r *Repo) RootKeys() ([]*data.Key, error) {
+	root, err := r.root()
+	if err != nil {
+		return nil, err
+	}
+	role, ok := root.Roles["root"]
+	if !ok {
+		return nil, nil
+	}
+	rootKeys := make([]*data.Key, len(role.KeyIDs))
+	for i, id := range role.KeyIDs {
+		key, ok := root.Keys[id]
+		if !ok {
+			return nil, fmt.Errorf("tuf: invalid root metadata")
+		}
+		rootKeys[i] = key
+	}
+	return rootKeys, nil
+}
+
 func (r *Repo) setMeta(name string, meta interface{}) error {
 	keys, err := r.local.GetKeys(strings.TrimSuffix(name, ".json"))
 	if err != nil {

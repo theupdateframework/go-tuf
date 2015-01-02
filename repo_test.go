@@ -127,9 +127,9 @@ func (RepoSuite) TestGenKey(c *C) {
 	// check root key + role are in db
 	db, err := r.db()
 	c.Assert(err, IsNil)
-	key := db.GetKey(keyID)
-	c.Assert(key, NotNil)
-	c.Assert(key.ID, Equals, keyID)
+	rootKey := db.GetKey(keyID)
+	c.Assert(rootKey, NotNil)
+	c.Assert(rootKey.ID, Equals, keyID)
 	role := db.GetRole("root")
 	c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{keyID: {}})
 
@@ -138,6 +138,14 @@ func (RepoSuite) TestGenKey(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(localKeys, HasLen, 1)
 	c.Assert(localKeys[0].ID(), Equals, keyID)
+
+	// check RootKeys() is correct
+	rootKeys, err := r.RootKeys()
+	c.Assert(err, IsNil)
+	c.Assert(rootKeys, HasLen, 1)
+	c.Assert(rootKeys[0].ID(), Equals, rootKey.ID)
+	c.Assert(rootKeys[0].Value.Public, DeepEquals, rootKey.Serialize().Value.Public)
+	c.Assert(rootKeys[0].Value.Private, IsNil)
 
 	// generate two targets keys
 	c.Assert(r.GenKey("targets"), IsNil)
@@ -162,12 +170,18 @@ func (RepoSuite) TestGenKey(c *C) {
 		if !ok {
 			c.Fatal("missing key")
 		}
-		key = db.GetKey(id)
+		key := db.GetKey(id)
 		c.Assert(key, NotNil)
 		c.Assert(key.ID, Equals, id)
 	}
 	role = db.GetRole("targets")
 	c.Assert(role.KeyIDs, DeepEquals, targetKeyIDs)
+
+	// check RootKeys() is unchanged
+	rootKeys, err = r.RootKeys()
+	c.Assert(err, IsNil)
+	c.Assert(rootKeys, HasLen, 1)
+	c.Assert(rootKeys[0].ID(), Equals, rootKey.ID)
 
 	// check the keys were saved correctly
 	localKeys, err = local.GetKeys("targets")
