@@ -81,6 +81,11 @@ Recreates the `targets` manifest based on the files in `repository/targets`.
 
 Removes all staged manifests and targets.
 
+#### `tuf root-keys`
+
+Outputs a JSON serialized array of root keys to STDOUT. The resulting JSON
+should be distributed to clients for performing initial updates.
+
 For a list of supported commands, run `tuf help` from the command line.
 
 ### Examples
