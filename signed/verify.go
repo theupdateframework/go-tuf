@@ -96,7 +96,11 @@ var checkExpires = func(t time.Time) error {
 	return nil
 }
 
-func Unmarshal(s *data.Signed, v interface{}, role string, minVersion int, db *keys.DB) error {
+func Unmarshal(b []byte, v interface{}, role string, minVersion int, db *keys.DB) error {
+	s := &data.Signed{}
+	if err := json.Unmarshal(b, s); err != nil {
+		return err
+	}
 	if err := Verify(s, role, minVersion, db); err != nil {
 		return err
 	}

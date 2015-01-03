@@ -10,9 +10,13 @@ import (
 	"strings"
 
 	"github.com/flynn/go-tuf/data"
+	"github.com/flynn/go-tuf/util"
 )
 
 func MemoryStore(meta map[string]json.RawMessage, files map[string][]byte) LocalStore {
+	if meta == nil {
+		meta = make(map[string]json.RawMessage)
+	}
 	return &memoryStore{
 		meta:  meta,
 		files: files,
@@ -35,20 +39,12 @@ func (m *memoryStore) SetMeta(name string, meta json.RawMessage) error {
 	return nil
 }
 
-type bytesReadCloser struct {
-	*bytes.Reader
-}
-
-func (b bytesReadCloser) Close() error {
-	return nil
-}
-
 func (m *memoryStore) GetStagedTarget(path string) (io.ReadCloser, error) {
 	data, ok := m.files[path]
 	if !ok {
 		return nil, ErrFileNotFound{path}
 	}
-	return bytesReadCloser{bytes.NewReader(data)}, nil
+	return util.BytesReadCloser{bytes.NewReader(data)}, nil
 }
 
 func (m *memoryStore) Commit(meta map[string]json.RawMessage, targets data.Files) error {
