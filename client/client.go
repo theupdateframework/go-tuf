@@ -261,6 +261,10 @@ func (c *Client) getLocalMeta() error {
 	return nil
 }
 
+// maxMetaSize is the maximum number of bytes that will be downloaded when
+// getting remote metadata without knowing it's length.
+const maxMetaSize = 50 * 1024
+
 // downloadMeta downloads top-level metadata from remote storage and verifies
 // it using the given file metadata.
 func (c *Client) downloadMeta(name string, m *data.FileMeta) ([]byte, error) {
@@ -278,9 +282,9 @@ func (c *Client) downloadMeta(name string, m *data.FileMeta) ([]byte, error) {
 	defer r.Close()
 
 	// if m is nil (e.g. when downloading timestamp.json, which has unknown
-	// size), just read the entire stream and return it
+	// size), just read the stream (up to a sane maximum) and return it
 	if m == nil {
-		b, err := ioutil.ReadAll(r)
+		b, err := ioutil.ReadAll(io.LimitReader(r, maxMetaSize))
 		if err != nil {
 			return nil, err
 		}
