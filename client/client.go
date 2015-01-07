@@ -74,9 +74,9 @@ func NewClient(local LocalStore, remote RemoteStore) *Client {
 // Init initializes a local repository.
 //
 // The latest root.json is fetched from remote storage, verified using rootKeys
-// and then saved in local storage. It is expected that rootKeys were securely
-// distributed with the software being updated.
-func (c *Client) Init(rootKeys []*data.Key) error {
+// and threshold, and then saved in local storage. It is expected that rootKeys
+// were securely distributed with the software being updated.
+func (c *Client) Init(rootKeys []*data.Key, threshold int) error {
 	rootJSON, err := c.downloadMeta("root.json", nil)
 	if err != nil {
 		return err
@@ -91,7 +91,10 @@ func (c *Client) Init(rootKeys []*data.Key) error {
 			return err
 		}
 	}
-	c.db.AddRole("root", &data.Role{Threshold: 1, KeyIDs: rootKeyIDs})
+	role := &data.Role{Threshold: threshold, KeyIDs: rootKeyIDs}
+	if err := c.db.AddRole("root", role); err != nil {
+		return err
+	}
 
 	if err := c.decodeRoot(rootJSON); err != nil {
 		return err

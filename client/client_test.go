@@ -8,6 +8,8 @@ import (
 
 	"github.com/flynn/go-tuf"
 	"github.com/flynn/go-tuf/data"
+	"github.com/flynn/go-tuf/keys"
+	"github.com/flynn/go-tuf/signed"
 	"github.com/flynn/go-tuf/util"
 	. "gopkg.in/check.v1"
 )
@@ -89,7 +91,7 @@ func (s *ClientSuite) rootKeys(c *C) []*data.Key {
 
 func (s *ClientSuite) newClient(c *C) *Client {
 	client := NewClient(MemoryLocalStore(), s.remote)
-	c.Assert(client.Init(s.rootKeys(c)), IsNil)
+	c.Assert(client.Init(s.rootKeys(c), 1), IsNil)
 	return client
 }
 
@@ -113,12 +115,18 @@ func assertUpdatedFiles(c *C, files data.Files, names []string) {
 func (s *ClientSuite) TestInit(c *C) {
 	client := NewClient(MemoryLocalStore(), s.remote)
 
+	// check Init() returns keys.ErrInvalidThreshold with an invalid threshold
+	c.Assert(client.Init(s.rootKeys(c), 0), Equals, keys.ErrInvalidThreshold)
+
+	// check Init() returns signed.ErrRoleThreshold when not enough keys
+	c.Assert(client.Init(s.rootKeys(c), 2), Equals, signed.ErrRoleThreshold)
+
 	// check Update() returns ErrNoRootKeys when uninitialized
 	_, err := client.Update()
 	c.Assert(err, Equals, ErrNoRootKeys)
 
 	// check Update() does not return ErrNoRootKeys after initialization
-	c.Assert(client.Init(s.rootKeys(c)), IsNil)
+	c.Assert(client.Init(s.rootKeys(c), 1), IsNil)
 	_, err = client.Update()
 	c.Assert(err, Not(Equals), ErrNoRootKeys)
 }
