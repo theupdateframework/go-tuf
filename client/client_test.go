@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"io"
+	"io/ioutil"
 	"testing"
 
 	"github.com/flynn/go-tuf"
@@ -32,7 +33,7 @@ func (f FakeRemoteStore) Get(name string, size int64) (io.ReadCloser, error) {
 	if size > 0 && int64(len(b)) != size {
 		return nil, ErrWrongSize
 	}
-	return util.BytesReadCloser{bytes.NewReader(b)}, nil
+	return ioutil.NopCloser(bytes.NewReader(b)), nil
 }
 
 var targetFiles = map[string][]byte{

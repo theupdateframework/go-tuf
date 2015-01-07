@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/util"
 )
 
 func MemoryStore(meta map[string]json.RawMessage, files map[string][]byte) LocalStore {
@@ -44,7 +43,7 @@ func (m *memoryStore) GetStagedTarget(path string) (io.ReadCloser, error) {
 	if !ok {
 		return nil, ErrFileNotFound{path}
 	}
-	return util.BytesReadCloser{bytes.NewReader(data)}, nil
+	return ioutil.NopCloser(bytes.NewReader(data)), nil
 }
 
 func (m *memoryStore) Commit(meta map[string]json.RawMessage, targets data.Files) error {

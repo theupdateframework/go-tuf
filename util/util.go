@@ -1,21 +1,12 @@
 package util
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/sha512"
 	"io"
 
 	"github.com/flynn/go-tuf/data"
 )
-
-type BytesReadCloser struct {
-	*bytes.Reader
-}
-
-func (b BytesReadCloser) Close() error {
-	return nil
-}
 
 func FileMetaEqual(actual data.FileMeta, expected data.FileMeta) bool {
 	if actual.Length != expected.Length {
