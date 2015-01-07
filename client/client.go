@@ -96,7 +96,7 @@ func (c *Client) Init(rootKeys []*data.Key, threshold int) error {
 		return err
 	}
 
-	if err := c.decodeRoot(rootJSON); err != nil {
+	if err := c.verifyRoot(rootJSON); err != nil {
 		return err
 	}
 
@@ -158,7 +158,7 @@ func (c *Client) Update() (data.Files, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := c.decodeRoot(rootJSON); err != nil {
+		if err := c.verifyRoot(rootJSON); err != nil {
 			return nil, err
 		}
 		if err := c.local.SetMeta("root.json", rootJSON); err != nil {
@@ -304,16 +304,17 @@ func (c *Client) downloadMeta(name string, m *data.FileMeta) ([]byte, error) {
 	return buf, nil
 }
 
-// decodeRoot decodes and verifies root metadata.
-func (c *Client) decodeRoot(b json.RawMessage) error {
+// verifyRoot verifies root metadata.
+func (c *Client) verifyRoot(b json.RawMessage) error {
 	var minVer int
 	if c.root != nil {
 		minVer = c.root.Version
 	}
-	if err := signed.Unmarshal(b, &data.Root{}, "root", minVer, c.db); err != nil {
+	s := &data.Signed{}
+	if err := json.Unmarshal(b, s); err != nil {
 		return err
 	}
-	return nil
+	return signed.Verify(s, "root", minVer, c.db)
 }
 
 // decodeSnapshot decodes and verifies snapshot metadata, and returns the new
