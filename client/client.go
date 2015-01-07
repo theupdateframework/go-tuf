@@ -298,8 +298,8 @@ func (c *Client) downloadMeta(name string, m *data.FileMeta) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !util.FileMetaEqual(meta, *m) {
-		return nil, ErrChecksumFailed
+	if err := util.FileMetaEqual(meta, *m); err != nil {
+		return nil, ErrDownloadFailed{name, err}
 	}
 	return buf, nil
 }
@@ -346,8 +346,10 @@ func (c *Client) decodeTargets(b json.RawMessage) (data.Files, error) {
 	}
 	updatedTargets := make(data.Files)
 	for path, meta := range targets.Targets {
-		if curr, ok := currTargets[path]; ok && util.FileMetaEqual(curr, meta) {
-			continue
+		if curr, ok := currTargets[path]; ok {
+			if err := util.FileMetaEqual(curr, meta); err == nil {
+				continue
+			}
 		}
 		updatedTargets[path] = meta
 	}
@@ -378,7 +380,8 @@ func (c *Client) hasMeta(name string, m data.FileMeta) bool {
 	if err != nil {
 		return false
 	}
-	return util.FileMetaEqual(meta, m)
+	err = util.FileMetaEqual(meta, m)
+	return err == nil
 }
 
 func (c *Client) Expires() time.Time {

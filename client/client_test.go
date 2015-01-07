@@ -108,7 +108,7 @@ func assertUpdatedFiles(c *C, files data.Files, names []string) {
 		if !ok {
 			c.Fatalf("expected file update for %s", name)
 		}
-		c.Assert(util.FileMetaEqual(file, meta), Equals, true)
+		c.Assert(util.FileMetaEqual(file, meta), IsNil)
 	}
 }
 
@@ -178,4 +178,4 @@ func (s *ClientSuite) TestNewTargets(c *C) {
 // * Test new root data (e.g. new targets keys)
 // * Test locally expired metadata is ok
 // * Test invalid timestamp / snapshot signature downloads root.json
-// * Test invalid hash returns ErrChecksumFailed
+// * Test invalid hash returns ErrDownloadFailed

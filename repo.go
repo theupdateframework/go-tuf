@@ -3,7 +3,6 @@ package tuf
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -360,8 +359,8 @@ func (r *Repo) Commit() error {
 		if err != nil {
 			return err
 		}
-		if !util.FileMetaEqual(actual, expected) {
-			return fmt.Errorf("tuf: invalid %s hash in snapshot.json", name)
+		if err := util.FileMetaEqual(actual, expected); err != nil {
+			return fmt.Errorf("tuf: invalid %s in snapshot.json: %s", name, err)
 		}
 	}
 
@@ -374,8 +373,8 @@ func (r *Repo) Commit() error {
 	if err != nil {
 		return err
 	}
-	if !util.FileMetaEqual(snapshotMeta, timestamp.Meta["snapshot.json"]) {
-		return errors.New("tuf: invalid snapshot.json hash in timestamp.json")
+	if err := util.FileMetaEqual(snapshotMeta, timestamp.Meta["snapshot.json"]); err != nil {
+		return fmt.Errorf("tuf: invalid snapshot.json in timestamp.json: %s", err)
 	}
 
 	// verify all signatures are correct
