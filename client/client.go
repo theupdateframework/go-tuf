@@ -40,7 +40,7 @@ type RemoteStore interface {
 	//
 	// `file` should be relative to the root of remote repository (e.g.
 	// "root.json" or "targets/path/to/target/file.txt")
-	Get(file string) (io.ReadCloser, error)
+	Get(file string, size int64) (io.ReadCloser, error)
 }
 
 // Client provides methods for fetching updates from a remote repository and
@@ -261,7 +261,11 @@ func (c *Client) getLocalMeta() error {
 // downloadMeta downloads top-level metadata from remote storage and verifies
 // it using the given file metadata.
 func (c *Client) downloadMeta(name string, m *data.FileMeta) ([]byte, error) {
-	r, err := c.remote.Get(name)
+	var size int64
+	if m != nil {
+		size = m.Length
+	}
+	r, err := c.remote.Get(name, size)
 	if err != nil {
 		if err == ErrNotFound {
 			return nil, ErrMissingRemoteMetadata{name}

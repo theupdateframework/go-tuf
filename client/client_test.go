@@ -24,10 +24,13 @@ var _ = Suite(&ClientSuite{})
 
 type FakeRemoteStore map[string][]byte
 
-func (f FakeRemoteStore) Get(name string) (io.ReadCloser, error) {
+func (f FakeRemoteStore) Get(name string, size int64) (io.ReadCloser, error) {
 	b, ok := f[name]
 	if !ok {
 		return nil, ErrNotFound
+	}
+	if size > 0 && int64(len(b)) != size {
+		return nil, ErrWrongSize
 	}
 	return util.BytesReadCloser{bytes.NewReader(b)}, nil
 }
