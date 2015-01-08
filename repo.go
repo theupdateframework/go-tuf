@@ -2,10 +2,7 @@ package tuf
 
 import (
 	"bytes"
-	"crypto/hmac"
-	"crypto/sha512"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -14,6 +11,7 @@ import (
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/keys"
 	"github.com/flynn/go-tuf/signed"
+	"github.com/flynn/go-tuf/util"
 )
 
 type CompressionType uint8
@@ -275,7 +273,7 @@ func (r *Repo) AddTarget(path string, custom map[string]interface{}) error {
 		return err
 	}
 	defer target.Close()
-	t.Targets[path], err = generateFileMeta(target)
+	t.Targets[path], err = util.GenerateFileMeta(target)
 	if err != nil {
 		return err
 	}
@@ -361,8 +359,8 @@ func (r *Repo) Commit() error {
 		if err != nil {
 			return err
 		}
-		if !fileMetaEqual(actual, expected) {
-			return fmt.Errorf("tuf: invalid %s hash in snapshot.json", name)
+		if err := util.FileMetaEqual(actual, expected); err != nil {
+			return fmt.Errorf("tuf: invalid %s in snapshot.json: %s", name, err)
 		}
 	}
 
@@ -375,8 +373,8 @@ func (r *Repo) Commit() error {
 	if err != nil {
 		return err
 	}
-	if !fileMetaEqual(snapshotMeta, timestamp.Meta["snapshot.json"]) {
-		return errors.New("tuf: invalid snapshot.json hash in timestamp.json")
+	if err := util.FileMetaEqual(snapshotMeta, timestamp.Meta["snapshot.json"]); err != nil {
+		return fmt.Errorf("tuf: invalid snapshot.json in timestamp.json: %s", err)
 	}
 
 	// verify all signatures are correct
@@ -394,18 +392,6 @@ func (r *Repo) Commit() error {
 		return err
 	}
 	return r.local.Commit(r.meta, t.Targets)
-}
-
-func fileMetaEqual(actual data.FileMeta, expected data.FileMeta) bool {
-	if actual.Length != expected.Length {
-		return false
-	}
-	for typ, hash := range expected.Hashes {
-		if !hmac.Equal(actual.Hashes[typ], hash) {
-			return false
-		}
-	}
-	return true
 }
 
 func (r *Repo) Clean() error {
@@ -438,22 +424,5 @@ func (r *Repo) fileMeta(name string) (data.FileMeta, error) {
 	if !ok {
 		return data.FileMeta{}, ErrMissingMetadata{name}
 	}
-	return generateFileMeta(bytes.NewReader(b))
-}
-
-func generateFileMeta(r io.Reader) (data.FileMeta, error) {
-	h, n, err := hash512(r)
-	if err != nil {
-		return data.FileMeta{}, err
-	}
-	return data.FileMeta{Length: n, Hashes: map[string]data.HexBytes{"sha512": h}}, nil
-}
-
-func hash512(r io.Reader) ([]byte, int64, error) {
-	h := sha512.New()
-	n, err := io.Copy(h, r)
-	if err != nil {
-		return nil, 0, err
-	}
-	return h.Sum(nil), n, nil
+	return util.GenerateFileMeta(bytes.NewReader(b))
 }

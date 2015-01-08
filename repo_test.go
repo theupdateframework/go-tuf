@@ -267,14 +267,19 @@ func (RepoSuite) TestCommit(c *C) {
 	// commit with an invalid root hash in snapshot.json due to new key creation
 	c.Assert(r.GenKey("targets"), IsNil)
 	c.Assert(r.Sign("targets.json"), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid root.json hash in snapshot.json"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid root.json in snapshot.json: wrong length"))
 
 	// commit with an invalid targets hash in snapshot.json
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.AddTarget("bar.txt", nil), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json hash in snapshot.json"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length"))
 
 	// commit with an invalid timestamp
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid snapshot.json hash in timestamp.json"))
+	// TODO: Change this test once Snapshot() supports compression and we
+	//       can guarantee the error will end in "wrong length" by
+	//       compressing a file and thus changing the size of snapshot.json
+	err = r.Commit()
+	c.Assert(err, NotNil)
+	c.Assert(err.Error()[0:44], Equals, "tuf: invalid snapshot.json in timestamp.json")
 }
