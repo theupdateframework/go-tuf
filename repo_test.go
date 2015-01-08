@@ -223,12 +223,39 @@ func (RepoSuite) TestSign(c *C) {
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
 
+	// signing with no keys returns ErrInsufficientKeys
 	c.Assert(r.Sign("root.json"), Equals, ErrInsufficientKeys{"root.json"})
 
+	checkSigIDs := func(keyIDs ...string) {
+		rootJSON, ok := meta["root.json"]
+		if !ok {
+			c.Fatal("missing root.json")
+		}
+		s := &data.Signed{}
+		c.Assert(json.Unmarshal(rootJSON, s), IsNil)
+		c.Assert(s.Signatures, HasLen, len(keyIDs))
+		for i, id := range keyIDs {
+			c.Assert(s.Signatures[i].KeyID, Equals, id)
+		}
+	}
+
+	// signing with an available key generates a signature
 	key, err := keys.NewKey()
 	c.Assert(err, IsNil)
-	c.Assert(local.SaveKey("root", key.Serialize()), IsNil)
+	c.Assert(local.SaveKey("root", key.SerializePrivate()), IsNil)
 	c.Assert(r.Sign("root.json"), IsNil)
+	checkSigIDs(key.ID)
+
+	// signing again does not generate a duplicate signature
+	c.Assert(r.Sign("root.json"), IsNil)
+	checkSigIDs(key.ID)
+
+	// signing with a new available key generates another signature
+	newKey, err := keys.NewKey()
+	c.Assert(err, IsNil)
+	c.Assert(local.SaveKey("root", newKey.SerializePrivate()), IsNil)
+	c.Assert(r.Sign("root.json"), IsNil)
+	checkSigIDs(key.ID, newKey.ID)
 }
 
 func (RepoSuite) TestCommit(c *C) {

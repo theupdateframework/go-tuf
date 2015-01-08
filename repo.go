@@ -211,7 +211,6 @@ func (r *Repo) setMeta(name string, meta interface{}) error {
 	return r.local.SetMeta(name, b)
 }
 
-// TODO: Ensure only one signature per key ID
 func (r *Repo) Sign(name string) error {
 	role := strings.TrimSuffix(name, ".json")
 	if !keys.ValidRole(role) {
