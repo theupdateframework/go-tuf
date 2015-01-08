@@ -11,9 +11,7 @@ import (
 	"github.com/flynn/go-tuf/data"
 )
 
-var (
-	ErrWrongLength = errors.New("wrong length")
-)
+var ErrWrongLength = errors.New("wrong length")
 
 type ErrWrongHash struct {
 	Type     string
