@@ -30,10 +30,13 @@ type FakeRemoteStore map[string][]byte
 func (f FakeRemoteStore) Get(name string, size int64) (io.ReadCloser, error) {
 	b, ok := f[name]
 	if !ok {
-		return nil, ErrNotFound
+		return nil, ErrNotFound{name}
 	}
-	if size > 0 && int64(len(b)) != size {
-		return nil, ErrWrongSize
+	if size > 0 {
+		actual := int64(len(b))
+		if actual != size {
+			return nil, ErrWrongSize{name, actual, size}
+		}
 	}
 	return ioutil.NopCloser(bytes.NewReader(b)), nil
 }
@@ -149,7 +152,7 @@ func (s *ClientSuite) TestNoChangeUpdate(c *C) {
 	_, err := client.Update()
 	c.Assert(err, IsNil)
 	_, err = client.Update()
-	c.Assert(err, Equals, ErrLatest)
+	c.Assert(IsLatestSnapshot(err), Equals, true)
 }
 
 func (s *ClientSuite) TestNewTargets(c *C) {
