@@ -3,7 +3,6 @@ package client
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io"
 	"io/ioutil"
 	"time"
@@ -12,14 +11,6 @@ import (
 	"github.com/flynn/go-tuf/keys"
 	"github.com/flynn/go-tuf/signed"
 	"github.com/flynn/go-tuf/util"
-)
-
-var (
-	ErrNotFound       = errors.New("tuf: file not found")
-	ErrLatest         = errors.New("tuf: the current version is the latest")
-	ErrWrongSize      = errors.New("tuf: unexpected file size")
-	ErrNoRootKeys     = errors.New("tuf: no root keys found in local meta store")
-	ErrChecksumFailed = errors.New("tuf: checksum failed")
 )
 
 // LocalStore is local storage for downloaded top-level metadata.
@@ -135,9 +126,9 @@ func (c *Client) Update() (data.Files, error) {
 		return nil, err
 	}
 
-	// Return ErrLatest if we already have the latest snapshot.json
+	// Return ErrLatestSnapshot if we already have the latest snapshot.json
 	if c.hasMeta("snapshot.json", snapshotMeta) {
-		return nil, ErrLatest
+		return nil, ErrLatestSnapshot{c.localSnapshotVer}
 	}
 
 	// Get snapshot.json, then extract root.json and targets.json file meta.
@@ -278,7 +269,7 @@ func (c *Client) downloadMeta(name string, m *data.FileMeta) ([]byte, error) {
 	}
 	r, err := c.remote.Get(name, size)
 	if err != nil {
-		if err == ErrNotFound {
+		if IsNotFound(err) {
 			return nil, ErrMissingRemoteMetadata{name}
 		}
 		return nil, err
