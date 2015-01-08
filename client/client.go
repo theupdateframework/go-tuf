@@ -49,12 +49,15 @@ type Client struct {
 	local  LocalStore
 	remote RemoteStore
 
-	// The following four fields represent decoded metatdata from
+	// The following four fields represent the versions of metatdata from
 	// local storage
-	root      *data.Root
-	targets   *data.Targets
-	snapshot  *data.Snapshot
-	timestamp *data.Timestamp
+	localRootVer      int
+	localTargetsVer   int
+	localSnapshotVer  int
+	localTimestampVer int
+
+	// localTargets is the list of targets from local storage
+	localTargets data.Files
 
 	// localMeta is the raw metadata from local storage and is used to
 	// check whether remote metadata is present locally
@@ -227,7 +230,7 @@ func (c *Client) getLocalMeta() error {
 		if err := signed.Verify(s, "root", 0, db); err != nil {
 			return err
 		}
-		c.root = root
+		c.localRootVer = root.Version
 		c.db = db
 	} else {
 		return ErrNoRootKeys
@@ -238,7 +241,7 @@ func (c *Client) getLocalMeta() error {
 		if err := signed.Unmarshal(snapshotJSON, snapshot, "snapshot", 0, c.db); err != nil {
 			return err
 		}
-		c.snapshot = snapshot
+		c.localSnapshotVer = snapshot.Version
 	}
 
 	if targetsJSON, ok := meta["targets.json"]; ok {
@@ -246,7 +249,8 @@ func (c *Client) getLocalMeta() error {
 		if err := signed.Unmarshal(targetsJSON, targets, "targets", 0, c.db); err != nil {
 			return err
 		}
-		c.targets = targets
+		c.localTargetsVer = targets.Version
+		c.localTargets = targets.Targets
 	}
 
 	if timestampJSON, ok := meta["timestamp.json"]; ok {
@@ -254,7 +258,7 @@ func (c *Client) getLocalMeta() error {
 		if err := signed.Unmarshal(timestampJSON, timestamp, "timestamp", 0, c.db); err != nil {
 			return err
 		}
-		c.timestamp = timestamp
+		c.localTimestampVer = timestamp.Version
 	}
 
 	c.localMeta = meta
@@ -310,26 +314,18 @@ func (c *Client) downloadMeta(name string, m *data.FileMeta) ([]byte, error) {
 
 // verifyRoot verifies root metadata.
 func (c *Client) verifyRoot(b json.RawMessage) error {
-	var minVer int
-	if c.root != nil {
-		minVer = c.root.Version
-	}
 	s := &data.Signed{}
 	if err := json.Unmarshal(b, s); err != nil {
 		return err
 	}
-	return signed.Verify(s, "root", minVer, c.db)
+	return signed.Verify(s, "root", c.localRootVer, c.db)
 }
 
 // decodeSnapshot decodes and verifies snapshot metadata, and returns the new
 // root and targets file meta.
 func (c *Client) decodeSnapshot(b json.RawMessage) (data.FileMeta, data.FileMeta, error) {
-	var minVer int
-	if c.snapshot != nil {
-		minVer = c.snapshot.Version
-	}
 	snapshot := &data.Snapshot{}
-	if err := signed.Unmarshal(b, snapshot, "snapshot", minVer, c.db); err != nil {
+	if err := signed.Unmarshal(b, snapshot, "snapshot", c.localSnapshotVer, c.db); err != nil {
 		return data.FileMeta{}, data.FileMeta{}, err
 	}
 	return snapshot.Meta["root.json"], snapshot.Meta["targets.json"], nil
@@ -338,20 +334,14 @@ func (c *Client) decodeSnapshot(b json.RawMessage) (data.FileMeta, data.FileMeta
 // decodeTargets decodes and verifies targets metadata, and returns updated
 // targets.
 func (c *Client) decodeTargets(b json.RawMessage) (data.Files, error) {
-	var minVer int
-	var currTargets data.Files
-	if c.targets != nil {
-		minVer = c.targets.Version
-		currTargets = c.targets.Targets
-	}
 	targets := &data.Targets{}
-	if err := signed.Unmarshal(b, targets, "targets", minVer, c.db); err != nil {
+	if err := signed.Unmarshal(b, targets, "targets", c.localTargetsVer, c.db); err != nil {
 		return nil, err
 	}
 	updatedTargets := make(data.Files)
 	for path, meta := range targets.Targets {
-		if curr, ok := currTargets[path]; ok {
-			if err := util.FileMetaEqual(curr, meta); err == nil {
+		if local, ok := c.localTargets[path]; ok {
+			if err := util.FileMetaEqual(local, meta); err == nil {
 				continue
 			}
 		}
@@ -363,12 +353,8 @@ func (c *Client) decodeTargets(b json.RawMessage) (data.Files, error) {
 // decodeTimestamp decodes and verifies timestamp metadata, and returns the
 // new snapshot file meta.
 func (c *Client) decodeTimestamp(b json.RawMessage) (data.FileMeta, error) {
-	var minVer int
-	if c.timestamp != nil {
-		minVer = c.timestamp.Version
-	}
 	timestamp := &data.Timestamp{}
-	if err := signed.Unmarshal(b, timestamp, "timestamp", minVer, c.db); err != nil {
+	if err := signed.Unmarshal(b, timestamp, "timestamp", c.localTimestampVer, c.db); err != nil {
 		return data.FileMeta{}, err
 	}
 	return timestamp.Meta["snapshot.json"], nil
