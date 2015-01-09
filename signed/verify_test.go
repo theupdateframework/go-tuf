@@ -2,6 +2,7 @@ package signed
 
 import (
 	"testing"
+	"time"
 
 	"github.com/agl/ed25519"
 	"github.com/flynn/go-tuf/data"
@@ -24,12 +25,17 @@ func (VerifySuite) Test(c *C) {
 		roles map[string]*data.Role
 		s     *data.Signed
 		ver   int
+		exp   *time.Time
 		typ   string
 		role  string
 		err   error
 		mut   func(*test)
 	}
 
+	expires := func(d time.Duration) *time.Time {
+		t := time.Now().Add(d)
+		return &t
+	}
 	minVer := 10
 	tests := []test{
 		{
@@ -131,6 +137,11 @@ func (VerifySuite) Test(c *C) {
 			ver:  minVer - 1,
 			err:  ErrLowVersion,
 		},
+		{
+			name: "expired",
+			exp:  expires(-time.Hour),
+			err:  ErrExpired,
+		},
 	}
 	for _, t := range tests {
 		if t.role == "" {
@@ -139,12 +150,15 @@ func (VerifySuite) Test(c *C) {
 		if t.ver == 0 {
 			t.ver = minVer
 		}
+		if t.exp == nil {
+			t.exp = expires(time.Hour)
+		}
 		if t.typ == "" {
 			t.typ = t.role
 		}
 		if t.keys == nil && t.s == nil {
 			k, _ := keys.NewKey()
-			t.s, _ = Marshal(&signedMeta{Type: t.typ, Version: t.ver}, k.SerializePrivate())
+			t.s, _ = Marshal(&signedMeta{Type: t.typ, Version: t.ver, Expires: *t.exp}, k.SerializePrivate())
 			t.keys = []*data.Key{k.Serialize()}
 		}
 		if t.roles == nil {

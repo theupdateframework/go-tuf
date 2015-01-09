@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/flynn/go-tuf"
 	"github.com/flynn/go-tuf/data"
@@ -21,6 +22,7 @@ func Test(t *testing.T) { TestingT(t) }
 type ClientSuite struct {
 	store  tuf.LocalStore
 	repo   *tuf.Repo
+	local  LocalStore
 	remote FakeRemoteStore
 }
 
@@ -86,6 +88,14 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	}
 }
 
+func (s *ClientSuite) syncLocal(c *C) {
+	meta, err := s.store.GetMeta()
+	c.Assert(err, IsNil)
+	for k, v := range meta {
+		c.Assert(s.local.SetMeta(k, v), IsNil)
+	}
+}
+
 func (s *ClientSuite) syncRemote(c *C) {
 	meta, err := s.store.GetMeta()
 	c.Assert(err, IsNil)
@@ -109,7 +119,8 @@ func (s *ClientSuite) rootKeys(c *C) []*data.Key {
 }
 
 func (s *ClientSuite) newClient(c *C) *Client {
-	client := NewClient(MemoryLocalStore(), s.remote)
+	s.local = MemoryLocalStore()
+	client := NewClient(s.local, s.remote)
 	c.Assert(client.Init(s.rootKeys(c), 1), IsNil)
 	return client
 }
@@ -142,6 +153,15 @@ func (s *ClientSuite) TestInitRootTooLarge(c *C) {
 	client := NewClient(MemoryLocalStore(), s.remote)
 	s.remote["root.json"] = newFakeFile(make([]byte, maxMetaSize+1))
 	c.Assert(client.Init(s.rootKeys(c), 0), Equals, ErrMetaTooLarge{"root.json", maxMetaSize + 1})
+}
+
+func (s *ClientSuite) TestInitRootExpired(c *C) {
+	duration := 100 * time.Millisecond
+	s.repo.GenKeyWithExpires("targets", time.Now().Add(duration))
+	s.syncRemote(c)
+	time.Sleep(duration)
+	client := NewClient(MemoryLocalStore(), s.remote)
+	c.Assert(client.Init(s.rootKeys(c), 1), Equals, ErrExpiredMeta{"root.json"})
 }
 
 func (s *ClientSuite) TestInit(c *C) {
@@ -204,17 +224,111 @@ func (s *ClientSuite) TestNewTargets(c *C) {
 	c.Assert(files, HasLen, 0)
 }
 
+func (s *ClientSuite) TestLocalExpired(c *C) {
+	client := s.newClient(c)
+	duration := 100 * time.Millisecond
+	syncAndWait := func() {
+		s.syncLocal(c)
+		time.Sleep(duration)
+		c.Assert(client.getLocalMeta(), IsNil)
+	}
+
+	// locally expired timestamp.json is ok
+	version := client.localTimestampVer
+	s.repo.TimestampWithExpires(time.Now().Add(duration))
+	syncAndWait()
+	c.Assert(client.localTimestampVer > version, Equals, true)
+
+	// locally expired snapshot.json is ok
+	version = client.localSnapshotVer
+	s.repo.SnapshotWithExpires(tuf.CompressionTypeNone, time.Now().Add(duration))
+	syncAndWait()
+	c.Assert(client.localSnapshotVer > version, Equals, true)
+
+	// locally expired targets.json is ok
+	version = client.localTargetsVer
+	s.repo.AddTargetWithExpires("foo.txt", nil, time.Now().Add(duration))
+	syncAndWait()
+	c.Assert(client.localTargetsVer > version, Equals, true)
+
+	// locally expired root.json is not ok
+	version = client.localRootVer
+	s.repo.GenKeyWithExpires("targets", time.Now().Add(duration))
+	s.syncLocal(c)
+	time.Sleep(duration)
+	c.Assert(client.getLocalMeta(), Equals, signed.ErrExpired)
+	c.Assert(client.localRootVer, Equals, version)
+}
+
 func (s *ClientSuite) TestTimestampTooLarge(c *C) {
 	s.remote["timestamp.json"] = newFakeFile(make([]byte, maxMetaSize+1))
 	_, err := s.newClient(c).Update()
 	c.Assert(err, Equals, ErrMetaTooLarge{"timestamp.json", maxMetaSize + 1})
 }
 
+func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
+	client := s.newClient(c)
+	duration := 100 * time.Millisecond
+
+	// add soon to expire root.json to local storage
+	c.Assert(s.repo.GenKeyWithExpires("timestamp", time.Now().Add(duration)), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	s.syncLocal(c)
+
+	// add far expiring root.json to remote storage
+	c.Assert(s.repo.GenKey("timestamp"), IsNil)
+	s.addRemoteTarget(c, "bar.txt")
+	s.syncRemote(c)
+
+	// wait for local storage to expire then check the update is ok (as
+	// the update will download the non expired remote root.json and
+	// restart itself)
+	time.Sleep(duration)
+	c.Assert(client.getLocalMeta(), Equals, signed.ErrExpired)
+	_, err := client.Update()
+	c.Assert(err, IsNil)
+}
+
+func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
+	client := s.updatedClient(c)
+	duration := 100 * time.Millisecond
+	syncAndWait := func() {
+		s.syncRemote(c)
+		time.Sleep(duration)
+	}
+
+	// expired remote metadata should always be rejected
+	c.Assert(s.repo.TimestampWithExpires(time.Now().Add(duration)), IsNil)
+	syncAndWait()
+	_, err := client.Update()
+	c.Assert(err, DeepEquals, ErrExpiredMeta{"timestamp.json"})
+
+	c.Assert(s.repo.SnapshotWithExpires(tuf.CompressionTypeNone, time.Now().Add(duration)), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	syncAndWait()
+	_, err = client.Update()
+	c.Assert(err, DeepEquals, ErrExpiredMeta{"snapshot.json"})
+
+	c.Assert(s.repo.AddTargetWithExpires("bar.txt", nil, time.Now().Add(duration)), IsNil)
+	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	syncAndWait()
+	_, err = client.Update()
+	c.Assert(err, DeepEquals, ErrExpiredMeta{"targets.json"})
+
+	c.Assert(s.repo.GenKeyWithExpires("timestamp", time.Now().Add(duration)), IsNil)
+	c.Assert(s.repo.RemoveTarget("bar.txt"), IsNil)
+	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	syncAndWait()
+	_, err = client.Update()
+	c.Assert(err, DeepEquals, ErrExpiredMeta{"root.json"})
+}
+
 // TODO: Implement these tests:
 //
 // * Test new timestamp with same snapshot
 // * Test new root data (e.g. new targets keys)
-// * Test locally expired metadata is ok
 // * Test invalid timestamp / snapshot signature downloads root.json
 // * Test invalid hash returns ErrDownloadFailed
 
