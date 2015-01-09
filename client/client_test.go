@@ -28,18 +28,12 @@ var _ = Suite(&ClientSuite{})
 
 type FakeRemoteStore map[string]*fakeFile
 
-func (f FakeRemoteStore) Get(path string, size int64) (io.ReadCloser, error) {
-	name := strings.TrimPrefix(path, "targets/")
+func (f FakeRemoteStore) Get(path string) (io.ReadCloser, int64, error) {
 	file, ok := f[path]
 	if !ok {
-		return nil, ErrNotFound{name}
+		return nil, 0, ErrNotFound{strings.TrimPrefix(path, "targets/")}
 	}
-	if size > 0 {
-		if file.size != size {
-			return nil, ErrWrongSize{name, file.size, size}
-		}
-	}
-	return file, nil
+	return file, file.size, nil
 }
 
 func newFakeFile(b []byte) *fakeFile {
@@ -144,6 +138,12 @@ func assertFiles(c *C, files data.Files, names []string) {
 	}
 }
 
+func (s *ClientSuite) TestInitRootTooLarge(c *C) {
+	client := NewClient(MemoryLocalStore(), s.remote)
+	s.remote["root.json"] = newFakeFile(make([]byte, maxMetaSize+1))
+	c.Assert(client.Init(s.rootKeys(c), 0), Equals, ErrMetaTooLarge{"root.json", maxMetaSize + 1})
+}
+
 func (s *ClientSuite) TestInit(c *C) {
 	client := NewClient(MemoryLocalStore(), s.remote)
 
@@ -202,6 +202,12 @@ func (s *ClientSuite) TestNewTargets(c *C) {
 	files, err = client.Update()
 	c.Assert(err, IsNil)
 	c.Assert(files, HasLen, 0)
+}
+
+func (s *ClientSuite) TestTimestampTooLarge(c *C) {
+	s.remote["timestamp.json"] = newFakeFile(make([]byte, maxMetaSize+1))
+	_, err := s.newClient(c).Update()
+	c.Assert(err, Equals, ErrMetaTooLarge{"timestamp.json", maxMetaSize + 1})
 }
 
 // TODO: Implement these tests:
