@@ -439,3 +439,14 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 
 	return nil
 }
+
+// Targets returns the complete list of available targets.
+func (c *Client) Targets() (data.Files, error) {
+	// populate c.targets from local storage if not set
+	if c.targets == nil {
+		if err := c.getLocalMeta(); err != nil {
+			return nil, err
+		}
+	}
+	return c.targets, nil
+}

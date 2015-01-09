@@ -292,3 +292,18 @@ func (s *ClientSuite) TestDownloadTargetCorruptData(c *C) {
 	}
 	c.Assert(dest.deleted, Equals, true)
 }
+
+func (s *ClientSuite) TestAvailableTargets(c *C) {
+	client := s.updatedClient(c)
+	files, err := client.Targets()
+	c.Assert(err, IsNil)
+	assertFiles(c, files, []string{"foo.txt"})
+
+	s.addRemoteTarget(c, "bar.txt")
+	s.addRemoteTarget(c, "baz.txt")
+	_, err = client.Update()
+	c.Assert(err, IsNil)
+	files, err = client.Targets()
+	c.Assert(err, IsNil)
+	assertFiles(c, files, []string{"foo.txt", "bar.txt", "baz.txt"})
+}
