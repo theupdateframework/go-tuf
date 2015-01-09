@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/flynn/go-docopt"
 	"github.com/flynn/go-tuf"
@@ -96,4 +98,12 @@ func runCommand(name string, args []string) error {
 		return err
 	}
 	return cmd.f(parsedArgs, repo)
+}
+
+func parseExpires(arg string) (time.Time, error) {
+	days, err := strconv.Atoi(arg)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to parse --expires arg: %s", err)
+	}
+	return time.Now().AddDate(0, 0, days).UTC(), nil
 }

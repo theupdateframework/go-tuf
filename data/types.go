@@ -42,6 +42,21 @@ type KeyValue struct {
 	Private HexBytes `json:"private,omitempty"`
 }
 
+func DefaultExpires(role string) time.Time {
+	switch role {
+	case "root":
+		return time.Now().AddDate(1, 0, 0).UTC()
+	case "targets":
+		return time.Now().AddDate(0, 3, 0).UTC()
+	case "snapshot":
+		return time.Now().AddDate(0, 0, 7).UTC()
+	case "timestamp":
+		return time.Now().AddDate(0, 0, 1).UTC()
+	default:
+		return time.Time{}
+	}
+}
+
 type Root struct {
 	Type    string           `json:"_type"`
 	Version int              `json:"version"`
@@ -56,7 +71,7 @@ func NewRoot() *Root {
 	return &Root{
 		Type:    "root",
 		Version: 1,
-		Expires: time.Now().AddDate(1, 0, 0).UTC(),
+		Expires: DefaultExpires("root"),
 		Keys:    make(map[string]*Key),
 		Roles:   make(map[string]*Role),
 	}
@@ -80,7 +95,7 @@ func NewSnapshot() *Snapshot {
 	return &Snapshot{
 		Type:    "snapshot",
 		Version: 1,
-		Expires: time.Now().AddDate(0, 0, 7).UTC(),
+		Expires: DefaultExpires("snapshot"),
 		Meta:    make(Files),
 	}
 }
@@ -102,7 +117,7 @@ func NewTargets() *Targets {
 	return &Targets{
 		Type:    "targets",
 		Version: 1,
-		Expires: time.Now().AddDate(0, 3, 0).UTC(),
+		Expires: DefaultExpires("targets"),
 		Targets: make(Files),
 	}
 }
@@ -118,7 +133,7 @@ func NewTimestamp() *Timestamp {
 	return &Timestamp{
 		Type:    "timestamp",
 		Version: 1,
-		Expires: time.Now().AddDate(0, 0, 1).UTC(),
+		Expires: DefaultExpires("timestamp"),
 		Meta:    make(Files),
 	}
 }

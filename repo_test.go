@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/agl/ed25519"
 	"github.com/flynn/go-tuf/data"
@@ -309,4 +310,55 @@ func (RepoSuite) TestCommit(c *C) {
 	err = r.Commit()
 	c.Assert(err, NotNil)
 	c.Assert(err.Error()[0:44], Equals, "tuf: invalid snapshot.json in timestamp.json")
+}
+
+func (RepoSuite) TestExpires(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	past := time.Now().Add(-1 * time.Second)
+	for _, err := range []error{
+		r.GenKeyWithExpires("root", past),
+		r.AddTargetWithExpires("foo.txt", nil, past),
+		r.RemoveTargetWithExpires("foo.txt", past),
+		r.SnapshotWithExpires(CompressionTypeNone, past),
+		r.TimestampWithExpires(past),
+	} {
+		c.Assert(err, Equals, ErrInvalidExpires{past})
+	}
+
+	expires := time.Now().Add(24 * time.Hour)
+	c.Assert(r.GenKeyWithExpires("root", expires), IsNil)
+	root, err := r.root()
+	c.Assert(err, IsNil)
+	c.Assert(root.Expires.Unix(), DeepEquals, expires.Unix())
+
+	expires = time.Now().Add(6 * time.Hour)
+	c.Assert(r.GenKey("targets"), IsNil)
+	c.Assert(r.AddTargetWithExpires("foo.txt", nil, expires), IsNil)
+	targets, err := r.targets()
+	c.Assert(err, IsNil)
+	c.Assert(targets.Expires.Unix(), Equals, expires.Unix())
+
+	expires = time.Now().Add(2 * time.Hour)
+	c.Assert(r.RemoveTargetWithExpires("foo.txt", expires), IsNil)
+	targets, err = r.targets()
+	c.Assert(err, IsNil)
+	c.Assert(targets.Expires.Unix(), Equals, expires.Unix())
+
+	expires = time.Now().Add(time.Hour)
+	c.Assert(r.GenKey("snapshot"), IsNil)
+	c.Assert(r.SnapshotWithExpires(CompressionTypeNone, expires), IsNil)
+	snapshot, err := r.snapshot()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Expires.Unix(), Equals, expires.Unix())
+
+	expires = time.Now().Add(10 * time.Minute)
+	c.Assert(r.GenKey("timestamp"), IsNil)
+	c.Assert(r.TimestampWithExpires(expires), IsNil)
+	timestamp, err := r.timestamp()
+	c.Assert(err, IsNil)
+	c.Assert(timestamp.Expires.Unix(), Equals, expires.Unix())
 }

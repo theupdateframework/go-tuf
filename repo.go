@@ -143,9 +143,17 @@ func (r *Repo) timestamp() (*data.Timestamp, error) {
 	return timestamp, nil
 }
 
-func (r *Repo) GenKey(keyRole string) error {
+func (r *Repo) GenKey(role string) error {
+	return r.GenKeyWithExpires(role, data.DefaultExpires(role))
+}
+
+func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) error {
 	if !keys.ValidRole(keyRole) {
 		return ErrInvalidRole{keyRole}
+	}
+
+	if !validExpires(expires) {
+		return ErrInvalidExpires{expires}
 	}
 
 	root, err := r.root()
@@ -169,9 +177,13 @@ func (r *Repo) GenKey(keyRole string) error {
 	role.KeyIDs = append(role.KeyIDs, key.ID)
 
 	root.Keys[key.ID] = key.Serialize()
-	root.Expires = time.Now().AddDate(1, 0, 0).UTC()
+	root.Expires = expires
 
 	return r.setMeta("root.json", root)
+}
+
+func validExpires(expires time.Time) bool {
+	return expires.Sub(time.Now()) > 0
 }
 
 func (r *Repo) RootKeys() ([]*data.Key, error) {
@@ -263,6 +275,14 @@ func validManifest(name string) bool {
 }
 
 func (r *Repo) AddTarget(path string, custom map[string]interface{}) error {
+	return r.AddTargetWithExpires(path, custom, data.DefaultExpires("targets"))
+}
+
+func (r *Repo) AddTargetWithExpires(path string, custom map[string]interface{}, expires time.Time) error {
+	if !validExpires(expires) {
+		return ErrInvalidExpires{expires}
+	}
+
 	t, err := r.targets()
 	if err != nil {
 		return err
@@ -276,11 +296,19 @@ func (r *Repo) AddTarget(path string, custom map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	t.Expires = time.Now().AddDate(0, 3, 0).UTC()
+	t.Expires = expires
 	return r.setMeta("targets.json", t)
 }
 
 func (r *Repo) RemoveTarget(path string) error {
+	return r.RemoveTargetWithExpires(path, data.DefaultExpires("targets"))
+}
+
+func (r *Repo) RemoveTargetWithExpires(path string, expires time.Time) error {
+	if !validExpires(expires) {
+		return ErrInvalidExpires{expires}
+	}
+
 	t, err := r.targets()
 	if err != nil {
 		return err
@@ -289,10 +317,19 @@ func (r *Repo) RemoveTarget(path string) error {
 		return nil
 	}
 	delete(t.Targets, path)
+	t.Expires = expires
 	return r.setMeta("targets.json", t)
 }
 
 func (r *Repo) Snapshot(t CompressionType) error {
+	return r.SnapshotWithExpires(t, data.DefaultExpires("snapshot"))
+}
+
+func (r *Repo) SnapshotWithExpires(t CompressionType, expires time.Time) error {
+	if !validExpires(expires) {
+		return ErrInvalidExpires{expires}
+	}
+
 	snapshot, err := r.snapshot()
 	if err != nil {
 		return err
@@ -312,11 +349,19 @@ func (r *Repo) Snapshot(t CompressionType) error {
 			return err
 		}
 	}
-	snapshot.Expires = time.Now().AddDate(0, 0, 7).UTC()
+	snapshot.Expires = expires
 	return r.setMeta("snapshot.json", snapshot)
 }
 
 func (r *Repo) Timestamp() error {
+	return r.TimestampWithExpires(data.DefaultExpires("timestamp"))
+}
+
+func (r *Repo) TimestampWithExpires(expires time.Time) error {
+	if !validExpires(expires) {
+		return ErrInvalidExpires{expires}
+	}
+
 	db, err := r.db()
 	if err != nil {
 		return err
@@ -332,7 +377,7 @@ func (r *Repo) Timestamp() error {
 	if err != nil {
 		return err
 	}
-	timestamp.Expires = time.Now().AddDate(0, 0, 1).UTC()
+	timestamp.Expires = expires
 	return r.setMeta("timestamp.json", timestamp)
 }
 

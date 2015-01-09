@@ -1,6 +1,9 @@
 package tuf
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type ErrMissingMetadata struct {
 	Name string
@@ -41,4 +44,12 @@ type ErrInvalidRole struct {
 
 func (e ErrInvalidRole) Error() string {
 	return fmt.Sprintf("tuf: invalid role %s", e.Role)
+}
+
+type ErrInvalidExpires struct {
+	Expires time.Time
+}
+
+func (e ErrInvalidExpires) Error() string {
+	return fmt.Sprintf("tuf: invalid expires: %s", e.Expires)
 }
