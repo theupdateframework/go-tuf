@@ -3,7 +3,8 @@ package client
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/flynn/go-tuf"
@@ -25,20 +26,41 @@ type ClientSuite struct {
 
 var _ = Suite(&ClientSuite{})
 
-type FakeRemoteStore map[string][]byte
+type FakeRemoteStore map[string]*fakeFile
 
-func (f FakeRemoteStore) Get(name string, size int64) (io.ReadCloser, error) {
-	b, ok := f[name]
+func (f FakeRemoteStore) Get(path string, size int64) (io.ReadCloser, error) {
+	name := strings.TrimPrefix(path, "targets/")
+	file, ok := f[path]
 	if !ok {
 		return nil, ErrNotFound{name}
 	}
 	if size > 0 {
-		actual := int64(len(b))
-		if actual != size {
-			return nil, ErrWrongSize{name, actual, size}
+		if file.size != size {
+			return nil, ErrWrongSize{name, file.size, size}
 		}
 	}
-	return ioutil.NopCloser(bytes.NewReader(b)), nil
+	return file, nil
+}
+
+func newFakeFile(b []byte) *fakeFile {
+	return &fakeFile{buf: bytes.NewReader(b), size: int64(len(b))}
+}
+
+type fakeFile struct {
+	buf       *bytes.Reader
+	bytesRead int
+	size      int64
+}
+
+func (f *fakeFile) Read(p []byte) (int, error) {
+	n, err := f.buf.Read(p)
+	f.bytesRead += n
+	return n, err
+}
+
+func (f *fakeFile) Close() error {
+	f.buf.Seek(0, os.SEEK_SET)
+	return nil
 }
 
 var targetFiles = map[string][]byte{
@@ -66,7 +88,7 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	s.remote = make(FakeRemoteStore)
 	s.syncRemote(c)
 	for k, v := range targetFiles {
-		s.remote["targets/"+k] = v
+		s.remote["targets/"+k] = newFakeFile(v)
 	}
 }
 
@@ -74,7 +96,7 @@ func (s *ClientSuite) syncRemote(c *C) {
 	meta, err := s.store.GetMeta()
 	c.Assert(err, IsNil)
 	for k, v := range meta {
-		s.remote[k] = v
+		s.remote[k] = newFakeFile(v)
 	}
 }
 
@@ -98,7 +120,14 @@ func (s *ClientSuite) newClient(c *C) *Client {
 	return client
 }
 
-func assertUpdatedFiles(c *C, files data.Files, names []string) {
+func (s *ClientSuite) updatedClient(c *C) *Client {
+	client := s.newClient(c)
+	_, err := client.Update()
+	c.Assert(err, IsNil)
+	return client
+}
+
+func assertFiles(c *C, files data.Files, names []string) {
 	c.Assert(files, HasLen, len(names))
 	for _, name := range names {
 		target, ok := targetFiles[name]
@@ -109,7 +138,7 @@ func assertUpdatedFiles(c *C, files data.Files, names []string) {
 		c.Assert(err, IsNil)
 		file, ok := files[name]
 		if !ok {
-			c.Fatalf("expected file update for %s", name)
+			c.Fatalf("expected files to contain %s", name)
 		}
 		c.Assert(util.FileMetaEqual(file, meta), IsNil)
 	}
@@ -138,7 +167,7 @@ func (s *ClientSuite) TestFirstUpdate(c *C) {
 	files, err := s.newClient(c).Update()
 	c.Assert(err, IsNil)
 	c.Assert(files, HasLen, 1)
-	assertUpdatedFiles(c, files, []string{"foo.txt"})
+	assertFiles(c, files, []string{"foo.txt"})
 }
 
 func (s *ClientSuite) TestMissingRemoteMetadata(c *C) {
@@ -159,14 +188,14 @@ func (s *ClientSuite) TestNewTargets(c *C) {
 	client := s.newClient(c)
 	files, err := client.Update()
 	c.Assert(err, IsNil)
-	assertUpdatedFiles(c, files, []string{"foo.txt"})
+	assertFiles(c, files, []string{"foo.txt"})
 
 	s.addRemoteTarget(c, "bar.txt")
 	s.addRemoteTarget(c, "baz.txt")
 
 	files, err = client.Update()
 	c.Assert(err, IsNil)
-	assertUpdatedFiles(c, files, []string{"bar.txt", "baz.txt"})
+	assertFiles(c, files, []string{"bar.txt", "baz.txt"})
 
 	// Adding the same exact file should not lead to an update
 	s.addRemoteTarget(c, "bar.txt")
@@ -182,3 +211,99 @@ func (s *ClientSuite) TestNewTargets(c *C) {
 // * Test locally expired metadata is ok
 // * Test invalid timestamp / snapshot signature downloads root.json
 // * Test invalid hash returns ErrDownloadFailed
+
+type testDestination struct {
+	bytes.Buffer
+	deleted bool
+}
+
+func (t *testDestination) Delete() error {
+	t.deleted = true
+	return nil
+}
+
+func (s *ClientSuite) TestDownloadUnknownTarget(c *C) {
+	client := s.updatedClient(c)
+	var dest testDestination
+	c.Assert(client.Download("nonexistent", &dest), Equals, ErrUnknownTarget{"nonexistent"})
+	c.Assert(dest.deleted, Equals, true)
+}
+
+func (s *ClientSuite) TestDownloadNoExist(c *C) {
+	client := s.updatedClient(c)
+	delete(s.remote, "targets/foo.txt")
+	var dest testDestination
+	c.Assert(client.Download("foo.txt", &dest), Equals, ErrNotFound{"foo.txt"})
+	c.Assert(dest.deleted, Equals, true)
+}
+
+func (s *ClientSuite) TestDownloadOK(c *C) {
+	client := s.updatedClient(c)
+	var dest testDestination
+	c.Assert(client.Download("foo.txt", &dest), IsNil)
+	c.Assert(dest.deleted, Equals, false)
+	c.Assert(dest.String(), Equals, "foo")
+}
+
+func (s *ClientSuite) TestDownloadWrongSize(c *C) {
+	client := s.updatedClient(c)
+	remoteFile := &fakeFile{buf: bytes.NewReader([]byte("wrong-size")), size: 10}
+	s.remote["targets/foo.txt"] = remoteFile
+	var dest testDestination
+	c.Assert(client.Download("foo.txt", &dest), DeepEquals, ErrWrongSize{"foo.txt", 10, 3})
+	c.Assert(remoteFile.bytesRead, Equals, 0)
+	c.Assert(dest.deleted, Equals, true)
+}
+
+func (s *ClientSuite) TestDownloadTargetTooLong(c *C) {
+	client := s.updatedClient(c)
+	remoteFile := s.remote["targets/foo.txt"]
+	remoteFile.buf = bytes.NewReader([]byte("foo-ooo"))
+	var dest testDestination
+	c.Assert(client.Download("foo.txt", &dest), IsNil)
+	c.Assert(remoteFile.bytesRead, Equals, 3)
+	c.Assert(dest.deleted, Equals, false)
+	c.Assert(dest.String(), Equals, "foo")
+}
+
+func (s *ClientSuite) TestDownloadTargetTooShort(c *C) {
+	client := s.updatedClient(c)
+	remoteFile := s.remote["targets/foo.txt"]
+	remoteFile.buf = bytes.NewReader([]byte("fo"))
+	var dest testDestination
+	c.Assert(client.Download("foo.txt", &dest), DeepEquals, ErrWrongSize{"foo.txt", 2, 3})
+	c.Assert(dest.deleted, Equals, true)
+}
+
+func (s *ClientSuite) TestDownloadTargetCorruptData(c *C) {
+	client := s.updatedClient(c)
+	remoteFile := s.remote["targets/foo.txt"]
+	remoteFile.buf = bytes.NewReader([]byte("corrupt"))
+	var dest testDestination
+	err := client.Download("foo.txt", &dest)
+	// just test the type of err rather using DeepEquals (as it contains sha512
+	// hashes we don't necessarily care about here).
+	e, ok := err.(ErrDownloadFailed)
+	if !ok {
+		c.Fatalf("expected err to have type ErrDownloadFailed, got %T", err)
+	}
+	if _, ok := e.Err.(util.ErrWrongHash); !ok {
+		c.Fatalf("expected err.Err to have type util.ErrWrongHash, got %T", err)
+	}
+	c.Assert(dest.deleted, Equals, true)
+}
+
+func (s *ClientSuite) TestAvailableTargets(c *C) {
+	client := s.updatedClient(c)
+	files, err := client.Targets()
+	c.Assert(err, IsNil)
+	assertFiles(c, files, []string{"foo.txt"})
+
+	s.addRemoteTarget(c, "bar.txt")
+	s.addRemoteTarget(c, "baz.txt")
+	_, err = client.Update()
+	c.Assert(err, IsNil)
+	files, err = client.Targets()
+	c.Assert(err, IsNil)
+	assertFiles(c, files, []string{"foo.txt", "bar.txt", "baz.txt"})
+}

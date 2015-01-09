@@ -44,7 +44,7 @@ type ErrWrongSize struct {
 }
 
 func (e ErrWrongSize) Error() string {
-	return fmt.Sprintf("tuf: unexpected file size: %s (expected %d got %d)", e.File, e.Expected, e.Actual)
+	return fmt.Sprintf("tuf: unexpected file size: %s (expected %d bytes, got %d bytes)", e.File, e.Expected, e.Actual)
 }
 
 type ErrLatestSnapshot struct {
@@ -58,4 +58,12 @@ func (e ErrLatestSnapshot) Error() string {
 func IsLatestSnapshot(err error) bool {
 	_, ok := err.(ErrLatestSnapshot)
 	return ok
+}
+
+type ErrUnknownTarget struct {
+	Name string
+}
+
+func (e ErrUnknownTarget) Error() string {
+	return fmt.Sprintf("tuf: unknown target file: %s", e.Name)
 }

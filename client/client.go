@@ -47,8 +47,9 @@ type Client struct {
 	localSnapshotVer  int
 	localTimestampVer int
 
-	// localTargets is the list of targets from local storage
-	localTargets data.Files
+	// targets is the list of available targets, either from local storage
+	// or from recently downloaded targets metadata
+	targets data.Files
 
 	// localMeta is the raw metadata from local storage and is used to
 	// check whether remote metadata is present locally
@@ -241,7 +242,7 @@ func (c *Client) getLocalMeta() error {
 			return err
 		}
 		c.localTargetsVer = targets.Version
-		c.localTargets = targets.Targets
+		c.targets = targets.Targets
 	}
 
 	if timestampJSON, ok := meta["timestamp.json"]; ok {
@@ -322,8 +323,8 @@ func (c *Client) decodeSnapshot(b json.RawMessage) (data.FileMeta, data.FileMeta
 	return snapshot.Meta["root.json"], snapshot.Meta["targets.json"], nil
 }
 
-// decodeTargets decodes and verifies targets metadata, and returns updated
-// targets.
+// decodeTargets decodes and verifies targets metadata, sets c.targets and
+// returns updated targets.
 func (c *Client) decodeTargets(b json.RawMessage) (data.Files, error) {
 	targets := &data.Targets{}
 	if err := signed.Unmarshal(b, targets, "targets", c.localTargetsVer, c.db); err != nil {
@@ -331,13 +332,14 @@ func (c *Client) decodeTargets(b json.RawMessage) (data.Files, error) {
 	}
 	updatedTargets := make(data.Files)
 	for path, meta := range targets.Targets {
-		if local, ok := c.localTargets[path]; ok {
+		if local, ok := c.targets[path]; ok {
 			if err := util.FileMetaEqual(local, meta); err == nil {
 				continue
 			}
 		}
 		updatedTargets[path] = meta
 	}
+	c.targets = targets.Targets
 	return updatedTargets, nil
 }
 
@@ -379,16 +381,72 @@ func (c *Client) Files() data.Files {
 
 type Destination interface {
 	io.Writer
-	Size() (int, error)
 	Delete() error
 }
 
-func (c *Client) Download(name string, dest Destination) error {
-	/*
-		The software update system instructs TUF to download a specific target file.
+// Download downloads the given target file from remote storage into dest.
+//
+// dest will be deleted and an error returned in the following situations:
+//
+//   * The target does not exist in the local targets.json
+//   * The target does not exist in remote storage
+//   * Metadata cannot be generated for the downloaded data
+//   * Generated metadata does not match local metadata for the given file
+func (c *Client) Download(name string, dest Destination) (err error) {
+	// delete dest if there is an error
+	defer func() {
+		if err != nil {
+			dest.Delete()
+		}
+	}()
 
-		TUF downloads and verifies the file and then makes the file available to the
-		software update system.
-	*/
+	// populate c.targets from local storage if not set
+	if c.targets == nil {
+		if err := c.getLocalMeta(); err != nil {
+			return err
+		}
+	}
+
+	// return ErrNotFound if the file is not in the local targets.json
+	localMeta, ok := c.targets[name]
+	if !ok {
+		return ErrUnknownTarget{name}
+	}
+
+	// get the data from remote storage
+	r, err := c.remote.Get("targets/"+name, localMeta.Length)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	// wrap the data in a LimitReader so we download at most localMeta.Length bytes
+	stream := io.LimitReader(r, localMeta.Length)
+
+	// read the data, simultaneously writing it to dest and generating metadata
+	actual, err := util.GenerateFileMeta(io.TeeReader(stream, dest))
+	if err != nil {
+		return ErrDownloadFailed{name, err}
+	}
+
+	// check the data has the correct length and hashes
+	if err := util.FileMetaEqual(actual, localMeta); err != nil {
+		if err == util.ErrWrongLength {
+			return ErrWrongSize{name, actual.Length, localMeta.Length}
+		}
+		return ErrDownloadFailed{name, err}
+	}
+
 	return nil
+}
+
+// Targets returns the complete list of available targets.
+func (c *Client) Targets() (data.Files, error) {
+	// populate c.targets from local storage if not set
+	if c.targets == nil {
+		if err := c.getLocalMeta(); err != nil {
+			return nil, err
+		}
+	}
+	return c.targets, nil
 }
