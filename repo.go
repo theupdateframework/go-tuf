@@ -443,21 +443,12 @@ func (r *Repo) Clean() error {
 }
 
 func (r *Repo) verifySignature(name string, db *keys.DB) error {
-	// need root.json to determine minimum version
-	if _, ok := r.meta["root.json"]; !ok {
-		return ErrMissingMetadata{"root.json"}
-	}
-	root, err := r.root()
-	if err != nil {
-		return err
-	}
-
 	s, err := r.signedMeta(name)
 	if err != nil {
 		return err
 	}
 	role := strings.TrimSuffix(name, ".json")
-	if err := signed.Verify(s, role, root.Version, db); err != nil {
+	if err := signed.Verify(s, role, 0, db); err != nil {
 		return ErrInsufficientSignatures{name, err}
 	}
 	return nil
