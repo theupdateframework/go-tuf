@@ -25,6 +25,7 @@ type ClientSuite struct {
 	local       LocalStore
 	remote      FakeRemoteStore
 	expiredTime time.Time
+	keyIDs      map[string]string
 }
 
 var _ = Suite(&ClientSuite{})
@@ -73,10 +74,12 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	var err error
 	s.repo, err = tuf.NewRepo(s.store)
 	c.Assert(err, IsNil)
-	c.Assert(s.repo.GenKey("root"), IsNil)
-	c.Assert(s.repo.GenKey("targets"), IsNil)
-	c.Assert(s.repo.GenKey("snapshot"), IsNil)
-	c.Assert(s.repo.GenKey("timestamp"), IsNil)
+	s.keyIDs = map[string]string{
+		"root":      s.genKey(c, "root"),
+		"targets":   s.genKey(c, "targets"),
+		"snapshot":  s.genKey(c, "snapshot"),
+		"timestamp": s.genKey(c, "timestamp"),
+	}
 	c.Assert(s.repo.AddTarget("foo.txt", nil), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
@@ -89,6 +92,18 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	}
 
 	s.expiredTime = time.Now().Add(time.Hour)
+}
+
+func (s *ClientSuite) genKey(c *C, role string) string {
+	id, err := s.repo.GenKey(role)
+	c.Assert(err, IsNil)
+	return id
+}
+
+func (s *ClientSuite) genKeyExpired(c *C, role string) string {
+	id, err := s.repo.GenKeyWithExpires(role, s.expiredTime)
+	c.Assert(err, IsNil)
+	return id
 }
 
 // withMetaExpired sets signed.IsExpired throughout the invocation of f so that
@@ -171,7 +186,7 @@ func (s *ClientSuite) TestInitRootTooLarge(c *C) {
 }
 
 func (s *ClientSuite) TestInitRootExpired(c *C) {
-	c.Assert(s.repo.GenKeyWithExpires("targets", s.expiredTime), IsNil)
+	s.genKeyExpired(c, "targets")
 	s.syncRemote(c)
 	client := NewClient(MemoryLocalStore(), s.remote)
 	s.withMetaExpired(func() {
@@ -219,6 +234,46 @@ func (s *ClientSuite) TestNoChangeUpdate(c *C) {
 	c.Assert(IsLatestSnapshot(err), Equals, true)
 }
 
+func (s *ClientSuite) TestNewRoot(c *C) {
+	client := s.newClient(c)
+
+	// replace all keys
+	newKeyIDs := make(map[string]string)
+	for role, id := range s.keyIDs {
+		c.Assert(s.repo.RevokeKey(role, id), IsNil)
+		newKeyIDs[role] = s.genKey(c, role)
+	}
+
+	// update metadata
+	c.Assert(s.repo.Sign("targets.json"), IsNil)
+	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	s.syncRemote(c)
+
+	// check update gets new root version
+	c.Assert(client.getLocalMeta(), IsNil)
+	version := client.localRootVer
+	c.Assert(version > 0, Equals, true)
+	_, err := client.Update()
+	c.Assert(err, IsNil)
+	c.Assert(client.localRootVer > version, Equals, true)
+
+	// check old keys are not in db
+	for _, id := range s.keyIDs {
+		c.Assert(client.db.GetKey(id), IsNil)
+	}
+
+	// check new keys are in db
+	for name, id := range newKeyIDs {
+		key := client.db.GetKey(id)
+		c.Assert(key, NotNil)
+		c.Assert(key.ID, Equals, id)
+		role := client.db.GetRole(name)
+		c.Assert(role, NotNil)
+		c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{id: {}})
+	}
+}
+
 func (s *ClientSuite) TestNewTargets(c *C) {
 	client := s.newClient(c)
 	files, err := client.Update()
@@ -244,7 +299,7 @@ func (s *ClientSuite) TestLocalExpired(c *C) {
 
 	// locally expired timestamp.json is ok
 	version := client.localTimestampVer
-	s.repo.TimestampWithExpires(s.expiredTime)
+	c.Assert(s.repo.TimestampWithExpires(s.expiredTime), IsNil)
 	s.syncLocal(c)
 	s.withMetaExpired(func() {
 		c.Assert(client.getLocalMeta(), IsNil)
@@ -253,7 +308,7 @@ func (s *ClientSuite) TestLocalExpired(c *C) {
 
 	// locally expired snapshot.json is ok
 	version = client.localSnapshotVer
-	s.repo.SnapshotWithExpires(tuf.CompressionTypeNone, s.expiredTime)
+	c.Assert(s.repo.SnapshotWithExpires(tuf.CompressionTypeNone, s.expiredTime), IsNil)
 	s.syncLocal(c)
 	s.withMetaExpired(func() {
 		c.Assert(client.getLocalMeta(), IsNil)
@@ -262,7 +317,7 @@ func (s *ClientSuite) TestLocalExpired(c *C) {
 
 	// locally expired targets.json is ok
 	version = client.localTargetsVer
-	s.repo.AddTargetWithExpires("foo.txt", nil, s.expiredTime)
+	c.Assert(s.repo.AddTargetWithExpires("foo.txt", nil, s.expiredTime), IsNil)
 	s.syncLocal(c)
 	s.withMetaExpired(func() {
 		c.Assert(client.getLocalMeta(), IsNil)
@@ -271,7 +326,7 @@ func (s *ClientSuite) TestLocalExpired(c *C) {
 
 	// locally expired root.json is not ok
 	version = client.localRootVer
-	s.repo.GenKeyWithExpires("targets", s.expiredTime)
+	s.genKeyExpired(c, "targets")
 	s.syncLocal(c)
 	s.withMetaExpired(func() {
 		c.Assert(client.getLocalMeta(), Equals, signed.ErrExpired)
@@ -289,12 +344,12 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 	client := s.newClient(c)
 
 	// add soon to expire root.json to local storage
-	c.Assert(s.repo.GenKeyWithExpires("timestamp", s.expiredTime), IsNil)
+	s.genKeyExpired(c, "timestamp")
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncLocal(c)
 
 	// add far expiring root.json to remote storage
-	c.Assert(s.repo.GenKey("timestamp"), IsNil)
+	s.genKey(c, "timestamp")
 	s.addRemoteTarget(c, "bar.txt")
 	s.syncRemote(c)
 
@@ -335,7 +390,7 @@ func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
 		c.Assert(err, DeepEquals, ErrExpiredMeta{"targets.json"})
 	})
 
-	c.Assert(s.repo.GenKeyWithExpires("timestamp", s.expiredTime), IsNil)
+	s.genKeyExpired(c, "timestamp")
 	c.Assert(s.repo.RemoveTarget("bar.txt"), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
@@ -349,7 +404,6 @@ func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
 // TODO: Implement these tests:
 //
 // * Test new timestamp with same snapshot
-// * Test new root data (e.g. new targets keys)
 // * Test invalid timestamp / snapshot signature downloads root.json
 // * Test invalid hash returns ErrDownloadFailed
 

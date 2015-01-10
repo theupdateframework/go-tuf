@@ -93,16 +93,23 @@ func (RepoSuite) TestNewRepo(c *C) {
 	c.Assert(timestamp.Meta, HasLen, 0)
 }
 
+func genKey(c *C, r *Repo, role string) string {
+	id, err := r.GenKey(role)
+	c.Assert(err, IsNil)
+	return id
+}
+
 func (RepoSuite) TestGenKey(c *C) {
 	local := MemoryStore(make(map[string]json.RawMessage), nil)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
 
 	// generate a key for an unknown role
-	c.Assert(r.GenKey("foo"), Equals, ErrInvalidRole{"foo"})
+	_, err = r.GenKey("foo")
+	c.Assert(err, Equals, ErrInvalidRole{"foo"})
 
 	// generate a root key
-	c.Assert(r.GenKey("root"), IsNil)
+	id := genKey(c, r, "root")
 
 	// check root metadata is correct
 	root, err := r.root()
@@ -117,6 +124,7 @@ func (RepoSuite) TestGenKey(c *C) {
 	}
 	c.Assert(rootRole.KeyIDs, HasLen, 1)
 	keyID := rootRole.KeyIDs[0]
+	c.Assert(keyID, Equals, id)
 	k, ok := root.Keys[keyID]
 	if !ok {
 		c.Fatal("missing key")
@@ -149,8 +157,8 @@ func (RepoSuite) TestGenKey(c *C) {
 	c.Assert(rootKeys[0].Value.Private, IsNil)
 
 	// generate two targets keys
-	c.Assert(r.GenKey("targets"), IsNil)
-	c.Assert(r.GenKey("targets"), IsNil)
+	genKey(c, r, "targets")
+	genKey(c, r, "targets")
 
 	// check root metadata is correct
 	root, err = r.root()
@@ -230,11 +238,11 @@ func (RepoSuite) TestRevokeKey(c *C) {
 	c.Assert(r.RevokeKey("root", "nonexistent"), DeepEquals, ErrKeyNotFound{"root", "nonexistent"})
 
 	// generate keys
-	c.Assert(r.GenKey("root"), IsNil)
-	c.Assert(r.GenKey("targets"), IsNil)
-	c.Assert(r.GenKey("targets"), IsNil)
-	c.Assert(r.GenKey("snapshot"), IsNil)
-	c.Assert(r.GenKey("timestamp"), IsNil)
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
 	root, err := r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Roles, NotNil)
@@ -317,16 +325,16 @@ func (RepoSuite) TestCommit(c *C) {
 	c.Assert(r.Commit(), DeepEquals, ErrMissingMetadata{"root.json"})
 
 	// commit without targets.json
-	c.Assert(r.GenKey("root"), IsNil)
+	genKey(c, r, "root")
 	c.Assert(r.Commit(), DeepEquals, ErrMissingMetadata{"targets.json"})
 
 	// commit without snapshot.json
-	c.Assert(r.GenKey("targets"), IsNil)
+	genKey(c, r, "targets")
 	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
 	c.Assert(r.Commit(), DeepEquals, ErrMissingMetadata{"snapshot.json"})
 
 	// commit without timestamp.json
-	c.Assert(r.GenKey("snapshot"), IsNil)
+	genKey(c, r, "snapshot")
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Commit(), DeepEquals, ErrMissingMetadata{"timestamp.json"})
 
@@ -335,13 +343,13 @@ func (RepoSuite) TestCommit(c *C) {
 	c.Assert(r.Commit(), DeepEquals, ErrInsufficientSignatures{"timestamp.json", signed.ErrNoSignatures})
 
 	// commit success
-	c.Assert(r.GenKey("timestamp"), IsNil)
+	genKey(c, r, "timestamp")
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
 
 	// commit with an invalid root hash in snapshot.json due to new key creation
-	c.Assert(r.GenKey("targets"), IsNil)
+	genKey(c, r, "targets")
 	c.Assert(r.Sign("targets.json"), IsNil)
 	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid root.json in snapshot.json: wrong length"))
 
@@ -381,8 +389,9 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(err, IsNil)
 
 	past := time.Now().Add(-1 * time.Second)
+	_, genKeyErr := r.GenKeyWithExpires("root", past)
 	for _, err := range []error{
-		r.GenKeyWithExpires("root", past),
+		genKeyErr,
 		r.AddTargetWithExpires("foo.txt", nil, past),
 		r.RemoveTargetWithExpires("foo.txt", past),
 		r.SnapshotWithExpires(CompressionTypeNone, past),
@@ -391,13 +400,14 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 		c.Assert(err, Equals, ErrInvalidExpires{past})
 	}
 
-	c.Assert(r.GenKey("root"), IsNil)
+	genKey(c, r, "root")
 	root, err := r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Version, Equals, 1)
 
 	expires := time.Now().Add(24 * time.Hour)
-	c.Assert(r.GenKeyWithExpires("root", expires), IsNil)
+	_, err = r.GenKeyWithExpires("root", expires)
+	c.Assert(err, IsNil)
 	root, err = r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Expires.Unix(), DeepEquals, expires.Unix())
@@ -416,7 +426,7 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(root.Version, Equals, 3)
 
 	expires = time.Now().Add(6 * time.Hour)
-	c.Assert(r.GenKey("targets"), IsNil)
+	genKey(c, r, "targets")
 	c.Assert(r.AddTargetWithExpires("foo.txt", nil, expires), IsNil)
 	targets, err := r.targets()
 	c.Assert(err, IsNil)
@@ -431,7 +441,7 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(targets.Version, Equals, 2)
 
 	expires = time.Now().Add(time.Hour)
-	c.Assert(r.GenKey("snapshot"), IsNil)
+	genKey(c, r, "snapshot")
 	c.Assert(r.SnapshotWithExpires(CompressionTypeNone, expires), IsNil)
 	snapshot, err := r.snapshot()
 	c.Assert(err, IsNil)
@@ -444,7 +454,7 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(snapshot.Version, Equals, 2)
 
 	expires = time.Now().Add(10 * time.Minute)
-	c.Assert(r.GenKey("timestamp"), IsNil)
+	genKey(c, r, "timestamp")
 	c.Assert(r.TimestampWithExpires(expires), IsNil)
 	timestamp, err := r.timestamp()
 	c.Assert(err, IsNil)

@@ -143,30 +143,30 @@ func (r *Repo) timestamp() (*data.Timestamp, error) {
 	return timestamp, nil
 }
 
-func (r *Repo) GenKey(role string) error {
+func (r *Repo) GenKey(role string) (string, error) {
 	return r.GenKeyWithExpires(role, data.DefaultExpires("root"))
 }
 
-func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) error {
+func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (string, error) {
 	if !keys.ValidRole(keyRole) {
-		return ErrInvalidRole{keyRole}
+		return "", ErrInvalidRole{keyRole}
 	}
 
 	if !validExpires(expires) {
-		return ErrInvalidExpires{expires}
+		return "", ErrInvalidExpires{expires}
 	}
 
 	root, err := r.root()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	key, err := keys.NewKey()
 	if err != nil {
-		return err
+		return "", err
 	}
 	if err := r.local.SaveKey(keyRole, key.SerializePrivate()); err != nil {
-		return err
+		return "", err
 	}
 
 	role, ok := root.Roles[keyRole]
@@ -180,7 +180,7 @@ func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) error {
 	root.Expires = expires
 	root.Version++
 
-	return r.setMeta("root.json", root)
+	return key.ID, r.setMeta("root.json", root)
 }
 
 func validExpires(expires time.Time) bool {

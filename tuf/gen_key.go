@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/flynn/go-docopt"
 	"github.com/flynn/go-tuf"
 )
@@ -21,12 +23,21 @@ Options:
 }
 
 func cmdGenKey(args *docopt.Args, repo *tuf.Repo) error {
+	role := args.String["<role>"]
+	var id string
+	var err error
 	if arg := args.String["--expires"]; arg != "" {
 		expires, err := parseExpires(arg)
 		if err != nil {
 			return err
 		}
-		return repo.GenKeyWithExpires(args.String["<role>"], expires)
+		id, err = repo.GenKeyWithExpires(role, expires)
+	} else {
+		id, err = repo.GenKey(role)
 	}
-	return repo.GenKey(args.String["<role>"])
+	if err != nil {
+		return err
+	}
+	fmt.Println("Generated", role, "key with ID", id)
+	return nil
 }
