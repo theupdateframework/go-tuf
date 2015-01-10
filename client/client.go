@@ -29,9 +29,13 @@ type LocalStore interface {
 type RemoteStore interface {
 	// Get downloads the given file from remote storage.
 	//
-	// `file` should be relative to the root of remote repository (e.g.
-	// "root.json" or "targets/path/to/target/file.txt")
-	Get(file string, size int64) (io.ReadCloser, error)
+	// `path` is the path of the file relative to the root of the remote
+	//        repository (e.g. "root.json" or "targets/path/to/file.txt").
+	//
+	// `err` is ErrNotFound if the given file does not exist.
+	//
+	// `size` is the size of the stream, -1 indicating an unknown length.
+	Get(path string) (stream io.ReadCloser, size int64, err error)
 }
 
 // Client provides methods for fetching updates from a remote repository and
@@ -72,7 +76,7 @@ func NewClient(local LocalStore, remote RemoteStore) *Client {
 // and threshold, and then saved in local storage. It is expected that rootKeys
 // were securely distributed with the software being updated.
 func (c *Client) Init(rootKeys []*data.Key, threshold int) error {
-	rootJSON, err := c.downloadMeta("root.json", nil)
+	rootJSON, err := c.downloadMetaUnsafe("root.json")
 	if err != nil {
 		return err
 	}
@@ -115,7 +119,7 @@ func (c *Client) Update() (data.Files, error) {
 
 	// Get timestamp.json, extract snapshot.json file meta and save the
 	// timestamp.json locally
-	timestampJSON, err := c.downloadMeta("timestamp.json", nil)
+	timestampJSON, err := c.downloadMetaUnsafe("timestamp.json")
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +141,7 @@ func (c *Client) Update() (data.Files, error) {
 	// The snapshot.json is only saved locally after checking root.json and
 	// targets.json so that it will be re-downloaded on subsequent updates
 	// if this update fails.
-	snapshotJSON, err := c.downloadMeta("snapshot.json", &snapshotMeta)
+	snapshotJSON, err := c.downloadMeta("snapshot.json", snapshotMeta)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +153,7 @@ func (c *Client) Update() (data.Files, error) {
 	// If we don't have the root.json, download it, save it in local
 	// storage and restart the update
 	if !c.hasMeta("root.json", rootMeta) {
-		rootJSON, err := c.downloadMeta("root.json", &rootMeta)
+		rootJSON, err := c.downloadMeta("root.json", rootMeta)
 		if err != nil {
 			return nil, err
 		}
@@ -166,7 +170,7 @@ func (c *Client) Update() (data.Files, error) {
 	// targets and save targets.json in local storage
 	var updatedTargets data.Files
 	if !c.hasMeta("targets.json", targetsMeta) {
-		targetsJSON, err := c.downloadMeta("targets.json", &targetsMeta)
+		targetsJSON, err := c.downloadMeta("targets.json", targetsMeta)
 		if err != nil {
 			return nil, err
 		}
@@ -261,14 +265,34 @@ func (c *Client) getLocalMeta() error {
 // getting remote metadata without knowing it's length.
 const maxMetaSize = 50 * 1024
 
+// downloadMetaUnsafe downloads top-level metadata from remote storage without
+// verifying it's length and hashes (used for example to download timestamp.json
+// which has unknown size). It will download at most maxMetaSize bytes.
+func (c *Client) downloadMetaUnsafe(name string) ([]byte, error) {
+	r, size, err := c.remote.Get(name)
+	if err != nil {
+		if IsNotFound(err) {
+			return nil, ErrMissingRemoteMetadata{name}
+		}
+		return nil, ErrDownloadFailed{name, err}
+	}
+	defer r.Close()
+
+	// return ErrMetaTooLarge if the reported size is greater than maxMetaSize
+	if size > maxMetaSize {
+		return nil, ErrMetaTooLarge{name, size}
+	}
+
+	// although the size has been checked above, use a LimitReader in case
+	// the reported size is inaccurate, or size is -1 which indicates an
+	// unknown length
+	return ioutil.ReadAll(io.LimitReader(r, maxMetaSize))
+}
+
 // downloadMeta downloads top-level metadata from remote storage and verifies
 // it using the given file metadata.
-func (c *Client) downloadMeta(name string, m *data.FileMeta) ([]byte, error) {
-	var size int64
-	if m != nil {
-		size = m.Length
-	}
-	r, err := c.remote.Get(name, size)
+func (c *Client) downloadMeta(name string, m data.FileMeta) ([]byte, error) {
+	r, size, err := c.remote.Get(name)
 	if err != nil {
 		if IsNotFound(err) {
 			return nil, ErrMissingRemoteMetadata{name}
@@ -277,31 +301,24 @@ func (c *Client) downloadMeta(name string, m *data.FileMeta) ([]byte, error) {
 	}
 	defer r.Close()
 
-	// if m is nil (e.g. when downloading timestamp.json, which has unknown
-	// size), just read the stream (up to a sane maximum) and return it
-	if m == nil {
-		b, err := ioutil.ReadAll(io.LimitReader(r, maxMetaSize))
-		if err != nil {
-			return nil, err
-		}
-		return b, nil
+	// return ErrWrongSize if the reported size is known and incorrect
+	if size >= 0 && size != m.Length {
+		return nil, ErrWrongSize{name, size, m.Length}
 	}
 
-	// read exactly m.Length bytes from the stream
-	buf := make([]byte, m.Length)
-	if _, err := io.ReadFull(r, buf); err != nil {
-		return nil, err
-	}
+	// wrap the data in a LimitReader so we download at most m.Length bytes
+	stream := io.LimitReader(r, m.Length)
 
-	// verify buf matches given metadata
-	meta, err := util.GenerateFileMeta(bytes.NewReader(buf))
+	// read the data, simultaneously writing it to buf and generating metadata
+	var buf bytes.Buffer
+	meta, err := util.GenerateFileMeta(io.TeeReader(stream, &buf))
 	if err != nil {
 		return nil, err
 	}
-	if err := util.FileMetaEqual(meta, *m); err != nil {
+	if err := util.FileMetaEqual(meta, m); err != nil {
 		return nil, ErrDownloadFailed{name, err}
 	}
-	return buf, nil
+	return buf.Bytes(), nil
 }
 
 // verifyRoot verifies root metadata.
@@ -414,11 +431,16 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 	}
 
 	// get the data from remote storage
-	r, err := c.remote.Get("targets/"+name, localMeta.Length)
+	r, size, err := c.remote.Get("targets/" + name)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
+
+	// return ErrWrongSize if the reported size is known and incorrect
+	if size >= 0 && size != localMeta.Length {
+		return ErrWrongSize{name, size, localMeta.Length}
+	}
 
 	// wrap the data in a LimitReader so we download at most localMeta.Length bytes
 	stream := io.LimitReader(r, localMeta.Length)

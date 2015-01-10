@@ -67,3 +67,12 @@ type ErrUnknownTarget struct {
 func (e ErrUnknownTarget) Error() string {
 	return fmt.Sprintf("tuf: unknown target file: %s", e.Name)
 }
+
+type ErrMetaTooLarge struct {
+	Name string
+	Size int64
+}
+
+func (e ErrMetaTooLarge) Error() string {
+	return fmt.Sprintf("tuf: %s size %d bytes greater than maximum %d bytes", e.Name, e.Size, maxMetaSize)
+}
