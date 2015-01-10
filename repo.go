@@ -144,7 +144,7 @@ func (r *Repo) timestamp() (*data.Timestamp, error) {
 }
 
 func (r *Repo) GenKey(role string) error {
-	return r.GenKeyWithExpires(role, data.DefaultExpires(role))
+	return r.GenKeyWithExpires(role, data.DefaultExpires("root"))
 }
 
 func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) error {
