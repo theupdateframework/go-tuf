@@ -18,9 +18,7 @@ var (
 	ErrWrongMethod   = errors.New("tuf: invalid signature type")
 	ErrUnknownRole   = errors.New("tuf: unknown role")
 	ErrRoleThreshold = errors.New("tuf: valid signatures did not meet threshold")
-	ErrLowVersion    = errors.New("tuf: version is lower than current version")
 	ErrWrongType     = errors.New("tuf: meta file has wrong type")
-	ErrExpired       = errors.New("tuf: meta file has expired")
 )
 
 type signedMeta struct {
@@ -42,10 +40,10 @@ func Verify(s *data.Signed, role string, minVersion int, db *keys.DB) error {
 		return ErrWrongType
 	}
 	if IsExpired(sm.Expires) {
-		return ErrExpired
+		return ErrExpired{sm.Expires}
 	}
 	if sm.Version < minVersion {
-		return ErrLowVersion
+		return ErrLowVersion{sm.Version, minVersion}
 	}
 
 	return nil
