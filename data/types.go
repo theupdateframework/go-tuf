@@ -70,7 +70,6 @@ type Root struct {
 func NewRoot() *Root {
 	return &Root{
 		Type:    "root",
-		Version: 1,
 		Expires: DefaultExpires("root"),
 		Keys:    make(map[string]*Key),
 		Roles:   make(map[string]*Role),
@@ -94,7 +93,6 @@ type Snapshot struct {
 func NewSnapshot() *Snapshot {
 	return &Snapshot{
 		Type:    "snapshot",
-		Version: 1,
 		Expires: DefaultExpires("snapshot"),
 		Meta:    make(Files),
 	}
@@ -116,7 +114,6 @@ type Targets struct {
 func NewTargets() *Targets {
 	return &Targets{
 		Type:    "targets",
-		Version: 1,
 		Expires: DefaultExpires("targets"),
 		Targets: make(Files),
 	}
@@ -132,7 +129,6 @@ type Timestamp struct {
 func NewTimestamp() *Timestamp {
 	return &Timestamp{
 		Type:    "timestamp",
-		Version: 1,
 		Expires: DefaultExpires("timestamp"),
 		Meta:    make(Files),
 	}

@@ -312,7 +312,7 @@ func (RepoSuite) TestCommit(c *C) {
 	c.Assert(err.Error()[0:44], Equals, "tuf: invalid snapshot.json in timestamp.json")
 }
 
-func (RepoSuite) TestExpires(c *C) {
+func (RepoSuite) TestExpiresAndVersion(c *C) {
 	files := map[string][]byte{"foo.txt": []byte("foo")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
@@ -329,11 +329,17 @@ func (RepoSuite) TestExpires(c *C) {
 		c.Assert(err, Equals, ErrInvalidExpires{past})
 	}
 
-	expires := time.Now().Add(24 * time.Hour)
-	c.Assert(r.GenKeyWithExpires("root", expires), IsNil)
+	c.Assert(r.GenKey("root"), IsNil)
 	root, err := r.root()
 	c.Assert(err, IsNil)
+	c.Assert(root.Version, Equals, 1)
+
+	expires := time.Now().Add(24 * time.Hour)
+	c.Assert(r.GenKeyWithExpires("root", expires), IsNil)
+	root, err = r.root()
+	c.Assert(err, IsNil)
 	c.Assert(root.Expires.Unix(), DeepEquals, expires.Unix())
+	c.Assert(root.Version, Equals, 2)
 
 	expires = time.Now().Add(6 * time.Hour)
 	c.Assert(r.GenKey("targets"), IsNil)
@@ -341,12 +347,14 @@ func (RepoSuite) TestExpires(c *C) {
 	targets, err := r.targets()
 	c.Assert(err, IsNil)
 	c.Assert(targets.Expires.Unix(), Equals, expires.Unix())
+	c.Assert(targets.Version, Equals, 1)
 
 	expires = time.Now().Add(2 * time.Hour)
 	c.Assert(r.RemoveTargetWithExpires("foo.txt", expires), IsNil)
 	targets, err = r.targets()
 	c.Assert(err, IsNil)
 	c.Assert(targets.Expires.Unix(), Equals, expires.Unix())
+	c.Assert(targets.Version, Equals, 2)
 
 	expires = time.Now().Add(time.Hour)
 	c.Assert(r.GenKey("snapshot"), IsNil)
@@ -354,6 +362,12 @@ func (RepoSuite) TestExpires(c *C) {
 	snapshot, err := r.snapshot()
 	c.Assert(err, IsNil)
 	c.Assert(snapshot.Expires.Unix(), Equals, expires.Unix())
+	c.Assert(snapshot.Version, Equals, 1)
+
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	snapshot, err = r.snapshot()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Version, Equals, 2)
 
 	expires = time.Now().Add(10 * time.Minute)
 	c.Assert(r.GenKey("timestamp"), IsNil)
@@ -361,4 +375,10 @@ func (RepoSuite) TestExpires(c *C) {
 	timestamp, err := r.timestamp()
 	c.Assert(err, IsNil)
 	c.Assert(timestamp.Expires.Unix(), Equals, expires.Unix())
+	c.Assert(timestamp.Version, Equals, 1)
+
+	c.Assert(r.Timestamp(), IsNil)
+	timestamp, err = r.timestamp()
+	c.Assert(err, IsNil)
+	c.Assert(timestamp.Version, Equals, 2)
 }
