@@ -25,6 +25,7 @@ Options:
 Commands:
   help         Show usage for a specific command
   gen-key      Generate a new signing key for a specific manifest
+  revoke-key   Revoke a signing key
   add          Add a target file
   remove       Remove a target file
   snapshot     Update the snapshot manifest
