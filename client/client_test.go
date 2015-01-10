@@ -73,10 +73,10 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	var err error
 	s.repo, err = tuf.NewRepo(s.store)
 	c.Assert(err, IsNil)
-	c.Assert(s.repo.GenKey("root"), IsNil)
-	c.Assert(s.repo.GenKey("targets"), IsNil)
-	c.Assert(s.repo.GenKey("snapshot"), IsNil)
-	c.Assert(s.repo.GenKey("timestamp"), IsNil)
+	s.genKey(c, "root")
+	s.genKey(c, "targets")
+	s.genKey(c, "snapshot")
+	s.genKey(c, "timestamp")
 	c.Assert(s.repo.AddTarget("foo.txt", nil), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
@@ -89,6 +89,18 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	}
 
 	s.expiredTime = time.Now().Add(time.Hour)
+}
+
+func (s *ClientSuite) genKey(c *C, role string) string {
+	id, err := s.repo.GenKey(role)
+	c.Assert(err, IsNil)
+	return id
+}
+
+func (s *ClientSuite) genKeyExpired(c *C, role string) string {
+	id, err := s.repo.GenKeyWithExpires(role, s.expiredTime)
+	c.Assert(err, IsNil)
+	return id
 }
 
 // withMetaExpired sets signed.IsExpired throughout the invocation of f so that
@@ -171,7 +183,7 @@ func (s *ClientSuite) TestInitRootTooLarge(c *C) {
 }
 
 func (s *ClientSuite) TestInitRootExpired(c *C) {
-	c.Assert(s.repo.GenKeyWithExpires("targets", s.expiredTime), IsNil)
+	s.genKeyExpired(c, "targets")
 	s.syncRemote(c)
 	client := NewClient(MemoryLocalStore(), s.remote)
 	s.withMetaExpired(func() {
@@ -271,7 +283,7 @@ func (s *ClientSuite) TestLocalExpired(c *C) {
 
 	// locally expired root.json is not ok
 	version = client.localRootVer
-	s.repo.GenKeyWithExpires("targets", s.expiredTime)
+	s.genKeyExpired(c, "targets")
 	s.syncLocal(c)
 	s.withMetaExpired(func() {
 		c.Assert(client.getLocalMeta(), Equals, signed.ErrExpired)
@@ -289,12 +301,12 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 	client := s.newClient(c)
 
 	// add soon to expire root.json to local storage
-	c.Assert(s.repo.GenKeyWithExpires("timestamp", s.expiredTime), IsNil)
+	s.genKeyExpired(c, "timestamp")
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncLocal(c)
 
 	// add far expiring root.json to remote storage
-	c.Assert(s.repo.GenKey("timestamp"), IsNil)
+	s.genKey(c, "timestamp")
 	s.addRemoteTarget(c, "bar.txt")
 	s.syncRemote(c)
 
@@ -335,7 +347,7 @@ func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
 		c.Assert(err, DeepEquals, ErrExpiredMeta{"targets.json"})
 	})
 
-	c.Assert(s.repo.GenKeyWithExpires("timestamp", s.expiredTime), IsNil)
+	s.genKeyExpired(c, "timestamp")
 	c.Assert(s.repo.RemoveTarget("bar.txt"), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
