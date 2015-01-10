@@ -218,6 +218,54 @@ func (RepoSuite) TestGenKey(c *C) {
 	c.Assert(stagedRoot.Roles, DeepEquals, root.Roles)
 }
 
+func (RepoSuite) TestRevokeKey(c *C) {
+	local := MemoryStore(make(map[string]json.RawMessage), nil)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// revoking a key for an unknown role returns ErrInvalidRole
+	c.Assert(r.RevokeKey("foo", ""), DeepEquals, ErrInvalidRole{"foo"})
+
+	// revoking a key which doesn't exist returns ErrKeyNotFound
+	c.Assert(r.RevokeKey("root", "nonexistent"), DeepEquals, ErrKeyNotFound{"root", "nonexistent"})
+
+	// generate keys
+	c.Assert(r.GenKey("root"), IsNil)
+	c.Assert(r.GenKey("targets"), IsNil)
+	c.Assert(r.GenKey("targets"), IsNil)
+	c.Assert(r.GenKey("snapshot"), IsNil)
+	c.Assert(r.GenKey("timestamp"), IsNil)
+	root, err := r.root()
+	c.Assert(err, IsNil)
+	c.Assert(root.Roles, NotNil)
+	c.Assert(root.Roles, HasLen, 4)
+	c.Assert(root.Keys, NotNil)
+	c.Assert(root.Keys, HasLen, 5)
+
+	// revoke a key
+	targetsRole, ok := root.Roles["targets"]
+	if !ok {
+		c.Fatal("missing targets role")
+	}
+	c.Assert(targetsRole.KeyIDs, HasLen, 2)
+	id := targetsRole.KeyIDs[0]
+	c.Assert(r.RevokeKey("targets", id), IsNil)
+
+	// check root was updated
+	root, err = r.root()
+	c.Assert(err, IsNil)
+	c.Assert(root.Roles, NotNil)
+	c.Assert(root.Roles, HasLen, 4)
+	c.Assert(root.Keys, NotNil)
+	c.Assert(root.Keys, HasLen, 4)
+	targetsRole, ok = root.Roles["targets"]
+	if !ok {
+		c.Fatal("missing targets role")
+	}
+	c.Assert(targetsRole.KeyIDs, HasLen, 1)
+	c.Assert(targetsRole.KeyIDs[0], Not(Equals), id)
+}
+
 func (RepoSuite) TestSign(c *C) {
 	meta := map[string]json.RawMessage{"root.json": []byte(`{"signed":{},"signatures":[]}`)}
 	local := MemoryStore(meta, nil)
@@ -310,6 +358,20 @@ func (RepoSuite) TestCommit(c *C) {
 	err = r.Commit()
 	c.Assert(err, NotNil)
 	c.Assert(err.Error()[0:44], Equals, "tuf: invalid snapshot.json in timestamp.json")
+
+	// commit with a role's threshold greater than number of keys
+	root, err := r.root()
+	c.Assert(err, IsNil)
+	role, ok := root.Roles["timestamp"]
+	if !ok {
+		c.Fatal("missing timestamp role")
+	}
+	c.Assert(role.KeyIDs, HasLen, 1)
+	c.Assert(role.Threshold, Equals, 1)
+	c.Assert(r.RevokeKey("timestamp", role.KeyIDs[0]), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), DeepEquals, ErrNotEnoughKeys{"timestamp", 0, 1})
 }
 
 func (RepoSuite) TestExpiresAndVersion(c *C) {
@@ -340,6 +402,18 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(root.Expires.Unix(), DeepEquals, expires.Unix())
 	c.Assert(root.Version, Equals, 2)
+
+	expires = time.Now().Add(12 * time.Hour)
+	role, ok := root.Roles["root"]
+	if !ok {
+		c.Fatal("missing root role")
+	}
+	c.Assert(role.KeyIDs, HasLen, 2)
+	c.Assert(r.RevokeKeyWithExpires("root", role.KeyIDs[0], expires), IsNil)
+	root, err = r.root()
+	c.Assert(err, IsNil)
+	c.Assert(root.Expires.Unix(), DeepEquals, expires.Unix())
+	c.Assert(root.Version, Equals, 3)
 
 	expires = time.Now().Add(6 * time.Hour)
 	c.Assert(r.GenKey("targets"), IsNil)

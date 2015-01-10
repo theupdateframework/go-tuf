@@ -53,3 +53,22 @@ type ErrInvalidExpires struct {
 func (e ErrInvalidExpires) Error() string {
 	return fmt.Sprintf("tuf: invalid expires: %s", e.Expires)
 }
+
+type ErrKeyNotFound struct {
+	Role  string
+	KeyID string
+}
+
+func (e ErrKeyNotFound) Error() string {
+	return fmt.Sprintf(`tuf: no key with id "%s" exists for the %s role`, e.KeyID, e.Role)
+}
+
+type ErrNotEnoughKeys struct {
+	Role      string
+	Keys      int
+	Threshold int
+}
+
+func (e ErrNotEnoughKeys) Error() string {
+	return fmt.Sprintf("tuf: %s role has insufficient keys for threshold (has %d keys, threshold is %d)", e.Role, e.Keys, e.Threshold)
+}

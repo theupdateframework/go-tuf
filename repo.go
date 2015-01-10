@@ -144,7 +144,7 @@ func (r *Repo) timestamp() (*data.Timestamp, error) {
 }
 
 func (r *Repo) GenKey(role string) error {
-	return r.GenKeyWithExpires(role, data.DefaultExpires(role))
+	return r.GenKeyWithExpires(role, data.DefaultExpires("root"))
 }
 
 func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) error {
@@ -205,6 +205,53 @@ func (r *Repo) RootKeys() ([]*data.Key, error) {
 		rootKeys[i] = key
 	}
 	return rootKeys, nil
+}
+
+func (r *Repo) RevokeKey(role, id string) error {
+	return r.RevokeKeyWithExpires(role, id, data.DefaultExpires("root"))
+}
+
+func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error {
+	if !keys.ValidRole(keyRole) {
+		return ErrInvalidRole{keyRole}
+	}
+
+	if !validExpires(expires) {
+		return ErrInvalidExpires{expires}
+	}
+
+	root, err := r.root()
+	if err != nil {
+		return err
+	}
+
+	if _, ok := root.Keys[id]; !ok {
+		return ErrKeyNotFound{keyRole, id}
+	}
+
+	role, ok := root.Roles[keyRole]
+	if !ok {
+		return ErrKeyNotFound{keyRole, id}
+	}
+
+	keyIDs := make([]string, 0, len(role.KeyIDs))
+	for _, keyID := range role.KeyIDs {
+		if keyID == id {
+			continue
+		}
+		keyIDs = append(keyIDs, keyID)
+	}
+	if len(keyIDs) == len(role.KeyIDs) {
+		return ErrKeyNotFound{keyRole, id}
+	}
+	role.KeyIDs = keyIDs
+
+	delete(root.Keys, id)
+	root.Roles[keyRole] = role
+	root.Expires = expires
+	root.Version++
+
+	return r.setMeta("root.json", root)
 }
 
 func (r *Repo) setMeta(name string, meta interface{}) error {
@@ -391,6 +438,17 @@ func (r *Repo) Commit() error {
 	for _, name := range topLevelManifests {
 		if _, ok := r.meta[name]; !ok {
 			return ErrMissingMetadata{name}
+		}
+	}
+
+	// check roles are valid
+	root, err := r.root()
+	if err != nil {
+		return err
+	}
+	for name, role := range root.Roles {
+		if len(role.KeyIDs) < role.Threshold {
+			return ErrNotEnoughKeys{name, len(role.KeyIDs), role.Threshold}
 		}
 	}
 
