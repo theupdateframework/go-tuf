@@ -25,6 +25,7 @@ type ClientSuite struct {
 	local       LocalStore
 	remote      FakeRemoteStore
 	expiredTime time.Time
+	keyIDs      map[string]string
 }
 
 var _ = Suite(&ClientSuite{})
@@ -73,10 +74,12 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	var err error
 	s.repo, err = tuf.NewRepo(s.store)
 	c.Assert(err, IsNil)
-	s.genKey(c, "root")
-	s.genKey(c, "targets")
-	s.genKey(c, "snapshot")
-	s.genKey(c, "timestamp")
+	s.keyIDs = map[string]string{
+		"root":      s.genKey(c, "root"),
+		"targets":   s.genKey(c, "targets"),
+		"snapshot":  s.genKey(c, "snapshot"),
+		"timestamp": s.genKey(c, "timestamp"),
+	}
 	c.Assert(s.repo.AddTarget("foo.txt", nil), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
@@ -231,6 +234,46 @@ func (s *ClientSuite) TestNoChangeUpdate(c *C) {
 	c.Assert(IsLatestSnapshot(err), Equals, true)
 }
 
+func (s *ClientSuite) TestNewRoot(c *C) {
+	client := s.newClient(c)
+
+	// replace all keys
+	newKeyIDs := make(map[string]string)
+	for role, id := range s.keyIDs {
+		c.Assert(s.repo.RevokeKey(role, id), IsNil)
+		newKeyIDs[role] = s.genKey(c, role)
+	}
+
+	// update metadata
+	c.Assert(s.repo.Sign("targets.json"), IsNil)
+	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	s.syncRemote(c)
+
+	// check update gets new root version
+	c.Assert(client.getLocalMeta(), IsNil)
+	version := client.localRootVer
+	c.Assert(version > 0, Equals, true)
+	_, err := client.Update()
+	c.Assert(err, IsNil)
+	c.Assert(client.localRootVer > version, Equals, true)
+
+	// check old keys are not in db
+	for _, id := range s.keyIDs {
+		c.Assert(client.db.GetKey(id), IsNil)
+	}
+
+	// check new keys are in db
+	for name, id := range newKeyIDs {
+		key := client.db.GetKey(id)
+		c.Assert(key, NotNil)
+		c.Assert(key.ID, Equals, id)
+		role := client.db.GetRole(name)
+		c.Assert(role, NotNil)
+		c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{id: {}})
+	}
+}
+
 func (s *ClientSuite) TestNewTargets(c *C) {
 	client := s.newClient(c)
 	files, err := client.Update()
@@ -361,7 +404,6 @@ func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
 // TODO: Implement these tests:
 //
 // * Test new timestamp with same snapshot
-// * Test new root data (e.g. new targets keys)
 // * Test invalid timestamp / snapshot signature downloads root.json
 // * Test invalid hash returns ErrDownloadFailed
 
