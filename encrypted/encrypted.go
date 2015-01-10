@@ -100,7 +100,7 @@ type secretBoxCipher struct {
 	Name  string `json:"name"`
 	Nonce []byte `json:"nonce"`
 
-	encrypted bool `json:"-"`
+	encrypted bool
 }
 
 func (s *secretBoxCipher) Encrypt(plaintext, key []byte) []byte {
