@@ -256,7 +256,7 @@ func (s *ClientSuite) TestLocalExpired(c *C) {
 
 	// locally expired timestamp.json is ok
 	version := client.localTimestampVer
-	s.repo.TimestampWithExpires(s.expiredTime)
+	c.Assert(s.repo.TimestampWithExpires(s.expiredTime), IsNil)
 	s.syncLocal(c)
 	s.withMetaExpired(func() {
 		c.Assert(client.getLocalMeta(), IsNil)
@@ -265,7 +265,7 @@ func (s *ClientSuite) TestLocalExpired(c *C) {
 
 	// locally expired snapshot.json is ok
 	version = client.localSnapshotVer
-	s.repo.SnapshotWithExpires(tuf.CompressionTypeNone, s.expiredTime)
+	c.Assert(s.repo.SnapshotWithExpires(tuf.CompressionTypeNone, s.expiredTime), IsNil)
 	s.syncLocal(c)
 	s.withMetaExpired(func() {
 		c.Assert(client.getLocalMeta(), IsNil)
@@ -274,7 +274,7 @@ func (s *ClientSuite) TestLocalExpired(c *C) {
 
 	// locally expired targets.json is ok
 	version = client.localTargetsVer
-	s.repo.AddTargetWithExpires("foo.txt", nil, s.expiredTime)
+	c.Assert(s.repo.AddTargetWithExpires("foo.txt", nil, s.expiredTime), IsNil)
 	s.syncLocal(c)
 	s.withMetaExpired(func() {
 		c.Assert(client.getLocalMeta(), IsNil)
