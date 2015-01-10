@@ -41,7 +41,7 @@ func Verify(s *data.Signed, role string, minVersion int, db *keys.DB) error {
 	if sm.Type != role {
 		return ErrWrongType
 	}
-	if sm.Expires.Sub(time.Now()) <= 0 {
+	if IsExpired(sm.Expires) {
 		return ErrExpired
 	}
 	if sm.Version < minVersion {
@@ -49,6 +49,10 @@ func Verify(s *data.Signed, role string, minVersion int, db *keys.DB) error {
 	}
 
 	return nil
+}
+
+var IsExpired = func(t time.Time) bool {
+	return t.Sub(time.Now()) <= 0
 }
 
 func VerifySignatures(s *data.Signed, role string, db *keys.DB) error {

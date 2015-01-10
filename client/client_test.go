@@ -20,10 +20,11 @@ import (
 func Test(t *testing.T) { TestingT(t) }
 
 type ClientSuite struct {
-	store  tuf.LocalStore
-	repo   *tuf.Repo
-	local  LocalStore
-	remote FakeRemoteStore
+	store       tuf.LocalStore
+	repo        *tuf.Repo
+	local       LocalStore
+	remote      FakeRemoteStore
+	expiredTime time.Time
 }
 
 var _ = Suite(&ClientSuite{})
@@ -86,6 +87,20 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	for k, v := range targetFiles {
 		s.remote["targets/"+k] = newFakeFile(v)
 	}
+
+	s.expiredTime = time.Now().Add(time.Hour)
+}
+
+// withMetaExpired sets signed.IsExpired throughout the invocation of f so that
+// any metadata marked to expire at s.expiredTime will be expired (this avoids
+// the need to sleep in the tests).
+func (s *ClientSuite) withMetaExpired(f func()) {
+	e := signed.IsExpired
+	signed.IsExpired = func(t time.Time) bool {
+		return t.Unix() == s.expiredTime.Unix()
+	}
+	f()
+	signed.IsExpired = e
 }
 
 func (s *ClientSuite) syncLocal(c *C) {
@@ -156,12 +171,12 @@ func (s *ClientSuite) TestInitRootTooLarge(c *C) {
 }
 
 func (s *ClientSuite) TestInitRootExpired(c *C) {
-	duration := 100 * time.Millisecond
-	s.repo.GenKeyWithExpires("targets", time.Now().Add(duration))
+	c.Assert(s.repo.GenKeyWithExpires("targets", s.expiredTime), IsNil)
 	s.syncRemote(c)
-	time.Sleep(duration)
 	client := NewClient(MemoryLocalStore(), s.remote)
-	c.Assert(client.Init(s.rootKeys(c), 1), Equals, ErrExpiredMeta{"root.json"})
+	s.withMetaExpired(func() {
+		c.Assert(client.Init(s.rootKeys(c), 1), Equals, ErrExpiredMeta{"root.json"})
+	})
 }
 
 func (s *ClientSuite) TestInit(c *C) {
@@ -226,38 +241,42 @@ func (s *ClientSuite) TestNewTargets(c *C) {
 
 func (s *ClientSuite) TestLocalExpired(c *C) {
 	client := s.newClient(c)
-	duration := 100 * time.Millisecond
-	syncAndWait := func() {
-		s.syncLocal(c)
-		time.Sleep(duration)
-		c.Assert(client.getLocalMeta(), IsNil)
-	}
 
 	// locally expired timestamp.json is ok
 	version := client.localTimestampVer
-	s.repo.TimestampWithExpires(time.Now().Add(duration))
-	syncAndWait()
-	c.Assert(client.localTimestampVer > version, Equals, true)
+	s.repo.TimestampWithExpires(s.expiredTime)
+	s.syncLocal(c)
+	s.withMetaExpired(func() {
+		c.Assert(client.getLocalMeta(), IsNil)
+		c.Assert(client.localTimestampVer > version, Equals, true)
+	})
 
 	// locally expired snapshot.json is ok
 	version = client.localSnapshotVer
-	s.repo.SnapshotWithExpires(tuf.CompressionTypeNone, time.Now().Add(duration))
-	syncAndWait()
-	c.Assert(client.localSnapshotVer > version, Equals, true)
+	s.repo.SnapshotWithExpires(tuf.CompressionTypeNone, s.expiredTime)
+	s.syncLocal(c)
+	s.withMetaExpired(func() {
+		c.Assert(client.getLocalMeta(), IsNil)
+		c.Assert(client.localSnapshotVer > version, Equals, true)
+	})
 
 	// locally expired targets.json is ok
 	version = client.localTargetsVer
-	s.repo.AddTargetWithExpires("foo.txt", nil, time.Now().Add(duration))
-	syncAndWait()
-	c.Assert(client.localTargetsVer > version, Equals, true)
+	s.repo.AddTargetWithExpires("foo.txt", nil, s.expiredTime)
+	s.syncLocal(c)
+	s.withMetaExpired(func() {
+		c.Assert(client.getLocalMeta(), IsNil)
+		c.Assert(client.localTargetsVer > version, Equals, true)
+	})
 
 	// locally expired root.json is not ok
 	version = client.localRootVer
-	s.repo.GenKeyWithExpires("targets", time.Now().Add(duration))
+	s.repo.GenKeyWithExpires("targets", s.expiredTime)
 	s.syncLocal(c)
-	time.Sleep(duration)
-	c.Assert(client.getLocalMeta(), Equals, signed.ErrExpired)
-	c.Assert(client.localRootVer, Equals, version)
+	s.withMetaExpired(func() {
+		c.Assert(client.getLocalMeta(), Equals, signed.ErrExpired)
+		c.Assert(client.localRootVer, Equals, version)
+	})
 }
 
 func (s *ClientSuite) TestTimestampTooLarge(c *C) {
@@ -268,10 +287,9 @@ func (s *ClientSuite) TestTimestampTooLarge(c *C) {
 
 func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 	client := s.newClient(c)
-	duration := 100 * time.Millisecond
 
 	// add soon to expire root.json to local storage
-	c.Assert(s.repo.GenKeyWithExpires("timestamp", time.Now().Add(duration)), IsNil)
+	c.Assert(s.repo.GenKeyWithExpires("timestamp", s.expiredTime), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncLocal(c)
 
@@ -280,49 +298,52 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 	s.addRemoteTarget(c, "bar.txt")
 	s.syncRemote(c)
 
-	// wait for local storage to expire then check the update is ok (as
-	// the update will download the non expired remote root.json and
-	// restart itself)
-	time.Sleep(duration)
-	c.Assert(client.getLocalMeta(), Equals, signed.ErrExpired)
-	_, err := client.Update()
-	c.Assert(err, IsNil)
+	// check the update downloads the non expired remote root.json and
+	// restarts itself, thus successfully updating
+	s.withMetaExpired(func() {
+		c.Assert(client.getLocalMeta(), Equals, signed.ErrExpired)
+		_, err := client.Update()
+		c.Assert(err, IsNil)
+	})
 }
 
 func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
 	client := s.updatedClient(c)
-	duration := 100 * time.Millisecond
-	syncAndWait := func() {
-		s.syncRemote(c)
-		time.Sleep(duration)
-	}
 
 	// expired remote metadata should always be rejected
-	c.Assert(s.repo.TimestampWithExpires(time.Now().Add(duration)), IsNil)
-	syncAndWait()
-	_, err := client.Update()
-	c.Assert(err, DeepEquals, ErrExpiredMeta{"timestamp.json"})
+	c.Assert(s.repo.TimestampWithExpires(s.expiredTime), IsNil)
+	s.syncRemote(c)
+	s.withMetaExpired(func() {
+		_, err := client.Update()
+		c.Assert(err, DeepEquals, ErrExpiredMeta{"timestamp.json"})
+	})
 
-	c.Assert(s.repo.SnapshotWithExpires(tuf.CompressionTypeNone, time.Now().Add(duration)), IsNil)
+	c.Assert(s.repo.SnapshotWithExpires(tuf.CompressionTypeNone, s.expiredTime), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
-	syncAndWait()
-	_, err = client.Update()
-	c.Assert(err, DeepEquals, ErrExpiredMeta{"snapshot.json"})
+	s.syncRemote(c)
+	s.withMetaExpired(func() {
+		_, err := client.Update()
+		c.Assert(err, DeepEquals, ErrExpiredMeta{"snapshot.json"})
+	})
 
-	c.Assert(s.repo.AddTargetWithExpires("bar.txt", nil, time.Now().Add(duration)), IsNil)
+	c.Assert(s.repo.AddTargetWithExpires("bar.txt", nil, s.expiredTime), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
-	syncAndWait()
-	_, err = client.Update()
-	c.Assert(err, DeepEquals, ErrExpiredMeta{"targets.json"})
+	s.syncRemote(c)
+	s.withMetaExpired(func() {
+		_, err := client.Update()
+		c.Assert(err, DeepEquals, ErrExpiredMeta{"targets.json"})
+	})
 
-	c.Assert(s.repo.GenKeyWithExpires("timestamp", time.Now().Add(duration)), IsNil)
+	c.Assert(s.repo.GenKeyWithExpires("timestamp", s.expiredTime), IsNil)
 	c.Assert(s.repo.RemoveTarget("bar.txt"), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
-	syncAndWait()
-	_, err = client.Update()
-	c.Assert(err, DeepEquals, ErrExpiredMeta{"root.json"})
+	s.syncRemote(c)
+	s.withMetaExpired(func() {
+		_, err := client.Update()
+		c.Assert(err, DeepEquals, ErrExpiredMeta{"root.json"})
+	})
 }
 
 // TODO: Implement these tests:
