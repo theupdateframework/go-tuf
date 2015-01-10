@@ -76,3 +76,11 @@ type ErrMetaTooLarge struct {
 func (e ErrMetaTooLarge) Error() string {
 	return fmt.Sprintf("tuf: %s size %d bytes greater than maximum %d bytes", e.Name, e.Size, maxMetaSize)
 }
+
+type ErrExpiredMeta struct {
+	Name string
+}
+
+func (e ErrExpiredMeta) Error() string {
+	return fmt.Sprintf("tuf: %s has expired", e.Name)
+}

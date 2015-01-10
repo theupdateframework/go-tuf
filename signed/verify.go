@@ -20,6 +20,7 @@ var (
 	ErrRoleThreshold = errors.New("tuf: valid signatures did not meet threshold")
 	ErrLowVersion    = errors.New("tuf: version is lower than current version")
 	ErrWrongType     = errors.New("tuf: meta file has wrong type")
+	ErrExpired       = errors.New("tuf: meta file has expired")
 )
 
 type signedMeta struct {
@@ -29,6 +30,32 @@ type signedMeta struct {
 }
 
 func Verify(s *data.Signed, role string, minVersion int, db *keys.DB) error {
+	if err := VerifySignatures(s, role, db); err != nil {
+		return err
+	}
+
+	sm := &signedMeta{}
+	if err := json.Unmarshal(s.Signed, sm); err != nil {
+		return err
+	}
+	if sm.Type != role {
+		return ErrWrongType
+	}
+	if IsExpired(sm.Expires) {
+		return ErrExpired
+	}
+	if sm.Version < minVersion {
+		return ErrLowVersion
+	}
+
+	return nil
+}
+
+var IsExpired = func(t time.Time) bool {
+	return t.Sub(time.Now()) <= 0
+}
+
+func VerifySignatures(s *data.Signed, role string, db *keys.DB) error {
 	if len(s.Signatures) == 0 {
 		return ErrNoSignatures
 	}
@@ -75,24 +102,6 @@ func Verify(s *data.Signed, role string, minVersion int, db *keys.DB) error {
 		return ErrRoleThreshold
 	}
 
-	sm := &signedMeta{}
-	if err := json.Unmarshal(s.Signed, sm); err != nil {
-		return err
-	}
-	if sm.Type != role {
-		return ErrWrongType
-	}
-	if err := checkExpires(sm.Expires); err != nil {
-		return err
-	}
-	if sm.Version < minVersion {
-		return ErrLowVersion
-	}
-
-	return nil
-}
-
-var checkExpires = func(t time.Time) error {
 	return nil
 }
 
@@ -102,6 +111,17 @@ func Unmarshal(b []byte, v interface{}, role string, minVersion int, db *keys.DB
 		return err
 	}
 	if err := Verify(s, role, minVersion, db); err != nil {
+		return err
+	}
+	return json.Unmarshal(s.Signed, v)
+}
+
+func UnmarshalTrusted(b []byte, v interface{}, role string, db *keys.DB) error {
+	s := &data.Signed{}
+	if err := json.Unmarshal(b, s); err != nil {
+		return err
+	}
+	if err := VerifySignatures(s, role, db); err != nil {
 		return err
 	}
 	return json.Unmarshal(s.Signed, v)
