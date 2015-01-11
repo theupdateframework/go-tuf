@@ -309,6 +309,9 @@ func (c *Client) downloadMetaUnsafe(name string) ([]byte, error) {
 	}
 	defer r.Close()
 
+	// wrap in a timeoutReader to prevent slow retrieval attacks
+	stream := newTimeoutReader(r)
+
 	// return ErrMetaTooLarge if the reported size is greater than maxMetaSize
 	if size > maxMetaSize {
 		return nil, ErrMetaTooLarge{name, size}
@@ -317,7 +320,7 @@ func (c *Client) downloadMetaUnsafe(name string) ([]byte, error) {
 	// although the size has been checked above, use a LimitReader in case
 	// the reported size is inaccurate, or size is -1 which indicates an
 	// unknown length
-	return ioutil.ReadAll(io.LimitReader(r, maxMetaSize))
+	return ioutil.ReadAll(io.LimitReader(stream, maxMetaSize))
 }
 
 // downloadMeta downloads top-level metadata from remote storage and verifies
@@ -337,8 +340,9 @@ func (c *Client) downloadMeta(name string, m data.FileMeta) ([]byte, error) {
 		return nil, ErrWrongSize{name, size, m.Length}
 	}
 
-	// wrap the data in a LimitReader so we download at most m.Length bytes
-	stream := io.LimitReader(r, m.Length)
+	// wrap the data in a timeoutReader to prevent slow retrieval attacks,
+	// and a LimitReader so we download at most m.Length bytes
+	stream := newTimeoutReader(io.LimitReader(r, m.Length))
 
 	// read the data, simultaneously writing it to buf and generating metadata
 	var buf bytes.Buffer
@@ -465,8 +469,9 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 		return ErrWrongSize{name, size, localMeta.Length}
 	}
 
-	// wrap the data in a LimitReader so we download at most localMeta.Length bytes
-	stream := io.LimitReader(r, localMeta.Length)
+	// wrap the data in a timeoutReader to prevent slow retrieval attacks,
+	// and a LimitReader so we download at most localMeta.Length bytes
+	stream := newTimeoutReader(io.LimitReader(r, localMeta.Length))
 
 	// read the data, simultaneously writing it to dest and generating metadata
 	actual, err := util.GenerateFileMeta(io.TeeReader(stream, dest))

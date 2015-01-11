@@ -45,13 +45,28 @@ func newFakeFile(b []byte) *fakeFile {
 	return &fakeFile{buf: bytes.NewReader(b), size: int64(len(b))}
 }
 
+func newBlockingFakeFile(b []byte) *fakeFile {
+	return &fakeFile{typ: "blocking", buf: bytes.NewReader(b), size: int64(len(b))}
+}
+
+func newSlowFakeFile(b []byte) *fakeFile {
+	return &fakeFile{typ: "slow", buf: bytes.NewReader(b), size: int64(len(b))}
+}
+
 type fakeFile struct {
+	typ       string
 	buf       *bytes.Reader
 	bytesRead int
 	size      int64
 }
 
 func (f *fakeFile) Read(p []byte) (int, error) {
+	switch f.typ {
+	case "blocking":
+		<-make(chan struct{})
+	case "slow":
+		time.Sleep(2 * time.Second)
+	}
 	n, err := f.buf.Read(p)
 	f.bytesRead += n
 	return n, err
@@ -643,6 +658,26 @@ func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
 	s.syncRemote(c)
 	_, err = client.Update()
 	c.Assert(err, DeepEquals, ErrWrongSize{"targets.json", int64(len(tamperedJSON)), int64(len(targetsJSON))})
+}
+
+func (s *ClientSuite) TestUpdateSlowRetrievalAttack(c *C) {
+	meta, err := s.store.GetMeta()
+	c.Assert(err, IsNil)
+	snapshot, ok := meta["snapshot.json"]
+	if !ok {
+		c.Fatal("missing snapshot.json")
+	}
+	client := s.newClient(c)
+
+	s.remote["snapshot.json"] = newBlockingFakeFile(snapshot)
+	_, err = client.Update()
+	// c.Assert(err, DeepEquals, ErrWrongSize{"snapshot.json", 0, int64(len(snapshot))})
+	c.Assert(err, DeepEquals, ErrDownloadFailed{"snapshot.json", util.ErrWrongLength})
+
+	s.remote["snapshot.json"] = newSlowFakeFile(snapshot)
+	_, err = client.Update()
+	// c.Assert(err, DeepEquals, ErrWrongSize{"snapshot.json", 16384, int64(len(snapshot))})
+	c.Assert(err, DeepEquals, ErrDownloadFailed{"snapshot.json", util.ErrWrongLength})
 }
 
 type testDestination struct {
