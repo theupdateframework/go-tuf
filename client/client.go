@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
-	"time"
 
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/keys"
@@ -417,18 +416,6 @@ func (c *Client) hasMeta(name string, m data.FileMeta) bool {
 	}
 	err = util.FileMetaEqual(meta, m)
 	return err == nil
-}
-
-func (c *Client) Expires() time.Time {
-	return time.Time{}
-}
-
-func (c *Client) Version() int {
-	return 0
-}
-
-func (c *Client) Files() data.Files {
-	return nil
 }
 
 type Destination interface {
