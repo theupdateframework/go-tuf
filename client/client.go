@@ -342,7 +342,7 @@ func (c *Client) downloadMeta(name string, m data.FileMeta) ([]byte, error) {
 
 	// read the data, simultaneously writing it to buf and generating metadata
 	var buf bytes.Buffer
-	meta, err := util.GenerateFileMeta(io.TeeReader(stream, &buf))
+	meta, err := util.GenerateFileMeta(io.TeeReader(stream, &buf), m.HashAlgorithms()...)
 	if err != nil {
 		return nil, err
 	}
@@ -411,7 +411,7 @@ func (c *Client) hasMeta(name string, m data.FileMeta) bool {
 	if !ok {
 		return false
 	}
-	meta, err := util.GenerateFileMeta(bytes.NewReader(b))
+	meta, err := util.GenerateFileMeta(bytes.NewReader(b), m.HashAlgorithms()...)
 	if err != nil {
 		return false
 	}
@@ -469,7 +469,7 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 	stream := io.LimitReader(r, localMeta.Length)
 
 	// read the data, simultaneously writing it to dest and generating metadata
-	actual, err := util.GenerateFileMeta(io.TeeReader(stream, dest))
+	actual, err := util.GenerateFileMeta(io.TeeReader(stream, dest), localMeta.HashAlgorithms()...)
 	if err != nil {
 		return ErrDownloadFailed{name, err}
 	}

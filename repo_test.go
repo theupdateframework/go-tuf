@@ -466,3 +466,50 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(timestamp.Version, Equals, 2)
 }
+
+func (RepoSuite) TestHashAlgorithm(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	type hashTest struct {
+		args     []string
+		expected []string
+	}
+	for _, test := range []hashTest{
+		{args: []string{}, expected: []string{"sha512"}},
+		{args: []string{"sha256"}},
+		{args: []string{"sha512", "sha256"}},
+	} {
+		// generate metadata with specific hash functions
+		r, err := NewRepo(local, test.args...)
+		c.Assert(err, IsNil)
+		genKey(c, r, "root")
+		genKey(c, r, "targets")
+		genKey(c, r, "snapshot")
+		c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+		c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+		c.Assert(r.Timestamp(), IsNil)
+
+		// check metadata has correct hash functions
+		if test.expected == nil {
+			test.expected = test.args
+		}
+		targets, err := r.targets()
+		c.Assert(err, IsNil)
+		snapshot, err := r.snapshot()
+		c.Assert(err, IsNil)
+		timestamp, err := r.timestamp()
+		c.Assert(err, IsNil)
+		for name, file := range map[string]data.FileMeta{
+			"foo.txt":       targets.Targets["foo.txt"],
+			"root.json":     snapshot.Meta["root.json"],
+			"targets.json":  snapshot.Meta["targets.json"],
+			"snapshot.json": timestamp.Meta["snapshot.json"],
+		} {
+			for _, hashAlgorithm := range test.expected {
+				if _, ok := file.Hashes[hashAlgorithm]; !ok {
+					c.Fatalf("expected %s hash to contain hash func %s, got %s", name, hashAlgorithm, file.HashAlgorithms())
+				}
+			}
+		}
+	}
+}

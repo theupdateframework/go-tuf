@@ -104,6 +104,14 @@ type FileMeta struct {
 	Custom map[string]interface{} `json:"custom,omitempty"`
 }
 
+func (f FileMeta) HashAlgorithms() []string {
+	funcs := make([]string, 0, len(f.Hashes))
+	for name := range f.Hashes {
+		funcs = append(funcs, name)
+	}
+	return funcs
+}
+
 type Targets struct {
 	Type    string    `json:"_type"`
 	Version int       `json:"version"`

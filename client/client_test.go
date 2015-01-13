@@ -170,12 +170,12 @@ func assertFiles(c *C, files data.Files, names []string) {
 		if !ok {
 			c.Fatalf("unknown target %s", name)
 		}
-		meta, err := util.GenerateFileMeta(bytes.NewReader(target))
-		c.Assert(err, IsNil)
 		file, ok := files[name]
 		if !ok {
 			c.Fatalf("expected files to contain %s", name)
 		}
+		meta, err := util.GenerateFileMeta(bytes.NewReader(target), file.HashAlgorithms()...)
+		c.Assert(err, IsNil)
 		c.Assert(util.FileMetaEqual(file, meta), IsNil)
 	}
 }
