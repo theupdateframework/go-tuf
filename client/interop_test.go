@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/agl/ed25519"
@@ -31,7 +32,7 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 		b, err := ioutil.ReadFile(filepath.Join(repoDir, "targets", name))
 		c.Assert(err, IsNil)
 		targets[name] = b
-		remote["targets"+name] = newFakeFile(b)
+		remote[path.Join("targets"+name)] = newFakeFile(b)
 	}
 
 	// initiate a client with the root keys

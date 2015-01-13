@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"path"
 	"strings"
 	"testing"
 	"time"
@@ -89,7 +90,7 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	s.remote = make(FakeRemoteStore)
 	s.syncRemote(c)
 	for k, v := range targetFiles {
-		s.remote["targets"+k] = newFakeFile(v)
+		s.remote[path.Join("targets", k)] = newFakeFile(v)
 	}
 
 	s.expiredTime = time.Now().Add(time.Hour)

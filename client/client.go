@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
+	"path"
 
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/keys"
@@ -454,7 +455,7 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 	}
 
 	// get the data from remote storage
-	r, size, err := c.remote.Get("targets" + name)
+	r, size, err := c.remote.Get(path.Join("targets", name))
 	if err != nil {
 		return err
 	}
