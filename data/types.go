@@ -62,7 +62,7 @@ type Root struct {
 	Version int              `json:"version"`
 	Expires time.Time        `json:"expires"`
 	Keys    map[string]*Key  `json:"keys"`
-	Roles   map[string]*Role `json:"role"`
+	Roles   map[string]*Role `json:"roles"`
 
 	ConsistentSnapshot bool `json:"consistent_snapshot"`
 }
