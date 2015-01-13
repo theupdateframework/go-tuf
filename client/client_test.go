@@ -36,7 +36,7 @@ type FakeRemoteStore map[string]*fakeFile
 func (f FakeRemoteStore) Get(path string) (io.ReadCloser, int64, error) {
 	file, ok := f[path]
 	if !ok {
-		return nil, 0, ErrNotFound{strings.TrimPrefix(path, "targets/")}
+		return nil, 0, ErrNotFound{strings.TrimPrefix(path, "targets")}
 	}
 	return file, file.size, nil
 }
@@ -63,9 +63,9 @@ func (f *fakeFile) Close() error {
 }
 
 var targetFiles = map[string][]byte{
-	"foo.txt": []byte("foo"),
-	"bar.txt": []byte("bar"),
-	"baz.txt": []byte("baz"),
+	"/foo.txt": []byte("foo"),
+	"/bar.txt": []byte("bar"),
+	"/baz.txt": []byte("baz"),
 }
 
 func (s *ClientSuite) SetUpTest(c *C) {
@@ -89,7 +89,7 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	s.remote = make(FakeRemoteStore)
 	s.syncRemote(c)
 	for k, v := range targetFiles {
-		s.remote["targets/"+k] = newFakeFile(v)
+		s.remote["targets"+k] = newFakeFile(v)
 	}
 
 	s.expiredTime = time.Now().Add(time.Hour)
@@ -243,7 +243,7 @@ func (s *ClientSuite) TestFirstUpdate(c *C) {
 	files, err := s.newClient(c).Update()
 	c.Assert(err, IsNil)
 	c.Assert(files, HasLen, 1)
-	assertFiles(c, files, []string{"foo.txt"})
+	assertFiles(c, files, []string{"/foo.txt"})
 }
 
 func (s *ClientSuite) TestMissingRemoteMetadata(c *C) {
@@ -321,14 +321,14 @@ func (s *ClientSuite) TestNewTargets(c *C) {
 	client := s.newClient(c)
 	files, err := client.Update()
 	c.Assert(err, IsNil)
-	assertFiles(c, files, []string{"foo.txt"})
+	assertFiles(c, files, []string{"/foo.txt"})
 
 	s.addRemoteTarget(c, "bar.txt")
 	s.addRemoteTarget(c, "baz.txt")
 
 	files, err = client.Update()
 	c.Assert(err, IsNil)
-	assertFiles(c, files, []string{"bar.txt", "baz.txt"})
+	assertFiles(c, files, []string{"/bar.txt", "/baz.txt"})
 
 	// Adding the same exact file should not lead to an update
 	s.addRemoteTarget(c, "bar.txt")
@@ -658,7 +658,7 @@ func (t *testDestination) Delete() error {
 func (s *ClientSuite) TestDownloadUnknownTarget(c *C) {
 	client := s.updatedClient(c)
 	var dest testDestination
-	c.Assert(client.Download("nonexistent", &dest), Equals, ErrUnknownTarget{"nonexistent"})
+	c.Assert(client.Download("/nonexistent", &dest), Equals, ErrUnknownTarget{"/nonexistent"})
 	c.Assert(dest.deleted, Equals, true)
 }
 
@@ -666,14 +666,14 @@ func (s *ClientSuite) TestDownloadNoExist(c *C) {
 	client := s.updatedClient(c)
 	delete(s.remote, "targets/foo.txt")
 	var dest testDestination
-	c.Assert(client.Download("foo.txt", &dest), Equals, ErrNotFound{"foo.txt"})
+	c.Assert(client.Download("/foo.txt", &dest), Equals, ErrNotFound{"/foo.txt"})
 	c.Assert(dest.deleted, Equals, true)
 }
 
 func (s *ClientSuite) TestDownloadOK(c *C) {
 	client := s.updatedClient(c)
 	var dest testDestination
-	c.Assert(client.Download("foo.txt", &dest), IsNil)
+	c.Assert(client.Download("/foo.txt", &dest), IsNil)
 	c.Assert(dest.deleted, Equals, false)
 	c.Assert(dest.String(), Equals, "foo")
 }
@@ -683,7 +683,7 @@ func (s *ClientSuite) TestDownloadWrongSize(c *C) {
 	remoteFile := &fakeFile{buf: bytes.NewReader([]byte("wrong-size")), size: 10}
 	s.remote["targets/foo.txt"] = remoteFile
 	var dest testDestination
-	c.Assert(client.Download("foo.txt", &dest), DeepEquals, ErrWrongSize{"foo.txt", 10, 3})
+	c.Assert(client.Download("/foo.txt", &dest), DeepEquals, ErrWrongSize{"/foo.txt", 10, 3})
 	c.Assert(remoteFile.bytesRead, Equals, 0)
 	c.Assert(dest.deleted, Equals, true)
 }
@@ -693,7 +693,7 @@ func (s *ClientSuite) TestDownloadTargetTooLong(c *C) {
 	remoteFile := s.remote["targets/foo.txt"]
 	remoteFile.buf = bytes.NewReader([]byte("foo-ooo"))
 	var dest testDestination
-	c.Assert(client.Download("foo.txt", &dest), IsNil)
+	c.Assert(client.Download("/foo.txt", &dest), IsNil)
 	c.Assert(remoteFile.bytesRead, Equals, 3)
 	c.Assert(dest.deleted, Equals, false)
 	c.Assert(dest.String(), Equals, "foo")
@@ -704,7 +704,7 @@ func (s *ClientSuite) TestDownloadTargetTooShort(c *C) {
 	remoteFile := s.remote["targets/foo.txt"]
 	remoteFile.buf = bytes.NewReader([]byte("fo"))
 	var dest testDestination
-	c.Assert(client.Download("foo.txt", &dest), DeepEquals, ErrWrongSize{"foo.txt", 2, 3})
+	c.Assert(client.Download("/foo.txt", &dest), DeepEquals, ErrWrongSize{"/foo.txt", 2, 3})
 	c.Assert(dest.deleted, Equals, true)
 }
 
@@ -713,7 +713,7 @@ func (s *ClientSuite) TestDownloadTargetCorruptData(c *C) {
 	remoteFile := s.remote["targets/foo.txt"]
 	remoteFile.buf = bytes.NewReader([]byte("corrupt"))
 	var dest testDestination
-	assertWrongHash(c, client.Download("foo.txt", &dest))
+	assertWrongHash(c, client.Download("/foo.txt", &dest))
 	c.Assert(dest.deleted, Equals, true)
 }
 
@@ -721,7 +721,7 @@ func (s *ClientSuite) TestAvailableTargets(c *C) {
 	client := s.updatedClient(c)
 	files, err := client.Targets()
 	c.Assert(err, IsNil)
-	assertFiles(c, files, []string{"foo.txt"})
+	assertFiles(c, files, []string{"/foo.txt"})
 
 	s.addRemoteTarget(c, "bar.txt")
 	s.addRemoteTarget(c, "baz.txt")
@@ -729,5 +729,5 @@ func (s *ClientSuite) TestAvailableTargets(c *C) {
 	c.Assert(err, IsNil)
 	files, err = client.Targets()
 	c.Assert(err, IsNil)
-	assertFiles(c, files, []string{"foo.txt", "bar.txt", "baz.txt"})
+	assertFiles(c, files, []string{"/foo.txt", "/bar.txt", "/baz.txt"})
 }

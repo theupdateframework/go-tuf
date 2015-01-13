@@ -447,14 +447,14 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 		}
 	}
 
-	// return ErrNotFound if the file is not in the local targets.json
-	localMeta, ok := c.targets[name]
+	// return ErrUnknownTarget if the file is not in the local targets.json
+	localMeta, ok := c.targets[util.NormalizeTarget(name)]
 	if !ok {
 		return ErrUnknownTarget{name}
 	}
 
 	// get the data from remote storage
-	r, size, err := c.remote.Get("targets/" + name)
+	r, size, err := c.remote.Get("targets" + name)
 	if err != nil {
 		return err
 	}

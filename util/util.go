@@ -10,6 +10,8 @@ import (
 	"hash"
 	"io"
 	"io/ioutil"
+	"path/filepath"
+	"strings"
 
 	"github.com/flynn/go-tuf/data"
 )
@@ -94,8 +96,19 @@ func GenerateFileMeta(r io.Reader, hashAlgorithms ...string) (data.FileMeta, err
 		return data.FileMeta{}, err
 	}
 	m := data.FileMeta{Length: n, Hashes: make(map[string]data.HexBytes, len(hashes))}
-	for hashFunc, h := range hashes {
-		m.Hashes[hashFunc] = h.Sum(nil)
+	for hashAlgorithm, h := range hashes {
+		m.Hashes[hashAlgorithm] = h.Sum(nil)
 	}
 	return m, nil
+}
+
+func NormalizeTarget(path string) string {
+	if path == "" {
+		return "/"
+	}
+	s := filepath.Clean(path)
+	if strings.HasPrefix(s, "/") {
+		return s
+	}
+	return "/" + s
 }

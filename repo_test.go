@@ -316,7 +316,7 @@ func (RepoSuite) TestSign(c *C) {
 }
 
 func (RepoSuite) TestCommit(c *C) {
-	files := map[string][]byte{"foo.txt": []byte("foo"), "bar.txt": []byte("bar")}
+	files := map[string][]byte{"/foo.txt": []byte("foo"), "/bar.txt": []byte("bar")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -383,7 +383,7 @@ func (RepoSuite) TestCommit(c *C) {
 }
 
 func (RepoSuite) TestExpiresAndVersion(c *C) {
-	files := map[string][]byte{"foo.txt": []byte("foo")}
+	files := map[string][]byte{"/foo.txt": []byte("foo")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -468,7 +468,7 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 }
 
 func (RepoSuite) TestHashAlgorithm(c *C) {
-	files := map[string][]byte{"foo.txt": []byte("foo")}
+	files := map[string][]byte{"/foo.txt": []byte("foo")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	type hashTest struct {
 		args     []string
@@ -500,7 +500,7 @@ func (RepoSuite) TestHashAlgorithm(c *C) {
 		timestamp, err := r.timestamp()
 		c.Assert(err, IsNil)
 		for name, file := range map[string]data.FileMeta{
-			"foo.txt":       targets.Targets["foo.txt"],
+			"foo.txt":       targets.Targets["/foo.txt"],
 			"root.json":     snapshot.Meta["root.json"],
 			"targets.json":  snapshot.Meta["targets.json"],
 			"snapshot.json": timestamp.Meta["snapshot.json"],

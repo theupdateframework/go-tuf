@@ -370,6 +370,7 @@ func (r *Repo) AddTargetWithExpires(path string, custom map[string]interface{}, 
 	if err != nil {
 		return err
 	}
+	path = util.NormalizeTarget(path)
 	target, err := r.local.GetStagedTarget(path)
 	if err != nil {
 		return err
@@ -397,6 +398,7 @@ func (r *Repo) RemoveTargetWithExpires(path string, expires time.Time) error {
 	if err != nil {
 		return err
 	}
+	path = util.NormalizeTarget(path)
 	if _, ok := t.Targets[path]; !ok {
 		return nil
 	}

@@ -96,3 +96,16 @@ func (UtilSuite) TestFileMetaEqual(c *C) {
 		c.Assert(FileMetaEqual(t.a, t.b), DeepEquals, t.err(t), Commentf("name = %s", t.name))
 	}
 }
+
+func (UtilSuite) TestNormalizeTarget(c *C) {
+	for before, after := range map[string]string{
+		"":                    "/",
+		"foo.txt":             "/foo.txt",
+		"/bar.txt":            "/bar.txt",
+		"foo//bar.txt":        "/foo/bar.txt",
+		"/with/./a/dot":       "/with/a/dot",
+		"/with/double/../dot": "/with/dot",
+	} {
+		c.Assert(NormalizeTarget(before), Equals, after)
+	}
+}
