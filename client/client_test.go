@@ -554,6 +554,12 @@ func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
 }
 
 func (s *ClientSuite) TestUpdateMixAndMatchAttack(c *C) {
+	// generate metadata with an explicit expires so we can make predictable changes
+	expires := time.Now().Add(time.Hour)
+	c.Assert(s.repo.AddTargetWithExpires("foo.txt", nil, expires), IsNil)
+	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	s.syncRemote(c)
 	client := s.updatedClient(c)
 
 	// grab the remote targets.json
@@ -563,7 +569,10 @@ func (s *ClientSuite) TestUpdateMixAndMatchAttack(c *C) {
 	}
 
 	// generate new remote metadata, but replace targets.json with the old one
-	s.addRemoteTarget(c, "bar.txt")
+	c.Assert(s.repo.AddTargetWithExpires("bar.txt", nil, expires), IsNil)
+	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	s.syncRemote(c)
 	newTargets, ok := s.remote["targets.json"]
 	if !ok {
 		c.Fatal("missing remote targets.json")
@@ -575,7 +584,7 @@ func (s *ClientSuite) TestUpdateMixAndMatchAttack(c *C) {
 	c.Assert(err, DeepEquals, ErrWrongSize{"targets.json", oldTargets.size, newTargets.size})
 
 	// do the same but keep the size the same
-	c.Assert(s.repo.RemoveTarget("foo.txt"), IsNil)
+	c.Assert(s.repo.RemoveTargetWithExpires("foo.txt", expires), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncRemote(c)
