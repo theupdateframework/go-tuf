@@ -2,11 +2,16 @@ package util
 
 import (
 	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
 
 	"github.com/flynn/go-tuf/data"
 )
@@ -39,6 +44,14 @@ func (e ErrNoCommonHash) Error() string {
 	return fmt.Sprintf("no common hash function, expected one of %s, got %s", types(e.Expected), types(e.Actual))
 }
 
+type ErrUnknownHashAlgorithm struct {
+	Name string
+}
+
+func (e ErrUnknownHashAlgorithm) Error() string {
+	return fmt.Sprintf("unknown hash algorithm: %s", e.Name)
+}
+
 func FileMetaEqual(actual data.FileMeta, expected data.FileMeta) error {
 	if actual.Length != expected.Length {
 		return ErrWrongLength
@@ -58,14 +71,44 @@ func FileMetaEqual(actual data.FileMeta, expected data.FileMeta) error {
 	return nil
 }
 
-func GenerateFileMeta(r io.Reader) (data.FileMeta, error) {
-	h := sha512.New()
-	n, err := io.Copy(h, r)
+const defaultHashAlgorithm = "sha512"
+
+func GenerateFileMeta(r io.Reader, hashAlgorithms ...string) (data.FileMeta, error) {
+	if len(hashAlgorithms) == 0 {
+		hashAlgorithms = []string{defaultHashAlgorithm}
+	}
+	hashes := make(map[string]hash.Hash, len(hashAlgorithms))
+	for _, hashAlgorithm := range hashAlgorithms {
+		var h hash.Hash
+		switch hashAlgorithm {
+		case "sha256":
+			h = sha256.New()
+		case "sha512":
+			h = sha512.New()
+		default:
+			return data.FileMeta{}, ErrUnknownHashAlgorithm{hashAlgorithm}
+		}
+		hashes[hashAlgorithm] = h
+		r = io.TeeReader(r, h)
+	}
+	n, err := io.Copy(ioutil.Discard, r)
 	if err != nil {
 		return data.FileMeta{}, err
 	}
-	return data.FileMeta{
-		Length: n,
-		Hashes: map[string]data.HexBytes{"sha512": h.Sum(nil)},
-	}, nil
+	m := data.FileMeta{Length: n, Hashes: make(map[string]data.HexBytes, len(hashes))}
+	for hashAlgorithm, h := range hashes {
+		m.Hashes[hashAlgorithm] = h.Sum(nil)
+	}
+	return m, nil
+}
+
+func NormalizeTarget(path string) string {
+	if path == "" {
+		return "/"
+	}
+	s := filepath.Clean(path)
+	if strings.HasPrefix(s, "/") {
+		return s
+	}
+	return "/" + s
 }

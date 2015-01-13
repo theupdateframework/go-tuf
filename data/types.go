@@ -62,7 +62,7 @@ type Root struct {
 	Version int              `json:"version"`
 	Expires time.Time        `json:"expires"`
 	Keys    map[string]*Key  `json:"keys"`
-	Roles   map[string]*Role `json:"role"`
+	Roles   map[string]*Role `json:"roles"`
 
 	ConsistentSnapshot bool `json:"consistent_snapshot"`
 }
@@ -102,6 +102,14 @@ type FileMeta struct {
 	Length int64                  `json:"length"`
 	Hashes map[string]HexBytes    `json:"hashes"`
 	Custom map[string]interface{} `json:"custom,omitempty"`
+}
+
+func (f FileMeta) HashAlgorithms() []string {
+	funcs := make([]string, 0, len(f.Hashes))
+	for name := range f.Hashes {
+		funcs = append(funcs, name)
+	}
+	return funcs
 }
 
 type Targets struct {

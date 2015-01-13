@@ -45,12 +45,13 @@ type LocalStore interface {
 }
 
 type Repo struct {
-	local LocalStore
-	meta  map[string]json.RawMessage
+	local          LocalStore
+	hashAlgorithms []string
+	meta           map[string]json.RawMessage
 }
 
-func NewRepo(local LocalStore) (*Repo, error) {
-	r := &Repo{local: local}
+func NewRepo(local LocalStore, hashAlgorithms ...string) (*Repo, error) {
+	r := &Repo{local: local, hashAlgorithms: hashAlgorithms}
 
 	var err error
 	r.meta, err = local.GetMeta()
@@ -369,12 +370,13 @@ func (r *Repo) AddTargetWithExpires(path string, custom map[string]interface{}, 
 	if err != nil {
 		return err
 	}
+	path = util.NormalizeTarget(path)
 	target, err := r.local.GetStagedTarget(path)
 	if err != nil {
 		return err
 	}
 	defer target.Close()
-	t.Targets[path], err = util.GenerateFileMeta(target)
+	t.Targets[path], err = util.GenerateFileMeta(target, r.hashAlgorithms...)
 	if err != nil {
 		return err
 	}
@@ -396,6 +398,7 @@ func (r *Repo) RemoveTargetWithExpires(path string, expires time.Time) error {
 	if err != nil {
 		return err
 	}
+	path = util.NormalizeTarget(path)
 	if _, ok := t.Targets[path]; !ok {
 		return nil
 	}
@@ -556,5 +559,5 @@ func (r *Repo) fileMeta(name string) (data.FileMeta, error) {
 	if !ok {
 		return data.FileMeta{}, ErrMissingMetadata{name}
 	}
-	return util.GenerateFileMeta(bytes.NewReader(b))
+	return util.GenerateFileMeta(bytes.NewReader(b), r.hashAlgorithms...)
 }
