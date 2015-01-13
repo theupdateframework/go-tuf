@@ -255,7 +255,7 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 }
 
 func (r *Repo) setMeta(name string, meta interface{}) error {
-	keys, err := r.local.GetKeys(strings.TrimSuffix(name, ".json"))
+	keys, err := r.getKeys(strings.TrimSuffix(name, ".json"))
 	if err != nil {
 		return err
 	}
@@ -282,7 +282,7 @@ func (r *Repo) Sign(name string) error {
 		return err
 	}
 
-	keys, err := r.local.GetKeys(role)
+	keys, err := r.getKeys(role)
 	if err != nil {
 		return err
 	}
@@ -299,6 +299,40 @@ func (r *Repo) Sign(name string) error {
 	}
 	r.meta[name] = b
 	return r.local.SetMeta(name, b)
+}
+
+// getKeys returns signing keys from local storage.
+//
+// Only keys contained in the keys db are returned (i.e. local keys which have
+// been revoked are omitted), except for the root role in which case all local
+// keys are returned (revoked root keys still need to sign new root metadata so
+// clients can verify the new root.json and update their keys db accordingly).
+func (r *Repo) getKeys(name string) ([]*data.Key, error) {
+	localKeys, err := r.local.GetKeys(name)
+	if err != nil {
+		return nil, err
+	}
+	if name == "root" {
+		return localKeys, nil
+	}
+	db, err := r.db()
+	if err != nil {
+		return nil, err
+	}
+	role := db.GetRole(name)
+	if role == nil {
+		return nil, nil
+	}
+	if len(role.KeyIDs) == 0 {
+		return nil, nil
+	}
+	keys := make([]*data.Key, 0, len(role.KeyIDs))
+	for _, key := range localKeys {
+		if _, ok := role.KeyIDs[key.ID()]; ok {
+			keys = append(keys, key)
+		}
+	}
+	return keys, nil
 }
 
 func (r *Repo) signedMeta(name string) (*data.Signed, error) {

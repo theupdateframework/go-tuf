@@ -43,12 +43,12 @@ type Client struct {
 	local  LocalStore
 	remote RemoteStore
 
-	// The following four fields represent the versions of metatdata from
-	// local storage
-	localRootVer      int
-	localTargetsVer   int
-	localSnapshotVer  int
-	localTimestampVer int
+	// The following four fields represent the versions of metatdata either
+	// from local storage or from recently downloaded metadata
+	rootVer      int
+	targetsVer   int
+	snapshotVer  int
+	timestampVer int
 
 	// targets is the list of available targets, either from local storage
 	// or from recently downloaded targets metadata
@@ -75,6 +75,9 @@ func NewClient(local LocalStore, remote RemoteStore) *Client {
 // and threshold, and then saved in local storage. It is expected that rootKeys
 // were securely distributed with the software being updated.
 func (c *Client) Init(rootKeys []*data.Key, threshold int) error {
+	if len(rootKeys) < threshold {
+		return ErrInsufficientKeys
+	}
 	rootJSON, err := c.downloadMetaUnsafe("root.json")
 	if err != nil {
 		return err
@@ -94,7 +97,7 @@ func (c *Client) Init(rootKeys []*data.Key, threshold int) error {
 		return err
 	}
 
-	if err := c.verifyRoot(rootJSON); err != nil {
+	if err := c.decodeRoot(rootJSON); err != nil {
 		return err
 	}
 
@@ -114,19 +117,17 @@ func (c *Client) Update() (data.Files, error) {
 func (c *Client) update(latestRoot bool) (data.Files, error) {
 	// Always start the update using local metadata
 	if err := c.getLocalMeta(); err != nil {
-		if err == signed.ErrExpired {
-			// if the latest root.json has been downloaded and it
-			// is still expired, halt the update with an error
-			if latestRoot {
-				return nil, ErrExpiredMeta{"root.json"}
+		if _, ok := err.(signed.ErrExpired); ok {
+			if !latestRoot {
+				return c.updateWithLatestRoot(nil)
 			}
-			return c.updateWithLatestRoot(nil)
+			// this should not be reached as if the latest root has
+			// been downloaded and it is expired, updateWithLatestRoot
+			// should not have continued the update
+			return nil, err
 		}
 		return nil, err
 	}
-
-	// TODO: If we get an invalid signature downloading timestamp.json
-	//       or snapshot.json, return c.updateWithLatestRoot
 
 	// Get timestamp.json, extract snapshot.json file meta and save the
 	// timestamp.json locally
@@ -136,6 +137,11 @@ func (c *Client) update(latestRoot bool) (data.Files, error) {
 	}
 	snapshotMeta, err := c.decodeTimestamp(timestampJSON)
 	if err != nil {
+		// ErrRoleThreshold could indicate timestamp keys have been
+		// revoked, so retry with the latest root.json
+		if isDecodeFailedWithErr(err, signed.ErrRoleThreshold) && !latestRoot {
+			return c.updateWithLatestRoot(nil)
+		}
 		return nil, err
 	}
 	if err := c.local.SetMeta("timestamp.json", timestampJSON); err != nil {
@@ -144,7 +150,7 @@ func (c *Client) update(latestRoot bool) (data.Files, error) {
 
 	// Return ErrLatestSnapshot if we already have the latest snapshot.json
 	if c.hasMeta("snapshot.json", snapshotMeta) {
-		return nil, ErrLatestSnapshot{c.localSnapshotVer}
+		return nil, ErrLatestSnapshot{c.snapshotVer}
 	}
 
 	// Get snapshot.json, then extract root.json and targets.json file meta.
@@ -158,6 +164,11 @@ func (c *Client) update(latestRoot bool) (data.Files, error) {
 	}
 	rootMeta, targetsMeta, err := c.decodeSnapshot(snapshotJSON)
 	if err != nil {
+		// ErrRoleThreshold could indicate snapshot keys have been
+		// revoked, so retry with the latest root.json
+		if isDecodeFailedWithErr(err, signed.ErrRoleThreshold) && !latestRoot {
+			return c.updateWithLatestRoot(nil)
+		}
 		return nil, err
 	}
 
@@ -203,7 +214,7 @@ func (c *Client) updateWithLatestRoot(m *data.FileMeta) (data.Files, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := c.verifyRoot(rootJSON); err != nil {
+	if err := c.decodeRoot(rootJSON); err != nil {
 		return nil, err
 	}
 	if err := c.local.SetMeta("root.json", rootJSON); err != nil {
@@ -247,7 +258,6 @@ func (c *Client) getLocalMeta() error {
 		if err := signed.Verify(s, "root", 0, db); err != nil {
 			return err
 		}
-		c.localRootVer = root.Version
 		c.db = db
 	} else {
 		return ErrNoRootKeys
@@ -258,7 +268,7 @@ func (c *Client) getLocalMeta() error {
 		if err := signed.UnmarshalTrusted(snapshotJSON, snapshot, "snapshot", c.db); err != nil {
 			return err
 		}
-		c.localSnapshotVer = snapshot.Version
+		c.snapshotVer = snapshot.Version
 	}
 
 	if targetsJSON, ok := meta["targets.json"]; ok {
@@ -266,7 +276,7 @@ func (c *Client) getLocalMeta() error {
 		if err := signed.UnmarshalTrusted(targetsJSON, targets, "targets", c.db); err != nil {
 			return err
 		}
-		c.localTargetsVer = targets.Version
+		c.targetsVer = targets.Version
 		c.targets = targets.Targets
 	}
 
@@ -275,7 +285,7 @@ func (c *Client) getLocalMeta() error {
 		if err := signed.UnmarshalTrusted(timestampJSON, timestamp, "timestamp", c.db); err != nil {
 			return err
 		}
-		c.localTimestampVer = timestamp.Version
+		c.timestampVer = timestamp.Version
 	}
 
 	c.localMeta = meta
@@ -342,29 +352,24 @@ func (c *Client) downloadMeta(name string, m data.FileMeta) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// verifyRoot verifies root metadata.
-func (c *Client) verifyRoot(b json.RawMessage) (err error) {
-	s := &data.Signed{}
-	if err = json.Unmarshal(b, s); err != nil {
-		return
+// decodeRoot decodes and verifies root metadata.
+func (c *Client) decodeRoot(b json.RawMessage) error {
+	root := &data.Root{}
+	if err := signed.Unmarshal(b, root, "root", c.rootVer, c.db); err != nil {
+		return ErrDecodeFailed{"root.json", err}
 	}
-	err = signed.Verify(s, "root", c.localRootVer, c.db)
-	if err == signed.ErrExpired {
-		err = ErrExpiredMeta{"root.json"}
-	}
-	return
+	c.rootVer = root.Version
+	return nil
 }
 
 // decodeSnapshot decodes and verifies snapshot metadata, and returns the new
 // root and targets file meta.
 func (c *Client) decodeSnapshot(b json.RawMessage) (data.FileMeta, data.FileMeta, error) {
 	snapshot := &data.Snapshot{}
-	if err := signed.Unmarshal(b, snapshot, "snapshot", c.localSnapshotVer, c.db); err != nil {
-		if err == signed.ErrExpired {
-			err = ErrExpiredMeta{"snapshot.json"}
-		}
-		return data.FileMeta{}, data.FileMeta{}, err
+	if err := signed.Unmarshal(b, snapshot, "snapshot", c.snapshotVer, c.db); err != nil {
+		return data.FileMeta{}, data.FileMeta{}, ErrDecodeFailed{"snapshot.json", err}
 	}
+	c.snapshotVer = snapshot.Version
 	return snapshot.Meta["root.json"], snapshot.Meta["targets.json"], nil
 }
 
@@ -372,11 +377,8 @@ func (c *Client) decodeSnapshot(b json.RawMessage) (data.FileMeta, data.FileMeta
 // returns updated targets.
 func (c *Client) decodeTargets(b json.RawMessage) (data.Files, error) {
 	targets := &data.Targets{}
-	if err := signed.Unmarshal(b, targets, "targets", c.localTargetsVer, c.db); err != nil {
-		if err == signed.ErrExpired {
-			err = ErrExpiredMeta{"targets.json"}
-		}
-		return nil, err
+	if err := signed.Unmarshal(b, targets, "targets", c.targetsVer, c.db); err != nil {
+		return nil, ErrDecodeFailed{"targets.json", err}
 	}
 	updatedTargets := make(data.Files)
 	for path, meta := range targets.Targets {
@@ -387,6 +389,7 @@ func (c *Client) decodeTargets(b json.RawMessage) (data.Files, error) {
 		}
 		updatedTargets[path] = meta
 	}
+	c.targetsVer = targets.Version
 	c.targets = targets.Targets
 	return updatedTargets, nil
 }
@@ -395,12 +398,10 @@ func (c *Client) decodeTargets(b json.RawMessage) (data.Files, error) {
 // new snapshot file meta.
 func (c *Client) decodeTimestamp(b json.RawMessage) (data.FileMeta, error) {
 	timestamp := &data.Timestamp{}
-	if err := signed.Unmarshal(b, timestamp, "timestamp", c.localTimestampVer, c.db); err != nil {
-		if err == signed.ErrExpired {
-			err = ErrExpiredMeta{"timestamp.json"}
-		}
-		return data.FileMeta{}, err
+	if err := signed.Unmarshal(b, timestamp, "timestamp", c.timestampVer, c.db); err != nil {
+		return data.FileMeta{}, ErrDecodeFailed{"timestamp.json", err}
 	}
+	c.timestampVer = timestamp.Version
 	return timestamp.Meta["snapshot.json"], nil
 }
 

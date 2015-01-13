@@ -32,10 +32,7 @@ func (VerifySuite) Test(c *C) {
 		mut   func(*test)
 	}
 
-	expires := func(d time.Duration) *time.Time {
-		t := time.Now().Add(d)
-		return &t
-	}
+	expiredTime := time.Now().Add(-time.Hour)
 	minVer := 10
 	tests := []test{
 		{
@@ -135,12 +132,12 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "low version",
 			ver:  minVer - 1,
-			err:  ErrLowVersion,
+			err:  ErrLowVersion{minVer - 1, minVer},
 		},
 		{
 			name: "expired",
-			exp:  expires(-time.Hour),
-			err:  ErrExpired,
+			exp:  &expiredTime,
+			err:  ErrExpired{expiredTime},
 		},
 	}
 	for _, t := range tests {
@@ -151,7 +148,8 @@ func (VerifySuite) Test(c *C) {
 			t.ver = minVer
 		}
 		if t.exp == nil {
-			t.exp = expires(time.Hour)
+			expires := time.Now().Add(time.Hour)
+			t.exp = &expires
 		}
 		if t.typ == "" {
 			t.typ = t.role
@@ -184,6 +182,18 @@ func (VerifySuite) Test(c *C) {
 		}
 
 		err := Verify(t.s, t.role, minVer, db)
-		c.Assert(err, Equals, t.err, Commentf("name = %s", t.name))
+		if e, ok := t.err.(ErrExpired); ok {
+			assertErrExpired(c, err, e)
+		} else {
+			c.Assert(err, DeepEquals, t.err, Commentf("name = %s", t.name))
+		}
 	}
+}
+
+func assertErrExpired(c *C, err error, expected ErrExpired) {
+	actual, ok := err.(ErrExpired)
+	if !ok {
+		c.Fatalf("expected err to have type ErrExpired, got %T", err)
+	}
+	c.Assert(actual.Expired.Unix(), Equals, expected.Expired.Unix())
 }

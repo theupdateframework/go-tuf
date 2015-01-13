@@ -5,7 +5,10 @@ import (
 	"fmt"
 )
 
-var ErrNoRootKeys = errors.New("tuf: no root keys found in local meta store")
+var (
+	ErrNoRootKeys       = errors.New("tuf: no root keys found in local meta store")
+	ErrInsufficientKeys = errors.New("tuf: insufficient keys to meet threshold")
+)
 
 type ErrMissingRemoteMetadata struct {
 	Name string
@@ -22,6 +25,23 @@ type ErrDownloadFailed struct {
 
 func (e ErrDownloadFailed) Error() string {
 	return fmt.Sprintf("tuf: failed to download %s: %s", e.File, e.Err)
+}
+
+type ErrDecodeFailed struct {
+	File string
+	Err  error
+}
+
+func (e ErrDecodeFailed) Error() string {
+	return fmt.Sprintf("tuf: failed to decode %s: %s", e.File, e.Err)
+}
+
+func isDecodeFailedWithErr(err, expected error) bool {
+	e, ok := err.(ErrDecodeFailed)
+	if !ok {
+		return false
+	}
+	return e.Err == expected
 }
 
 type ErrNotFound struct {
@@ -75,12 +95,4 @@ type ErrMetaTooLarge struct {
 
 func (e ErrMetaTooLarge) Error() string {
 	return fmt.Sprintf("tuf: %s size %d bytes greater than maximum %d bytes", e.Name, e.Size, maxMetaSize)
-}
-
-type ErrExpiredMeta struct {
-	Name string
-}
-
-func (e ErrExpiredMeta) Error() string {
-	return fmt.Sprintf("tuf: %s has expired", e.Name)
 }
