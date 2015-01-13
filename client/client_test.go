@@ -682,10 +682,13 @@ func (s *ClientSuite) TestDownloadNoExist(c *C) {
 
 func (s *ClientSuite) TestDownloadOK(c *C) {
 	client := s.updatedClient(c)
-	var dest testDestination
-	c.Assert(client.Download("/foo.txt", &dest), IsNil)
-	c.Assert(dest.deleted, Equals, false)
-	c.Assert(dest.String(), Equals, "foo")
+	// the filename is normalized if necessary
+	for _, name := range []string{"/foo.txt", "foo.txt"} {
+		var dest testDestination
+		c.Assert(client.Download(name, &dest), IsNil)
+		c.Assert(dest.deleted, Equals, false)
+		c.Assert(dest.String(), Equals, "foo")
+	}
 }
 
 func (s *ClientSuite) TestDownloadWrongSize(c *C) {
