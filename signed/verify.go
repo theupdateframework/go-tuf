@@ -3,6 +3,7 @@ package signed
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/agl/ed25519"
@@ -36,7 +37,7 @@ func Verify(s *data.Signed, role string, minVersion int, db *keys.DB) error {
 	if err := json.Unmarshal(s.Signed, sm); err != nil {
 		return err
 	}
-	if sm.Type != role {
+	if strings.ToLower(sm.Type) != strings.ToLower(role) {
 		return ErrWrongType
 	}
 	if IsExpired(sm.Expires) {
