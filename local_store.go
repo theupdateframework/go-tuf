@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/flynn/go-tuf/data"
+	"github.com/flynn/go-tuf/util"
 )
 
 func MemoryStore(meta map[string]json.RawMessage, files map[string][]byte) LocalStore {
@@ -168,7 +169,7 @@ func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, targets data.F
 		return nil
 	}
 	needsRemoval := func(path string) bool {
-		_, ok := targets[path]
+		_, ok := targets[util.NormalizeTarget(path)]
 		return !ok
 	}
 	removeFile := func(path string, info os.FileInfo, err error) error {
