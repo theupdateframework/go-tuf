@@ -114,7 +114,7 @@ func (s *ClientSuite) genKeyExpired(c *C, role string) string {
 func (s *ClientSuite) withMetaExpired(f func()) {
 	e := signed.IsExpired
 	signed.IsExpired = func(t time.Time) bool {
-		return t.Unix() == s.expiredTime.Unix()
+		return t.Unix() == s.expiredTime.Round(time.Second).Unix()
 	}
 	f()
 	signed.IsExpired = e
@@ -203,7 +203,7 @@ func (s *ClientSuite) assertErrExpired(c *C, err error, file string) {
 	if !ok {
 		c.Fatalf("expected err.Err to have type signed.ErrExpired, got %T", err)
 	}
-	c.Assert(expiredErr.Expired.Unix(), Equals, s.expiredTime.Unix())
+	c.Assert(expiredErr.Expired.Unix(), Equals, s.expiredTime.Round(time.Second).Unix())
 }
 
 func (s *ClientSuite) TestInitRootTooLarge(c *C) {

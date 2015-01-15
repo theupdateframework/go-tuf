@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
+	"net"
+	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 
 	"github.com/agl/ed25519"
+	"github.com/flynn/go-tuf"
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/util"
 	. "gopkg.in/check.v1"
@@ -66,4 +70,83 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 		c.Assert(dest.deleted, Equals, false)
 		c.Assert(dest.String(), Equals, filepath.Base(name))
 	}
+}
+
+func (InteropSuite) TestPythonClientGoGenerated(c *C) {
+	// clone the Python client if necessary
+	cwd, err := os.Getwd()
+	c.Assert(err, IsNil)
+	tufDir := filepath.Join(cwd, "testdata", "tuf")
+	if _, err := os.Stat(tufDir); os.IsNotExist(err) {
+		c.Assert(exec.Command(
+			"git",
+			"clone",
+			"--quiet",
+			"--branch=v0.9.9",
+			"--depth=1",
+			"https://github.com/theupdateframework/tuf.git",
+			tufDir,
+		).Run(), IsNil)
+	}
+
+	// generate repository
+	tmp := c.MkDir()
+	repoDir := filepath.Join(tmp, "repo")
+	c.Assert(os.Mkdir(repoDir, 0755), IsNil)
+	repo, err := tuf.NewRepo(tuf.FileSystemStore(repoDir))
+	c.Assert(err, IsNil)
+	for _, role := range []string{"root", "snapshot", "targets", "timestamp"} {
+		_, err := repo.GenKey(role)
+		c.Assert(err, IsNil)
+	}
+	files := map[string][]byte{
+		"foo.txt":     []byte("foo"),
+		"bar/baz.txt": []byte("baz"),
+	}
+	for file, data := range files {
+		path := filepath.Join(repoDir, "staged", "targets", file)
+		c.Assert(os.MkdirAll(filepath.Dir(path), 0755), IsNil)
+		c.Assert(ioutil.WriteFile(path, data, 0644), IsNil)
+		c.Assert(repo.AddTarget(file, nil), IsNil)
+	}
+	c.Assert(repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+	c.Assert(repo.Timestamp(), IsNil)
+	c.Assert(repo.Commit(), IsNil)
+
+	// create initial files for Python client
+	clientDir := filepath.Join(tmp, "client")
+	currDir := filepath.Join(clientDir, "metadata", "current")
+	prevDir := filepath.Join(clientDir, "metadata", "previous")
+	c.Assert(os.MkdirAll(currDir, 0755), IsNil)
+	c.Assert(os.MkdirAll(prevDir, 0755), IsNil)
+	rootJSON, err := ioutil.ReadFile(filepath.Join(repoDir, "repository", "root.json"))
+	c.Assert(err, IsNil)
+	c.Assert(ioutil.WriteFile(filepath.Join(currDir, "root.json"), rootJSON, 0644), IsNil)
+
+	// start file server
+	addr, cleanup := startFileServer(c, repoDir)
+	defer cleanup()
+
+	// run Python client update
+	cmd := exec.Command("python", filepath.Join(cwd, "testdata", "client.py"), "--repo=http://"+addr)
+	cmd.Env = append(os.Environ(), "PYTHONPATH="+tufDir)
+	cmd.Dir = clientDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	c.Assert(cmd.Run(), IsNil)
+
+	// check the target files got downloaded
+	for path, expected := range files {
+		actual, err := ioutil.ReadFile(filepath.Join(clientDir, "targets", path))
+		c.Assert(err, IsNil)
+		c.Assert(actual, DeepEquals, expected)
+	}
+}
+
+func startFileServer(c *C, dir string) (string, func() error) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	c.Assert(err, IsNil)
+	addr := l.Addr().String()
+	go http.Serve(l, http.FileServer(http.Dir(dir)))
+	return addr, l.Close
 }

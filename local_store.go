@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/flynn/go-tuf/data"
+	"github.com/flynn/go-tuf/util"
 )
 
 func MemoryStore(meta map[string]json.RawMessage, files map[string][]byte) LocalStore {
@@ -113,7 +114,7 @@ func (f *fileSystemStore) SetMeta(name string, meta json.RawMessage) error {
 	if err := f.createDirs(); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(filepath.Join(f.stagedDir(), name), prettyJSON(meta), 0644); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(f.stagedDir(), name), meta, 0644); err != nil {
 		return err
 	}
 	return nil
@@ -168,7 +169,7 @@ func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, targets data.F
 		return nil
 	}
 	needsRemoval := func(path string) bool {
-		_, ok := targets[path]
+		_, ok := targets[util.NormalizeTarget(path)]
 		return !ok
 	}
 	removeFile := func(path string, info os.FileInfo, err error) error {
@@ -227,7 +228,7 @@ func (f *fileSystemStore) SaveKey(role string, key *data.Key) error {
 	if err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(filepath.Join(f.dir, "keys", role+"-"+key.ID()+".json"), prettyJSON(data), 0600); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(f.dir, "keys", role+"-"+key.ID()+".json"), append(data, '\n'), 0600); err != nil {
 		return err
 	}
 	return nil
@@ -238,11 +239,4 @@ func (f *fileSystemStore) Clean() error {
 		return err
 	}
 	return os.Mkdir(f.stagedDir(), 0755)
-}
-
-func prettyJSON(data []byte) []byte {
-	var buf bytes.Buffer
-	json.Indent(&buf, data, "", "\t")
-	buf.WriteByte('\n')
-	return buf.Bytes()
 }
