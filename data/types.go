@@ -43,18 +43,18 @@ type KeyValue struct {
 }
 
 func DefaultExpires(role string) time.Time {
+	var t time.Time
 	switch role {
 	case "root":
-		return time.Now().AddDate(1, 0, 0).UTC()
+		t = time.Now().AddDate(1, 0, 0)
 	case "targets":
-		return time.Now().AddDate(0, 3, 0).UTC()
+		t = time.Now().AddDate(0, 3, 0)
 	case "snapshot":
-		return time.Now().AddDate(0, 0, 7).UTC()
+		t = time.Now().AddDate(0, 0, 7)
 	case "timestamp":
-		return time.Now().AddDate(0, 0, 1).UTC()
-	default:
-		return time.Time{}
+		t = time.Now().AddDate(0, 0, 1)
 	}
+	return t.UTC().Round(time.Second)
 }
 
 type Root struct {

@@ -410,7 +410,7 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(err, IsNil)
 	root, err = r.root()
 	c.Assert(err, IsNil)
-	c.Assert(root.Expires.Unix(), DeepEquals, expires.Unix())
+	c.Assert(root.Expires.Unix(), DeepEquals, expires.Round(time.Second).Unix())
 	c.Assert(root.Version, Equals, 2)
 
 	expires = time.Now().Add(12 * time.Hour)
@@ -422,7 +422,7 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(r.RevokeKeyWithExpires("root", role.KeyIDs[0], expires), IsNil)
 	root, err = r.root()
 	c.Assert(err, IsNil)
-	c.Assert(root.Expires.Unix(), DeepEquals, expires.Unix())
+	c.Assert(root.Expires.Unix(), DeepEquals, expires.Round(time.Second).Unix())
 	c.Assert(root.Version, Equals, 3)
 
 	expires = time.Now().Add(6 * time.Hour)
@@ -430,14 +430,14 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(r.AddTargetWithExpires("foo.txt", nil, expires), IsNil)
 	targets, err := r.targets()
 	c.Assert(err, IsNil)
-	c.Assert(targets.Expires.Unix(), Equals, expires.Unix())
+	c.Assert(targets.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
 	c.Assert(targets.Version, Equals, 1)
 
 	expires = time.Now().Add(2 * time.Hour)
 	c.Assert(r.RemoveTargetWithExpires("foo.txt", expires), IsNil)
 	targets, err = r.targets()
 	c.Assert(err, IsNil)
-	c.Assert(targets.Expires.Unix(), Equals, expires.Unix())
+	c.Assert(targets.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
 	c.Assert(targets.Version, Equals, 2)
 
 	expires = time.Now().Add(time.Hour)
@@ -445,7 +445,7 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(r.SnapshotWithExpires(CompressionTypeNone, expires), IsNil)
 	snapshot, err := r.snapshot()
 	c.Assert(err, IsNil)
-	c.Assert(snapshot.Expires.Unix(), Equals, expires.Unix())
+	c.Assert(snapshot.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
 	c.Assert(snapshot.Version, Equals, 1)
 
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
@@ -458,7 +458,7 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(r.TimestampWithExpires(expires), IsNil)
 	timestamp, err := r.timestamp()
 	c.Assert(err, IsNil)
-	c.Assert(timestamp.Expires.Unix(), Equals, expires.Unix())
+	c.Assert(timestamp.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
 	c.Assert(timestamp.Version, Equals, 1)
 
 	c.Assert(r.Timestamp(), IsNil)

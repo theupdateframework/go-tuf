@@ -178,7 +178,7 @@ func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (string, err
 	role.KeyIDs = append(role.KeyIDs, key.ID)
 
 	root.Keys[key.ID] = key.Serialize()
-	root.Expires = expires
+	root.Expires = expires.Round(time.Second)
 	root.Version++
 
 	return key.ID, r.setMeta("root.json", root)
@@ -249,7 +249,7 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 
 	delete(root.Keys, id)
 	root.Roles[keyRole] = role
-	root.Expires = expires
+	root.Expires = expires.Round(time.Second)
 	root.Version++
 
 	return r.setMeta("root.json", root)
@@ -380,7 +380,7 @@ func (r *Repo) AddTargetWithExpires(path string, custom map[string]interface{}, 
 	if err != nil {
 		return err
 	}
-	t.Expires = expires
+	t.Expires = expires.Round(time.Second)
 	t.Version++
 	return r.setMeta("targets.json", t)
 }
@@ -403,7 +403,7 @@ func (r *Repo) RemoveTargetWithExpires(path string, expires time.Time) error {
 		return nil
 	}
 	delete(t.Targets, path)
-	t.Expires = expires
+	t.Expires = expires.Round(time.Second)
 	t.Version++
 	return r.setMeta("targets.json", t)
 }
@@ -436,7 +436,7 @@ func (r *Repo) SnapshotWithExpires(t CompressionType, expires time.Time) error {
 			return err
 		}
 	}
-	snapshot.Expires = expires
+	snapshot.Expires = expires.Round(time.Second)
 	snapshot.Version++
 	return r.setMeta("snapshot.json", snapshot)
 }
@@ -465,7 +465,7 @@ func (r *Repo) TimestampWithExpires(expires time.Time) error {
 	if err != nil {
 		return err
 	}
-	timestamp.Expires = expires
+	timestamp.Expires = expires.Round(time.Second)
 	timestamp.Version++
 	return r.setMeta("timestamp.json", timestamp)
 }
