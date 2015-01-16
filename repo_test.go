@@ -97,6 +97,27 @@ func (RepoSuite) TestNewRepo(c *C) {
 	c.Assert(timestamp.Meta, HasLen, 0)
 }
 
+func (RepoSuite) TestInit(c *C) {
+	local := MemoryStore(
+		make(map[string]json.RawMessage),
+		map[string][]byte{"/foo.txt": []byte("foo")},
+	)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// Init() sets root.ConsistentSnapshot
+	for _, v := range []bool{true, false} {
+		c.Assert(r.Init(v), IsNil)
+		root, err := r.root()
+		c.Assert(err, IsNil)
+		c.Assert(root.ConsistentSnapshot, Equals, v)
+	}
+
+	// Init() fails if targets have been added
+	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+	c.Assert(r.Init(true), Equals, ErrInitNotAllowed)
+}
+
 func genKey(c *C, r *Repo, role string) string {
 	id, err := r.GenKey(role)
 	c.Assert(err, IsNil)
@@ -386,116 +407,188 @@ func (RepoSuite) TestCommit(c *C) {
 	c.Assert(r.Commit(), DeepEquals, ErrNotEnoughKeys{"timestamp", 0, 1})
 }
 
+type tmpDir struct {
+	path string
+	c    *C
+}
+
+func newTmpDir(c *C) *tmpDir {
+	return &tmpDir{path: c.MkDir(), c: c}
+}
+
+func (t *tmpDir) assertExists(path string) {
+	if _, err := os.Stat(filepath.Join(t.path, path)); os.IsNotExist(err) {
+		t.c.Fatalf("expected path to exist but it doesn't: %s", path)
+	}
+}
+
+func (t *tmpDir) assertNotExist(path string) {
+	if _, err := os.Stat(filepath.Join(t.path, path)); !os.IsNotExist(err) {
+		t.c.Fatalf("expected path to not exist but it does: %s", path)
+	}
+}
+
+func (t *tmpDir) assertHashedFilesExist(path string, hashes data.Hashes) {
+	t.c.Assert(len(hashes) > 0, Equals, true)
+	for _, path := range hashedPaths(path, hashes) {
+		t.assertExists(path)
+	}
+}
+
+func (t *tmpDir) assertHashedFilesNotExist(path string, hashes data.Hashes) {
+	t.c.Assert(len(hashes) > 0, Equals, true)
+	for _, path := range hashedPaths(path, hashes) {
+		t.assertNotExist(path)
+	}
+}
+
+func (t *tmpDir) assertEmpty(dir string) {
+	path := filepath.Join(t.path, dir)
+	f, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		t.c.Fatalf("expected dir to exist but it doesn't: %s", dir)
+	}
+	t.c.Assert(err, IsNil)
+	t.c.Assert(f.IsDir(), Equals, true)
+	entries, err := ioutil.ReadDir(path)
+	t.c.Assert(err, IsNil)
+	// check that all (if any) entries are also empty
+	for _, e := range entries {
+		t.assertEmpty(filepath.Join(dir, e.Name()))
+	}
+}
+
+func (t *tmpDir) assertFileContent(path, content string) {
+	t.assertExists(path)
+	actual, err := ioutil.ReadFile(filepath.Join(t.path, path))
+	t.c.Assert(err, IsNil)
+	t.c.Assert(string(actual), Equals, content)
+}
+
+func (t *tmpDir) stagedTargetPath(path string) string {
+	return filepath.Join(t.path, "staged", "targets", path)
+}
+func (t *tmpDir) writeStagedTarget(path, data string) {
+	path = t.stagedTargetPath(path)
+	t.c.Assert(os.MkdirAll(filepath.Dir(path), 0755), IsNil)
+	t.c.Assert(ioutil.WriteFile(path, []byte(data), 0644), IsNil)
+}
+
 func (RepoSuite) TestCommitFileSystem(c *C) {
-	tmp := c.MkDir()
-	local := FileSystemStore(tmp)
+	tmp := newTmpDir(c)
+	local := FileSystemStore(tmp.path)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
 
-	assertExists := func(path string) {
-		if _, err := os.Stat(filepath.Join(tmp, path)); os.IsNotExist(err) {
-			c.Fatalf("expected path to exist but it doesn't: %s", path)
-		}
-	}
-	assertNotExist := func(path string) {
-		if _, err := os.Stat(filepath.Join(tmp, path)); !os.IsNotExist(err) {
-			c.Fatalf("expected path to not exist but it does: %s", path)
-		}
-	}
-	var assertEmpty func(string)
-	assertEmpty = func(dir string) {
-		path := filepath.Join(tmp, dir)
-		f, err := os.Stat(path)
-		if os.IsNotExist(err) {
-			c.Fatalf("expected dir to exist but it doesn't: %s", dir)
-		}
-		c.Assert(err, IsNil)
-		c.Assert(f.IsDir(), Equals, true)
-		entries, err := ioutil.ReadDir(path)
-		c.Assert(err, IsNil)
-		// check that all (if any) entries are also empty
-		for _, e := range entries {
-			assertEmpty(filepath.Join(dir, e.Name()))
-		}
-	}
-	assertFileContent := func(path, expected string) {
-		assertExists(path)
-		actual, err := ioutil.ReadFile(filepath.Join(tmp, path))
-		c.Assert(err, IsNil)
-		c.Assert(string(actual), Equals, expected)
-	}
+	// don't use consistent snapshots to make the checks simpler
+	c.Assert(r.Init(false), IsNil)
 
 	// generating keys should save them to the keys directory, stage root.json
 	// and create repo dirs
 	for _, role := range []string{"root", "targets", "snapshot", "timestamp"} {
 		id := genKey(c, r, role)
-		assertExists(fmt.Sprintf("keys/%s-%s.json", role, id))
+		tmp.assertExists(fmt.Sprintf("keys/%s-%s.json", role, id))
 	}
-	assertExists("staged/root.json")
-	assertEmpty("repository")
-	assertEmpty("staged/targets")
-
-	stagedTargetPath := func(path string) string {
-		return filepath.Join(tmp, "staged", "targets", path)
-	}
-	writeStagedTarget := func(path, data string) {
-		path = stagedTargetPath(path)
-		c.Assert(os.MkdirAll(filepath.Dir(path), 0755), IsNil)
-		c.Assert(ioutil.WriteFile(path, []byte(data), 0644), IsNil)
-	}
+	tmp.assertExists("staged/root.json")
+	tmp.assertEmpty("repository")
+	tmp.assertEmpty("staged/targets")
 
 	// adding a non-existent file fails
-	c.Assert(r.AddTarget("foo.txt", nil), Equals, ErrFileNotFound{stagedTargetPath("foo.txt")})
-	assertEmpty("repository")
+	c.Assert(r.AddTarget("foo.txt", nil), Equals, ErrFileNotFound{tmp.stagedTargetPath("foo.txt")})
+	tmp.assertEmpty("repository")
 
 	// adding a file stages targets.json
-	writeStagedTarget("foo.txt", "foo")
+	tmp.writeStagedTarget("foo.txt", "foo")
 	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
-	assertExists("staged/targets.json")
-	assertEmpty("repository")
+	tmp.assertExists("staged/targets.json")
+	tmp.assertEmpty("repository")
 
 	// Snapshot() stages snapshot.json
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
-	assertExists("staged/snapshot.json")
-	assertEmpty("repository")
+	tmp.assertExists("staged/snapshot.json")
+	tmp.assertEmpty("repository")
 
 	// Timestamp() stages timestamp.json
 	c.Assert(r.Timestamp(), IsNil)
-	assertExists("staged/timestamp.json")
-	assertEmpty("repository")
+	tmp.assertExists("staged/timestamp.json")
+	tmp.assertEmpty("repository")
 
 	// committing moves files from staged -> repository
 	c.Assert(r.Commit(), IsNil)
-	assertExists("repository/root.json")
-	assertExists("repository/targets.json")
-	assertExists("repository/snapshot.json")
-	assertExists("repository/timestamp.json")
-	assertFileContent("repository/targets/foo.txt", "foo")
-	assertEmpty("staged/targets")
-	assertEmpty("staged")
+	tmp.assertExists("repository/root.json")
+	tmp.assertExists("repository/targets.json")
+	tmp.assertExists("repository/snapshot.json")
+	tmp.assertExists("repository/timestamp.json")
+	tmp.assertFileContent("repository/targets/foo.txt", "foo")
+	tmp.assertEmpty("staged/targets")
+	tmp.assertEmpty("staged")
 
 	// adding and committing another file moves it into repository/targets
-	writeStagedTarget("path/to/bar.txt", "bar")
+	tmp.writeStagedTarget("path/to/bar.txt", "bar")
 	c.Assert(r.AddTarget("path/to/bar.txt", nil), IsNil)
-	assertExists("staged/targets.json")
+	tmp.assertExists("staged/targets.json")
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
-	assertFileContent("repository/targets/foo.txt", "foo")
-	assertFileContent("repository/targets/path/to/bar.txt", "bar")
-	assertEmpty("staged/targets")
-	assertEmpty("staged")
+	tmp.assertFileContent("repository/targets/foo.txt", "foo")
+	tmp.assertFileContent("repository/targets/path/to/bar.txt", "bar")
+	tmp.assertEmpty("staged/targets")
+	tmp.assertEmpty("staged")
 
 	// removing and committing a file removes it from repository/targets
 	c.Assert(r.RemoveTarget("foo.txt"), IsNil)
-	assertExists("staged/targets.json")
+	tmp.assertExists("staged/targets.json")
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
-	assertNotExist("repository/targets/foo.txt")
-	assertFileContent("repository/targets/path/to/bar.txt", "bar")
-	assertEmpty("staged/targets")
-	assertEmpty("staged")
+	tmp.assertNotExist("repository/targets/foo.txt")
+	tmp.assertFileContent("repository/targets/path/to/bar.txt", "bar")
+	tmp.assertEmpty("staged/targets")
+	tmp.assertEmpty("staged")
+}
+
+func (RepoSuite) TestConsistentSnapshot(c *C) {
+	tmp := newTmpDir(c)
+	local := FileSystemStore(tmp.path)
+	r, err := NewRepo(local, "sha512", "sha256")
+	c.Assert(err, IsNil)
+
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+	tmp.writeStagedTarget("foo.txt", "foo")
+	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+	tmp.writeStagedTarget("dir/bar.txt", "bar")
+	c.Assert(r.AddTarget("dir/bar.txt", nil), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	hashes, err := r.fileHashes()
+	c.Assert(err, IsNil)
+
+	// root.json should exist at both hashed and unhashed paths
+	tmp.assertHashedFilesExist("repository/root.json", hashes["root.json"])
+	tmp.assertExists("repository/root.json")
+
+	// targets.json, snapshot.json and target files should exist at hashed but not unhashed paths
+	for _, path := range []string{"targets.json", "snapshot.json", "targets/foo.txt", "targets/dir/bar.txt"} {
+		repoPath := filepath.Join("repository", path)
+		tmp.assertHashedFilesExist(repoPath, hashes[path])
+		tmp.assertNotExist(repoPath)
+	}
+
+	// timestamp.json should exist at an unhashed path (it doesn't have a hash)
+	tmp.assertExists("repository/timestamp.json")
+
+	// removing a file should remove the hashed files
+	c.Assert(r.RemoveTarget("foo.txt"), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+	tmp.assertHashedFilesNotExist("repository/targets/foo.txt", hashes["targets/foo.txt"])
+	tmp.assertNotExist("repository/targets/foo.txt")
 }
 
 func (RepoSuite) TestExpiresAndVersion(c *C) {

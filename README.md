@@ -36,6 +36,15 @@ go get github.com/flynn/go-tuf/tuf
 
 ### Commands
 
+#### `tuf init [--consistent-snapshot=false]`
+
+Initializes a new repository.
+
+This is only required if the repository should not generate consistent
+snapshots (i.e. by passing `--consistent-snapshot=false`). If consistent
+snapshots should be generated, the repository will be implicitly
+initialized to do so when generating keys.
+
 #### `tuf gen-key <role>`
 
 Generates a new signing key, serializes it to JSON and writes it to the `keys`
@@ -73,7 +82,7 @@ to the correct threshold, then moves the staged files into the `repository`
 directory. It also removes any target files which are not in the `targets`
 manifest.
 
-#### `tuf regenerate`
+#### `tuf regenerate [--consistent-snapshot=false]`
 
 Recreates the `targets` manifest based on the files in `repository/targets`.
 
