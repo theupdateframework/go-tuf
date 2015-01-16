@@ -130,8 +130,12 @@ func (f *fileSystemStore) createDirs() error {
 }
 
 func (f *fileSystemStore) GetStagedTarget(path string) (io.ReadCloser, error) {
-	file, err := os.Open(filepath.Join(f.stagedDir(), "targets", path))
+	path = filepath.Join(f.stagedDir(), "targets", path)
+	file, err := os.Open(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, ErrFileNotFound{path}
+		}
 		return nil, err
 	}
 	return file, nil

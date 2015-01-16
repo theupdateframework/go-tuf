@@ -3,6 +3,10 @@ package tuf
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -380,6 +384,118 @@ func (RepoSuite) TestCommit(c *C) {
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), DeepEquals, ErrNotEnoughKeys{"timestamp", 0, 1})
+}
+
+func (RepoSuite) TestCommitFileSystem(c *C) {
+	tmp := c.MkDir()
+	local := FileSystemStore(tmp)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	assertExists := func(path string) {
+		if _, err := os.Stat(filepath.Join(tmp, path)); os.IsNotExist(err) {
+			c.Fatalf("expected path to exist but it doesn't: %s", path)
+		}
+	}
+	assertNotExist := func(path string) {
+		if _, err := os.Stat(filepath.Join(tmp, path)); !os.IsNotExist(err) {
+			c.Fatalf("expected path to not exist but it does: %s", path)
+		}
+	}
+	var assertEmpty func(string)
+	assertEmpty = func(dir string) {
+		path := filepath.Join(tmp, dir)
+		f, err := os.Stat(path)
+		if os.IsNotExist(err) {
+			c.Fatalf("expected dir to exist but it doesn't: %s", dir)
+		}
+		c.Assert(err, IsNil)
+		c.Assert(f.IsDir(), Equals, true)
+		entries, err := ioutil.ReadDir(path)
+		c.Assert(err, IsNil)
+		// check that all (if any) entries are also empty
+		for _, e := range entries {
+			assertEmpty(filepath.Join(dir, e.Name()))
+		}
+	}
+	assertFileContent := func(path, expected string) {
+		assertExists(path)
+		actual, err := ioutil.ReadFile(filepath.Join(tmp, path))
+		c.Assert(err, IsNil)
+		c.Assert(string(actual), Equals, expected)
+	}
+
+	// generating keys should save them to the keys directory, stage root.json
+	// and create repo dirs
+	for _, role := range []string{"root", "targets", "snapshot", "timestamp"} {
+		id := genKey(c, r, role)
+		assertExists(fmt.Sprintf("keys/%s-%s.json", role, id))
+	}
+	assertExists("staged/root.json")
+	assertEmpty("repository")
+	assertEmpty("staged/targets")
+
+	stagedTargetPath := func(path string) string {
+		return filepath.Join(tmp, "staged", "targets", path)
+	}
+	writeStagedTarget := func(path, data string) {
+		path = stagedTargetPath(path)
+		c.Assert(os.MkdirAll(filepath.Dir(path), 0755), IsNil)
+		c.Assert(ioutil.WriteFile(path, []byte(data), 0644), IsNil)
+	}
+
+	// adding a non-existent file fails
+	c.Assert(r.AddTarget("foo.txt", nil), Equals, ErrFileNotFound{stagedTargetPath("foo.txt")})
+	assertEmpty("repository")
+
+	// adding a file stages targets.json
+	writeStagedTarget("foo.txt", "foo")
+	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+	assertExists("staged/targets.json")
+	assertEmpty("repository")
+
+	// Snapshot() stages snapshot.json
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	assertExists("staged/snapshot.json")
+	assertEmpty("repository")
+
+	// Timestamp() stages timestamp.json
+	c.Assert(r.Timestamp(), IsNil)
+	assertExists("staged/timestamp.json")
+	assertEmpty("repository")
+
+	// committing moves files from staged -> repository
+	c.Assert(r.Commit(), IsNil)
+	assertExists("repository/root.json")
+	assertExists("repository/targets.json")
+	assertExists("repository/snapshot.json")
+	assertExists("repository/timestamp.json")
+	assertFileContent("repository/targets/foo.txt", "foo")
+	assertEmpty("staged/targets")
+	assertEmpty("staged")
+
+	// adding and committing another file moves it into repository/targets
+	writeStagedTarget("path/to/bar.txt", "bar")
+	c.Assert(r.AddTarget("path/to/bar.txt", nil), IsNil)
+	assertExists("staged/targets.json")
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+	assertFileContent("repository/targets/foo.txt", "foo")
+	assertFileContent("repository/targets/path/to/bar.txt", "bar")
+	assertEmpty("staged/targets")
+	assertEmpty("staged")
+
+	// removing and committing a file removes it from repository/targets
+	c.Assert(r.RemoveTarget("foo.txt"), IsNil)
+	assertExists("staged/targets.json")
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+	assertNotExist("repository/targets/foo.txt")
+	assertFileContent("repository/targets/path/to/bar.txt", "bar")
+	assertEmpty("staged/targets")
+	assertEmpty("staged")
 }
 
 func (RepoSuite) TestExpiresAndVersion(c *C) {
