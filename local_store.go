@@ -204,6 +204,9 @@ func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, targets data.F
 func (f *fileSystemStore) GetKeys(role string) ([]*data.Key, error) {
 	files, err := ioutil.ReadDir(filepath.Join(f.dir, "keys"))
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	signingKeys := make([]*data.Key, 0, len(files))
