@@ -3,9 +3,11 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -76,6 +78,9 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	var err error
 	s.repo, err = tuf.NewRepo(s.store)
 	c.Assert(err, IsNil)
+	// don't use consistent snapshots to make testing easier (consistent
+	// snapshots are tested explicitly elsewhere)
+	c.Assert(s.repo.Init(false), IsNil)
 	s.keyIDs = map[string]string{
 		"root":      s.genKey(c, "root"),
 		"targets":   s.genKey(c, "targets"),
@@ -653,6 +658,43 @@ func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
 	s.syncRemote(c)
 	_, err = client.Update()
 	c.Assert(err, DeepEquals, ErrWrongSize{"targets.json", int64(len(tamperedJSON)), int64(len(targetsJSON))})
+}
+
+func (s *ClientSuite) TestUpdateHTTP(c *C) {
+	tmp := c.MkDir()
+
+	// start file server
+	addr, cleanup := startFileServer(c, tmp)
+	defer cleanup()
+
+	for _, consistentSnapshot := range []bool{false, true} {
+		dir := fmt.Sprintf("consistent-snapshot-%t", consistentSnapshot)
+
+		// generate repository
+		repo := generateRepoFS(c, filepath.Join(tmp, dir), targetFiles, consistentSnapshot)
+
+		// initialize a client
+		remote, err := HTTPRemoteStore(fmt.Sprintf("http://%s/%s/repository", addr, dir))
+		c.Assert(err, IsNil)
+		client := NewClient(MemoryLocalStore(), remote)
+		rootKeys, err := repo.RootKeys()
+		c.Assert(err, IsNil)
+		c.Assert(rootKeys, HasLen, 1)
+		c.Assert(client.Init(rootKeys, 1), IsNil)
+
+		// check update is ok
+		targets, err := client.Update()
+		c.Assert(err, IsNil)
+		assertFiles(c, targets, []string{"/foo.txt", "/bar.txt", "/baz.txt"})
+
+		// check can download files
+		for name, data := range targetFiles {
+			var dest testDestination
+			c.Assert(client.Download(name, &dest), IsNil)
+			c.Assert(dest.deleted, Equals, false)
+			c.Assert(dest.String(), Equals, string(data))
+		}
+	}
 }
 
 type testDestination struct {

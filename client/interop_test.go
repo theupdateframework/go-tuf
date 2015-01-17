@@ -73,6 +73,28 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 	}
 }
 
+func generateRepoFS(c *C, dir string, files map[string][]byte, consistentSnapshot bool) *tuf.Repo {
+	repo, err := tuf.NewRepo(tuf.FileSystemStore(dir))
+	c.Assert(err, IsNil)
+	if !consistentSnapshot {
+		c.Assert(repo.Init(false), IsNil)
+	}
+	for _, role := range []string{"root", "snapshot", "targets", "timestamp"} {
+		_, err := repo.GenKey(role)
+		c.Assert(err, IsNil)
+	}
+	for file, data := range files {
+		path := filepath.Join(dir, "staged", "targets", file)
+		c.Assert(os.MkdirAll(filepath.Dir(path), 0755), IsNil)
+		c.Assert(ioutil.WriteFile(path, data, 0644), IsNil)
+		c.Assert(repo.AddTarget(file, nil), IsNil)
+	}
+	c.Assert(repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+	c.Assert(repo.Timestamp(), IsNil)
+	c.Assert(repo.Commit(), IsNil)
+	return repo
+}
+
 func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 	// clone the Python client if necessary
 	cwd, err := os.Getwd()
@@ -94,25 +116,11 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 	tmp := c.MkDir()
 	repoDir := filepath.Join(tmp, "repo")
 	c.Assert(os.Mkdir(repoDir, 0755), IsNil)
-	repo, err := tuf.NewRepo(tuf.FileSystemStore(repoDir))
-	c.Assert(err, IsNil)
-	for _, role := range []string{"root", "snapshot", "targets", "timestamp"} {
-		_, err := repo.GenKey(role)
-		c.Assert(err, IsNil)
-	}
 	files := map[string][]byte{
 		"foo.txt":     []byte("foo"),
 		"bar/baz.txt": []byte("baz"),
 	}
-	for file, data := range files {
-		path := filepath.Join(repoDir, "staged", "targets", file)
-		c.Assert(os.MkdirAll(filepath.Dir(path), 0755), IsNil)
-		c.Assert(ioutil.WriteFile(path, data, 0644), IsNil)
-		c.Assert(repo.AddTarget(file, nil), IsNil)
-	}
-	c.Assert(repo.Snapshot(tuf.CompressionTypeNone), IsNil)
-	c.Assert(repo.Timestamp(), IsNil)
-	c.Assert(repo.Commit(), IsNil)
+	generateRepoFS(c, repoDir, files, true)
 
 	// create initial files for Python client
 	clientDir := filepath.Join(tmp, "client")

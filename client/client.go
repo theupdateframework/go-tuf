@@ -61,6 +61,10 @@ type Client struct {
 
 	// db is a key DB used for verifying metadata
 	db *keys.DB
+
+	// consistentSnapshot indicates whether the remote storage is using
+	// consistent snapshots (as specified in root.json)
+	consistentSnapshot bool
 }
 
 func NewClient(local LocalStore, remote RemoteStore) *Client {
@@ -259,6 +263,7 @@ func (c *Client) getLocalMeta() error {
 		if err := signed.Verify(s, "root", 0, db); err != nil {
 			return err
 		}
+		c.consistentSnapshot = root.ConsistentSnapshot
 		c.db = db
 	} else {
 		return ErrNoRootKeys
@@ -321,10 +326,32 @@ func (c *Client) downloadMetaUnsafe(name string) ([]byte, error) {
 	return ioutil.ReadAll(io.LimitReader(r, maxMetaSize))
 }
 
+// download downloads the given file from remote storage, adding hashes to the
+// path if consistent snapshots are in use
+func (c *Client) download(file string, hashes data.Hashes) (io.ReadCloser, int64, error) {
+	if c.consistentSnapshot {
+		// try each hashed path in turn, and either return the contents,
+		// try the next one if a 404 is returned, or return an error
+		for _, path := range util.HashedPaths(file, hashes) {
+			r, size, err := c.remote.Get(path)
+			if err != nil {
+				if IsNotFound(err) {
+					continue
+				}
+				return nil, 0, err
+			}
+			return r, size, nil
+		}
+		return nil, 0, ErrNotFound{file}
+	} else {
+		return c.remote.Get(file)
+	}
+}
+
 // downloadMeta downloads top-level metadata from remote storage and verifies
 // it using the given file metadata.
 func (c *Client) downloadMeta(name string, m data.FileMeta) ([]byte, error) {
-	r, size, err := c.remote.Get(name)
+	r, size, err := c.download(name, m.Hashes)
 	if err != nil {
 		if IsNotFound(err) {
 			return nil, ErrMissingRemoteMetadata{name}
@@ -360,6 +387,7 @@ func (c *Client) decodeRoot(b json.RawMessage) error {
 		return ErrDecodeFailed{"root.json", err}
 	}
 	c.rootVer = root.Version
+	c.consistentSnapshot = root.ConsistentSnapshot
 	return nil
 }
 
@@ -455,7 +483,7 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 	}
 
 	// get the data from remote storage
-	r, size, err := c.remote.Get(path.Join("targets", name))
+	r, size, err := c.download(path.Join("targets", name), localMeta.Hashes)
 	if err != nil {
 		return err
 	}

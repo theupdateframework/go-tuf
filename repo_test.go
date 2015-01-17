@@ -14,6 +14,7 @@ import (
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/keys"
 	"github.com/flynn/go-tuf/signed"
+	"github.com/flynn/go-tuf/util"
 	. "gopkg.in/check.v1"
 )
 
@@ -430,14 +431,14 @@ func (t *tmpDir) assertNotExist(path string) {
 
 func (t *tmpDir) assertHashedFilesExist(path string, hashes data.Hashes) {
 	t.c.Assert(len(hashes) > 0, Equals, true)
-	for _, path := range hashedPaths(path, hashes) {
+	for _, path := range util.HashedPaths(path, hashes) {
 		t.assertExists(path)
 	}
 }
 
 func (t *tmpDir) assertHashedFilesNotExist(path string, hashes data.Hashes) {
 	t.c.Assert(len(hashes) > 0, Equals, true)
-	for _, path := range hashedPaths(path, hashes) {
+	for _, path := range util.HashedPaths(path, hashes) {
 		t.assertNotExist(path)
 	}
 }

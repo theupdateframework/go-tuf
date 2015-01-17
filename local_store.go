@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/flynn/go-tuf/data"
+	"github.com/flynn/go-tuf/util"
 )
 
 func MemoryStore(meta map[string]json.RawMessage, files map[string][]byte) LocalStore {
@@ -144,15 +145,6 @@ func (f *fileSystemStore) createRepoFile(path string) (*os.File, error) {
 	return os.Create(dst)
 }
 
-func hashedPaths(path string, hashes data.Hashes) []string {
-	paths := make([]string, 0, len(hashes))
-	for _, hash := range hashes {
-		hashedPath := filepath.Join(filepath.Dir(path), hash.String()+"."+filepath.Base(path))
-		paths = append(paths, hashedPath)
-	}
-	return paths
-}
-
 func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, consistentSnapshot bool, hashes map[string]data.Hashes) error {
 	shouldCopyHashed := func(path string) bool {
 		return consistentSnapshot && path != "timestamp.json"
@@ -173,7 +165,7 @@ func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, consistentSnap
 		}
 		var paths []string
 		if shouldCopyHashed(rel) {
-			paths = append(paths, hashedPaths(rel, hashes[rel])...)
+			paths = append(paths, util.HashedPaths(rel, hashes[rel])...)
 		}
 		if shouldCopyUnhashed(rel) {
 			paths = append(paths, rel)

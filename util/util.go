@@ -112,3 +112,12 @@ func NormalizeTarget(path string) string {
 	}
 	return "/" + s
 }
+
+func HashedPaths(path string, hashes data.Hashes) []string {
+	paths := make([]string, 0, len(hashes))
+	for _, hash := range hashes {
+		hashedPath := filepath.Join(filepath.Dir(path), hash.String()+"."+filepath.Base(path))
+		paths = append(paths, hashedPath)
+	}
+	return paths
+}

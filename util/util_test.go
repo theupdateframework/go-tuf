@@ -109,3 +109,25 @@ func (UtilSuite) TestNormalizeTarget(c *C) {
 		c.Assert(NormalizeTarget(before), Equals, after)
 	}
 }
+
+func (UtilSuite) TestHashedPaths(c *C) {
+	hexBytes := func(s string) data.HexBytes {
+		v, err := hex.DecodeString(s)
+		c.Assert(err, IsNil)
+		return v
+	}
+	hashes := data.Hashes{
+		"sha512": hexBytes("abc123"),
+		"sha256": hexBytes("def456"),
+	}
+	paths := HashedPaths("foo/bar.txt", hashes)
+	// cannot use DeepEquals as the returned order is non-deterministic
+	c.Assert(paths, HasLen, 2)
+	expected := map[string]struct{}{"foo/abc123.bar.txt": {}, "foo/def456.bar.txt": {}}
+	for _, path := range paths {
+		if _, ok := expected[path]; !ok {
+			c.Fatalf("unexpected path: %s", path)
+		}
+		delete(expected, path)
+	}
+}
