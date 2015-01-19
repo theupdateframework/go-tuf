@@ -99,9 +99,9 @@ func NewSnapshot() *Snapshot {
 }
 
 type FileMeta struct {
-	Length int64                  `json:"length"`
-	Hashes map[string]HexBytes    `json:"hashes"`
-	Custom map[string]interface{} `json:"custom,omitempty"`
+	Length int64               `json:"length"`
+	Hashes map[string]HexBytes `json:"hashes"`
+	Custom json.RawMessage     `json:"custom,omitempty"`
 }
 
 func (f FileMeta) HashAlgorithms() []string {
