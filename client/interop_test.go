@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/agl/ed25519"
 	"github.com/flynn/go-tuf"
@@ -129,7 +130,18 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 
 	// run Python client update
 	cmd := exec.Command("python", filepath.Join(cwd, "testdata", "client.py"), "--repo=http://"+addr)
-	cmd.Env = append(os.Environ(), "PYTHONPATH="+tufDir)
+
+	environ := os.Environ()
+	cmd.Env = make([]string, 0, len(environ)+1)
+	// remove any existing PYTHONPATH from the environment
+	for _, e := range environ {
+		if strings.HasPrefix(e, "PYTHONPATH=") {
+			continue
+		}
+		cmd.Env = append(cmd.Env, e)
+	}
+	cmd.Env = append(cmd.Env, "PYTHONPATH="+tufDir)
+
 	cmd.Dir = clientDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
