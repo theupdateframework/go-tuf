@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"path"
 	"strconv"
 	"strings"
@@ -38,7 +39,8 @@ func (h *httpRemoteStore) GetTarget(name string) (io.ReadCloser, int64, error) {
 }
 
 func (h *httpRemoteStore) get(s string) (io.ReadCloser, int64, error) {
-	res, err := http.Get(h.url(s))
+	u := h.url(s)
+	res, err := http.Get(u)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -48,7 +50,11 @@ func (h *httpRemoteStore) get(s string) (io.ReadCloser, int64, error) {
 		return nil, 0, ErrNotFound{s}
 	} else if res.StatusCode != http.StatusOK {
 		res.Body.Close()
-		return nil, 0, fmt.Errorf("unexpected HTTP response code: %d", res.StatusCode)
+		return nil, 0, &url.Error{
+			Op:  "GET",
+			URL: u,
+			Err: fmt.Errorf("unexpected HTTP status %d", res.StatusCode),
+		}
 	}
 
 	size, err := strconv.ParseInt(res.Header.Get("Content-Length"), 10, 0)
