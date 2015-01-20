@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
-	"path"
 
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/keys"
@@ -27,15 +26,24 @@ type LocalStore interface {
 // RemoteStore downloads top-level metadata and target files from a remote
 // repository.
 type RemoteStore interface {
-	// Get downloads the given file from remote storage.
+	// GetMeta downloads the given metadata from remote storage.
 	//
-	// `path` is the path of the file relative to the root of the remote
-	//        repository (e.g. "root.json" or "targets/path/to/file.txt").
+	// `name` is the filename of the metadata (e.g. "root.json")
 	//
 	// `err` is ErrNotFound if the given file does not exist.
 	//
 	// `size` is the size of the stream, -1 indicating an unknown length.
-	Get(path string) (stream io.ReadCloser, size int64, err error)
+	GetMeta(name string) (stream io.ReadCloser, size int64, err error)
+
+	// GetTarget downloads the given target file from remote storage.
+	//
+	// `path` is the path of the file relative to the root of the remote
+	//        targets directory (e.g. "/path/to/file.txt").
+	//
+	// `err` is ErrNotFound if the given file does not exist.
+	//
+	// `size` is the size of the stream, -1 indicating an unknown length.
+	GetTarget(path string) (stream io.ReadCloser, size int64, err error)
 }
 
 // Client provides methods for fetching updates from a remote repository and
@@ -306,7 +314,7 @@ const maxMetaSize = 50 * 1024
 // verifying it's length and hashes (used for example to download timestamp.json
 // which has unknown size). It will download at most maxMetaSize bytes.
 func (c *Client) downloadMetaUnsafe(name string) ([]byte, error) {
-	r, size, err := c.remote.Get(name)
+	r, size, err := c.remote.GetMeta(name)
 	if err != nil {
 		if IsNotFound(err) {
 			return nil, ErrMissingRemoteMetadata{name}
@@ -326,14 +334,18 @@ func (c *Client) downloadMetaUnsafe(name string) ([]byte, error) {
 	return ioutil.ReadAll(io.LimitReader(r, maxMetaSize))
 }
 
-// download downloads the given file from remote storage, adding hashes to the
-// path if consistent snapshots are in use
-func (c *Client) download(file string, hashes data.Hashes) (io.ReadCloser, int64, error) {
+// remoteGetFunc is the type of function the download method uses to download
+// remote files
+type remoteGetFunc func(string) (io.ReadCloser, int64, error)
+
+// download downloads the given file from remote storage using the get function,
+// adding hashes to the path if consistent snapshots are in use
+func (c *Client) download(file string, get remoteGetFunc, hashes data.Hashes) (io.ReadCloser, int64, error) {
 	if c.consistentSnapshot {
 		// try each hashed path in turn, and either return the contents,
 		// try the next one if a 404 is returned, or return an error
 		for _, path := range util.HashedPaths(file, hashes) {
-			r, size, err := c.remote.Get(path)
+			r, size, err := get(path)
 			if err != nil {
 				if IsNotFound(err) {
 					continue
@@ -344,14 +356,14 @@ func (c *Client) download(file string, hashes data.Hashes) (io.ReadCloser, int64
 		}
 		return nil, 0, ErrNotFound{file}
 	} else {
-		return c.remote.Get(file)
+		return get(file)
 	}
 }
 
 // downloadMeta downloads top-level metadata from remote storage and verifies
 // it using the given file metadata.
 func (c *Client) downloadMeta(name string, m data.FileMeta) ([]byte, error) {
-	r, size, err := c.download(name, m.Hashes)
+	r, size, err := c.download(name, c.remote.GetMeta, m.Hashes)
 	if err != nil {
 		if IsNotFound(err) {
 			return nil, ErrMissingRemoteMetadata{name}
@@ -477,13 +489,14 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 	}
 
 	// return ErrUnknownTarget if the file is not in the local targets.json
-	localMeta, ok := c.targets[util.NormalizeTarget(name)]
+	normalizedName := util.NormalizeTarget(name)
+	localMeta, ok := c.targets[normalizedName]
 	if !ok {
 		return ErrUnknownTarget{name}
 	}
 
 	// get the data from remote storage
-	r, size, err := c.download(path.Join("targets", name), localMeta.Hashes)
+	r, size, err := c.download(normalizedName, c.remote.GetTarget, localMeta.Hashes)
 	if err != nil {
 		return err
 	}

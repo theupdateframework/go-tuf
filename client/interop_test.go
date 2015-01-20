@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -25,19 +24,19 @@ var _ = Suite(&InteropSuite{})
 
 func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 	// populate the remote store with the Python files
-	remote := make(FakeRemoteStore)
+	remote := newFakeRemoteStore()
 	repoDir := filepath.Join("testdata", "repository")
 	for _, file := range []string{"root.json", "snapshot.json", "targets.json", "timestamp.json"} {
 		b, err := ioutil.ReadFile(filepath.Join(repoDir, "metadata", file))
 		c.Assert(err, IsNil)
-		remote[file] = newFakeFile(b)
+		remote.meta[file] = newFakeFile(b)
 	}
 	targets := make(map[string][]byte)
 	for _, name := range []string{"/file1.txt", "/dir/file2.txt"} {
 		b, err := ioutil.ReadFile(filepath.Join(repoDir, "targets", name))
 		c.Assert(err, IsNil)
 		targets[name] = b
-		remote[path.Join("targets"+name)] = newFakeFile(b)
+		remote.targets[name] = newFakeFile(b)
 	}
 
 	// initiate a client with the root keys
