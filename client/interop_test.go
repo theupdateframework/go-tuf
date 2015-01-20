@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -22,53 +23,57 @@ type InteropSuite struct{}
 
 var _ = Suite(&InteropSuite{})
 
+var pythonTargets = map[string][]byte{
+	"/file1.txt":     []byte("file1.txt"),
+	"/dir/file2.txt": []byte("file2.txt"),
+}
+
 func (InteropSuite) TestGoClientPythonGenerated(c *C) {
-	// populate the remote store with the Python files
-	remote := newFakeRemoteStore()
-	repoDir := filepath.Join("testdata", "repository")
-	for _, file := range []string{"root.json", "snapshot.json", "targets.json", "timestamp.json"} {
-		b, err := ioutil.ReadFile(filepath.Join(repoDir, "metadata", file))
-		c.Assert(err, IsNil)
-		remote.meta[file] = newFakeFile(b)
-	}
-	targets := make(map[string][]byte)
-	for _, name := range []string{"/file1.txt", "/dir/file2.txt"} {
-		b, err := ioutil.ReadFile(filepath.Join(repoDir, "targets", name))
-		c.Assert(err, IsNil)
-		targets[name] = b
-		remote.targets[name] = newFakeFile(b)
-	}
-
-	// initiate a client with the root keys
-	f, err := os.Open(filepath.Join("testdata", "keystore", "root_key.pub"))
+	// start file server
+	cwd, err := os.Getwd()
 	c.Assert(err, IsNil)
-	key := &data.Key{}
-	c.Assert(json.NewDecoder(f).Decode(key), IsNil)
-	c.Assert(key.Type, Equals, "ed25519")
-	c.Assert(key.Value.Public, HasLen, ed25519.PublicKeySize)
-	client := NewClient(MemoryLocalStore(), remote)
-	c.Assert(client.Init([]*data.Key{key}, 1), IsNil)
+	testDataDir := filepath.Join(cwd, "testdata")
+	addr, cleanup := startFileServer(c, testDataDir)
+	defer cleanup()
 
-	// check update returns the correct updated targets
-	files, err := client.Update()
-	c.Assert(err, IsNil)
-	c.Assert(files, HasLen, len(targets))
-	for name, b := range targets {
-		file, ok := files[name]
-		if !ok {
-			c.Fatalf("expected updated targets to contain %s", name)
+	for _, dir := range []string{"with-consistent-snapshot", "without-consistent-snapshot"} {
+		remote, err := HTTPRemoteStore(
+			fmt.Sprintf("http://%s/%s/repository", addr, dir),
+			&HTTPRemoteOptions{MetadataPath: "metadata", TargetsPath: "targets"},
+		)
+		c.Assert(err, IsNil)
+
+		// initiate a client with the root keys
+		f, err := os.Open(filepath.Join("testdata", dir, "keystore", "root_key.pub"))
+		c.Assert(err, IsNil)
+		key := &data.Key{}
+		c.Assert(json.NewDecoder(f).Decode(key), IsNil)
+		c.Assert(key.Type, Equals, "ed25519")
+		c.Assert(key.Value.Public, HasLen, ed25519.PublicKeySize)
+		client := NewClient(MemoryLocalStore(), remote)
+		c.Assert(client.Init([]*data.Key{key}, 1), IsNil)
+
+		// check update returns the correct updated targets
+		files, err := client.Update()
+		c.Assert(err, IsNil)
+		c.Assert(files, HasLen, len(pythonTargets))
+		for name, data := range pythonTargets {
+			file, ok := files[name]
+			if !ok {
+				c.Fatalf("expected updated targets to contain %s", name)
+			}
+			meta, err := util.GenerateFileMeta(bytes.NewReader(data), file.HashAlgorithms()...)
+			c.Assert(err, IsNil)
+			c.Assert(util.FileMetaEqual(file, meta), IsNil)
 		}
-		meta, err := util.GenerateFileMeta(bytes.NewReader(b), file.HashAlgorithms()...)
-		c.Assert(err, IsNil)
-		c.Assert(util.FileMetaEqual(file, meta), IsNil)
-	}
 
-	// download the files and check they have the correct content
-	for name := range targets {
-		var dest testDestination
-		c.Assert(client.Download(name, &dest), IsNil)
-		c.Assert(dest.deleted, Equals, false)
-		c.Assert(dest.String(), Equals, filepath.Base(name))
+		// download the files and check they have the correct content
+		for name, data := range pythonTargets {
+			var dest testDestination
+			c.Assert(client.Download(name, &dest), IsNil)
+			c.Assert(dest.deleted, Equals, false)
+			c.Assert(dest.String(), Equals, string(data))
+		}
 	}
 }
 
@@ -111,54 +116,58 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 		).Run(), IsNil)
 	}
 
-	// generate repository
 	tmp := c.MkDir()
-	repoDir := filepath.Join(tmp, "repo")
-	c.Assert(os.Mkdir(repoDir, 0755), IsNil)
 	files := map[string][]byte{
 		"foo.txt":     []byte("foo"),
 		"bar/baz.txt": []byte("baz"),
 	}
-	generateRepoFS(c, repoDir, files, true)
-
-	// create initial files for Python client
-	clientDir := filepath.Join(tmp, "client")
-	currDir := filepath.Join(clientDir, "metadata", "current")
-	prevDir := filepath.Join(clientDir, "metadata", "previous")
-	c.Assert(os.MkdirAll(currDir, 0755), IsNil)
-	c.Assert(os.MkdirAll(prevDir, 0755), IsNil)
-	rootJSON, err := ioutil.ReadFile(filepath.Join(repoDir, "repository", "root.json"))
-	c.Assert(err, IsNil)
-	c.Assert(ioutil.WriteFile(filepath.Join(currDir, "root.json"), rootJSON, 0644), IsNil)
 
 	// start file server
-	addr, cleanup := startFileServer(c, repoDir)
+	addr, cleanup := startFileServer(c, tmp)
 	defer cleanup()
 
-	// run Python client update
-	cmd := exec.Command("python", filepath.Join(cwd, "testdata", "client.py"), "--repo=http://"+addr)
-
+	// setup Python env
 	environ := os.Environ()
-	cmd.Env = make([]string, 0, len(environ)+1)
+	pythonEnv := make([]string, 0, len(environ)+1)
 	// remove any existing PYTHONPATH from the environment
 	for _, e := range environ {
 		if strings.HasPrefix(e, "PYTHONPATH=") {
 			continue
 		}
-		cmd.Env = append(cmd.Env, e)
+		pythonEnv = append(pythonEnv, e)
 	}
-	cmd.Env = append(cmd.Env, "PYTHONPATH="+tufDir)
+	pythonEnv = append(pythonEnv, "PYTHONPATH="+tufDir)
 
-	cmd.Dir = clientDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	c.Assert(cmd.Run(), IsNil)
+	for _, consistentSnapshot := range []bool{false, true} {
+		// generate repository
+		name := fmt.Sprintf("consistent-snapshot-%t", consistentSnapshot)
+		dir := filepath.Join(tmp, name)
+		generateRepoFS(c, dir, files, consistentSnapshot)
 
-	// check the target files got downloaded
-	for path, expected := range files {
-		actual, err := ioutil.ReadFile(filepath.Join(clientDir, "targets", path))
+		// create initial files for Python client
+		clientDir := filepath.Join(dir, "client")
+		currDir := filepath.Join(clientDir, "metadata", "current")
+		prevDir := filepath.Join(clientDir, "metadata", "previous")
+		c.Assert(os.MkdirAll(currDir, 0755), IsNil)
+		c.Assert(os.MkdirAll(prevDir, 0755), IsNil)
+		rootJSON, err := ioutil.ReadFile(filepath.Join(dir, "repository", "root.json"))
 		c.Assert(err, IsNil)
-		c.Assert(actual, DeepEquals, expected)
+		c.Assert(ioutil.WriteFile(filepath.Join(currDir, "root.json"), rootJSON, 0644), IsNil)
+
+		// run Python client update
+		cmd := exec.Command("python", filepath.Join(cwd, "testdata", "client.py"), "--repo=http://"+addr+"/"+name)
+		cmd.Env = pythonEnv
+		cmd.Dir = clientDir
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		c.Assert(cmd.Run(), IsNil)
+
+		// check the target files got downloaded
+		for path, expected := range files {
+			actual, err := ioutil.ReadFile(filepath.Join(clientDir, "targets", path))
+			c.Assert(err, IsNil)
+			c.Assert(actual, DeepEquals, expected)
+		}
 	}
 }
 

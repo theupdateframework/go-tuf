@@ -3,6 +3,6 @@ all:
 	docker run tuf-gen | tar x
 
 clean:
-	rm -rf keystore repository
+	rm -rf with{,out}-consistent-snapshot
 
 .PHONY: all clean
