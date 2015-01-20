@@ -47,7 +47,7 @@ func (m *memoryStore) GetStagedTarget(path string) (io.ReadCloser, error) {
 	return ioutil.NopCloser(bytes.NewReader(data)), nil
 }
 
-func (m *memoryStore) Commit(meta map[string]json.RawMessage, targets data.Files) error {
+func (m *memoryStore) Commit(map[string]json.RawMessage, bool, map[string]data.Hashes) error {
 	return nil
 }
 
@@ -77,10 +77,6 @@ type fileSystemStore struct {
 
 func (f *fileSystemStore) repoDir() string {
 	return filepath.Join(f.dir, "repository")
-}
-
-func (f *fileSystemStore) repoTargetsDir() string {
-	return filepath.Join(f.repoDir(), "targets")
 }
 
 func (f *fileSystemStore) stagedDir() string {
@@ -130,14 +126,32 @@ func (f *fileSystemStore) createDirs() error {
 }
 
 func (f *fileSystemStore) GetStagedTarget(path string) (io.ReadCloser, error) {
-	file, err := os.Open(filepath.Join(f.stagedDir(), "targets", path))
+	path = filepath.Join(f.stagedDir(), "targets", path)
+	file, err := os.Open(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, ErrFileNotFound{path}
+		}
 		return nil, err
 	}
 	return file, nil
 }
 
-func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, targets data.Files) error {
+func (f *fileSystemStore) createRepoFile(path string) (*os.File, error) {
+	dst := filepath.Join(f.repoDir(), path)
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return nil, err
+	}
+	return os.Create(dst)
+}
+
+func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, consistentSnapshot bool, hashes map[string]data.Hashes) error {
+	shouldCopyHashed := func(path string) bool {
+		return consistentSnapshot && path != "timestamp.json"
+	}
+	shouldCopyUnhashed := func(path string) bool {
+		return !consistentSnapshot || path == "root.json" || path == "timestamp.json"
+	}
 	copyToRepo := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -149,38 +163,56 @@ func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, targets data.F
 		if err != nil {
 			return err
 		}
-		dst := filepath.Join(f.repoDir(), rel)
-		if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
-			return err
+		var paths []string
+		if shouldCopyHashed(rel) {
+			paths = append(paths, util.HashedPaths(rel, hashes[rel])...)
+		}
+		if shouldCopyUnhashed(rel) {
+			paths = append(paths, rel)
+		}
+		var files []io.Writer
+		for _, path := range paths {
+			file, err := f.createRepoFile(path)
+			if err != nil {
+				return err
+			}
+			defer file.Close()
+			files = append(files, file)
 		}
 		staged, err := os.Open(path)
 		if err != nil {
 			return err
 		}
 		defer staged.Close()
-		file, err := os.Create(dst)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		if _, err = io.Copy(file, staged); err != nil {
+		if _, err = io.Copy(io.MultiWriter(files...), staged); err != nil {
 			return err
 		}
 		return nil
 	}
+	isTarget := func(path string) bool {
+		return strings.HasPrefix(path, "targets")
+	}
 	needsRemoval := func(path string) bool {
-		_, ok := targets[util.NormalizeTarget(path)]
+		if consistentSnapshot {
+			// strip out the hash
+			name := strings.SplitN(filepath.Base(path), ".", 2)
+			if name[1] == "" {
+				return false
+			}
+			path = filepath.Join(filepath.Dir(path), name[1])
+		}
+		_, ok := hashes[path]
 		return !ok
 	}
 	removeFile := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		rel, err := filepath.Rel(f.repoTargetsDir(), path)
+		rel, err := filepath.Rel(f.repoDir(), path)
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() && needsRemoval(rel) {
+		if !info.IsDir() && isTarget(rel) && needsRemoval(rel) {
 			if err := os.Remove(path); err != nil {
 				// TODO: log / handle error
 			}
@@ -191,7 +223,7 @@ func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, targets data.F
 	if err := filepath.Walk(f.stagedDir(), copyToRepo); err != nil {
 		return err
 	}
-	if err := filepath.Walk(f.repoTargetsDir(), removeFile); err != nil {
+	if err := filepath.Walk(f.repoDir(), removeFile); err != nil {
 		return err
 	}
 	return f.Clean()
@@ -200,6 +232,9 @@ func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, targets data.F
 func (f *fileSystemStore) GetKeys(role string) ([]*data.Key, error) {
 	files, err := ioutil.ReadDir(filepath.Join(f.dir, "keys"))
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	signingKeys := make([]*data.Key, 0, len(files))
@@ -238,5 +273,5 @@ func (f *fileSystemStore) Clean() error {
 	if err := os.RemoveAll(f.stagedDir()); err != nil {
 		return err
 	}
-	return os.Mkdir(f.stagedDir(), 0755)
+	return os.MkdirAll(filepath.Join(f.stagedDir(), "targets"), 0755)
 }

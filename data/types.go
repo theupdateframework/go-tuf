@@ -69,10 +69,11 @@ type Root struct {
 
 func NewRoot() *Root {
 	return &Root{
-		Type:    "Root",
-		Expires: DefaultExpires("root"),
-		Keys:    make(map[string]*Key),
-		Roles:   make(map[string]*Role),
+		Type:               "Root",
+		Expires:            DefaultExpires("root"),
+		Keys:               make(map[string]*Key),
+		Roles:              make(map[string]*Role),
+		ConsistentSnapshot: true,
 	}
 }
 
@@ -98,10 +99,12 @@ func NewSnapshot() *Snapshot {
 	}
 }
 
+type Hashes map[string]HexBytes
+
 type FileMeta struct {
-	Length int64               `json:"length"`
-	Hashes map[string]HexBytes `json:"hashes"`
-	Custom json.RawMessage     `json:"custom,omitempty"`
+	Length int64           `json:"length"`
+	Hashes Hashes          `json:"hashes"`
+	Custom json.RawMessage `json:"custom,omitempty"`
 }
 
 func (f FileMeta) HashAlgorithms() []string {

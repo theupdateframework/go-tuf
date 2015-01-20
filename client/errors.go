@@ -96,3 +96,11 @@ type ErrMetaTooLarge struct {
 func (e ErrMetaTooLarge) Error() string {
 	return fmt.Sprintf("tuf: %s size %d bytes greater than maximum %d bytes", e.Name, e.Size, maxMetaSize)
 }
+
+type ErrInvalidURL struct {
+	URL string
+}
+
+func (e ErrInvalidURL) Error() string {
+	return fmt.Sprintf("tuf: invalid repository URL %s", e.URL)
+}

@@ -7,10 +7,16 @@
 
 import shutil
 import datetime
+import optparse
 import stat
 
 from tuf.repository_tool import *
 import tuf.util
+
+parser = optparse.OptionParser()
+parser.add_option("-c","--consistent-snapshot", action='store_true',  dest="consistent_snapshot",
+    help="Generate consistent snapshot", default=False)
+(options, args) = parser.parse_args()
 
 repository = create_new_repository('repository')
 
@@ -67,6 +73,10 @@ repository.timestamp.expiration = datetime.datetime(2030, 1, 1, 0, 0)
 
 repository.targets.compressions = ['gz']
 
-repository.write()
+if options.consistent_snapshot:
+  repository.write(False, True)
+
+else:
+  repository.write()
 
 shutil.move('repository/metadata.staged', 'repository/metadata')

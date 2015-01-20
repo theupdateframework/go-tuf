@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path"
 	"strings"
 	"time"
 
@@ -38,7 +39,7 @@ type LocalStore interface {
 	GetMeta() (map[string]json.RawMessage, error)
 	SetMeta(string, json.RawMessage) error
 	GetStagedTarget(string) (io.ReadCloser, error)
-	Commit(map[string]json.RawMessage, data.Files) error
+	Commit(map[string]json.RawMessage, bool, map[string]data.Hashes) error
 	GetKeys(string) ([]*data.Key, error)
 	SaveKey(string, *data.Key) error
 	Clean() error
@@ -59,6 +60,19 @@ func NewRepo(local LocalStore, hashAlgorithms ...string) (*Repo, error) {
 		return nil, err
 	}
 	return r, nil
+}
+
+func (r *Repo) Init(consistentSnapshot bool) error {
+	t, err := r.targets()
+	if err != nil {
+		return err
+	}
+	if len(t.Targets) > 0 {
+		return ErrInitNotAllowed
+	}
+	root := data.NewRoot()
+	root.ConsistentSnapshot = consistentSnapshot
+	return r.setMeta("root.json", root)
 }
 
 func (r *Repo) db() (*keys.DB, error) {
@@ -470,6 +484,34 @@ func (r *Repo) TimestampWithExpires(expires time.Time) error {
 	return r.setMeta("timestamp.json", timestamp)
 }
 
+func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
+	hashes := make(map[string]data.Hashes)
+	addHashes := func(name string, meta data.Files) {
+		if m, ok := meta[name]; ok {
+			hashes[name] = m.Hashes
+		}
+	}
+	timestamp, err := r.timestamp()
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err := r.snapshot()
+	if err != nil {
+		return nil, err
+	}
+	addHashes("root.json", snapshot.Meta)
+	addHashes("targets.json", snapshot.Meta)
+	addHashes("snapshot.json", timestamp.Meta)
+	t, err := r.targets()
+	if err != nil {
+		return nil, err
+	}
+	for name, meta := range t.Targets {
+		hashes[path.Join("targets", name)] = meta.Hashes
+	}
+	return hashes, nil
+}
+
 func (r *Repo) Commit() error {
 	// check we have all the metadata
 	for _, name := range topLevelManifests {
@@ -531,11 +573,12 @@ func (r *Repo) Commit() error {
 			return err
 		}
 	}
-	t, err := r.targets()
+
+	hashes, err := r.fileHashes()
 	if err != nil {
 		return err
 	}
-	return r.local.Commit(r.meta, t.Targets)
+	return r.local.Commit(r.meta, root.ConsistentSnapshot, hashes)
 }
 
 func (r *Repo) Clean() error {

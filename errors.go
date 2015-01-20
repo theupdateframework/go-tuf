@@ -1,9 +1,12 @@
 package tuf
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
+
+var ErrInitNotAllowed = errors.New("tuf: repository already initialized")
 
 type ErrMissingMetadata struct {
 	Name string

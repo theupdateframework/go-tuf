@@ -29,12 +29,12 @@ func (e ErrWrongHash) Error() string {
 }
 
 type ErrNoCommonHash struct {
-	Expected map[string]data.HexBytes
-	Actual   map[string]data.HexBytes
+	Expected data.Hashes
+	Actual   data.Hashes
 }
 
 func (e ErrNoCommonHash) Error() string {
-	types := func(a map[string]data.HexBytes) []string {
+	types := func(a data.Hashes) []string {
 		t := make([]string, 0, len(a))
 		for typ := range a {
 			t = append(t, typ)
@@ -95,7 +95,7 @@ func GenerateFileMeta(r io.Reader, hashAlgorithms ...string) (data.FileMeta, err
 	if err != nil {
 		return data.FileMeta{}, err
 	}
-	m := data.FileMeta{Length: n, Hashes: make(map[string]data.HexBytes, len(hashes))}
+	m := data.FileMeta{Length: n, Hashes: make(data.Hashes, len(hashes))}
 	for hashAlgorithm, h := range hashes {
 		m.Hashes[hashAlgorithm] = h.Sum(nil)
 	}
@@ -111,4 +111,13 @@ func NormalizeTarget(path string) string {
 		return s
 	}
 	return "/" + s
+}
+
+func HashedPaths(path string, hashes data.Hashes) []string {
+	paths := make([]string, 0, len(hashes))
+	for _, hash := range hashes {
+		hashedPath := filepath.Join(filepath.Dir(path), hash.String()+"."+filepath.Base(path))
+		paths = append(paths, hashedPath)
+	}
+	return paths
 }

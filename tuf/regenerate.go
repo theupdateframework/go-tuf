@@ -9,7 +9,7 @@ import (
 
 func init() {
 	register("regenerate", cmdRegenerate, `
-usage: tuf regenerate
+usage: tuf regenerate [--consistent-snapshot=false]
 
 Recreate the targets manifest.
   `)
