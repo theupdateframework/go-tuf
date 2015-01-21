@@ -1,12 +1,16 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/docker/docker/pkg/term"
 	"github.com/flynn/go-docopt"
 	"github.com/flynn/go-tuf"
 )
@@ -64,7 +68,7 @@ See "tuf help <command>" for more information on a specific command
 	}
 
 	if err := runCommand(cmd, cmdArgs, dir); err != nil {
-		log.Fatal(err)
+		log.Fatalln("ERROR:", err)
 	}
 }
 
@@ -95,7 +99,7 @@ func runCommand(name string, args []string, dir string) error {
 	if err != nil {
 		return err
 	}
-	repo, err := tuf.NewRepo(tuf.FileSystemStore(dir))
+	repo, err := tuf.NewRepo(tuf.FileSystemStore(dir, getPassphrase))
 	if err != nil {
 		return err
 	}
@@ -108,4 +112,40 @@ func parseExpires(arg string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("failed to parse --expires arg: %s", err)
 	}
 	return time.Now().AddDate(0, 0, days).UTC(), nil
+}
+
+func getPassphrase(role string, confirm bool) ([]byte, error) {
+	state, err := term.SaveState(0)
+	if err != nil {
+		return nil, err
+	}
+	term.DisableEcho(0, state)
+	defer term.RestoreTerminal(0, state)
+
+	stdin := bufio.NewReader(os.Stdin)
+
+	fmt.Printf("Enter %s keys passphrase: ", role)
+	passphrase, err := stdin.ReadBytes('\n')
+	fmt.Println()
+	if err != nil {
+		return nil, err
+	}
+	passphrase = passphrase[0 : len(passphrase)-1]
+
+	if !confirm {
+		return passphrase, nil
+	}
+
+	fmt.Printf("Repeat %s keys passphrase: ", role)
+	confirmation, err := stdin.ReadBytes('\n')
+	fmt.Println()
+	if err != nil {
+		return nil, err
+	}
+	confirmation = confirmation[0 : len(confirmation)-1]
+
+	if !bytes.Equal(passphrase, confirmation) {
+		return nil, errors.New("The entered passphrases do not match")
+	}
+	return passphrase, nil
 }

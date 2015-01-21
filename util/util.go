@@ -52,6 +52,8 @@ func (e ErrUnknownHashAlgorithm) Error() string {
 	return fmt.Sprintf("unknown hash algorithm: %s", e.Name)
 }
 
+type PassphraseFunc func(role string, confirm bool) ([]byte, error)
+
 func FileMetaEqual(actual data.FileMeta, expected data.FileMeta) error {
 	if actual.Length != expected.Length {
 		return ErrWrongLength

@@ -3,7 +3,6 @@ package tuf
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/agl/ed25519"
 	"github.com/flynn/go-tuf/data"
+	"github.com/flynn/go-tuf/encrypted"
 	"github.com/flynn/go-tuf/keys"
 	"github.com/flynn/go-tuf/signed"
 	"github.com/flynn/go-tuf/util"
@@ -460,36 +460,41 @@ func (t *tmpDir) assertEmpty(dir string) {
 }
 
 func (t *tmpDir) assertFileContent(path, content string) {
-	t.assertExists(path)
-	actual, err := ioutil.ReadFile(filepath.Join(t.path, path))
-	t.c.Assert(err, IsNil)
+	actual := t.readFile(path)
 	t.c.Assert(string(actual), Equals, content)
 }
 
 func (t *tmpDir) stagedTargetPath(path string) string {
 	return filepath.Join(t.path, "staged", "targets", path)
 }
+
 func (t *tmpDir) writeStagedTarget(path, data string) {
 	path = t.stagedTargetPath(path)
 	t.c.Assert(os.MkdirAll(filepath.Dir(path), 0755), IsNil)
 	t.c.Assert(ioutil.WriteFile(path, []byte(data), 0644), IsNil)
 }
 
+func (t *tmpDir) readFile(path string) []byte {
+	t.assertExists(path)
+	data, err := ioutil.ReadFile(filepath.Join(t.path, path))
+	t.c.Assert(err, IsNil)
+	return data
+}
+
 func (RepoSuite) TestCommitFileSystem(c *C) {
 	tmp := newTmpDir(c)
-	local := FileSystemStore(tmp.path)
+	local := FileSystemStore(tmp.path, nil)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
 
 	// don't use consistent snapshots to make the checks simpler
 	c.Assert(r.Init(false), IsNil)
 
-	// generating keys should save them to the keys directory, stage root.json
-	// and create repo dirs
-	for _, role := range []string{"root", "targets", "snapshot", "timestamp"} {
-		id := genKey(c, r, role)
-		tmp.assertExists(fmt.Sprintf("keys/%s-%s.json", role, id))
-	}
+	// generating keys should stage root.json and create repo dirs
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
 	tmp.assertExists("staged/root.json")
 	tmp.assertEmpty("repository")
 	tmp.assertEmpty("staged/targets")
@@ -550,7 +555,7 @@ func (RepoSuite) TestCommitFileSystem(c *C) {
 
 func (RepoSuite) TestConsistentSnapshot(c *C) {
 	tmp := newTmpDir(c)
-	local := FileSystemStore(tmp.path)
+	local := FileSystemStore(tmp.path, nil)
 	r, err := NewRepo(local, "sha512", "sha256")
 	c.Assert(err, IsNil)
 
@@ -722,4 +727,71 @@ func (RepoSuite) TestHashAlgorithm(c *C) {
 			}
 		}
 	}
+}
+
+func testPassphraseFunc(p []byte) util.PassphraseFunc {
+	return func(string, bool) ([]byte, error) { return p, nil }
+}
+
+func (RepoSuite) TestKeyPersistence(c *C) {
+	tmp := newTmpDir(c)
+	passphrase := []byte("s3cr3t")
+	store := FileSystemStore(tmp.path, testPassphraseFunc(passphrase))
+
+	assertEqual := func(actual []*data.Key, expected []*keys.Key) {
+		c.Assert(actual, HasLen, len(expected))
+		for i, key := range expected {
+			c.Assert(actual[i].ID(), Equals, key.ID)
+			c.Assert(actual[i].Value.Public, DeepEquals, data.HexBytes(key.Public[:]))
+			c.Assert(actual[i].Value.Private, DeepEquals, data.HexBytes(key.Private[:]))
+		}
+	}
+
+	assertKeys := func(role string, enc bool, expected []*keys.Key) {
+		keysJSON := tmp.readFile("keys/" + role + ".json")
+		pk := &persistedKeys{}
+		c.Assert(json.Unmarshal(keysJSON, pk), IsNil)
+
+		// check the persisted keys are correct
+		var actual []*data.Key
+		if enc {
+			c.Assert(pk.Encrypted, Equals, true)
+			decrypted, err := encrypted.Decrypt(pk.Data, passphrase)
+			c.Assert(err, IsNil)
+			c.Assert(json.Unmarshal(decrypted, &actual), IsNil)
+		} else {
+			c.Assert(pk.Encrypted, Equals, false)
+			c.Assert(json.Unmarshal(pk.Data, &actual), IsNil)
+		}
+		assertEqual(actual, expected)
+
+		// check GetKeys is correct
+		actual, err := store.GetKeys(role)
+		c.Assert(err, IsNil)
+		assertEqual(actual, expected)
+	}
+
+	// save a key and check it gets encrypted
+	key, err := keys.NewKey()
+	c.Assert(err, IsNil)
+	c.Assert(store.SaveKey("root", key.SerializePrivate()), IsNil)
+	assertKeys("root", true, []*keys.Key{key})
+
+	// save another key and check it gets added to the existing keys
+	newKey, err := keys.NewKey()
+	c.Assert(err, IsNil)
+	c.Assert(store.SaveKey("root", newKey.SerializePrivate()), IsNil)
+	assertKeys("root", true, []*keys.Key{key, newKey})
+
+	// check saving a key to an encrypted file without a passphrase fails
+	insecureStore := FileSystemStore(tmp.path, nil)
+	key, err = keys.NewKey()
+	c.Assert(err, IsNil)
+	c.Assert(insecureStore.SaveKey("root", key.SerializePrivate()), Equals, ErrPassphraseRequired{"root"})
+
+	// save a key to an insecure store and check it is not encrypted
+	key, err = keys.NewKey()
+	c.Assert(err, IsNil)
+	c.Assert(insecureStore.SaveKey("targets", key.SerializePrivate()), IsNil)
+	assertKeys("targets", false, []*keys.Key{key})
 }

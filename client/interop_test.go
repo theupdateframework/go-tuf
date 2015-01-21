@@ -78,7 +78,7 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 }
 
 func generateRepoFS(c *C, dir string, files map[string][]byte, consistentSnapshot bool) *tuf.Repo {
-	repo, err := tuf.NewRepo(tuf.FileSystemStore(dir))
+	repo, err := tuf.NewRepo(tuf.FileSystemStore(dir, nil))
 	c.Assert(err, IsNil)
 	if !consistentSnapshot {
 		c.Assert(repo.Init(false), IsNil)

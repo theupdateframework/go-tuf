@@ -75,3 +75,11 @@ type ErrNotEnoughKeys struct {
 func (e ErrNotEnoughKeys) Error() string {
 	return fmt.Sprintf("tuf: %s role has insufficient keys for threshold (has %d keys, threshold is %d)", e.Role, e.Keys, e.Threshold)
 }
+
+type ErrPassphraseRequired struct {
+	Role string
+}
+
+func (e ErrPassphraseRequired) Error() string {
+	return fmt.Sprintf("tuf: a passphrase is required to access the encrypted %s keys file", e.Role)
+}
