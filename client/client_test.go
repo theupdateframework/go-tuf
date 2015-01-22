@@ -134,11 +134,11 @@ func (s *ClientSuite) genKeyExpired(c *C, role string) string {
 // the need to sleep in the tests).
 func (s *ClientSuite) withMetaExpired(f func()) {
 	e := signed.IsExpired
+	defer func() { signed.IsExpired = e }()
 	signed.IsExpired = func(t time.Time) bool {
 		return t.Unix() == s.expiredTime.Round(time.Second).Unix()
 	}
 	f()
-	signed.IsExpired = e
 }
 
 func (s *ClientSuite) syncLocal(c *C) {
