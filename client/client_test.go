@@ -575,6 +575,38 @@ func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
 	})
 }
 
+func (s *ClientSuite) TestUpdateLocalRootExpiredKeyChange(c *C) {
+	client := s.newClient(c)
+
+	// add soon to expire root.json to local storage
+	s.genKeyExpired(c, "timestamp")
+	c.Assert(s.repo.Timestamp(), IsNil)
+	s.syncLocal(c)
+
+	// replace all keys
+	newKeyIDs := make(map[string]string)
+	for role, id := range s.keyIDs {
+		c.Assert(s.repo.RevokeKey(role, id), IsNil)
+		newKeyIDs[role] = s.genKey(c, role)
+	}
+
+	// update metadata
+	c.Assert(s.repo.Sign("targets.json"), IsNil)
+	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	s.syncRemote(c)
+
+	// check the update downloads the non expired remote root.json and
+	// restarts itself, thus successfully updating
+	s.withMetaExpired(func() {
+		err := client.getLocalMeta()
+		c.Assert(err, FitsTypeOf, signed.ErrExpired{})
+
+		_, err = client.Update()
+		c.Assert(err, IsNil)
+	})
+}
+
 func (s *ClientSuite) TestUpdateMixAndMatchAttack(c *C) {
 	// generate metadata with an explicit expires so we can make predictable changes
 	expires := time.Now().Add(time.Hour)

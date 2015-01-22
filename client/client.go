@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"io/ioutil"
 
@@ -139,7 +140,16 @@ func (c *Client) update(latestRoot bool) (data.Files, error) {
 			// should not have continued the update
 			return nil, err
 		}
-		return nil, err
+		if latestRoot && err == signed.ErrRoleThreshold {
+			// Root was updated with new keys, so our local metadata is no
+			// longer validating. Read only the versions from the local metadata
+			// and re-download everything.
+			if err := c.getRootAndLocalVersionsUnsafe(); err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
 	}
 
 	// Get timestamp.json, extract snapshot.json file meta and save the
@@ -332,6 +342,56 @@ func (c *Client) downloadMetaUnsafe(name string) ([]byte, error) {
 	// the reported size is inaccurate, or size is -1 which indicates an
 	// unknown length
 	return ioutil.ReadAll(io.LimitReader(r, maxMetaSize))
+}
+
+// getRootAndLocalVersionsUnsafe decodes the versions stored in the local
+// metadata without verifying signatures to protect against downgrade attacks
+// when the root is replaced and contains new keys. It also sets the local meta
+// cache to only contain the local root metadata.
+func (c *Client) getRootAndLocalVersionsUnsafe() error {
+	type versionData struct {
+		Signed struct {
+			Version int
+		}
+	}
+
+	meta, err := c.local.GetMeta()
+	if err != nil {
+		return err
+	}
+
+	getVersion := func(name string) (int, error) {
+		m, ok := meta[name]
+		if !ok {
+			return 0, nil
+		}
+		var data versionData
+		if err := json.Unmarshal(m, &data); err != nil {
+			return 0, err
+		}
+		return data.Signed.Version, nil
+	}
+
+	c.timestampVer, err = getVersion("timestamp.json")
+	if err != nil {
+		return err
+	}
+	c.snapshotVer, err = getVersion("snapshot.json")
+	if err != nil {
+		return err
+	}
+	c.targetsVer, err = getVersion("targets.json")
+	if err != nil {
+		return err
+	}
+
+	root, ok := meta["root.json"]
+	if !ok {
+		return errors.New("tuf: missing local root after downloading, this should not be possible")
+	}
+	c.localMeta = map[string]json.RawMessage{"root.json": root}
+
+	return nil
 }
 
 // remoteGetFunc is the type of function the download method uses to download
