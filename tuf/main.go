@@ -11,8 +11,6 @@ import (
 	"github.com/flynn/go-tuf"
 )
 
-var dir string
-
 func main() {
 	log.SetFlags(0)
 
@@ -20,7 +18,7 @@ func main() {
 
 Options:
   -h, --help
-  -d, --dir=<dir>
+  -d <dir>     The path to the repository (defaults to the current working directory)
 
 Commands:
   help         Show usage for a specific command
@@ -53,7 +51,10 @@ See "tuf help <command>" for more information on a specific command
 		}
 	}
 
-	dir = args.String["--tuf-dir"]
+	dir, ok := args.String["-d"]
+	if !ok {
+		dir = args.String["--dir"]
+	}
 	if dir == "" {
 		var err error
 		dir, err = os.Getwd()
@@ -62,7 +63,7 @@ See "tuf help <command>" for more information on a specific command
 		}
 	}
 
-	if err := runCommand(cmd, cmdArgs); err != nil {
+	if err := runCommand(cmd, cmdArgs, dir); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -80,7 +81,7 @@ func register(name string, f cmdFunc, usage string) {
 	commands[name] = &command{usage: usage, f: f}
 }
 
-func runCommand(name string, args []string) error {
+func runCommand(name string, args []string, dir string) error {
 	argv := make([]string, 1, 1+len(args))
 	argv[0] = name
 	argv = append(argv, args...)
