@@ -174,6 +174,15 @@ func Encrypt(plaintext, passphrase []byte) ([]byte, error) {
 	return json.Marshal(data)
 }
 
+// Marshal encrypts the JSON encoding of v using passphrase.
+func Marshal(v interface{}, passphrase []byte) ([]byte, error) {
+	data, err := json.MarshalIndent(v, "", "\t")
+	if err != nil {
+		return nil, err
+	}
+	return Encrypt(data, passphrase)
+}
+
 // Decrypt takes a JSON-encoded ciphertext object encrypted using Encrypt and
 // tries to decrypt it using passphrase. If successful, it returns the
 // plaintext.
@@ -199,6 +208,16 @@ func Decrypt(ciphertext, passphrase []byte) ([]byte, error) {
 	}
 
 	return data.Cipher.Decrypt(data.Ciphertext, key)
+}
+
+// Unmarshal decrypts the data using passphrase and unmarshals the resulting
+// plaintext into the value pointed to by v.
+func Unmarshal(data []byte, v interface{}, passphrase []byte) error {
+	decrypted, err := Decrypt(data, passphrase)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(decrypted, v)
 }
 
 func fillRandom(b []byte) error {

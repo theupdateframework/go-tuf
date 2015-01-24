@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/flynn/go-tuf/data"
+	"github.com/flynn/go-tuf/encrypted"
 	"github.com/flynn/go-tuf/util"
 )
 
@@ -67,12 +68,25 @@ func (m *memoryStore) Clean() error {
 	return nil
 }
 
-func FileSystemStore(dir string) LocalStore {
-	return &fileSystemStore{dir}
+type persistedKeys struct {
+	Encrypted bool            `json:"encrypted"`
+	Data      json.RawMessage `json:"data"`
+}
+
+func FileSystemStore(dir string, p util.PassphraseFunc) LocalStore {
+	return &fileSystemStore{
+		dir:            dir,
+		passphraseFunc: p,
+		keys:           make(map[string][]*data.Key),
+	}
 }
 
 type fileSystemStore struct {
-	dir string
+	dir            string
+	passphraseFunc util.PassphraseFunc
+
+	// keys is a cache of persisted keys to avoid decrypting multiple times
+	keys map[string][]*data.Key
 }
 
 func (f *fileSystemStore) repoDir() string {
@@ -230,43 +244,105 @@ func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, consistentSnap
 }
 
 func (f *fileSystemStore) GetKeys(role string) ([]*data.Key, error) {
-	files, err := ioutil.ReadDir(filepath.Join(f.dir, "keys"))
+	if keys, ok := f.keys[role]; ok {
+		return keys, nil
+	}
+	keys, _, err := f.loadKeys(role)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	signingKeys := make([]*data.Key, 0, len(files))
-	for _, file := range files {
-		if !strings.HasPrefix(file.Name(), role) {
-			continue
-		}
-		s, err := os.Open(filepath.Join(f.dir, "keys", file.Name()))
-		if err != nil {
-			return nil, err
-		}
-		key := &data.Key{}
-		if err := json.NewDecoder(s).Decode(key); err != nil {
-			return nil, err
-		}
-		signingKeys = append(signingKeys, key)
-	}
-	return signingKeys, nil
+	return keys, nil
 }
 
 func (f *fileSystemStore) SaveKey(role string, key *data.Key) error {
 	if err := f.createDirs(); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(key, "", "  ")
+
+	// add the key to the existing keys (if any)
+	keys, pass, err := f.loadKeys(role)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	keys = append(keys, key)
+
+	// if loadKeys didn't return a passphrase (because no keys yet exist)
+	// and passphraseFunc is set, get the passphrase so the keys file can
+	// be encrypted later (passphraseFunc being nil indicates the keys file
+	// should not be encrypted)
+	if pass == nil && f.passphraseFunc != nil {
+		pass, err = f.passphraseFunc(role, true)
+		if err != nil {
+			return err
+		}
+	}
+
+	pk := &persistedKeys{}
+	if pass != nil {
+		pk.Data, err = encrypted.Marshal(keys, pass)
+		if err != nil {
+			return err
+		}
+		pk.Encrypted = true
+	} else {
+		pk.Data, err = json.MarshalIndent(keys, "", "\t")
+		if err != nil {
+			return err
+		}
+	}
+	data, err := json.MarshalIndent(pk, "", "\t")
 	if err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(filepath.Join(f.dir, "keys", role+"-"+key.ID()+".json"), append(data, '\n'), 0600); err != nil {
+	if err := ioutil.WriteFile(f.keysPath(role), append(data, '\n'), 0600); err != nil {
 		return err
 	}
+	f.keys[role] = keys
 	return nil
+}
+
+// loadKeys loads keys for the given role and returns them along with the
+// passphrase (if read) so that callers don't need to re-read it.
+func (f *fileSystemStore) loadKeys(role string) ([]*data.Key, []byte, error) {
+	file, err := os.Open(f.keysPath(role))
+	if err != nil {
+		return nil, nil, err
+	}
+	defer file.Close()
+
+	pk := &persistedKeys{}
+	if err := json.NewDecoder(file).Decode(pk); err != nil {
+		return nil, nil, err
+	}
+
+	var keys []*data.Key
+	if !pk.Encrypted {
+		if err := json.Unmarshal(pk.Data, &keys); err != nil {
+			return nil, nil, err
+		}
+		return keys, nil, nil
+	}
+
+	// the keys are encrypted so cannot be loaded if passphraseFunc is not set
+	if f.passphraseFunc == nil {
+		return nil, nil, ErrPassphraseRequired{role}
+	}
+
+	pass, err := f.passphraseFunc(role, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := encrypted.Unmarshal(pk.Data, &keys, pass); err != nil {
+		return nil, nil, err
+	}
+	return keys, pass, nil
+}
+
+func (f *fileSystemStore) keysPath(role string) string {
+	return filepath.Join(f.dir, "keys", role+".json")
 }
 
 func (f *fileSystemStore) Clean() error {
