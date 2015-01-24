@@ -14,16 +14,18 @@ import (
 	"github.com/docker/docker/pkg/term"
 	"github.com/flynn/go-docopt"
 	"github.com/flynn/go-tuf"
+	"github.com/flynn/go-tuf/util"
 )
 
 func main() {
 	log.SetFlags(0)
 
-	usage := `usage: tuf [-h|--help] [-d|--dir=<dir>] <command> [<args>...]
+	usage := `usage: tuf [-h|--help] [-d|--dir=<dir>] [--insecure-plaintext] <command> [<args>...]
 
 Options:
   -h, --help
-  -d <dir>     The path to the repository (defaults to the current working directory)
+  -d <dir>              The path to the repository (defaults to the current working directory)
+  --insecure-plaintext  Don't encrypt signing keys
 
 Commands:
   help         Show usage for a specific command
@@ -68,7 +70,7 @@ See "tuf help <command>" for more information on a specific command
 		}
 	}
 
-	if err := runCommand(cmd, cmdArgs, dir); err != nil {
+	if err := runCommand(cmd, cmdArgs, dir, args.Bool["--insecure-plaintext"]); err != nil {
 		log.Fatalln("ERROR:", err)
 	}
 }
@@ -86,7 +88,7 @@ func register(name string, f cmdFunc, usage string) {
 	commands[name] = &command{usage: usage, f: f}
 }
 
-func runCommand(name string, args []string, dir string) error {
+func runCommand(name string, args []string, dir string, insecure bool) error {
 	argv := make([]string, 1, 1+len(args))
 	argv[0] = name
 	argv = append(argv, args...)
@@ -100,7 +102,12 @@ func runCommand(name string, args []string, dir string) error {
 	if err != nil {
 		return err
 	}
-	repo, err := tuf.NewRepo(tuf.FileSystemStore(dir, getPassphrase))
+
+	var p util.PassphraseFunc
+	if !insecure {
+		p = getPassphrase
+	}
+	repo, err := tuf.NewRepo(tuf.FileSystemStore(dir, p))
 	if err != nil {
 		return err
 	}
