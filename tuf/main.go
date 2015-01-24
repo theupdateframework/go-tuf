@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/docker/docker/pkg/term"
@@ -115,6 +116,10 @@ func parseExpires(arg string) (time.Time, error) {
 }
 
 func getPassphrase(role string, confirm bool) ([]byte, error) {
+	if pass := os.Getenv(fmt.Sprintf("TUF_%s_PASSPHRASE", strings.ToUpper(role))); pass != "" {
+		return []byte(pass), nil
+	}
+
 	state, err := term.SaveState(0)
 	if err != nil {
 		return nil, err
