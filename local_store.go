@@ -40,12 +40,26 @@ func (m *memoryStore) SetMeta(name string, meta json.RawMessage) error {
 	return nil
 }
 
-func (m *memoryStore) GetStagedTarget(path string) (io.ReadCloser, error) {
-	data, ok := m.files[path]
-	if !ok {
-		return nil, ErrFileNotFound{path}
+func (m *memoryStore) WalkStagedTargets(paths []string, targetsFn targetsWalkFunc) error {
+	if len(paths) == 0 {
+		for path, data := range m.files {
+			if err := targetsFn(path, bytes.NewReader(data)); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
-	return ioutil.NopCloser(bytes.NewReader(data)), nil
+
+	for _, path := range paths {
+		data, ok := m.files[path]
+		if !ok {
+			return ErrFileNotFound{path}
+		}
+		if err := targetsFn(path, bytes.NewReader(data)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *memoryStore) Commit(map[string]json.RawMessage, bool, map[string]data.Hashes) error {
@@ -139,16 +153,56 @@ func (f *fileSystemStore) createDirs() error {
 	return nil
 }
 
-func (f *fileSystemStore) GetStagedTarget(path string) (io.ReadCloser, error) {
-	path = filepath.Join(f.stagedDir(), "targets", path)
-	file, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, ErrFileNotFound{path}
+func (f *fileSystemStore) WalkStagedTargets(paths []string, targetsFn targetsWalkFunc) error {
+	if len(paths) == 0 {
+		walkFunc := func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() || !info.Mode().IsRegular() {
+				return nil
+			}
+			rel, err := filepath.Rel(filepath.Join(f.stagedDir(), "targets"), path)
+			if err != nil {
+				return err
+			}
+			file, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			defer file.Close()
+			return targetsFn(rel, file)
 		}
-		return nil, err
+		return filepath.Walk(filepath.Join(f.stagedDir(), "targets"), walkFunc)
 	}
-	return file, nil
+
+	// check all the files exist before processing any files
+	for _, path := range paths {
+		realPath := filepath.Join(f.stagedDir(), "targets", path)
+		if _, err := os.Stat(realPath); err != nil {
+			if os.IsNotExist(err) {
+				return ErrFileNotFound{realPath}
+			}
+			return err
+		}
+	}
+
+	for _, path := range paths {
+		realPath := filepath.Join(f.stagedDir(), "targets", path)
+		file, err := os.Open(realPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return ErrFileNotFound{realPath}
+			}
+			return err
+		}
+		err = targetsFn(path, file)
+		file.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (f *fileSystemStore) createRepoFile(path string) (*os.File, error) {
