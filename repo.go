@@ -35,10 +35,17 @@ var snapshotManifests = []string{
 	"targets.json",
 }
 
+type targetsWalkFunc func(path string, target io.Reader) error
+
 type LocalStore interface {
 	GetMeta() (map[string]json.RawMessage, error)
 	SetMeta(string, json.RawMessage) error
-	GetStagedTarget(string) (io.ReadCloser, error)
+
+	// WalkStagedTargets calls targetsFn for each staged target file in paths.
+	//
+	// If paths is empty, all staged target files will be walked.
+	WalkStagedTargets(paths []string, targetsFn targetsWalkFunc) error
+
 	Commit(map[string]json.RawMessage, bool, map[string]data.Hashes) error
 	GetKeys(string) ([]*data.Key, error)
 	SaveKey(string, *data.Key) error
@@ -372,10 +379,18 @@ func validManifest(name string) bool {
 }
 
 func (r *Repo) AddTarget(path string, custom map[string]interface{}) error {
-	return r.AddTargetWithExpires(path, custom, data.DefaultExpires("targets"))
+	return r.AddTargets([]string{path}, custom)
+}
+
+func (r *Repo) AddTargets(paths []string, custom map[string]interface{}) error {
+	return r.AddTargetsWithExpires(paths, custom, data.DefaultExpires("targets"))
 }
 
 func (r *Repo) AddTargetWithExpires(path string, custom map[string]interface{}, expires time.Time) error {
+	return r.AddTargetsWithExpires([]string{path}, custom, expires)
+}
+
+func (r *Repo) AddTargetsWithExpires(paths []string, custom map[string]interface{}, expires time.Time) error {
 	if !validExpires(expires) {
 		return ErrInvalidExpires{expires}
 	}
@@ -384,14 +399,14 @@ func (r *Repo) AddTargetWithExpires(path string, custom map[string]interface{}, 
 	if err != nil {
 		return err
 	}
-	path = util.NormalizeTarget(path)
-	target, err := r.local.GetStagedTarget(path)
-	if err != nil {
-		return err
+	normalizedPaths := make([]string, len(paths))
+	for i, path := range paths {
+		normalizedPaths[i] = util.NormalizeTarget(path)
 	}
-	defer target.Close()
-	t.Targets[path], err = util.GenerateFileMeta(target, r.hashAlgorithms...)
-	if err != nil {
+	if err := r.local.WalkStagedTargets(normalizedPaths, func(path string, target io.Reader) (err error) {
+		t.Targets[path], err = util.GenerateFileMeta(target, r.hashAlgorithms...)
+		return err
+	}); err != nil {
 		return err
 	}
 	t.Expires = expires.Round(time.Second)

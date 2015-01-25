@@ -3,6 +3,7 @@ package tuf
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -794,4 +795,43 @@ func (RepoSuite) TestKeyPersistence(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(insecureStore.SaveKey("targets", key.SerializePrivate()), IsNil)
 	assertKeys("targets", false, []*keys.Key{key})
+}
+
+func (RepoSuite) TestAddMultipleTargets(c *C) {
+	tmp := newTmpDir(c)
+	local := FileSystemStore(tmp.path, nil)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+	// don't use consistent snapshots to make the checks simpler
+	c.Assert(r.Init(false), IsNil)
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	// adding and committing multiple files moves correct targets from staged -> repository
+	tmp.writeStagedTarget("foo.txt", "foo")
+	tmp.writeStagedTarget("bar.txt", "bar")
+	c.Assert(r.AddTargets([]string{"foo.txt", "bar.txt"}, nil), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+	tmp.assertExists("repository/targets/foo.txt")
+	tmp.assertExists("repository/targets/bar.txt")
+
+	// adding all targets moves them all from staged -> repository
+	for i := 0; i < 10; i++ {
+		tmp.writeStagedTarget(fmt.Sprintf("file%d.txt", i), "data")
+	}
+	c.Assert(r.AddTargets(nil, nil), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+	tmp.assertExists("repository/targets/foo.txt")
+	tmp.assertExists("repository/targets/bar.txt")
+	for i := 0; i < 10; i++ {
+		tmp.assertExists(fmt.Sprintf("repository/targets/file%d.txt", i))
+	}
+	tmp.assertEmpty("staged/targets")
+	tmp.assertEmpty("staged")
 }
