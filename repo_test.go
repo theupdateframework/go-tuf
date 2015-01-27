@@ -575,12 +575,15 @@ func (RepoSuite) TestConsistentSnapshot(c *C) {
 	hashes, err := r.fileHashes()
 	c.Assert(err, IsNil)
 
-	// root.json should exist at both hashed and unhashed paths
-	tmp.assertHashedFilesExist("repository/root.json", hashes["root.json"])
-	tmp.assertExists("repository/root.json")
+	// root.json, targets.json and snapshot.json should exist at both hashed and unhashed paths
+	for _, path := range []string{"root.json", "targets.json", "snapshot.json"} {
+		repoPath := filepath.Join("repository", path)
+		tmp.assertHashedFilesExist(repoPath, hashes[path])
+		tmp.assertExists(repoPath)
+	}
 
-	// targets.json, snapshot.json and target files should exist at hashed but not unhashed paths
-	for _, path := range []string{"targets.json", "snapshot.json", "targets/foo.txt", "targets/dir/bar.txt"} {
+	// target files should exist at hashed but not unhashed paths
+	for _, path := range []string{"targets/foo.txt", "targets/dir/bar.txt"} {
 		repoPath := filepath.Join("repository", path)
 		tmp.assertHashedFilesExist(repoPath, hashes[path])
 		tmp.assertNotExist(repoPath)
@@ -596,6 +599,16 @@ func (RepoSuite) TestConsistentSnapshot(c *C) {
 	c.Assert(r.Commit(), IsNil)
 	tmp.assertHashedFilesNotExist("repository/targets/foo.txt", hashes["targets/foo.txt"])
 	tmp.assertNotExist("repository/targets/foo.txt")
+
+	// targets should be returned by new repo
+	newRepo, err := NewRepo(local, "sha512", "sha256")
+	c.Assert(err, IsNil)
+	t, err := newRepo.targets()
+	c.Assert(err, IsNil)
+	c.Assert(t.Targets, HasLen, 1)
+	if _, ok := t.Targets["/dir/bar.txt"]; !ok {
+		c.Fatal("missing targets file: dir/bar.txt")
+	}
 }
 
 func (RepoSuite) TestExpiresAndVersion(c *C) {

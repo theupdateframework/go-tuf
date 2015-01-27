@@ -214,11 +214,14 @@ func (f *fileSystemStore) createRepoFile(path string) (*os.File, error) {
 }
 
 func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, consistentSnapshot bool, hashes map[string]data.Hashes) error {
+	isTarget := func(path string) bool {
+		return strings.HasPrefix(path, "targets/")
+	}
 	shouldCopyHashed := func(path string) bool {
 		return consistentSnapshot && path != "timestamp.json"
 	}
 	shouldCopyUnhashed := func(path string) bool {
-		return !consistentSnapshot || path == "root.json" || path == "timestamp.json"
+		return !consistentSnapshot || !isTarget(path)
 	}
 	copyToRepo := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -256,9 +259,6 @@ func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, consistentSnap
 			return err
 		}
 		return nil
-	}
-	isTarget := func(path string) bool {
-		return strings.HasPrefix(path, "targets")
 	}
 	needsRemoval := func(path string) bool {
 		if consistentSnapshot {
