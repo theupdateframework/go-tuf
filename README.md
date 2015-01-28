@@ -31,7 +31,7 @@ The directories contain the following files:
 ### Install
 
 ```
-go get github.com/flynn/go-tuf/tuf
+go get github.com/flynn/go-tuf/cmd/tuf
 ```
 
 ### Commands
