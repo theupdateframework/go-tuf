@@ -49,10 +49,10 @@ See "tuf help <command>" for more information on a specific command
 	cmdArgs := args.All["<args>"].([]string)
 
 	if cmd == "help" {
-		if len(cmdArgs) == 0 { // `flynn help`
+		if len(cmdArgs) == 0 { // `tuf help`
 			fmt.Println(usage)
 			return
-		} else { // `flynn help <command>`
+		} else { // `tuf help <command>`
 			cmd = cmdArgs[0]
 			cmdArgs = []string{"--help"}
 		}

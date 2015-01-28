@@ -509,6 +509,12 @@ func (RepoSuite) TestCommitFileSystem(c *C) {
 	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
 	tmp.assertExists("staged/targets.json")
 	tmp.assertEmpty("repository")
+	t, err := r.targets()
+	c.Assert(err, IsNil)
+	c.Assert(t.Targets, HasLen, 1)
+	if _, ok := t.Targets["/foo.txt"]; !ok {
+		c.Fatal("missing target file: /foo.txt")
+	}
 
 	// Snapshot() stages snapshot.json
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
@@ -822,6 +828,16 @@ func (RepoSuite) TestAddMultipleTargets(c *C) {
 	genKey(c, r, "snapshot")
 	genKey(c, r, "timestamp")
 
+	assertRepoTargets := func(paths ...string) {
+		t, err := r.targets()
+		c.Assert(err, IsNil)
+		for _, path := range paths {
+			if _, ok := t.Targets[path]; !ok {
+				c.Fatalf("missing target file: %s", path)
+			}
+		}
+	}
+
 	// adding and committing multiple files moves correct targets from staged -> repository
 	tmp.writeStagedTarget("foo.txt", "foo")
 	tmp.writeStagedTarget("bar.txt", "bar")
@@ -829,12 +845,16 @@ func (RepoSuite) TestAddMultipleTargets(c *C) {
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
+	assertRepoTargets("/foo.txt", "/bar.txt")
 	tmp.assertExists("repository/targets/foo.txt")
 	tmp.assertExists("repository/targets/bar.txt")
 
 	// adding all targets moves them all from staged -> repository
-	for i := 0; i < 10; i++ {
-		tmp.writeStagedTarget(fmt.Sprintf("file%d.txt", i), "data")
+	count := 10
+	files := make([]string, count)
+	for i := 0; i < count; i++ {
+		files[i] = fmt.Sprintf("/file%d.txt", i)
+		tmp.writeStagedTarget(files[i], "data")
 	}
 	c.Assert(r.AddTargets(nil, nil), IsNil)
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
@@ -842,8 +862,9 @@ func (RepoSuite) TestAddMultipleTargets(c *C) {
 	c.Assert(r.Commit(), IsNil)
 	tmp.assertExists("repository/targets/foo.txt")
 	tmp.assertExists("repository/targets/bar.txt")
-	for i := 0; i < 10; i++ {
-		tmp.assertExists(fmt.Sprintf("repository/targets/file%d.txt", i))
+	assertRepoTargets(files...)
+	for _, file := range files {
+		tmp.assertExists("repository/targets/" + file)
 	}
 	tmp.assertEmpty("staged/targets")
 	tmp.assertEmpty("staged")
