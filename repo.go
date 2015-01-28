@@ -404,7 +404,7 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom map[string]interface
 		normalizedPaths[i] = util.NormalizeTarget(path)
 	}
 	if err := r.local.WalkStagedTargets(normalizedPaths, func(path string, target io.Reader) (err error) {
-		t.Targets[path], err = util.GenerateFileMeta(target, r.hashAlgorithms...)
+		t.Targets[util.NormalizeTarget(path)], err = util.GenerateFileMeta(target, r.hashAlgorithms...)
 		return err
 	}); err != nil {
 		return err
