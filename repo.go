@@ -415,10 +415,19 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom map[string]interface
 }
 
 func (r *Repo) RemoveTarget(path string) error {
-	return r.RemoveTargetWithExpires(path, data.DefaultExpires("targets"))
+	return r.RemoveTargets([]string{path})
+}
+
+func (r *Repo) RemoveTargets(paths []string) error {
+	return r.RemoveTargetsWithExpires(paths, data.DefaultExpires("targets"))
 }
 
 func (r *Repo) RemoveTargetWithExpires(path string, expires time.Time) error {
+	return r.RemoveTargetsWithExpires([]string{path}, expires)
+}
+
+// If paths is empty, all targets will be removed.
+func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error {
 	if !validExpires(expires) {
 		return ErrInvalidExpires{expires}
 	}
@@ -427,11 +436,22 @@ func (r *Repo) RemoveTargetWithExpires(path string, expires time.Time) error {
 	if err != nil {
 		return err
 	}
-	path = util.NormalizeTarget(path)
-	if _, ok := t.Targets[path]; !ok {
-		return nil
+	if len(paths) == 0 {
+		t.Targets = make(data.Files)
+	} else {
+		removed := false
+		for _, path := range paths {
+			path = util.NormalizeTarget(path)
+			if _, ok := t.Targets[path]; !ok {
+				continue
+			}
+			removed = true
+			delete(t.Targets, path)
+		}
+		if !removed {
+			return nil
+		}
 	}
-	delete(t.Targets, path)
 	t.Expires = expires.Round(time.Second)
 	t.Version++
 	return r.setMeta("targets.json", t)

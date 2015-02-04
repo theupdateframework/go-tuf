@@ -816,7 +816,7 @@ func (RepoSuite) TestKeyPersistence(c *C) {
 	assertKeys("targets", false, []*keys.Key{key})
 }
 
-func (RepoSuite) TestAddMultipleTargets(c *C) {
+func (RepoSuite) TestManageMultipleTargets(c *C) {
 	tmp := newTmpDir(c)
 	local := FileSystemStore(tmp.path, nil)
 	r, err := NewRepo(local)
@@ -868,4 +868,14 @@ func (RepoSuite) TestAddMultipleTargets(c *C) {
 	}
 	tmp.assertEmpty("staged/targets")
 	tmp.assertEmpty("staged")
+
+	// removing all targets removes them from the repository and targets.json
+	c.Assert(r.RemoveTargets(nil), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+	tmp.assertEmpty("repository/targets")
+	t, err := r.targets()
+	c.Assert(err, IsNil)
+	c.Assert(t.Targets, HasLen, 0)
 }
