@@ -18,7 +18,7 @@ A TUF repository has the following directory layout:
 
 The directories contain the following files:
 
-* `keys/` - signing keys with filename pattern `ROLE-KEYID.json`
+* `keys/` - signing keys (optionally encrypted) with filename pattern `ROLE.json`
 * `repository/` - signed manifests
 * `repository/targets/` - hashed target files
 * `staged/` - either signed, unsigned or partially signed manifests
@@ -47,18 +47,22 @@ initialized to do so when generating keys.
 
 #### `tuf gen-key <role>`
 
-Generates a new signing key, serializes it to JSON and writes it to the `keys`
-directory. It also stages the addition of the new key to the `root` manifest.
+Prompts the user for an encryption passphrase (unless the
+`--insecure-plaintext` flag is set), then generates a new signing key and
+writes it to the relevant key file in the `keys` directory. It also stages
+the addition of the new key to the `root` manifest.
 
-#### `tuf add <path>`
+#### `tuf add [<path>...]`
 
-Hashes a file at `staged/targets/<path>`, then updates and stages the `targets`
-manifest.
+Hashes files in the `staged/targets` directory at the given path(s), then
+updates and stages the `targets` manifest. Specifying no paths hashes all
+files in the `staged/targets` directory.
 
-#### `tuf remove <path>`
+#### `tuf remove [<path>...]`
 
-Stages the removal of `<path>` from the `targets` manifest (it gets removed
-from the filesystem when the change is committed).
+Stages the removal of files with the given path(s) from the `targets` manifest
+(they get removed from the filesystem when the change is committed). Specifying
+no paths removes all files from the `targets` manifest.
 
 #### `tuf snapshot [--compression=<format>]`
 
@@ -116,14 +120,18 @@ Generate a root key on the root box:
 
 ```
 $ tuf gen-key root
+Enter root keys passphrase:
+Repeat root keys passphrase:
+Generated root key with ID 184b133f
 
 $ tree .
 .
 ├── keys
-│   └── root-184b133f.json
+│   └── root.json
 ├── repository
 └── staged
-    └── root.json
+    ├── root.json
+    └── targets
 ```
 
 Copy `staged/root.json` from the root box to the repo box and generate targets,
@@ -135,21 +143,34 @@ $ tree .
 ├── keys
 ├── repository
 └── staged
-    └── root.json
+    ├── root.json
+    └── targets
 
 $ tuf gen-key targets
+Enter targets keys passphrase:
+Repeat targets keys passphrase:
+Generated targets key with ID 8cf4810c
+
 $ tuf gen-key snapshot
+Enter snapshot keys passphrase:
+Repeat snapshot keys passphrase:
+Generated snapshot key with ID 3e070e53
+
 $ tuf gen-key timestamp
+Enter timestamp keys passphrase:
+Repeat timestamp keys passphrase:
+Generated timestamp key with ID a3768063
 
 $ tree .
 .
 ├── keys
-│   ├── snapshot-3e070e53.json
-│   ├── targets-8cf4810c.json
-│   └── timestamp-a3768063.json
+│   ├── snapshot.json
+│   ├── targets.json
+│   └── timestamp.json
 ├── repository
 └── staged
-    └── root.json
+    ├── root.json
+    └── targets
 ```
 
 Copy `staged/root.json` from the repo box back to the root box and sign it:
@@ -158,12 +179,14 @@ Copy `staged/root.json` from the repo box back to the root box and sign it:
 $ tree .
 .
 ├── keys
-│   ├── root-184b133f.json
+│   ├── root.json
 ├── repository
 └── staged
-    └── root.json
+    ├── root.json
+    └── targets
 
 $ tuf sign root.json
+Enter root keys passphrase:
 ```
 
 The staged `root.json` can now be copied back to the repo box ready to be
@@ -178,9 +201,9 @@ Assuming a staged, signed `root` manifest and the file to add exists at
 $ tree .
 .
 ├── keys
-│   ├── snapshot-3e070e53.json
-│   ├── targets-8cf4810c.json
-│   └── timestamp-a3768063.json
+│   ├── snapshot.json
+│   ├── targets.json
+│   └── timestamp.json
 ├── repository
 └── staged
     ├── root.json
@@ -190,13 +213,14 @@ $ tree .
                 └── baz.txt
 
 $ tuf add foo/bar/baz.txt
+Enter targets keys passphrase:
 
 $ tree .
 .
 ├── keys
-│   ├── snapshot-3e070e53.json
-│   ├── targets-8cf4810c.json
-│   └── timestamp-a3768063.json
+│   ├── snapshot.json
+│   ├── targets.json
+│   └── timestamp.json
 ├── repository
 └── staged
     ├── root.json
@@ -207,14 +231,17 @@ $ tree .
     └── targets.json
 
 $ tuf snapshot
+Enter snapshot keys passphrase:
+
 $ tuf timestamp
+Enter timestamp keys passphrase:
 
 $ tree .
 .
 ├── keys
-│   ├── snapshot-3e070e53.json
-│   ├── targets-8cf4810c.json
-│   └── timestamp-a3768063.json
+│   ├── snapshot.json
+│   ├── targets.json
+│   └── timestamp.json
 ├── repository
 └── staged
     ├── root.json
@@ -231,9 +258,9 @@ $ tuf commit
 $ tree .
 .
 ├── keys
-│   ├── snapshot-3e070e53.json
-│   ├── targets-8cf4810c.json
-│   └── timestamp-a3768063.json
+│   ├── snapshot.json
+│   ├── targets.json
+│   └── timestamp.json
 ├── repository
 │   ├── root.json
 │   ├── snapshot.json
@@ -254,9 +281,9 @@ Assuming the file to remove is at `repository/targets/foo/bar/baz.txt`:
 $ tree .
 .
 ├── keys
-│   ├── snapshot-3e070e53.json
-│   ├── targets-8cf4810c.json
-│   └── timestamp-a3768063.json
+│   ├── snapshot.json
+│   ├── targets.json
+│   └── timestamp.json
 ├── repository
 │   ├── root.json
 │   ├── snapshot.json
@@ -269,13 +296,14 @@ $ tree .
 └── staged
 
 $ tuf remove foo/bar/baz.txt
+Enter targets keys passphrase:
 
 $ tree .
 .
 ├── keys
-│   ├── snapshot-3e070e53.json
-│   ├── targets-8cf4810c.json
-│   └── timestamp-a3768063.json
+│   ├── snapshot.json
+│   ├── targets.json
+│   └── timestamp.json
 ├── repository
 │   ├── root.json
 │   ├── snapshot.json
@@ -289,14 +317,17 @@ $ tree .
     └── targets.json
 
 $ tuf snapshot
+Enter snapshot keys passphrase:
+
 $ tuf timestamp
+Enter timestamp keys passphrase:
 
 $ tree .
 .
 ├── keys
-│   ├── snapshot-3e070e53.json
-│   ├── targets-8cf4810c.json
-│   └── timestamp-a3768063.json
+│   ├── snapshot.json
+│   ├── targets.json
+│   └── timestamp.json
 ├── repository
 │   ├── root.json
 │   ├── snapshot.json
@@ -316,9 +347,9 @@ $ tuf commit
 $ tree .
 .
 ├── keys
-│   ├── snapshot-3e070e53.json
-│   ├── targets-8cf4810c.json
-│   └── timestamp-a3768063.json
+│   ├── snapshot.json
+│   ├── targets.json
+│   └── timestamp.json
 ├── repository
 │   ├── root.json
 │   ├── snapshot.json
@@ -333,9 +364,9 @@ $ tree .
 $ tree .
 .
 ├── keys
-│   ├── snapshot-3e070e53.json
-│   ├── targets-8cf4810c.json
-│   └── timestamp-a3768063.json
+│   ├── snapshot.json
+│   ├── targets.json
+│   └── timestamp.json
 ├── repository
 │   ├── root.json
 │   ├── snapshot.json
@@ -348,13 +379,14 @@ $ tree .
 └── staged
 
 $ tuf regenerate
+Enter targets keys passphrase:
 
 $ tree .
 .
 ├── keys
-│   ├── snapshot-3e070e53.json
-│   ├── targets-8cf4810c.json
-│   └── timestamp-a3768063.json
+│   ├── snapshot.json
+│   ├── targets.json
+│   └── timestamp.json
 ├── repository
 │   ├── root.json
 │   ├── snapshot.json
@@ -368,14 +400,17 @@ $ tree .
     └── targets.json
 
 $ tuf snapshot
+Enter snapshot keys passphrase:
+
 $ tuf timestamp
+Enter timestamp keys passphrase:
 
 $ tree .
 .
 ├── keys
-│   ├── snapshot-3e070e53.json
-│   ├── targets-8cf4810c.json
-│   └── timestamp-a3768063.json
+│   ├── snapshot.json
+│   ├── targets.json
+│   └── timestamp.json
 ├── repository
 │   ├── root.json
 │   ├── snapshot.json
@@ -395,9 +430,9 @@ $ tuf commit
 $ tree .
 .
 ├── keys
-│   ├── snapshot-3e070e53.json
-│   ├── targets-8cf4810c.json
-│   └── timestamp-a3768063.json
+│   ├── snapshot.json
+│   ├── targets.json
+│   └── timestamp.json
 ├── repository
 │   ├── root.json
 │   ├── snapshot.json
@@ -416,7 +451,7 @@ $ tree .
 $ tree .
 .
 ├── keys
-│   └── timestamp-a3768063.json
+│   └── timestamp.json
 ├── repository
 │   ├── root.json
 │   ├── snapshot.json
@@ -429,11 +464,12 @@ $ tree .
 └── staged
 
 $ tuf timestamp
+Enter timestamp keys passphrase:
 
 $ tree .
 .
 ├── keys
-│   └── timestamp-a3768063.json
+│   └── timestamp.json
 ├── repository
 │   ├── root.json
 │   ├── snapshot.json
@@ -451,7 +487,7 @@ $ tuf commit
 $ tree .
 .
 ├── keys
-│   └── timestamp-a3768063.json
+│   └── timestamp.json
 ├── repository
 │   ├── root.json
 │   ├── snapshot.json
@@ -470,4 +506,6 @@ TODO
 
 ## Client
 
-TODO
+For the client package, see https://godoc.org/github.com/flynn/go-tuf/client.
+
+For the client CLI, see https://github.com/flynn/go-tuf/tree/master/cmd/tuf-client.
