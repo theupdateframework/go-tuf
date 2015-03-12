@@ -378,19 +378,19 @@ func validManifest(name string) bool {
 	return false
 }
 
-func (r *Repo) AddTarget(path string, custom map[string]interface{}) error {
+func (r *Repo) AddTarget(path string, custom json.RawMessage) error {
 	return r.AddTargets([]string{path}, custom)
 }
 
-func (r *Repo) AddTargets(paths []string, custom map[string]interface{}) error {
+func (r *Repo) AddTargets(paths []string, custom json.RawMessage) error {
 	return r.AddTargetsWithExpires(paths, custom, data.DefaultExpires("targets"))
 }
 
-func (r *Repo) AddTargetWithExpires(path string, custom map[string]interface{}, expires time.Time) error {
+func (r *Repo) AddTargetWithExpires(path string, custom json.RawMessage, expires time.Time) error {
 	return r.AddTargetsWithExpires([]string{path}, custom, expires)
 }
 
-func (r *Repo) AddTargetsWithExpires(paths []string, custom map[string]interface{}, expires time.Time) error {
+func (r *Repo) AddTargetsWithExpires(paths []string, custom json.RawMessage, expires time.Time) error {
 	if !validExpires(expires) {
 		return ErrInvalidExpires{expires}
 	}
@@ -404,8 +404,15 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom map[string]interface
 		normalizedPaths[i] = util.NormalizeTarget(path)
 	}
 	if err := r.local.WalkStagedTargets(normalizedPaths, func(path string, target io.Reader) (err error) {
-		t.Targets[util.NormalizeTarget(path)], err = util.GenerateFileMeta(target, r.hashAlgorithms...)
-		return err
+		meta, err := util.GenerateFileMeta(target, r.hashAlgorithms...)
+		if err != nil {
+			return err
+		}
+		if len(custom) > 0 {
+			meta.Custom = &custom
+		}
+		t.Targets[util.NormalizeTarget(path)] = meta
+		return nil
 	}); err != nil {
 		return err
 	}
