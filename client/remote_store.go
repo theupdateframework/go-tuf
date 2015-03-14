@@ -21,7 +21,10 @@ func HTTPRemoteStore(baseURL string, opts *HTTPRemoteOptions) (RemoteStore, erro
 		return nil, ErrInvalidURL{baseURL}
 	}
 	if opts == nil {
-		opts = &HTTPRemoteOptions{TargetsPath: "targets"}
+		opts = &HTTPRemoteOptions{}
+	}
+	if opts.TargetsPath == "" {
+		opts.TargetsPath = "targets"
 	}
 	return &httpRemoteStore{baseURL, opts}, nil
 }
