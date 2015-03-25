@@ -10,6 +10,7 @@ import (
 	"hash"
 	"io"
 	"io/ioutil"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -104,11 +105,11 @@ func GenerateFileMeta(r io.Reader, hashAlgorithms ...string) (data.FileMeta, err
 	return m, nil
 }
 
-func NormalizeTarget(path string) string {
-	if path == "" {
+func NormalizeTarget(p string) string {
+	if p == "" {
 		return "/"
 	}
-	s := filepath.Clean(path)
+	s := path.Clean(p)
 	if strings.HasPrefix(s, "/") {
 		return s
 	}
