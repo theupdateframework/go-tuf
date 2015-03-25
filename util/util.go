@@ -11,7 +11,6 @@ import (
 	"io"
 	"io/ioutil"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/flynn/go-tuf/data"
@@ -116,10 +115,10 @@ func NormalizeTarget(p string) string {
 	return "/" + s
 }
 
-func HashedPaths(path string, hashes data.Hashes) []string {
+func HashedPaths(p string, hashes data.Hashes) []string {
 	paths := make([]string, 0, len(hashes))
 	for _, hash := range hashes {
-		hashedPath := filepath.Join(filepath.Dir(path), hash.String()+"."+filepath.Base(path))
+		hashedPath := path.Join(path.Dir(p), hash.String()+"."+path.Base(p))
 		paths = append(paths, hashedPath)
 	}
 	return paths
