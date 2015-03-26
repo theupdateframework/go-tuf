@@ -6,7 +6,10 @@ import (
 	"time"
 )
 
-var ErrInitNotAllowed = errors.New("tuf: repository already initialized")
+var (
+	ErrInitNotAllowed = errors.New("tuf: repository already initialized")
+	ErrNewRepository  = errors.New("tuf: repository not yet committed")
+)
 
 type ErrMissingMetadata struct {
 	Name string

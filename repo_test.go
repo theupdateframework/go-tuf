@@ -491,6 +491,9 @@ func (RepoSuite) TestCommitFileSystem(c *C) {
 	// don't use consistent snapshots to make the checks simpler
 	c.Assert(r.Init(false), IsNil)
 
+	// cleaning with nothing staged or committed should fail
+	c.Assert(r.Clean(), Equals, ErrNewRepository)
+
 	// generating keys should stage root.json and create repo dirs
 	genKey(c, r, "root")
 	genKey(c, r, "targets")
@@ -499,6 +502,9 @@ func (RepoSuite) TestCommitFileSystem(c *C) {
 	tmp.assertExists("staged/root.json")
 	tmp.assertEmpty("repository")
 	tmp.assertEmpty("staged/targets")
+
+	// cleaning with nothing committed should fail
+	c.Assert(r.Clean(), Equals, ErrNewRepository)
 
 	// adding a non-existent file fails
 	c.Assert(r.AddTarget("foo.txt", nil), Equals, ErrFileNotFound{tmp.stagedTargetPath("foo.txt")})
