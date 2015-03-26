@@ -400,6 +400,12 @@ func (f *fileSystemStore) keysPath(role string) string {
 }
 
 func (f *fileSystemStore) Clean() error {
+	_, err := os.Stat(filepath.Join(f.repoDir(), "root.json"))
+	if os.IsNotExist(err) {
+		return ErrNewRepository
+	} else if err != nil {
+		return err
+	}
 	if err := os.RemoveAll(f.stagedDir()); err != nil {
 		return err
 	}
