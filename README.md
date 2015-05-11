@@ -45,7 +45,7 @@ snapshots (i.e. by passing `--consistent-snapshot=false`). If consistent
 snapshots should be generated, the repository will be implicitly
 initialized to do so when generating keys.
 
-#### `tuf gen-key [expires=<days>] <role>`
+#### `tuf gen-key [--expires=<days>] <role>`
 
 Prompts the user for an encryption passphrase (unless the
 `--insecure-plaintext` flag is set), then generates a new signing key and
