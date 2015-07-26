@@ -885,3 +885,40 @@ func (RepoSuite) TestManageMultipleTargets(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(t.Targets, HasLen, 0)
 }
+
+func (RepoSuite) TestCustomTargetMetadata(c *C) {
+	files := map[string][]byte{
+		"/foo.txt": []byte("foo"),
+		"/bar.txt": []byte("bar"),
+		"/baz.txt": []byte("baz"),
+	}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	custom := json.RawMessage(`{"foo":"bar"}`)
+	assertCustomMeta := func(file string, custom *json.RawMessage) {
+		t, err := r.targets()
+		c.Assert(err, IsNil)
+		target, ok := t.Targets["/"+file]
+		if !ok {
+			c.Fatalf("missing target file: %s", file)
+		}
+		c.Assert(target.Custom, DeepEquals, custom)
+	}
+
+	// check custom metadata gets added to the target
+	c.Assert(r.AddTarget("foo.txt", custom), IsNil)
+	assertCustomMeta("foo.txt", &custom)
+
+	// check adding bar.txt with no metadata doesn't affect foo.txt
+	c.Assert(r.AddTarget("bar.txt", nil), IsNil)
+	assertCustomMeta("bar.txt", nil)
+	assertCustomMeta("foo.txt", &custom)
+
+	// check adding all files with no metadata doesn't reset existing metadata
+	c.Assert(r.AddTargets(nil, nil), IsNil)
+	assertCustomMeta("baz.txt", nil)
+	assertCustomMeta("bar.txt", nil)
+	assertCustomMeta("foo.txt", &custom)
+}

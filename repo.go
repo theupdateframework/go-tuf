@@ -408,10 +408,17 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom json.RawMessage, exp
 		if err != nil {
 			return err
 		}
+		path = util.NormalizeTarget(path)
+
+		// if we have custom metadata, set it, otherwise maintain
+		// existing metadata if present
 		if len(custom) > 0 {
 			meta.Custom = &custom
+		} else if t, ok := t.Targets[path]; ok {
+			meta.Custom = t.Custom
 		}
-		t.Targets[util.NormalizeTarget(path)] = meta
+
+		t.Targets[path] = meta
 		return nil
 	}); err != nil {
 		return err
