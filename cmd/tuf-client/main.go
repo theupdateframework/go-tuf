@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/flynn/go-tuf/Godeps/_workspace/src/github.com/flynn/go-docopt"
 	tuf "github.com/flynn/go-tuf/client"
@@ -88,7 +89,14 @@ func tufClient(args *docopt.Args) (*tuf.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	remote, err := tuf.HTTPRemoteStore(args.String["<url>"], nil)
+
+	baseURL := args.String["<url>"]
+	var remote tuf.RemoteStore
+	if strings.HasPrefix(baseURL, "s3") {
+		remote, err = tuf.S3RemoteStore(baseURL, nil)
+	} else {
+		remote, err = tuf.HTTPRemoteStore(baseURL, nil)
+	}
 	if err != nil {
 		return nil, err
 	}
