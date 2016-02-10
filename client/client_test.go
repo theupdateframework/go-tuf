@@ -531,6 +531,8 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 		if _, ok := err.(signed.ErrExpired); !ok {
 			c.Fatalf("expected err to have type signed.ErrExpired, got %T", err)
 		}
+
+		client := NewClient(s.local, s.remote)
 		_, err = client.Update()
 		c.Assert(err, IsNil)
 	})
