@@ -1,9 +1,9 @@
 package signed
 
 import (
-	"github.com/flynn/go-tuf/Godeps/_workspace/src/github.com/agl/ed25519"
-	"github.com/flynn/go-tuf/Godeps/_workspace/src/github.com/tent/canonical-json-go"
+	"github.com/agl/ed25519"
 	"github.com/flynn/go-tuf/data"
+	"github.com/tent/canonical-json-go"
 )
 
 func Sign(s *data.Signed, k *data.Key) {
