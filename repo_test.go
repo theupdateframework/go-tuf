@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agl/ed25519"
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/encrypted"
 	"github.com/flynn/go-tuf/keys"
 	"github.com/flynn/go-tuf/signed"
 	"github.com/flynn/go-tuf/util"
+	"golang.org/x/crypto/ed25519"
 	. "gopkg.in/check.v1"
 )
 

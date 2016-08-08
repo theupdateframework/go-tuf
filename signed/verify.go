@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agl/ed25519"
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/keys"
 	"github.com/tent/canonical-json-go"
+	"golang.org/x/crypto/ed25519"
 )
 
 var (

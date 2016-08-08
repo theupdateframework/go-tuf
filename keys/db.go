@@ -4,8 +4,8 @@ import (
 	"crypto/rand"
 	"errors"
 
-	"github.com/agl/ed25519"
 	"github.com/flynn/go-tuf/data"
+	"golang.org/x/crypto/ed25519"
 )
 
 var (
