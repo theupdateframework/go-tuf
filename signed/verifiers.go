@@ -1,11 +1,6 @@
 package signed
 
 import (
-	"crypto"
-	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/x509"
-
 	"github.com/agl/ed25519"
 )
 
@@ -21,7 +16,6 @@ type Verifier interface {
 // Verifiers is used to map algorithm names to Verifier instances.
 var Verifiers = map[string]Verifier{
 	"ed25519": Ed25519Verifier{},
-	//"rsa":     RSAVerifier{},
 }
 
 // RegisterVerifier provides a convenience function for init() functions
@@ -44,28 +38,6 @@ func (v Ed25519Verifier) Verify(key []byte, msg []byte, sig []byte) error {
 	copy(keyBytes[:], key)
 
 	if !ed25519.Verify(&keyBytes, msg, &sigBytes) {
-		return ErrInvalid
-	}
-	return nil
-}
-
-// RSAVerifier is an implementation of a Verifier that verifies RSA signatures.
-// N.B. Currently not covered by unit tests, use at your own risk.
-type RSAVerifier struct{}
-
-func (v RSAVerifier) Verify(key []byte, msg []byte, sig []byte) error {
-	digest := sha256.Sum256(msg)
-	pub, err := x509.ParsePKIXPublicKey(key)
-	if err != nil {
-		return ErrInvalid
-	}
-
-	rsaPub, ok := pub.(*rsa.PublicKey)
-	if !ok {
-		return ErrInvalid
-	}
-
-	if err = rsa.VerifyPKCS1v15(rsaPub, crypto.SHA256, digest[:], sig); err != nil {
 		return ErrInvalid
 	}
 	return nil
