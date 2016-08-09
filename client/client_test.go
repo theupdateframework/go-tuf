@@ -12,9 +12,8 @@ import (
 
 	"github.com/flynn/go-tuf"
 	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/keys"
-	"github.com/flynn/go-tuf/signed"
 	"github.com/flynn/go-tuf/util"
+	"github.com/flynn/go-tuf/verify"
 	. "gopkg.in/check.v1"
 )
 
@@ -133,9 +132,9 @@ func (s *ClientSuite) genKeyExpired(c *C, role string) string {
 // any metadata marked to expire at s.expiredTime will be expired (this avoids
 // the need to sleep in the tests).
 func (s *ClientSuite) withMetaExpired(f func()) {
-	e := signed.IsExpired
-	defer func() { signed.IsExpired = e }()
-	signed.IsExpired = func(t time.Time) bool {
+	e := verify.IsExpired
+	defer func() { verify.IsExpired = e }()
+	verify.IsExpired = func(t time.Time) bool {
 		return t.Unix() == s.expiredTime.Round(time.Second).Unix()
 	}
 	f()
@@ -220,7 +219,7 @@ func (s *ClientSuite) assertErrExpired(c *C, err error, file string) {
 		c.Fatalf("expected err to have type ErrDecodeFailed, got %T", err)
 	}
 	c.Assert(decodeErr.File, Equals, file)
-	expiredErr, ok := decodeErr.Err.(signed.ErrExpired)
+	expiredErr, ok := decodeErr.Err.(verify.ErrExpired)
 	if !ok {
 		c.Fatalf("expected err.Err to have type signed.ErrExpired, got %T", err)
 	}
@@ -246,7 +245,7 @@ func (s *ClientSuite) TestInit(c *C) {
 	client := NewClient(MemoryLocalStore(), s.remote)
 
 	// check Init() returns keys.ErrInvalidThreshold with an invalid threshold
-	c.Assert(client.Init(s.rootKeys(c), 0), Equals, keys.ErrInvalidThreshold)
+	c.Assert(client.Init(s.rootKeys(c), 0), Equals, verify.ErrInvalidThreshold)
 
 	// check Init() returns signed.ErrRoleThreshold when not enough keys
 	c.Assert(client.Init(s.rootKeys(c), 2), Equals, ErrInsufficientKeys)
@@ -332,7 +331,7 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	for name, id := range newKeyIDs {
 		key := client.db.GetKey(id)
 		c.Assert(key, NotNil)
-		c.Assert(key.ID, Equals, id)
+		c.Assert(key.ID(), Equals, id)
 		role := client.db.GetRole(name)
 		c.Assert(role, NotNil)
 		c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{id: {}})
@@ -385,7 +384,7 @@ func (s *ClientSuite) TestNewTimestampKey(c *C) {
 	c.Assert(client.db.GetKey(oldID), IsNil)
 	key := client.db.GetKey(newID)
 	c.Assert(key, NotNil)
-	c.Assert(key.ID, Equals, newID)
+	c.Assert(key.ID(), Equals, newID)
 	role := client.db.GetRole("timestamp")
 	c.Assert(role, NotNil)
 	c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{newID: {}})
@@ -419,7 +418,7 @@ func (s *ClientSuite) TestNewSnapshotKey(c *C) {
 	c.Assert(client.db.GetKey(oldID), IsNil)
 	key := client.db.GetKey(newID)
 	c.Assert(key, NotNil)
-	c.Assert(key.ID, Equals, newID)
+	c.Assert(key.ID(), Equals, newID)
 	role := client.db.GetRole("snapshot")
 	c.Assert(role, NotNil)
 	c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{newID: {}})
@@ -456,7 +455,7 @@ func (s *ClientSuite) TestNewTargetsKey(c *C) {
 	c.Assert(client.db.GetKey(oldID), IsNil)
 	key := client.db.GetKey(newID)
 	c.Assert(key, NotNil)
-	c.Assert(key.ID, Equals, newID)
+	c.Assert(key.ID(), Equals, newID)
 	role := client.db.GetRole("targets")
 	c.Assert(role, NotNil)
 	c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{newID: {}})
@@ -498,7 +497,7 @@ func (s *ClientSuite) TestLocalExpired(c *C) {
 	s.syncLocal(c)
 	s.withMetaExpired(func() {
 		err := client.getLocalMeta()
-		if _, ok := err.(signed.ErrExpired); !ok {
+		if _, ok := err.(verify.ErrExpired); !ok {
 			c.Fatalf("expected err to have type signed.ErrExpired, got %T", err)
 		}
 		c.Assert(client.rootVer, Equals, version)
@@ -528,7 +527,7 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 	// restarts itself, thus successfully updating
 	s.withMetaExpired(func() {
 		err := client.getLocalMeta()
-		if _, ok := err.(signed.ErrExpired); !ok {
+		if _, ok := err.(verify.ErrExpired); !ok {
 			c.Fatalf("expected err to have type signed.ErrExpired, got %T", err)
 		}
 
@@ -602,7 +601,7 @@ func (s *ClientSuite) TestUpdateLocalRootExpiredKeyChange(c *C) {
 	// restarts itself, thus successfully updating
 	s.withMetaExpired(func() {
 		err := client.getLocalMeta()
-		c.Assert(err, FitsTypeOf, signed.ErrExpired{})
+		c.Assert(err, FitsTypeOf, verify.ErrExpired{})
 
 		_, err = client.Update()
 		c.Assert(err, IsNil)
@@ -674,7 +673,7 @@ func (s *ClientSuite) TestUpdateReplayAttack(c *C) {
 
 	// check update returns ErrLowVersion
 	_, err = client.Update()
-	c.Assert(err, DeepEquals, ErrDecodeFailed{"timestamp.json", signed.ErrLowVersion{version, client.timestampVer}})
+	c.Assert(err, DeepEquals, ErrDecodeFailed{"timestamp.json", verify.ErrLowVersion{version, client.timestampVer}})
 }
 
 func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {

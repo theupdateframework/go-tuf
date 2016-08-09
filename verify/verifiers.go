@@ -1,4 +1,4 @@
-package signed
+package verify
 
 import (
 	"github.com/flynn/go-tuf/data"
@@ -22,12 +22,6 @@ var Verifiers = map[string]Verifier{
 	data.KeyTypeEd25519: ed25519Verifier{},
 }
 
-// RegisterVerifier provides a convenience function for init() functions
-// to register additional verifiers or replace existing ones.
-func RegisterVerifier(name string, v Verifier) {
-	Verifiers[name] = v
-}
-
 type ed25519Verifier struct{}
 
 func (ed25519Verifier) Verify(key, msg, sig []byte) error {
@@ -37,6 +31,6 @@ func (ed25519Verifier) Verify(key, msg, sig []byte) error {
 	return nil
 }
 
-func (ed25519Verifier) ValidKey(k []byte) {
+func (ed25519Verifier) ValidKey(k []byte) bool {
 	return len(k) == ed25519.PublicKeySize
 }

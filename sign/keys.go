@@ -1,4 +1,4 @@
-package signed
+package sign
 
 import (
 	"crypto/rand"

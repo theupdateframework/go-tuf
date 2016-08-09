@@ -11,7 +11,7 @@ import (
 
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/encrypted"
-	"github.com/flynn/go-tuf/signed"
+	"github.com/flynn/go-tuf/sign"
 	"github.com/flynn/go-tuf/util"
 )
 
@@ -22,14 +22,14 @@ func MemoryStore(meta map[string]json.RawMessage, files map[string][]byte) Local
 	return &memoryStore{
 		meta:    meta,
 		files:   files,
-		signers: make(map[string][]signed.Signer),
+		signers: make(map[string][]sign.Signer),
 	}
 }
 
 type memoryStore struct {
 	meta    map[string]json.RawMessage
 	files   map[string][]byte
-	signers map[string][]signed.Signer
+	signers map[string][]sign.Signer
 }
 
 func (m *memoryStore) GetMeta() (map[string]json.RawMessage, error) {
@@ -67,11 +67,11 @@ func (m *memoryStore) Commit(map[string]json.RawMessage, bool, map[string]data.H
 	return nil
 }
 
-func (m *memoryStore) GetSigningKeys(role string) ([]signed.Signer, error) {
+func (m *memoryStore) GetSigningKeys(role string) ([]sign.Signer, error) {
 	return m.signers[role], nil
 }
 
-func (m *memoryStore) SavePrivateKey(role string, key *signed.PrivateKey) error {
+func (m *memoryStore) SavePrivateKey(role string, key *sign.PrivateKey) error {
 	m.signers[role] = append(m.signers[role], key.Signer())
 	return nil
 }
@@ -89,7 +89,7 @@ func FileSystemStore(dir string, p util.PassphraseFunc) LocalStore {
 	return &fileSystemStore{
 		dir:            dir,
 		passphraseFunc: p,
-		signers:        make(map[string][]signed.Signer),
+		signers:        make(map[string][]sign.Signer),
 	}
 }
 
@@ -98,7 +98,7 @@ type fileSystemStore struct {
 	passphraseFunc util.PassphraseFunc
 
 	// signers is a cache of persisted keys to avoid decrypting multiple times
-	signers map[string][]signed.Signer
+	signers map[string][]sign.Signer
 }
 
 func (f *fileSystemStore) repoDir() string {
@@ -295,7 +295,7 @@ func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, consistentSnap
 	return f.Clean()
 }
 
-func (f *fileSystemStore) GetSigningKeys(role string) ([]signed.Signer, error) {
+func (f *fileSystemStore) GetSigningKeys(role string) ([]sign.Signer, error) {
 	if keys, ok := f.signers[role]; ok {
 		return keys, nil
 	}
@@ -310,7 +310,7 @@ func (f *fileSystemStore) GetSigningKeys(role string) ([]signed.Signer, error) {
 	return f.signers[role], nil
 }
 
-func (f *fileSystemStore) SavePrivateKey(role string, key *signed.PrivateKey) error {
+func (f *fileSystemStore) SavePrivateKey(role string, key *sign.PrivateKey) error {
 	if err := f.createDirs(); err != nil {
 		return err
 	}
@@ -357,8 +357,8 @@ func (f *fileSystemStore) SavePrivateKey(role string, key *signed.PrivateKey) er
 	return nil
 }
 
-func (f *fileSystemStore) privateKeySigners(keys []*signed.PrivateKey) []signed.Signer {
-	res := make([]signed.Signer, len(keys))
+func (f *fileSystemStore) privateKeySigners(keys []*sign.PrivateKey) []sign.Signer {
+	res := make([]sign.Signer, len(keys))
 	for i, k := range keys {
 		res[i] = k.Signer()
 	}
@@ -367,7 +367,7 @@ func (f *fileSystemStore) privateKeySigners(keys []*signed.PrivateKey) []signed.
 
 // loadKeys loads keys for the given role and returns them along with the
 // passphrase (if read) so that callers don't need to re-read it.
-func (f *fileSystemStore) loadKeys(role string) ([]*signed.PrivateKey, []byte, error) {
+func (f *fileSystemStore) loadKeys(role string) ([]*sign.PrivateKey, []byte, error) {
 	file, err := os.Open(f.keysPath(role))
 	if err != nil {
 		return nil, nil, err
@@ -379,7 +379,7 @@ func (f *fileSystemStore) loadKeys(role string) ([]*signed.PrivateKey, []byte, e
 		return nil, nil, err
 	}
 
-	var keys []*signed.PrivateKey
+	var keys []*sign.PrivateKey
 	if !pk.Encrypted {
 		if err := json.Unmarshal(pk.Data, &keys); err != nil {
 			return nil, nil, err

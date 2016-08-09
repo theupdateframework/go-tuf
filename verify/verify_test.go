@@ -1,11 +1,11 @@
-package signed
+package verify
 
 import (
 	"testing"
 	"time"
 
 	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/keys"
+	"github.com/flynn/go-tuf/sign"
 	"golang.org/x/crypto/ed25519"
 
 	. "gopkg.in/check.v1"
@@ -76,8 +76,8 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "more than enough signatures",
 			mut: func(t *test) {
-				k, _ := GenerateEd25519Key()
-				Sign(t.s, k.Signer())
+				k, _ := sign.GenerateEd25519Key()
+				sign.Sign(t.s, k.Signer())
 				t.keys = append(t.keys, k.PublicData())
 				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, k.PublicData().ID())
 			},
@@ -93,15 +93,15 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "unknown key",
 			mut: func(t *test) {
-				k, _ := GenerateEd25519Key()
-				Sign(t.s, k.Signer())
+				k, _ := sign.GenerateEd25519Key()
+				sign.Sign(t.s, k.Signer())
 			},
 		},
 		{
 			name: "unknown key below threshold",
 			mut: func(t *test) {
-				k, _ := GenerateEd25519Key()
-				Sign(t.s, k.Signer())
+				k, _ := sign.GenerateEd25519Key()
+				sign.Sign(t.s, k.Signer())
 				t.roles["root"].Threshold = 2
 			},
 			err: ErrRoleThreshold,
@@ -109,16 +109,16 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "unknown keys in db",
 			mut: func(t *test) {
-				k, _ := GenerateEd25519Key()
-				Sign(t.s, k.Signer())
+				k, _ := sign.GenerateEd25519Key()
+				sign.Sign(t.s, k.Signer())
 				t.keys = append(t.keys, k.PublicData())
 			},
 		},
 		{
 			name: "unknown keys in db below threshold",
 			mut: func(t *test) {
-				k, _ := GenerateEd25519Key()
-				Sign(t.s, k.Signer())
+				k, _ := sign.GenerateEd25519Key()
+				sign.Sign(t.s, k.Signer())
 				t.keys = append(t.keys, k.PublicData())
 				t.roles["root"].Threshold = 2
 			},
@@ -127,7 +127,7 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "wrong type",
 			typ:  "bar",
-			err:  ErrWrongType,
+			err:  ErrWrongMetaType,
 		},
 		{
 			name: "low version",
@@ -155,8 +155,8 @@ func (VerifySuite) Test(c *C) {
 			t.typ = t.role
 		}
 		if t.keys == nil && t.s == nil {
-			k, _ := GenerateEd25519Key()
-			t.s, _ = Marshal(&signedMeta{Type: t.typ, Version: t.ver, Expires: *t.exp}, k.Signer())
+			k, _ := sign.GenerateEd25519Key()
+			t.s, _ = sign.Marshal(&signedMeta{Type: t.typ, Version: t.ver, Expires: *t.exp}, k.Signer())
 			t.keys = []*data.Key{k.PublicData()}
 		}
 		if t.roles == nil {
@@ -171,7 +171,7 @@ func (VerifySuite) Test(c *C) {
 			t.mut(&t)
 		}
 
-		db := keys.NewDB()
+		db := NewDB()
 		for _, k := range t.keys {
 			err := db.AddKey(k.ID(), k)
 			c.Assert(err, IsNil)
@@ -181,7 +181,7 @@ func (VerifySuite) Test(c *C) {
 			c.Assert(err, IsNil)
 		}
 
-		err := Verify(t.s, t.role, minVer, db)
+		err := db.Verify(t.s, t.role, minVer)
 		if e, ok := t.err.(ErrExpired); ok {
 			assertErrExpired(c, err, e)
 		} else {
