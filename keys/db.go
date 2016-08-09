@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/flynn/go-tuf/data"
-	"golang.org/x/crypto/ed25519"
+	"github.com/flynn/go-tuf/signed"
 )
 
 var (
@@ -54,13 +54,14 @@ func NewDB() *DB {
 }
 
 func (db *DB) AddKey(id string, k *data.Key) error {
-	if k.Type != data.KeyTypeEd25519 {
+	v, ok := signed.Verifiers[k.Type]
+	if !ok {
 		return nil
 	}
 	if id != k.ID() {
 		return ErrWrongID
 	}
-	if len(k.Value.Public) != ed25519.PublicKeySize {
+	if !v.ValidKey(k.Value.Public) {
 		return ErrInvalidKey
 	}
 
