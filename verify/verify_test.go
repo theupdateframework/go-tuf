@@ -1,6 +1,12 @@
 package verify
 
 import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
+	"io"
 	"testing"
 	"time"
 
@@ -17,6 +23,31 @@ func Test(t *testing.T) { TestingT(t) }
 type VerifySuite struct{}
 
 var _ = Suite(&VerifySuite{})
+
+type ecdsaSigner struct {
+	*ecdsa.PrivateKey
+}
+
+func (s ecdsaSigner) PublicData() *data.Key {
+	pub := s.Public().(*ecdsa.PublicKey)
+	return &data.Key{
+		Type:  data.KeyTypeECDSA_SHA2_P256,
+		Value: data.KeyValue{Public: elliptic.Marshal(pub.Curve, pub.X, pub.Y)},
+	}
+}
+
+func (s ecdsaSigner) Sign(rand io.Reader, msg []byte, opts crypto.SignerOpts) ([]byte, error) {
+	hash := sha256.Sum256(msg)
+	return s.PrivateKey.Sign(rand, hash[:], crypto.SHA256)
+}
+
+func (s ecdsaSigner) ID() string {
+	return s.PublicData().ID()
+}
+
+func (ecdsaSigner) Type() string {
+	return data.KeyTypeECDSA_SHA2_P256
+}
 
 func (VerifySuite) Test(c *C) {
 	type test struct {
@@ -44,11 +75,6 @@ func (VerifySuite) Test(c *C) {
 			name: "unknown role",
 			role: "foo",
 			err:  ErrUnknownRole,
-		},
-		{
-			name: "wrong signature method",
-			mut:  func(t *test) { t.s.Signatures[0].Method = "foo" },
-			err:  ErrWrongMethod,
 		},
 		{
 			name: "signature wrong length",
@@ -138,6 +164,29 @@ func (VerifySuite) Test(c *C) {
 			name: "expired",
 			exp:  &expiredTime,
 			err:  ErrExpired{expiredTime},
+		},
+		{
+			name: "valid ecdsa signature",
+			mut: func(t *test) {
+				k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+				s := ecdsaSigner{k}
+				sign.Sign(t.s, s)
+				t.s.Signatures = t.s.Signatures[1:]
+				t.keys = []*data.Key{s.PublicData()}
+				t.roles["root"].KeyIDs = []string{s.PublicData().ID()}
+			},
+		},
+		{
+			name: "invalid ecdsa signature",
+			mut: func(t *test) {
+				k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+				s := ecdsaSigner{k}
+				sign.Sign(t.s, s)
+				t.s.Signatures[1].Signature[0]++
+				t.keys = append(t.keys, s.PublicData())
+				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, s.PublicData().ID())
+			},
+			err: ErrInvalid,
 		},
 	}
 	for _, t := range tests {
