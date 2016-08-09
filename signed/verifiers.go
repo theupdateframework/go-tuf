@@ -1,6 +1,7 @@
 package signed
 
 import (
+	"github.com/flynn/go-tuf/data"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -13,9 +14,9 @@ type Verifier interface {
 	Verify(key, msg, sig []byte) error
 }
 
-// Verifiers is used to map algorithm names to Verifier instances.
+// Verifiers is used to map key types to Verifier instances.
 var Verifiers = map[string]Verifier{
-	"ed25519": Ed25519Verifier{},
+	data.KeyTypeEd25519: Ed25519Verifier{},
 }
 
 // RegisterVerifier provides a convenience function for init() functions

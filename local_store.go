@@ -11,6 +11,7 @@ import (
 
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/encrypted"
+	"github.com/flynn/go-tuf/signed"
 	"github.com/flynn/go-tuf/util"
 )
 
@@ -19,16 +20,16 @@ func MemoryStore(meta map[string]json.RawMessage, files map[string][]byte) Local
 		meta = make(map[string]json.RawMessage)
 	}
 	return &memoryStore{
-		meta:  meta,
-		files: files,
-		keys:  make(map[string][]*data.Key),
+		meta:    meta,
+		files:   files,
+		signers: make(map[string][]signed.Signer),
 	}
 }
 
 type memoryStore struct {
-	meta  map[string]json.RawMessage
-	files map[string][]byte
-	keys  map[string][]*data.Key
+	meta    map[string]json.RawMessage
+	files   map[string][]byte
+	signers map[string][]signed.Signer
 }
 
 func (m *memoryStore) GetMeta() (map[string]json.RawMessage, error) {
@@ -66,15 +67,12 @@ func (m *memoryStore) Commit(map[string]json.RawMessage, bool, map[string]data.H
 	return nil
 }
 
-func (m *memoryStore) GetKeys(role string) ([]*data.Key, error) {
-	return m.keys[role], nil
+func (m *memoryStore) GetSigningKeys(role string) ([]signed.Signer, error) {
+	return m.signers[role], nil
 }
 
-func (m *memoryStore) SaveKey(role string, key *data.Key) error {
-	if _, ok := m.keys[role]; !ok {
-		m.keys[role] = make([]*data.Key, 0)
-	}
-	m.keys[role] = append(m.keys[role], key)
+func (m *memoryStore) SavePrivateKey(role string, key *signed.PrivateKey) error {
+	m.signers[role] = append(m.signers[role], key.Signer())
 	return nil
 }
 
@@ -91,7 +89,7 @@ func FileSystemStore(dir string, p util.PassphraseFunc) LocalStore {
 	return &fileSystemStore{
 		dir:            dir,
 		passphraseFunc: p,
-		keys:           make(map[string][]*data.Key),
+		signers:        make(map[string][]signed.Signer),
 	}
 }
 
@@ -99,8 +97,8 @@ type fileSystemStore struct {
 	dir            string
 	passphraseFunc util.PassphraseFunc
 
-	// keys is a cache of persisted keys to avoid decrypting multiple times
-	keys map[string][]*data.Key
+	// signers is a cache of persisted keys to avoid decrypting multiple times
+	signers map[string][]signed.Signer
 }
 
 func (f *fileSystemStore) repoDir() string {
@@ -297,8 +295,8 @@ func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, consistentSnap
 	return f.Clean()
 }
 
-func (f *fileSystemStore) GetKeys(role string) ([]*data.Key, error) {
-	if keys, ok := f.keys[role]; ok {
+func (f *fileSystemStore) GetSigningKeys(role string) ([]signed.Signer, error) {
+	if keys, ok := f.signers[role]; ok {
 		return keys, nil
 	}
 	keys, _, err := f.loadKeys(role)
@@ -308,10 +306,11 @@ func (f *fileSystemStore) GetKeys(role string) ([]*data.Key, error) {
 		}
 		return nil, err
 	}
-	return keys, nil
+	f.signers[role] = f.privateKeySigners(keys)
+	return f.signers[role], nil
 }
 
-func (f *fileSystemStore) SaveKey(role string, key *data.Key) error {
+func (f *fileSystemStore) SavePrivateKey(role string, key *signed.PrivateKey) error {
 	if err := f.createDirs(); err != nil {
 		return err
 	}
@@ -354,13 +353,21 @@ func (f *fileSystemStore) SaveKey(role string, key *data.Key) error {
 	if err := ioutil.WriteFile(f.keysPath(role), append(data, '\n'), 0600); err != nil {
 		return err
 	}
-	f.keys[role] = keys
+	f.signers[role] = f.privateKeySigners(keys)
 	return nil
+}
+
+func (f *fileSystemStore) privateKeySigners(keys []*signed.PrivateKey) []signed.Signer {
+	res := make([]signed.Signer, len(keys))
+	for i, k := range keys {
+		res[i] = k.Signer()
+	}
+	return res
 }
 
 // loadKeys loads keys for the given role and returns them along with the
 // passphrase (if read) so that callers don't need to re-read it.
-func (f *fileSystemStore) loadKeys(role string) ([]*data.Key, []byte, error) {
+func (f *fileSystemStore) loadKeys(role string) ([]*signed.PrivateKey, []byte, error) {
 	file, err := os.Open(f.keysPath(role))
 	if err != nil {
 		return nil, nil, err
@@ -372,7 +379,7 @@ func (f *fileSystemStore) loadKeys(role string) ([]*data.Key, []byte, error) {
 		return nil, nil, err
 	}
 
-	var keys []*data.Key
+	var keys []*signed.PrivateKey
 	if !pk.Encrypted {
 		if err := json.Unmarshal(pk.Data, &keys); err != nil {
 			return nil, nil, err

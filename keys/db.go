@@ -1,7 +1,7 @@
+// Package keys implements an in-memory public key database for TUF.
 package keys
 
 import (
-	"crypto/rand"
 	"errors"
 
 	"github.com/flynn/go-tuf/data"
@@ -18,39 +18,16 @@ var (
 	ErrInvalidThreshold = errors.New("tuf: invalid role threshold")
 )
 
-func NewKey() (*Key, error) {
-	pub, priv, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		return nil, err
-	}
-	k := &Key{
-		Public:  *pub,
-		Private: priv,
-	}
-	k.ID = k.Serialize().ID()
-	return k, nil
-}
-
 type Key struct {
-	ID      string
-	Public  [ed25519.PublicKeySize]byte
-	Private *[ed25519.PrivateKeySize]byte
+	ID     string
+	Type   string
+	Public []byte
 }
 
 func (k *Key) Serialize() *data.Key {
 	return &data.Key{
-		Type:  "ed25519",
+		Type:  k.Type,
 		Value: data.KeyValue{Public: k.Public[:]},
-	}
-}
-
-func (k *Key) SerializePrivate() *data.Key {
-	return &data.Key{
-		Type: "ed25519",
-		Value: data.KeyValue{
-			Public:  k.Public[:],
-			Private: k.Private[:],
-		},
 	}
 }
 
@@ -77,8 +54,8 @@ func NewDB() *DB {
 }
 
 func (db *DB) AddKey(id string, k *data.Key) error {
-	if k.Type != "ed25519" {
-		return ErrWrongType
+	if k.Type != data.KeyTypeEd25519 {
+		return nil
 	}
 	if id != k.ID() {
 		return ErrWrongID
@@ -87,10 +64,12 @@ func (db *DB) AddKey(id string, k *data.Key) error {
 		return ErrInvalidKey
 	}
 
-	var key Key
-	copy(key.Public[:], k.Value.Public)
-	key.ID = id
-	db.keys[id] = &key
+	db.keys[id] = &Key{
+		ID:     k.ID(),
+		Type:   k.Type,
+		Public: k.Value.Public,
+	}
+
 	return nil
 }
 

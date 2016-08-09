@@ -76,10 +76,10 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "more than enough signatures",
 			mut: func(t *test) {
-				k, _ := keys.NewKey()
-				Sign(t.s, k.SerializePrivate())
-				t.keys = append(t.keys, k.Serialize())
-				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, k.ID)
+				k, _ := GenerateEd25519Key()
+				Sign(t.s, k.Signer())
+				t.keys = append(t.keys, k.PublicData())
+				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, k.PublicData().ID())
 			},
 		},
 		{
@@ -93,15 +93,15 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "unknown key",
 			mut: func(t *test) {
-				k, _ := keys.NewKey()
-				Sign(t.s, k.Serialize())
+				k, _ := GenerateEd25519Key()
+				Sign(t.s, k.Signer())
 			},
 		},
 		{
 			name: "unknown key below threshold",
 			mut: func(t *test) {
-				k, _ := keys.NewKey()
-				Sign(t.s, k.Serialize())
+				k, _ := GenerateEd25519Key()
+				Sign(t.s, k.Signer())
 				t.roles["root"].Threshold = 2
 			},
 			err: ErrRoleThreshold,
@@ -109,17 +109,17 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "unknown keys in db",
 			mut: func(t *test) {
-				k, _ := keys.NewKey()
-				Sign(t.s, k.Serialize())
-				t.keys = append(t.keys, k.Serialize())
+				k, _ := GenerateEd25519Key()
+				Sign(t.s, k.Signer())
+				t.keys = append(t.keys, k.PublicData())
 			},
 		},
 		{
 			name: "unknown keys in db below threshold",
 			mut: func(t *test) {
-				k, _ := keys.NewKey()
-				Sign(t.s, k.Serialize())
-				t.keys = append(t.keys, k.Serialize())
+				k, _ := GenerateEd25519Key()
+				Sign(t.s, k.Signer())
+				t.keys = append(t.keys, k.PublicData())
 				t.roles["root"].Threshold = 2
 			},
 			err: ErrRoleThreshold,
@@ -155,9 +155,9 @@ func (VerifySuite) Test(c *C) {
 			t.typ = t.role
 		}
 		if t.keys == nil && t.s == nil {
-			k, _ := keys.NewKey()
-			t.s, _ = Marshal(&signedMeta{Type: t.typ, Version: t.ver, Expires: *t.exp}, k.SerializePrivate())
-			t.keys = []*data.Key{k.Serialize()}
+			k, _ := GenerateEd25519Key()
+			t.s, _ = Marshal(&signedMeta{Type: t.typ, Version: t.ver, Expires: *t.exp}, k.Signer())
+			t.keys = []*data.Key{k.PublicData()}
 		}
 		if t.roles == nil {
 			t.roles = map[string]*data.Role{
