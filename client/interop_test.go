@@ -12,10 +12,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/agl/ed25519"
 	"github.com/flynn/go-tuf"
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/util"
+	"golang.org/x/crypto/ed25519"
 	. "gopkg.in/check.v1"
 )
 

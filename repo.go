@@ -47,8 +47,8 @@ type LocalStore interface {
 	WalkStagedTargets(paths []string, targetsFn targetsWalkFunc) error
 
 	Commit(map[string]json.RawMessage, bool, map[string]data.Hashes) error
-	GetKeys(string) ([]*data.Key, error)
-	SaveKey(string, *data.Key) error
+	GetSigningKeys(string) ([]signed.Signer, error)
+	SavePrivateKey(string, *signed.PrivateKey) error
 	Clean() error
 }
 
@@ -183,26 +183,27 @@ func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (string, err
 		return "", err
 	}
 
-	key, err := keys.NewKey()
+	key, err := signed.GenerateEd25519Key()
 	if err != nil {
 		return "", err
 	}
-	if err := r.local.SaveKey(keyRole, key.SerializePrivate()); err != nil {
+	if err := r.local.SavePrivateKey(keyRole, key); err != nil {
 		return "", err
 	}
+	pk := key.PublicData()
 
 	role, ok := root.Roles[keyRole]
 	if !ok {
 		role = &data.Role{KeyIDs: []string{}, Threshold: 1}
 		root.Roles[keyRole] = role
 	}
-	role.KeyIDs = append(role.KeyIDs, key.ID)
+	role.KeyIDs = append(role.KeyIDs, pk.ID())
 
-	root.Keys[key.ID] = key.Serialize()
+	root.Keys[pk.ID()] = pk
 	root.Expires = expires.Round(time.Second)
 	root.Version++
 
-	return key.ID, r.setMeta("root.json", root)
+	return pk.ID(), r.setMeta("root.json", root)
 }
 
 func validExpires(expires time.Time) bool {
@@ -277,7 +278,7 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 }
 
 func (r *Repo) setMeta(name string, meta interface{}) error {
-	keys, err := r.getKeys(strings.TrimSuffix(name, ".json"))
+	keys, err := r.getSigningKeys(strings.TrimSuffix(name, ".json"))
 	if err != nil {
 		return err
 	}
@@ -304,7 +305,7 @@ func (r *Repo) Sign(name string) error {
 		return err
 	}
 
-	keys, err := r.getKeys(role)
+	keys, err := r.getSigningKeys(role)
 	if err != nil {
 		return err
 	}
@@ -323,19 +324,19 @@ func (r *Repo) Sign(name string) error {
 	return r.local.SetMeta(name, b)
 }
 
-// getKeys returns signing keys from local storage.
+// getSigningKeys returns available signing keys.
 //
 // Only keys contained in the keys db are returned (i.e. local keys which have
 // been revoked are omitted), except for the root role in which case all local
 // keys are returned (revoked root keys still need to sign new root metadata so
 // clients can verify the new root.json and update their keys db accordingly).
-func (r *Repo) getKeys(name string) ([]*data.Key, error) {
-	localKeys, err := r.local.GetKeys(name)
+func (r *Repo) getSigningKeys(name string) ([]signed.Signer, error) {
+	signingKeys, err := r.local.GetSigningKeys(name)
 	if err != nil {
 		return nil, err
 	}
 	if name == "root" {
-		return localKeys, nil
+		return signingKeys, nil
 	}
 	db, err := r.db()
 	if err != nil {
@@ -348,8 +349,8 @@ func (r *Repo) getKeys(name string) ([]*data.Key, error) {
 	if len(role.KeyIDs) == 0 {
 		return nil, nil
 	}
-	keys := make([]*data.Key, 0, len(role.KeyIDs))
-	for _, key := range localKeys {
+	keys := make([]signed.Signer, 0, len(role.KeyIDs))
+	for _, key := range signingKeys {
 		if _, ok := role.KeyIDs[key.ID()]; ok {
 			keys = append(keys, key)
 		}
