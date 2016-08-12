@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/keys"
-	"github.com/flynn/go-tuf/signed"
+	"github.com/flynn/go-tuf/sign"
 	"github.com/flynn/go-tuf/util"
+	"github.com/flynn/go-tuf/verify"
 )
 
 type CompressionType uint8
@@ -47,8 +47,8 @@ type LocalStore interface {
 	WalkStagedTargets(paths []string, targetsFn targetsWalkFunc) error
 
 	Commit(map[string]json.RawMessage, bool, map[string]data.Hashes) error
-	GetSigningKeys(string) ([]signed.Signer, error)
-	SavePrivateKey(string, *signed.PrivateKey) error
+	GetSigningKeys(string) ([]sign.Signer, error)
+	SavePrivateKey(string, *sign.PrivateKey) error
 	Clean() error
 }
 
@@ -82,8 +82,8 @@ func (r *Repo) Init(consistentSnapshot bool) error {
 	return r.setMeta("root.json", root)
 }
 
-func (r *Repo) db() (*keys.DB, error) {
-	db := keys.NewDB()
+func (r *Repo) db() (*verify.DB, error) {
+	db := verify.NewDB()
 	root, err := r.root()
 	if err != nil {
 		return nil, err
@@ -170,7 +170,7 @@ func (r *Repo) GenKey(role string) (string, error) {
 }
 
 func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (string, error) {
-	if !keys.ValidRole(keyRole) {
+	if !verify.ValidRole(keyRole) {
 		return "", ErrInvalidRole{keyRole}
 	}
 
@@ -183,7 +183,7 @@ func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (string, err
 		return "", err
 	}
 
-	key, err := signed.GenerateEd25519Key()
+	key, err := sign.GenerateEd25519Key()
 	if err != nil {
 		return "", err
 	}
@@ -235,7 +235,7 @@ func (r *Repo) RevokeKey(role, id string) error {
 }
 
 func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error {
-	if !keys.ValidRole(keyRole) {
+	if !verify.ValidRole(keyRole) {
 		return ErrInvalidRole{keyRole}
 	}
 
@@ -282,7 +282,7 @@ func (r *Repo) setMeta(name string, meta interface{}) error {
 	if err != nil {
 		return err
 	}
-	s, err := signed.Marshal(meta, keys...)
+	s, err := sign.Marshal(meta, keys...)
 	if err != nil {
 		return err
 	}
@@ -296,7 +296,7 @@ func (r *Repo) setMeta(name string, meta interface{}) error {
 
 func (r *Repo) Sign(name string) error {
 	role := strings.TrimSuffix(name, ".json")
-	if !keys.ValidRole(role) {
+	if !verify.ValidRole(role) {
 		return ErrInvalidRole{role}
 	}
 
@@ -313,7 +313,7 @@ func (r *Repo) Sign(name string) error {
 		return ErrInsufficientKeys{name}
 	}
 	for _, k := range keys {
-		signed.Sign(s, k)
+		sign.Sign(s, k)
 	}
 
 	b, err := json.Marshal(s)
@@ -330,7 +330,7 @@ func (r *Repo) Sign(name string) error {
 // been revoked are omitted), except for the root role in which case all local
 // keys are returned (revoked root keys still need to sign new root metadata so
 // clients can verify the new root.json and update their keys db accordingly).
-func (r *Repo) getSigningKeys(name string) ([]signed.Signer, error) {
+func (r *Repo) getSigningKeys(name string) ([]sign.Signer, error) {
 	signingKeys, err := r.local.GetSigningKeys(name)
 	if err != nil {
 		return nil, err
@@ -349,7 +349,7 @@ func (r *Repo) getSigningKeys(name string) ([]signed.Signer, error) {
 	if len(role.KeyIDs) == 0 {
 		return nil, nil
 	}
-	keys := make([]signed.Signer, 0, len(role.KeyIDs))
+	keys := make([]sign.Signer, 0, len(role.KeyIDs))
 	for _, key := range signingKeys {
 		if _, ok := role.KeyIDs[key.ID()]; ok {
 			keys = append(keys, key)
@@ -635,13 +635,13 @@ func (r *Repo) Clean() error {
 	return r.local.Clean()
 }
 
-func (r *Repo) verifySignature(name string, db *keys.DB) error {
+func (r *Repo) verifySignature(name string, db *verify.DB) error {
 	s, err := r.signedMeta(name)
 	if err != nil {
 		return err
 	}
 	role := strings.TrimSuffix(name, ".json")
-	if err := signed.Verify(s, role, 0, db); err != nil {
+	if err := db.Verify(s, role, 0); err != nil {
 		return ErrInsufficientSignatures{name, err}
 	}
 	return nil
