@@ -1,6 +1,12 @@
 package verify
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/sha256"
+	"encoding/asn1"
+	"math/big"
+
 	"github.com/flynn/go-tuf/data"
 	"golang.org/x/crypto/ed25519"
 )
@@ -19,7 +25,8 @@ type Verifier interface {
 
 // Verifiers is used to map key types to Verifier instances.
 var Verifiers = map[string]Verifier{
-	data.KeyTypeEd25519: ed25519Verifier{},
+	data.KeyTypeEd25519:         ed25519Verifier{},
+	data.KeyTypeECDSA_SHA2_P256: p256Verifier{},
 }
 
 type ed25519Verifier struct{}
@@ -33,4 +40,36 @@ func (ed25519Verifier) Verify(key, msg, sig []byte) error {
 
 func (ed25519Verifier) ValidKey(k []byte) bool {
 	return len(k) == ed25519.PublicKeySize
+}
+
+type ecdsaSignature struct {
+	R, S *big.Int
+}
+
+type p256Verifier struct{}
+
+func (p256Verifier) Verify(key, msg, sigBytes []byte) error {
+	x, y := elliptic.Unmarshal(elliptic.P256(), key)
+	k := &ecdsa.PublicKey{
+		Curve: elliptic.P256(),
+		X:     x,
+		Y:     y,
+	}
+
+	var sig ecdsaSignature
+	if _, err := asn1.Unmarshal(sigBytes, &sig); err != nil {
+		return ErrInvalid
+	}
+
+	hash := sha256.Sum256(msg)
+
+	if !ecdsa.Verify(k, hash[:], sig.R, sig.S) {
+		return ErrInvalid
+	}
+	return nil
+}
+
+func (p256Verifier) ValidKey(k []byte) bool {
+	x, _ := elliptic.Unmarshal(elliptic.P256(), k)
+	return x != nil
 }

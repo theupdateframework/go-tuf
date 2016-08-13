@@ -7,7 +7,6 @@ import (
 
 	"github.com/flynn/go-tuf/data"
 	"github.com/tent/canonical-json-go"
-	"golang.org/x/crypto/ed25519"
 )
 
 type signedMeta struct {
@@ -62,15 +61,7 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 	}
 
 	valid := make(map[string]struct{})
-	var sigBytes [ed25519.SignatureSize]byte
 	for _, sig := range s.Signatures {
-		if _, ok := Verifiers[sig.Method]; !ok {
-			return ErrWrongMethod
-		}
-		if len(sig.Signature) != len(sigBytes) {
-			return ErrInvalid
-		}
-
 		if !roleData.ValidKey(sig.KeyID) {
 			continue
 		}
@@ -79,8 +70,7 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 			continue
 		}
 
-		copy(sigBytes[:], sig.Signature)
-		if err := Verifiers[sig.Method].Verify(key.Value.Public, msg, sigBytes[:]); err != nil {
+		if err := Verifiers[key.Type].Verify(key.Value.Public, msg, sig.Signature); err != nil {
 			return err
 		}
 		valid[sig.KeyID] = struct{}{}

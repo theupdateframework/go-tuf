@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	KeyIDLength    = sha256.Size * 2
-	KeyTypeEd25519 = "ed25519"
+	KeyIDLength            = sha256.Size * 2
+	KeyTypeEd25519         = "ed25519"
+	KeyTypeECDSA_SHA2_P256 = "ecdsa-sha2-nistp256"
 )
 
 type Signed struct {
