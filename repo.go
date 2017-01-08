@@ -133,6 +133,14 @@ func (r *Repo) snapshot() (*data.Snapshot, error) {
 	return snapshot, nil
 }
 
+func (r *Repo) Targets() (data.Files, error) {
+	targets, err := r.targets()
+	if err != nil {
+		return nil, err
+	}
+	return targets.Targets, nil
+}
+
 func (r *Repo) targets() (*data.Targets, error) {
 	targetsJSON, ok := r.meta["targets.json"]
 	if !ok {
