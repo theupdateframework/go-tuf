@@ -2,9 +2,9 @@ package client
 
 import (
 	"encoding/json"
-	"time"
 
-	"github.com/boltdb/bolt"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
 func MemoryLocalStore() LocalStore {
@@ -22,46 +22,32 @@ func (m memoryLocalStore) SetMeta(name string, meta json.RawMessage) error {
 	return nil
 }
 
-const dbBucket = "tuf-client"
-
 func FileLocalStore(path string) (LocalStore, error) {
-	db, err := bolt.Open(path, 0600, &bolt.Options{Timeout: time.Second})
+	fd, err := storage.OpenFile(path, false)
 	if err != nil {
 		return nil, err
 	}
-	if err := db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(dbBucket))
-		return err
-	}); err != nil {
-		return nil, err
-	}
-	return &fileLocalStore{db: db}, nil
+
+	db, err := leveldb.Open(fd, nil)
+	return &fileLocalStore{db: db}, err
 }
 
 type fileLocalStore struct {
-	db *bolt.DB
+	db *leveldb.DB
 }
 
 func (f *fileLocalStore) GetMeta() (map[string]json.RawMessage, error) {
 	meta := make(map[string]json.RawMessage)
-	if err := f.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(dbBucket))
-		b.ForEach(func(k, v []byte) error {
-			vcopy := make([]byte, len(v))
-			copy(vcopy, v)
-			meta[string(k)] = vcopy
-			return nil
-		})
-		return nil
-	}); err != nil {
-		return nil, err
+	db_itr := f.db.NewIterator(nil, nil)
+	for db_itr.Next() {
+		vcopy := make([]byte, len(db_itr.Value()))
+		copy(vcopy, db_itr.Value())
+		meta[string(db_itr.Key())] = vcopy
 	}
-	return meta, nil
+	db_itr.Release()
+	return meta, db_itr.Error()
 }
 
 func (f *fileLocalStore) SetMeta(name string, meta json.RawMessage) error {
-	return f.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(dbBucket))
-		return b.Put([]byte(name), meta)
-	})
+	return f.db.Put([]byte(name), []byte(meta), nil)
 }
