@@ -392,12 +392,16 @@ func (f *fileSystemStore) loadKeys(role string) ([]*sign.PrivateKey, []byte, err
 		return nil, nil, ErrPassphraseRequired{role}
 	}
 
-	pass, err := f.passphraseFunc(role, false)
-	if err != nil {
-		return nil, nil, err
-	}
+	// try the empty string as the password first
+	pass := []byte("")
 	if err := encrypted.Unmarshal(pk.Data, &keys, pass); err != nil {
-		return nil, nil, err
+		pass, err = f.passphraseFunc(role, false)
+		if err != nil {
+			return nil, nil, err
+		}
+		if err = encrypted.Unmarshal(pk.Data, &keys, pass); err != nil {
+			return nil, nil, err
+		}
 	}
 	return keys, pass, nil
 }
