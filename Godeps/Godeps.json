@@ -1,0 +1,87 @@
+{
+	"ImportPath": "github.com/flynn/go-tuf",
+	"GoVersion": "go1.9",
+	"GodepVersion": "v79",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/Azure/go-ansiterm",
+			"Rev": "70b2c90b260171e829f1ebd7c17f600c11858dbe"
+		},
+		{
+			"ImportPath": "github.com/Azure/go-ansiterm/winterm",
+			"Rev": "70b2c90b260171e829f1ebd7c17f600c11858dbe"
+		},
+		{
+			"ImportPath": "github.com/Sirupsen/logrus",
+			"Comment": "v0.8.6",
+			"Rev": "5701be89e7d3cdcbc48504241b9c66ef085f759d"
+		},
+		{
+			"ImportPath": "github.com/boltdb/bolt",
+			"Comment": "v1.1.0-22-g6e1ca38",
+			"Rev": "6e1ca38c6a73025366cd8705553b404746ee6e63"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/term",
+			"Comment": "v1.9.1",
+			"Rev": "a34a1d598c6096ed8b5ce5219e77d68e5cd85462"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/term/windows",
+			"Comment": "v1.9.1",
+			"Rev": "a34a1d598c6096ed8b5ce5219e77d68e5cd85462"
+		},
+		{
+			"ImportPath": "github.com/dustin/go-humanize",
+			"Rev": "259d2a102b871d17f30e3cd9881a642961a1e486"
+		},
+		{
+			"ImportPath": "github.com/flynn/go-docopt",
+			"Comment": "0.6.1-rc2-26-gf6dd2eb",
+			"Rev": "f6dd2ebbb31e9721c860cf1faf5c944aa73e3844"
+		},
+		{
+			"ImportPath": "github.com/tent/canonical-json-go",
+			"Rev": "96e4ba3a7613a1216cbd1badca4efe382adea337"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/ed25519",
+			"Rev": "0fcca4842a8d74bfddc2c96a073bd2a4d2a7a2e8"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/ed25519/internal/edwards25519",
+			"Rev": "0fcca4842a8d74bfddc2c96a073bd2a4d2a7a2e8"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/nacl/secretbox",
+			"Rev": "0fcca4842a8d74bfddc2c96a073bd2a4d2a7a2e8"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/pbkdf2",
+			"Rev": "0fcca4842a8d74bfddc2c96a073bd2a4d2a7a2e8"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/poly1305",
+			"Rev": "0fcca4842a8d74bfddc2c96a073bd2a4d2a7a2e8"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/salsa20/salsa",
+			"Rev": "0fcca4842a8d74bfddc2c96a073bd2a4d2a7a2e8"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/scrypt",
+			"Rev": "0fcca4842a8d74bfddc2c96a073bd2a4d2a7a2e8"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/unix",
+			"Rev": "dd9ec17814d5b1de388ebe438ec013d57d8b3779"
+		},
+		{
+			"ImportPath": "gopkg.in/check.v1",
+			"Rev": "20d25e2804050c1cd24a7eea1e7a6447dd0e74ec"
+		}
+	]
+}
