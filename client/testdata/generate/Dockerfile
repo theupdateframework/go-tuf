@@ -1,12 +1,10 @@
-FROM ubuntu:trusty
+FROM ubuntu:xenial
 
 RUN apt-get update
-RUN apt-get install -y python python-dev python-pip libffi-dev tree
+RUN apt-get install -y python python-dev python-pip libffi-dev libssl-dev tree
 
-# Use the develop branch of tuf for the following fix:
-# https://github.com/theupdateframework/tuf/commit/38005fe
 RUN apt-get install -y git
-RUN pip install --no-use-wheel git+https://github.com/theupdateframework/tuf.git@develop && pip install tuf[tools]
+RUN pip install git+https://github.com/theupdateframework/tuf.git@v0.10.2 && pip install tuf[tools]
 
 ADD generate.py generate.sh /
 CMD /generate.sh

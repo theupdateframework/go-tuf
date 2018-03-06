@@ -11,7 +11,8 @@ import optparse
 import stat
 
 from tuf.repository_tool import *
-import tuf.util
+
+import securesystemslib
 
 parser = optparse.OptionParser()
 parser.add_option("-c","--consistent-snapshot", action='store_true',  dest="consistent_snapshot",
@@ -51,9 +52,9 @@ repository.snapshot.load_signing_key(snapshot_private)
 repository.timestamp.load_signing_key(timestamp_private)
 
 target1_filepath = 'repository/targets/file1.txt'
-tuf.util.ensure_parent_dir(target1_filepath)
+securesystemslib.util.ensure_parent_dir(target1_filepath)
 target2_filepath = 'repository/targets/dir/file2.txt'
-tuf.util.ensure_parent_dir(target2_filepath)
+securesystemslib.util.ensure_parent_dir(target2_filepath)
 
 with open(target1_filepath, 'wt') as file_object:
   file_object.write('file1.txt')
@@ -74,9 +75,9 @@ repository.timestamp.expiration = datetime.datetime(2030, 1, 1, 0, 0)
 repository.targets.compressions = ['gz']
 
 if options.consistent_snapshot:
-  repository.write(False, True)
+  repository.writeall(consistent_snapshot=True)
 
 else:
-  repository.write()
+  repository.writeall()
 
 shutil.move('repository/metadata.staged', 'repository/metadata')
