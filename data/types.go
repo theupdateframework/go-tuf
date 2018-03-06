@@ -28,8 +28,10 @@ type Signature struct {
 }
 
 type Key struct {
-	Type  string   `json:"keytype"`
-	Value KeyValue `json:"keyval"`
+	Type       string   `json:"keytype"`
+	Scheme     string   `json:"scheme"`
+	Algorithms []string `json:"keyid_hash_algorithms"`
+	Value      KeyValue `json:"keyval"`
 
 	id     string
 	idOnce sync.Once
