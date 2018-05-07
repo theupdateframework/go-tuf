@@ -141,6 +141,58 @@ func (r *Repo) Targets() (data.Files, error) {
 	return targets.Targets, nil
 }
 
+func (r *Repo) SetTargetsVersion(v int) error {
+	t, err := r.targets()
+	if err != nil {
+		return err
+	}
+	t.Version = v
+	return r.setMeta("targets.json", t)
+}
+
+func (r *Repo) TargetsVersion() (int, error) {
+	t, err := r.targets()
+	if err != nil {
+		return -1, err
+	}
+	return t.Version, nil
+}
+
+func (r *Repo) SetTimestampVersion(v int) error {
+	ts, err := r.timestamp()
+	if err != nil {
+		return err
+	}
+	ts.Version = v
+	return r.setMeta("timestamp.json", ts)
+}
+
+func (r *Repo) TimestampVersion() (int, error) {
+	ts, err := r.timestamp()
+	if err != nil {
+		return -1, err
+	}
+	return ts.Version, nil
+}
+
+func (r *Repo) SetSnapshotVersion(v int) error {
+	s, err := r.snapshot()
+	if err != nil {
+		return err
+	}
+
+	s.Version = v
+	return r.setMeta("snapshot.json", s)
+}
+
+func (r *Repo) SnapshotVersion() (int, error) {
+	s, err := r.snapshot()
+	if err != nil {
+		return -1, err
+	}
+	return s.Version, nil
+}
+
 func (r *Repo) targets() (*data.Targets, error) {
 	targetsJSON, ok := r.meta["targets.json"]
 	if !ok {
