@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/flynn/go-tuf"
+	tuf "github.com/flynn/go-tuf"
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/util"
 	"golang.org/x/crypto/ed25519"
@@ -40,6 +40,7 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 		remote, err := HTTPRemoteStore(
 			fmt.Sprintf("http://%s/%s/repository", addr, dir),
 			&HTTPRemoteOptions{MetadataPath: "metadata", TargetsPath: "targets"},
+			nil,
 		)
 		c.Assert(err, IsNil)
 

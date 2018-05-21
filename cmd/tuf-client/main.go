@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/flynn/go-docopt"
+	docopt "github.com/flynn/go-docopt"
 	tuf "github.com/flynn/go-tuf/client"
 )
 
@@ -88,7 +88,7 @@ func tufClient(args *docopt.Args) (*tuf.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	remote, err := tuf.HTTPRemoteStore(args.String["<url>"], nil)
+	remote, err := tuf.HTTPRemoteStore(args.String["<url>"], nil, nil)
 	if err != nil {
 		return nil, err
 	}
