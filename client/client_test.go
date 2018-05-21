@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flynn/go-tuf"
+	tuf "github.com/flynn/go-tuf"
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/util"
 	"github.com/flynn/go-tuf/verify"
@@ -723,7 +723,7 @@ func (s *ClientSuite) TestUpdateHTTP(c *C) {
 		repo := generateRepoFS(c, filepath.Join(tmp, dir), targetFiles, consistentSnapshot)
 
 		// initialize a client
-		remote, err := HTTPRemoteStore(fmt.Sprintf("http://%s/%s/repository", addr, dir), nil)
+		remote, err := HTTPRemoteStore(fmt.Sprintf("http://%s/%s/repository", addr, dir), nil, nil)
 		c.Assert(err, IsNil)
 		client := NewClient(MemoryLocalStore(), remote)
 		rootKeys, err := repo.RootKeys()

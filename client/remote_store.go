@@ -28,7 +28,7 @@ var DefaultHTTPRetries = &HTTPRemoteRetries{
 	Total: 10 * time.Second,
 }
 
-func HTTPRemoteStore(baseURL string, opts *HTTPRemoteOptions) (RemoteStore, error) {
+func HTTPRemoteStore(baseURL string, opts *HTTPRemoteOptions, client *http.Client) (RemoteStore, error) {
 	if !strings.HasPrefix(baseURL, "http") {
 		return nil, ErrInvalidURL{baseURL}
 	}
@@ -38,12 +38,16 @@ func HTTPRemoteStore(baseURL string, opts *HTTPRemoteOptions) (RemoteStore, erro
 	if opts.TargetsPath == "" {
 		opts.TargetsPath = "targets"
 	}
-	return &httpRemoteStore{baseURL, opts}, nil
+	if client == nil {
+		client = http.DefaultClient
+	}
+	return &httpRemoteStore{baseURL, opts, client}, nil
 }
 
 type httpRemoteStore struct {
 	baseURL string
 	opts    *HTTPRemoteOptions
+	cli     *http.Client
 }
 
 func (h *httpRemoteStore) GetMeta(name string) (io.ReadCloser, int64, error) {
@@ -66,13 +70,13 @@ func (h *httpRemoteStore) get(s string) (io.ReadCloser, int64, error) {
 	var res *http.Response
 	if r := h.opts.Retries; r != nil {
 		for start := time.Now(); time.Since(start) < r.Total; time.Sleep(r.Delay) {
-			res, err = http.DefaultClient.Do(req)
+			res, err = h.cli.Do(req)
 			if err == nil && (res.StatusCode < 500 || res.StatusCode > 599) {
 				break
 			}
 		}
 	} else {
-		res, err = http.DefaultClient.Do(req)
+		res, err = h.cli.Do(req)
 	}
 	if err != nil {
 		return nil, 0, err
