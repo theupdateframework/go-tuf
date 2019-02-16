@@ -1,0 +1,24 @@
+# github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
+github.com/Azure/go-ansiterm/winterm
+github.com/Azure/go-ansiterm
+# github.com/Sirupsen/logrus v1.3.0 => github.com/sirupsen/logrus v1.3.0
+github.com/Sirupsen/logrus
+# github.com/coreos/bbolt v1.3.2
+github.com/coreos/bbolt
+# github.com/docker/docker v1.13.1
+github.com/docker/docker/pkg/term
+github.com/docker/docker/pkg/term/windows
+# github.com/dustin/go-humanize v1.0.0
+github.com/dustin/go-humanize
+# github.com/flynn/go-docopt v0.0.0-20140912013429-f6dd2ebbb31e
+github.com/flynn/go-docopt
+# github.com/konsorten/go-windows-terminal-sequences v1.0.1
+github.com/konsorten/go-windows-terminal-sequences
+# github.com/kr/pretty v0.1.0
+github.com/kr/pretty
+# github.com/kr/text v0.1.0
+github.com/kr/text
+# github.com/tent/canonical-json-go v0.0.0-20130607151641-96e4ba3a7613
+github.com/tent/canonical-json-go
+# gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
+gopkg.in/check.v1
