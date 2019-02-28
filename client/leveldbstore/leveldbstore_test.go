@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json"
 	"path/filepath"
+	"testing"
 
 	. "gopkg.in/check.v1"
 )
@@ -10,6 +11,9 @@ import (
 type LocalStoreSuite struct{}
 
 var _ = Suite(&LocalStoreSuite{})
+
+// Hook up gocheck into the "go test" runner.
+func Test(t *testing.T) { TestingT(t) }
 
 func (LocalStoreSuite) TestFileLocalStore(c *C) {
 	tmp := c.MkDir()
@@ -39,7 +43,7 @@ func (LocalStoreSuite) TestFileLocalStore(c *C) {
 	assertGet(meta{"root.json": rootJSON, "targets.json": targetsJSON})
 
 	// a new store should get the same meta
-	c.Assert(store.(*fileLocalStore).db.Close(), IsNil)
+	c.Assert(store.(*fileLocalStore).Close(), IsNil)
 	store, err = FileLocalStore(path)
 	c.Assert(err, IsNil)
 	assertGet(meta{"root.json": rootJSON, "targets.json": targetsJSON})
