@@ -16,10 +16,10 @@ type UtilSuite struct{}
 
 var _ = Suite(&UtilSuite{})
 
-func (UtilSuite) TestGenerateFileMetaDefault(c *C) {
+func (UtilSuite) TestGenerateTargetFileMetaDefault(c *C) {
 	// default is sha512
 	r := bytes.NewReader([]byte("foo"))
-	meta, err := GenerateFileMeta(r)
+	meta, err := GenerateTargetFileMeta(r)
 	c.Assert(err, IsNil)
 	c.Assert(meta.Length, Equals, int64(3))
 	hashes := meta.Hashes
@@ -31,9 +31,9 @@ func (UtilSuite) TestGenerateFileMetaDefault(c *C) {
 	c.Assert(hash.String(), DeepEquals, "f7fbba6e0636f890e56fbbf3283e524c6fa3204ae298382d624741d0dc6638326e282c41be5e4254d8820772c5518a2c5a8c0c7f7eda19594a7eb539453e1ed7")
 }
 
-func (UtilSuite) TestGenerateFileMetaExplicit(c *C) {
+func (UtilSuite) TestGenerateTargetFileMetaExplicit(c *C) {
 	r := bytes.NewReader([]byte("foo"))
-	meta, err := GenerateFileMeta(r, "sha256", "sha512")
+	meta, err := GenerateTargetFileMeta(r, "sha256", "sha512")
 	c.Assert(err, IsNil)
 	c.Assert(meta.Length, Equals, int64(3))
 	hashes := meta.Hashes
@@ -50,15 +50,15 @@ func (UtilSuite) TestGenerateFileMetaExplicit(c *C) {
 	}
 }
 
-func (UtilSuite) TestFileMetaEqual(c *C) {
+func (UtilSuite) TestTargetFileMetaEqual(c *C) {
 	type test struct {
 		name string
-		b    data.FileMeta
-		a    data.FileMeta
+		b    data.TargetFileMeta
+		a    data.TargetFileMeta
 		err  func(test) error
 	}
-	fileMeta := func(length int64, hashes map[string]string) data.FileMeta {
-		m := data.FileMeta{Length: length, Hashes: make(map[string]data.HexBytes, len(hashes))}
+	fileMeta := func(length int64, hashes map[string]string) data.TargetFileMeta {
+		m := data.TargetFileMeta{Length: length, Hashes: make(map[string]data.HexBytes, len(hashes))}
 		for typ, hash := range hashes {
 			v, err := hex.DecodeString(hash)
 			c.Assert(err, IsNil)
@@ -69,8 +69,8 @@ func (UtilSuite) TestFileMetaEqual(c *C) {
 	tests := []test{
 		{
 			name: "wrong length",
-			a:    data.FileMeta{Length: 1},
-			b:    data.FileMeta{Length: 2},
+			a:    data.TargetFileMeta{Length: 1},
+			b:    data.TargetFileMeta{Length: 2},
 			err:  func(test) error { return ErrWrongLength },
 		},
 		{
@@ -93,7 +93,7 @@ func (UtilSuite) TestFileMetaEqual(c *C) {
 		},
 	}
 	for _, t := range tests {
-		c.Assert(FileMetaEqual(t.a, t.b), DeepEquals, t.err(t), Commentf("name = %s", t.name))
+		c.Assert(TargetFileMetaEqual(t.a, t.b), DeepEquals, t.err(t), Commentf("name = %s", t.name))
 	}
 }
 

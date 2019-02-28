@@ -108,12 +108,19 @@ func NewSnapshot() *Snapshot {
 type Hashes map[string]HexBytes
 
 type FileMeta struct {
+	TargetFileMeta
+	Version int `json:"version"`
+}
+
+type TargetFiles map[string]TargetFileMeta
+
+type TargetFileMeta struct {
 	Length int64            `json:"length"`
 	Hashes Hashes           `json:"hashes"`
 	Custom *json.RawMessage `json:"custom,omitempty"`
 }
 
-func (f FileMeta) HashAlgorithms() []string {
+func (f TargetFileMeta) HashAlgorithms() []string {
 	funcs := make([]string, 0, len(f.Hashes))
 	for name := range f.Hashes {
 		funcs = append(funcs, name)
@@ -122,17 +129,17 @@ func (f FileMeta) HashAlgorithms() []string {
 }
 
 type Targets struct {
-	Type    string    `json:"_type"`
-	Version int       `json:"version"`
-	Expires time.Time `json:"expires"`
-	Targets Files     `json:"targets"`
+	Type    string      `json:"_type"`
+	Version int         `json:"version"`
+	Expires time.Time   `json:"expires"`
+	Targets TargetFiles `json:"targets"`
 }
 
 func NewTargets() *Targets {
 	return &Targets{
 		Type:    "Targets",
 		Expires: DefaultExpires("targets"),
-		Targets: make(Files),
+		Targets: make(TargetFiles),
 	}
 }
 

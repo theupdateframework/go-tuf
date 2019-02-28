@@ -61,7 +61,7 @@ type Client struct {
 
 	// targets is the list of available targets, either from local storage
 	// or from recently downloaded targets metadata
-	targets data.Files
+	targets data.TargetFiles
 
 	// localMeta is the raw metadata from local storage and is used to
 	// check whether remote metadata is present locally
@@ -123,11 +123,11 @@ func (c *Client) Init(rootKeys []*data.Key, threshold int) error {
 // section 5.1 of the TUF spec:
 //
 // https://github.com/theupdateframework/tuf/blob/v0.9.9/docs/tuf-spec.txt#L714
-func (c *Client) Update() (data.Files, error) {
+func (c *Client) Update() (data.TargetFiles, error) {
 	return c.update(false)
 }
 
-func (c *Client) update(latestRoot bool) (data.Files, error) {
+func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 	// Always start the update using local metadata
 	if err := c.getLocalMeta(); err != nil {
 		if _, ok := err.(verify.ErrExpired); ok {
@@ -202,7 +202,7 @@ func (c *Client) update(latestRoot bool) (data.Files, error) {
 
 	// If we don't have the targets.json, download it, determine updated
 	// targets and save targets.json in local storage
-	var updatedTargets data.Files
+	var updatedTargets data.TargetFiles
 	if !c.hasMeta("targets.json", targetsMeta) {
 		targetsJSON, err := c.downloadMeta("targets.json", targetsMeta)
 		if err != nil {
@@ -225,7 +225,7 @@ func (c *Client) update(latestRoot bool) (data.Files, error) {
 	return updatedTargets, nil
 }
 
-func (c *Client) updateWithLatestRoot(m *data.FileMeta) (data.Files, error) {
+func (c *Client) updateWithLatestRoot(m *data.FileMeta) (data.TargetFiles, error) {
 	var rootJSON json.RawMessage
 	var err error
 	if m == nil {
@@ -474,15 +474,15 @@ func (c *Client) decodeSnapshot(b json.RawMessage) (data.FileMeta, data.FileMeta
 
 // decodeTargets decodes and verifies targets metadata, sets c.targets and
 // returns updated targets.
-func (c *Client) decodeTargets(b json.RawMessage) (data.Files, error) {
+func (c *Client) decodeTargets(b json.RawMessage) (data.TargetFiles, error) {
 	targets := &data.Targets{}
 	if err := verify.Unmarshal(b, targets, "targets", c.targetsVer, c.db); err != nil {
 		return nil, ErrDecodeFailed{"targets.json", err}
 	}
-	updatedTargets := make(data.Files)
+	updatedTargets := make(data.TargetFiles)
 	for path, meta := range targets.Targets {
 		if local, ok := c.targets[path]; ok {
-			if err := util.FileMetaEqual(local, meta); err == nil {
+			if err := util.TargetFileMetaEqual(local, meta); err == nil {
 				continue
 			}
 		}
@@ -569,13 +569,13 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 	stream := io.LimitReader(r, localMeta.Length)
 
 	// read the data, simultaneously writing it to dest and generating metadata
-	actual, err := util.GenerateFileMeta(io.TeeReader(stream, dest), localMeta.HashAlgorithms()...)
+	actual, err := util.GenerateTargetFileMeta(io.TeeReader(stream, dest), localMeta.HashAlgorithms()...)
 	if err != nil {
 		return ErrDownloadFailed{name, err}
 	}
 
 	// check the data has the correct length and hashes
-	if err := util.FileMetaEqual(actual, localMeta); err != nil {
+	if err := util.TargetFileMetaEqual(actual, localMeta); err != nil {
 		if err == util.ErrWrongLength {
 			return ErrWrongSize{name, actual.Length, localMeta.Length}
 		}
@@ -586,7 +586,7 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 }
 
 // Targets returns the complete list of available targets.
-func (c *Client) Targets() (data.Files, error) {
+func (c *Client) Targets() (data.TargetFiles, error) {
 	// populate c.targets from local storage if not set
 	if c.targets == nil {
 		if err := c.getLocalMeta(); err != nil {
