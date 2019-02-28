@@ -6,6 +6,7 @@ import (
 
 	docopt "github.com/flynn/go-docopt"
 	tuf "github.com/flynn/go-tuf/client"
+	tuf_leveldbstore "github.com/flynn/go-tuf/client/leveldbstore"
 )
 
 func main() {
@@ -84,7 +85,7 @@ func tufClient(args *docopt.Args) (*tuf.Client, error) {
 	if !ok {
 		store = args.String["-s"]
 	}
-	local, err := tuf.FileLocalStore(store)
+	local, err := tuf_leveldbstore.FileLocalStore(store)
 	if err != nil {
 		return nil, err
 	}
