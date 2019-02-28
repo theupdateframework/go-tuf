@@ -133,7 +133,7 @@ func (r *Repo) snapshot() (*data.Snapshot, error) {
 	return snapshot, nil
 }
 
-func (r *Repo) Targets() (data.Files, error) {
+func (r *Repo) Targets() (data.TargetFiles, error) {
 	targets, err := r.targets()
 	if err != nil {
 		return nil, err
@@ -465,7 +465,7 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom json.RawMessage, exp
 		normalizedPaths[i] = util.NormalizeTarget(path)
 	}
 	if err := r.local.WalkStagedTargets(normalizedPaths, func(path string, target io.Reader) (err error) {
-		meta, err := util.GenerateFileMeta(target, r.hashAlgorithms...)
+		meta, err := util.GenerateTargetFileMeta(target, r.hashAlgorithms...)
 		if err != nil {
 			return err
 		}
@@ -512,7 +512,7 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 		return err
 	}
 	if len(paths) == 0 {
-		t.Targets = make(data.Files)
+		t.Targets = make(data.TargetFiles)
 	} else {
 		removed := false
 		for _, path := range paths {

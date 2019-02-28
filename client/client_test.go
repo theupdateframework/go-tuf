@@ -184,7 +184,7 @@ func (s *ClientSuite) updatedClient(c *C) *Client {
 	return client
 }
 
-func assertFiles(c *C, files data.Files, names []string) {
+func assertFiles(c *C, files data.TargetFiles, names []string) {
 	c.Assert(files, HasLen, len(names))
 	for _, name := range names {
 		target, ok := targetFiles[name]
@@ -195,9 +195,9 @@ func assertFiles(c *C, files data.Files, names []string) {
 		if !ok {
 			c.Fatalf("expected files to contain %s", name)
 		}
-		meta, err := util.GenerateFileMeta(bytes.NewReader(target), file.HashAlgorithms()...)
+		meta, err := util.GenerateTargetFileMeta(bytes.NewReader(target), file.HashAlgorithms()...)
 		c.Assert(err, IsNil)
-		c.Assert(util.FileMetaEqual(file, meta), IsNil)
+		c.Assert(util.TargetFileMetaEqual(file, meta), IsNil)
 	}
 }
 

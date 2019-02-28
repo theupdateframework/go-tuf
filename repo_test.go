@@ -687,6 +687,11 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(snapshot.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
 	c.Assert(snapshot.Version, Equals, 1)
 
+	root, err = r.root()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Meta["root.json"].Version, Equals, root.Version)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, targets.Version)
+
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	snapshot, err = r.snapshot()
 	c.Assert(err, IsNil)
@@ -704,6 +709,7 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	timestamp, err = r.timestamp()
 	c.Assert(err, IsNil)
 	c.Assert(timestamp.Version, Equals, 2)
+	c.Assert(timestamp.Meta["snapshot.json"].Version, Equals, snapshot.Version)
 }
 
 func (RepoSuite) TestHashAlgorithm(c *C) {
@@ -739,7 +745,10 @@ func (RepoSuite) TestHashAlgorithm(c *C) {
 		timestamp, err := r.timestamp()
 		c.Assert(err, IsNil)
 		for name, file := range map[string]data.FileMeta{
-			"foo.txt":       targets.Targets["/foo.txt"],
+			"foo.txt": data.FileMeta{
+				TargetFileMeta: targets.Targets["/foo.txt"],
+				Version:        0,
+			},
 			"root.json":     snapshot.Meta["root.json"],
 			"targets.json":  snapshot.Meta["targets.json"],
 			"snapshot.json": timestamp.Meta["snapshot.json"],

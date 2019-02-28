@@ -1,10 +1,12 @@
 package util
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"hash"
@@ -16,6 +18,15 @@ import (
 )
 
 var ErrWrongLength = errors.New("wrong length")
+
+type ErrWrongVersion struct {
+	Expected int
+	Actual   int
+}
+
+func (e ErrWrongVersion) Error() string {
+	return fmt.Sprintf("wrong version, expected %d got %d", e.Expected, e.Actual)
+}
 
 type ErrWrongHash struct {
 	Type     string
@@ -54,6 +65,16 @@ func (e ErrUnknownHashAlgorithm) Error() string {
 type PassphraseFunc func(role string, confirm bool) ([]byte, error)
 
 func FileMetaEqual(actual data.FileMeta, expected data.FileMeta) error {
+	if err := TargetFileMetaEqual(actual.TargetFileMeta, expected.TargetFileMeta); err != nil {
+		return err
+	}
+	if actual.Length != expected.Length {
+		return ErrWrongVersion{actual.Version, expected.Version}
+	}
+	return nil
+}
+
+func TargetFileMetaEqual(actual data.TargetFileMeta, expected data.TargetFileMeta) error {
 	if actual.Length != expected.Length {
 		return ErrWrongLength
 	}
@@ -74,7 +95,38 @@ func FileMetaEqual(actual data.FileMeta, expected data.FileMeta) error {
 
 const defaultHashAlgorithm = "sha512"
 
+type versionedMeta struct {
+	Version int `json:"version"`
+}
+
 func GenerateFileMeta(r io.Reader, hashAlgorithms ...string) (data.FileMeta, error) {
+	b, err := ioutil.ReadAll(r)
+	if err != nil {
+		return data.FileMeta{}, err
+	}
+
+	meta, err := GenerateTargetFileMeta(bytes.NewReader(b), hashAlgorithms...)
+	if err != nil {
+		return data.FileMeta{}, err
+	}
+
+	s := &data.Signed{}
+	if err := json.Unmarshal(b, s); err != nil {
+		return data.FileMeta{}, err
+	}
+
+	vm := &versionedMeta{}
+	if err := json.Unmarshal(s.Signed, vm); err != nil {
+		return data.FileMeta{}, err
+	}
+
+	return data.FileMeta{
+		TargetFileMeta: meta,
+		Version:        vm.Version,
+	}, nil
+}
+
+func GenerateTargetFileMeta(r io.Reader, hashAlgorithms ...string) (data.TargetFileMeta, error) {
 	if len(hashAlgorithms) == 0 {
 		hashAlgorithms = []string{defaultHashAlgorithm}
 	}
@@ -87,16 +139,16 @@ func GenerateFileMeta(r io.Reader, hashAlgorithms ...string) (data.FileMeta, err
 		case "sha512":
 			h = sha512.New()
 		default:
-			return data.FileMeta{}, ErrUnknownHashAlgorithm{hashAlgorithm}
+			return data.TargetFileMeta{}, ErrUnknownHashAlgorithm{hashAlgorithm}
 		}
 		hashes[hashAlgorithm] = h
 		r = io.TeeReader(r, h)
 	}
 	n, err := io.Copy(ioutil.Discard, r)
 	if err != nil {
-		return data.FileMeta{}, err
+		return data.TargetFileMeta{}, err
 	}
-	m := data.FileMeta{Length: n, Hashes: make(data.Hashes, len(hashes))}
+	m := data.TargetFileMeta{Length: n, Hashes: make(data.Hashes, len(hashes))}
 	for hashAlgorithm, h := range hashes {
 		m.Hashes[hashAlgorithm] = h.Sum(nil)
 	}

@@ -63,9 +63,9 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 			if !ok {
 				c.Fatalf("expected updated targets to contain %s", name)
 			}
-			meta, err := util.GenerateFileMeta(bytes.NewReader(data), file.HashAlgorithms()...)
+			meta, err := util.GenerateTargetFileMeta(bytes.NewReader(data), file.HashAlgorithms()...)
 			c.Assert(err, IsNil)
-			c.Assert(util.FileMetaEqual(file, meta), IsNil)
+			c.Assert(util.TargetFileMetaEqual(file, meta), IsNil)
 		}
 
 		// download the files and check they have the correct content
