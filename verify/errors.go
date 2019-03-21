@@ -11,7 +11,6 @@ var (
 	ErrNoSignatures     = errors.New("tuf: data has no signatures")
 	ErrInvalid          = errors.New("tuf: signature verification failed")
 	ErrWrongMethod      = errors.New("tuf: invalid signature type")
-	ErrUnknownRole      = errors.New("tuf: unknown role")
 	ErrRoleThreshold    = errors.New("tuf: valid signatures did not meet threshold")
 	ErrWrongMetaType    = errors.New("tuf: meta file has wrong type")
 	ErrExists           = errors.New("tuf: key already in db")
@@ -21,6 +20,14 @@ var (
 	ErrInvalidKeyID     = errors.New("tuf: invalid key id")
 	ErrInvalidThreshold = errors.New("tuf: invalid role threshold")
 )
+
+type ErrUnknownRole struct {
+	Role string
+}
+
+func (e ErrUnknownRole) Error() string {
+	return fmt.Sprintf("tuf: unknown role %q", e.Role)
+}
 
 type ErrExpired struct {
 	Expired time.Time

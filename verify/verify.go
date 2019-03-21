@@ -48,7 +48,7 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 
 	roleData := db.GetRole(role)
 	if roleData == nil {
-		return ErrUnknownRole
+		return ErrUnknownRole{role}
 	}
 
 	var decoded map[string]interface{}
