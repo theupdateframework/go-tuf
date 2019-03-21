@@ -74,7 +74,7 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "unknown role",
 			role: "foo",
-			err:  ErrUnknownRole,
+			err:  ErrUnknownRole{"foo"},
 		},
 		{
 			name: "signature wrong length",
