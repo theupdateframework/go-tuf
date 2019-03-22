@@ -7,7 +7,6 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"hash"
 	"io"
@@ -17,7 +16,14 @@ import (
 	"github.com/flynn/go-tuf/data"
 )
 
-var ErrWrongLength = errors.New("wrong length")
+type ErrWrongLength struct {
+	Expected int64
+	Actual   int64
+}
+
+func (e ErrWrongLength) Error() string {
+	return fmt.Sprintf("wrong length, expected %d got %d", e.Expected, e.Actual)
+}
 
 type ErrWrongVersion struct {
 	Expected int
@@ -76,7 +82,7 @@ func FileMetaEqual(actual data.FileMeta, expected data.FileMeta) error {
 
 func TargetFileMetaEqual(actual data.TargetFileMeta, expected data.TargetFileMeta) error {
 	if actual.Length != expected.Length {
-		return ErrWrongLength
+		return ErrWrongLength{expected.Length, actual.Length}
 	}
 	hashChecked := false
 	for typ, hash := range expected.Hashes {

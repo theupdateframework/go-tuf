@@ -576,8 +576,8 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 
 	// check the data has the correct length and hashes
 	if err := util.TargetFileMetaEqual(actual, localMeta); err != nil {
-		if err == util.ErrWrongLength {
-			return ErrWrongSize{name, actual.Length, localMeta.Length}
+		if e, ok := err.(util.ErrWrongLength); ok {
+			return ErrWrongSize{name, e.Actual, e.Expected}
 		}
 		return ErrDownloadFailed{name, err}
 	}
