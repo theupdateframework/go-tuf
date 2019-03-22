@@ -71,7 +71,7 @@ func (UtilSuite) TestTargetFileMetaEqual(c *C) {
 			name: "wrong length",
 			a:    data.TargetFileMeta{Length: 1},
 			b:    data.TargetFileMeta{Length: 2},
-			err:  func(test) error { return ErrWrongLength },
+			err:  func(test) error { return ErrWrongLength{Actual: 1, Expected: 2} },
 		},
 		{
 			name: "wrong sha512 hash",
