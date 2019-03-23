@@ -90,42 +90,52 @@ type Role struct {
 
 type Files map[string]FileMeta
 
+type FileMeta struct {
+	Length int64            `json:"length",omitempty`
+	Hashes Hashes           `json:"hashes",ompitempty`
+	Custom *json.RawMessage `json:"custom,omitempty"`
+}
+
+type Hashes map[string]HexBytes
+
+func (f FileMeta) HashAlgorithms() []string {
+	funcs := make([]string, 0, len(f.Hashes))
+	for name := range f.Hashes {
+		funcs = append(funcs, name)
+	}
+	return funcs
+}
+
+type SnapshotFileMeta struct {
+	FileMeta
+	Version int `json:"version"`
+}
+
+type SnapshotFiles map[string]SnapshotFileMeta
+
 type Snapshot struct {
-	Type    string    `json:"_type"`
-	Version int       `json:"version"`
-	Expires time.Time `json:"expires"`
-	Meta    Files     `json:"meta"`
+	Type    string        `json:"_type"`
+	Version int           `json:"version"`
+	Expires time.Time     `json:"expires"`
+	Meta    SnapshotFiles `json:"meta"`
 }
 
 func NewSnapshot() *Snapshot {
 	return &Snapshot{
 		Type:    "Snapshot",
 		Expires: DefaultExpires("snapshot"),
-		Meta:    make(Files),
+		Meta:    make(SnapshotFiles),
 	}
-}
-
-type Hashes map[string]HexBytes
-
-type FileMeta struct {
-	TargetFileMeta
-	Version int `json:"version"`
 }
 
 type TargetFiles map[string]TargetFileMeta
 
 type TargetFileMeta struct {
-	Length int64            `json:"length"`
-	Hashes Hashes           `json:"hashes"`
-	Custom *json.RawMessage `json:"custom,omitempty"`
+	FileMeta
 }
 
 func (f TargetFileMeta) HashAlgorithms() []string {
-	funcs := make([]string, 0, len(f.Hashes))
-	for name := range f.Hashes {
-		funcs = append(funcs, name)
-	}
-	return funcs
+	return f.FileMeta.HashAlgorithms()
 }
 
 type Targets struct {
@@ -143,17 +153,24 @@ func NewTargets() *Targets {
 	}
 }
 
+type TimestampFileMeta struct {
+	FileMeta
+	Version int `json:"version"`
+}
+
+type TimestampFiles map[string]TimestampFileMeta
+
 type Timestamp struct {
-	Type    string    `json:"_type"`
-	Version int       `json:"version"`
-	Expires time.Time `json:"expires"`
-	Meta    Files     `json:"meta"`
+	Type    string         `json:"_type"`
+	Version int            `json:"version"`
+	Expires time.Time      `json:"expires"`
+	Meta    TimestampFiles `json:"meta"`
 }
 
 func NewTimestamp() *Timestamp {
 	return &Timestamp{
 		Type:    "Timestamp",
 		Expires: DefaultExpires("timestamp"),
-		Meta:    make(Files),
+		Meta:    make(TimestampFiles),
 	}
 }
