@@ -70,7 +70,7 @@ func (e ErrUnknownHashAlgorithm) Error() string {
 
 type PassphraseFunc func(role string, confirm bool) ([]byte, error)
 
-func TargetFileMetaEqual(actual data.TargetFileMeta, expected data.TargetFileMeta) error {
+func FileMetaEqual(actual data.FileMeta, expected data.FileMeta) error {
 	if actual.Length != expected.Length {
 		return ErrWrongLength{expected.Length, actual.Length}
 	}
@@ -99,8 +99,24 @@ func versionEqual(actual int, expected int) error {
 	return nil
 }
 
-func FileMetaEqual(actual data.FileMeta, expected data.FileMeta) error {
-	if err := TargetFileMetaEqual(actual.TargetFileMeta, expected.TargetFileMeta); err != nil {
+func SnapshotFileMetaEqual(actual data.SnapshotFileMeta, expected data.SnapshotFileMeta) error {
+	if err := FileMetaEqual(actual.FileMeta, expected.FileMeta); err != nil {
+		return err
+	}
+
+	if err := versionEqual(actual.Version, expected.Version); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func TargetFileMetaEqual(actual data.TargetFileMeta, expected data.TargetFileMeta) error {
+	return FileMetaEqual(actual.FileMeta, expected.FileMeta)
+}
+
+func TimestampFileMetaEqual(actual data.TimestampFileMeta, expected data.TimestampFileMeta) error {
+	if err := FileMetaEqual(actual.FileMeta, expected.FileMeta); err != nil {
 		return err
 	}
 
@@ -113,11 +129,7 @@ func FileMetaEqual(actual data.FileMeta, expected data.FileMeta) error {
 
 const defaultHashAlgorithm = "sha512"
 
-type versionedMeta struct {
-	Version int `json:"version"`
-}
-
-func GenerateTargetFileMeta(r io.Reader, hashAlgorithms ...string) (data.TargetFileMeta, error) {
+func GenerateFileMeta(r io.Reader, hashAlgorithms ...string) (data.FileMeta, error) {
 	if len(hashAlgorithms) == 0 {
 		hashAlgorithms = []string{defaultHashAlgorithm}
 	}
@@ -130,47 +142,72 @@ func GenerateTargetFileMeta(r io.Reader, hashAlgorithms ...string) (data.TargetF
 		case "sha512":
 			h = sha512.New()
 		default:
-			return data.TargetFileMeta{}, ErrUnknownHashAlgorithm{hashAlgorithm}
+			return data.FileMeta{}, ErrUnknownHashAlgorithm{hashAlgorithm}
 		}
 		hashes[hashAlgorithm] = h
 		r = io.TeeReader(r, h)
 	}
 	n, err := io.Copy(ioutil.Discard, r)
 	if err != nil {
-		return data.TargetFileMeta{}, err
+		return data.FileMeta{}, err
 	}
-	m := data.TargetFileMeta{Length: n, Hashes: make(data.Hashes, len(hashes))}
+	m := data.FileMeta{Length: n, Hashes: make(data.Hashes, len(hashes))}
 	for hashAlgorithm, h := range hashes {
 		m.Hashes[hashAlgorithm] = h.Sum(nil)
 	}
 	return m, nil
 }
 
-func GenerateFileMeta(r io.Reader, hashAlgorithms ...string) (data.FileMeta, error) {
+type versionedMeta struct {
+	Version int `json:"version"`
+}
+
+func generateVersionedFileMeta(r io.Reader, hashAlgorithms ...string) (data.FileMeta, int, error) {
 	b, err := ioutil.ReadAll(r)
 	if err != nil {
-		return data.FileMeta{}, err
+		return data.FileMeta{}, 0, err
 	}
 
-	meta, err := GenerateTargetFileMeta(bytes.NewReader(b), hashAlgorithms...)
+	m, err := GenerateFileMeta(bytes.NewReader(b), hashAlgorithms...)
 	if err != nil {
-		return data.FileMeta{}, err
+		return data.FileMeta{}, 0, err
 	}
 
 	s := data.Signed{}
 	if err := json.Unmarshal(b, &s); err != nil {
-		return data.FileMeta{}, err
+		return data.FileMeta{}, 0, err
 	}
 
 	vm := versionedMeta{}
 	if err := json.Unmarshal(s.Signed, &vm); err != nil {
-		return data.FileMeta{}, err
+		return data.FileMeta{}, 0, err
 	}
 
-	return data.FileMeta{
-		TargetFileMeta: meta,
-		Version:        vm.Version,
-	}, nil
+	return m, vm.Version, nil
+}
+
+func GenerateSnapshotFileMeta(r io.Reader, hashAlgorithms ...string) (data.SnapshotFileMeta, error) {
+	m, v, err := generateVersionedFileMeta(r, hashAlgorithms...)
+	if err != nil {
+		return data.SnapshotFileMeta{}, err
+	}
+	return data.SnapshotFileMeta{m, v}, nil
+}
+
+func GenerateTargetFileMeta(r io.Reader, hashAlgorithms ...string) (data.TargetFileMeta, error) {
+	m, err := GenerateFileMeta(r, hashAlgorithms...)
+	if err != nil {
+		return data.TargetFileMeta{}, err
+	}
+	return data.TargetFileMeta{m}, nil
+}
+
+func GenerateTimestampFileMeta(r io.Reader, hashAlgorithms ...string) (data.TimestampFileMeta, error) {
+	m, v, err := generateVersionedFileMeta(r, hashAlgorithms...)
+	if err != nil {
+		return data.TimestampFileMeta{}, err
+	}
+	return data.TimestampFileMeta{m, v}, nil
 }
 
 func NormalizeTarget(p string) string {

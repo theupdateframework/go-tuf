@@ -848,13 +848,10 @@ func (RepoSuite) TestHashAlgorithm(c *C) {
 		timestamp, err := r.timestamp()
 		c.Assert(err, IsNil)
 		for name, file := range map[string]data.FileMeta{
-			"foo.txt": {
-				TargetFileMeta: targets.Targets["/foo.txt"],
-				Version:        0,
-			},
-			"root.json":     snapshot.Meta["root.json"],
-			"targets.json":  snapshot.Meta["targets.json"],
-			"snapshot.json": timestamp.Meta["snapshot.json"],
+			"foo.txt":       targets.Targets["/foo.txt"].FileMeta,
+			"root.json":     snapshot.Meta["root.json"].FileMeta,
+			"targets.json":  snapshot.Meta["targets.json"].FileMeta,
+			"snapshot.json": timestamp.Meta["snapshot.json"].FileMeta,
 		} {
 			for _, hashAlgorithm := range test.expected {
 				if _, ok := file.Hashes[hashAlgorithm]; !ok {

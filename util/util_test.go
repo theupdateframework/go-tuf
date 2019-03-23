@@ -60,33 +60,33 @@ func makeHashes(c *C, hashes map[string]string) data.Hashes {
 	return h
 }
 
-type testTargetMetaFile struct {
+type testMetaFile struct {
 	name     string
-	actual   data.TargetFileMeta
-	expected data.TargetFileMeta
-	err      func(testTargetMetaFile) error
+	actual   data.FileMeta
+	expected data.FileMeta
+	err      func(testMetaFile) error
 }
 
-func testTargetMetaFileCases(c *C) []testTargetMetaFile {
-	fileMeta := func(c *C, length int64, hashes map[string]string) data.TargetFileMeta {
-		return data.TargetFileMeta{
+func testMetaFileCases(c *C) []testMetaFile {
+	fileMeta := func(c *C, length int64, hashes map[string]string) data.FileMeta {
+		return data.FileMeta{
 			Length: length,
 			Hashes: makeHashes(c, hashes),
 		}
 	}
 
-	return []testTargetMetaFile{
+	return []testMetaFile{
 		{
 			name:     "wrong length",
-			actual:   data.TargetFileMeta{Length: 1},
-			expected: data.TargetFileMeta{Length: 2},
-			err:      func(testTargetMetaFile) error { return ErrWrongLength{Actual: 1, Expected: 2} },
+			actual:   data.FileMeta{Length: 1},
+			expected: data.FileMeta{Length: 2},
+			err:      func(testMetaFile) error { return ErrWrongLength{Actual: 1, Expected: 2} },
 		},
 		{
 			name:     "wrong sha512 hash",
 			actual:   fileMeta(c, 10, map[string]string{"sha512": "111111"}),
 			expected: fileMeta(c, 10, map[string]string{"sha512": "222222"}),
-			err: func(t testTargetMetaFile) error {
+			err: func(t testMetaFile) error {
 				return ErrWrongHash{"sha512", t.expected.Hashes["sha512"], t.actual.Hashes["sha512"]}
 			},
 		},
@@ -94,28 +94,28 @@ func testTargetMetaFileCases(c *C) []testTargetMetaFile {
 			name:     "intersecting hashes",
 			actual:   fileMeta(c, 10, map[string]string{"sha512": "111111", "md5": "222222"}),
 			expected: fileMeta(c, 10, map[string]string{"sha512": "111111", "sha256": "333333"}),
-			err:      func(testTargetMetaFile) error { return nil },
+			err:      func(testMetaFile) error { return nil },
 		},
 		{
 			name:     "no common hashes",
 			actual:   fileMeta(c, 10, map[string]string{"sha512": "111111"}),
 			expected: fileMeta(c, 10, map[string]string{"sha256": "222222", "md5": "333333"}),
-			err:      func(t testTargetMetaFile) error { return ErrNoCommonHash{t.expected.Hashes, t.actual.Hashes} },
+			err:      func(t testMetaFile) error { return ErrNoCommonHash{t.expected.Hashes, t.actual.Hashes} },
 		},
 	}
 }
 
-func (UtilSuite) TestFileMetaEqual(c *C) {
+func (UtilSuite) TestSnapshotFileMetaEqual(c *C) {
 	type test struct {
 		name     string
-		actual   data.FileMeta
-		expected data.FileMeta
+		actual   data.SnapshotFileMeta
+		expected data.SnapshotFileMeta
 		err      func(test) error
 	}
 
-	fileMeta := func(version int, length int64, hashes map[string]string) data.FileMeta {
-		return data.FileMeta{
-			data.TargetFileMeta{
+	fileMeta := func(version int, length int64, hashes map[string]string) data.SnapshotFileMeta {
+		return data.SnapshotFileMeta{
+			data.FileMeta{
 				Length: length,
 				Hashes: makeHashes(c, hashes),
 			},
@@ -151,19 +151,13 @@ func (UtilSuite) TestFileMetaEqual(c *C) {
 	}
 
 	for _, t := range tests {
-		c.Assert(FileMetaEqual(t.actual, t.expected), DeepEquals, t.err(t), Commentf("name = %s", t.name))
+		c.Assert(SnapshotFileMetaEqual(t.actual, t.expected), DeepEquals, t.err(t), Commentf("name = %s", t.name))
 	}
 
-	for _, t := range testTargetMetaFileCases(c) {
-		actual := data.FileMeta{TargetFileMeta: t.actual}
-		expected := data.FileMeta{TargetFileMeta: t.expected}
-		c.Assert(FileMetaEqual(actual, expected), DeepEquals, t.err(t), Commentf("name = %s", t.name))
-	}
-}
-
-func (UtilSuite) TestTargetFileMetaEqual(c *C) {
-	for _, t := range testTargetMetaFileCases(c) {
-		c.Assert(TargetFileMetaEqual(t.actual, t.expected), DeepEquals, t.err(t), Commentf("name = %s", t.name))
+	for _, t := range testMetaFileCases(c) {
+		actual := data.SnapshotFileMeta{FileMeta: t.actual}
+		expected := data.SnapshotFileMeta{FileMeta: t.expected}
+		c.Assert(SnapshotFileMetaEqual(actual, expected), DeepEquals, t.err(t), Commentf("name = %s", t.name))
 	}
 }
 

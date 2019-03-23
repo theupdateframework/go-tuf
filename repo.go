@@ -586,7 +586,7 @@ func (r *Repo) SnapshotWithExpires(t CompressionType, expires time.Time) error {
 			return err
 		}
 		var err error
-		snapshot.Meta[name], err = r.fileMeta(name)
+		snapshot.Meta[name], err = r.snapshotFileMeta(name)
 		if err != nil {
 			return err
 		}
@@ -619,7 +619,7 @@ func (r *Repo) TimestampWithExpires(expires time.Time) error {
 	if err != nil {
 		return err
 	}
-	timestamp.Meta["snapshot.json"], err = r.fileMeta("snapshot.json")
+	timestamp.Meta["snapshot.json"], err = r.timestampFileMeta("snapshot.json")
 	if err != nil {
 		return err
 	}
@@ -633,11 +633,6 @@ func (r *Repo) TimestampWithExpires(expires time.Time) error {
 
 func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 	hashes := make(map[string]data.Hashes)
-	addHashes := func(name string, meta data.Files) {
-		if m, ok := meta[name]; ok {
-			hashes[name] = m.Hashes
-		}
-	}
 	timestamp, err := r.timestamp()
 	if err != nil {
 		return nil, err
@@ -646,9 +641,15 @@ func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 	if err != nil {
 		return nil, err
 	}
-	addHashes("root.json", snapshot.Meta)
-	addHashes("targets.json", snapshot.Meta)
-	addHashes("snapshot.json", timestamp.Meta)
+	if m, ok := snapshot.Meta["root.json"]; ok {
+		hashes["root.json"] = m.Hashes
+	}
+	if m, ok := snapshot.Meta["targets.json"]; ok {
+		hashes["targets.json"] = m.Hashes
+	}
+	if m, ok := timestamp.Meta["snapshot.json"]; ok {
+		hashes["snapshot.json"] = m.Hashes
+	}
 	t, err := r.targets()
 	if err != nil {
 		return nil, err
@@ -688,11 +689,11 @@ func (r *Repo) Commit() error {
 		if !ok {
 			return fmt.Errorf("tuf: snapshot.json missing hash for %s", name)
 		}
-		actual, err := r.fileMeta(name)
+		actual, err := r.snapshotFileMeta(name)
 		if err != nil {
 			return err
 		}
-		if err := util.FileMetaEqual(actual, expected); err != nil {
+		if err := util.SnapshotFileMetaEqual(actual, expected); err != nil {
 			return fmt.Errorf("tuf: invalid %s in snapshot.json: %s", name, err)
 		}
 	}
@@ -702,11 +703,11 @@ func (r *Repo) Commit() error {
 	if err != nil {
 		return err
 	}
-	snapshotMeta, err := r.fileMeta("snapshot.json")
+	snapshotMeta, err := r.timestampFileMeta("snapshot.json")
 	if err != nil {
 		return err
 	}
-	if err := util.FileMetaEqual(snapshotMeta, timestamp.Meta["snapshot.json"]); err != nil {
+	if err := util.TimestampFileMetaEqual(snapshotMeta, timestamp.Meta["snapshot.json"]); err != nil {
 		return fmt.Errorf("tuf: invalid snapshot.json in timestamp.json: %s", err)
 	}
 
@@ -753,10 +754,18 @@ func (r *Repo) verifySignature(name string, db *verify.DB) error {
 	return nil
 }
 
-func (r *Repo) fileMeta(name string) (data.FileMeta, error) {
+func (r *Repo) snapshotFileMeta(name string) (data.SnapshotFileMeta, error) {
 	b, ok := r.meta[name]
 	if !ok {
-		return data.FileMeta{}, ErrMissingMetadata{name}
+		return data.SnapshotFileMeta{}, ErrMissingMetadata{name}
 	}
-	return util.GenerateFileMeta(bytes.NewReader(b), r.hashAlgorithms...)
+	return util.GenerateSnapshotFileMeta(bytes.NewReader(b), r.hashAlgorithms...)
+}
+
+func (r *Repo) timestampFileMeta(name string) (data.TimestampFileMeta, error) {
+	b, ok := r.meta[name]
+	if !ok {
+		return data.TimestampFileMeta{}, ErrMissingMetadata{name}
+	}
+	return util.GenerateTimestampFileMeta(bytes.NewReader(b), r.hashAlgorithms...)
 }
