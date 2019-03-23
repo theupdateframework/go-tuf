@@ -70,16 +70,6 @@ func (e ErrUnknownHashAlgorithm) Error() string {
 
 type PassphraseFunc func(role string, confirm bool) ([]byte, error)
 
-func FileMetaEqual(actual data.FileMeta, expected data.FileMeta) error {
-	if err := TargetFileMetaEqual(actual.TargetFileMeta, expected.TargetFileMeta); err != nil {
-		return err
-	}
-	if actual.Length != expected.Length {
-		return ErrWrongVersion{actual.Version, expected.Version}
-	}
-	return nil
-}
-
 func TargetFileMetaEqual(actual data.TargetFileMeta, expected data.TargetFileMeta) error {
 	if actual.Length != expected.Length {
 		return ErrWrongLength{expected.Length, actual.Length}
@@ -99,37 +89,32 @@ func TargetFileMetaEqual(actual data.TargetFileMeta, expected data.TargetFileMet
 	return nil
 }
 
+func versionEqual(actual int, expected int) error {
+	// FIXME(TUF-0.9) TUF-0.9 does not contain version numbers in the
+	// metadata, so we only check them if we received TUF-1.0 compatible
+	// metadata.
+	if expected != 0 && actual != expected {
+		return ErrWrongVersion{expected, actual}
+	}
+	return nil
+}
+
+func FileMetaEqual(actual data.FileMeta, expected data.FileMeta) error {
+	if err := TargetFileMetaEqual(actual.TargetFileMeta, expected.TargetFileMeta); err != nil {
+		return err
+	}
+
+	if err := versionEqual(actual.Version, expected.Version); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 const defaultHashAlgorithm = "sha512"
 
 type versionedMeta struct {
 	Version int `json:"version"`
-}
-
-func GenerateFileMeta(r io.Reader, hashAlgorithms ...string) (data.FileMeta, error) {
-	b, err := ioutil.ReadAll(r)
-	if err != nil {
-		return data.FileMeta{}, err
-	}
-
-	meta, err := GenerateTargetFileMeta(bytes.NewReader(b), hashAlgorithms...)
-	if err != nil {
-		return data.FileMeta{}, err
-	}
-
-	s := &data.Signed{}
-	if err := json.Unmarshal(b, s); err != nil {
-		return data.FileMeta{}, err
-	}
-
-	vm := &versionedMeta{}
-	if err := json.Unmarshal(s.Signed, vm); err != nil {
-		return data.FileMeta{}, err
-	}
-
-	return data.FileMeta{
-		TargetFileMeta: meta,
-		Version:        vm.Version,
-	}, nil
 }
 
 func GenerateTargetFileMeta(r io.Reader, hashAlgorithms ...string) (data.TargetFileMeta, error) {
@@ -159,6 +144,33 @@ func GenerateTargetFileMeta(r io.Reader, hashAlgorithms ...string) (data.TargetF
 		m.Hashes[hashAlgorithm] = h.Sum(nil)
 	}
 	return m, nil
+}
+
+func GenerateFileMeta(r io.Reader, hashAlgorithms ...string) (data.FileMeta, error) {
+	b, err := ioutil.ReadAll(r)
+	if err != nil {
+		return data.FileMeta{}, err
+	}
+
+	meta, err := GenerateTargetFileMeta(bytes.NewReader(b), hashAlgorithms...)
+	if err != nil {
+		return data.FileMeta{}, err
+	}
+
+	s := data.Signed{}
+	if err := json.Unmarshal(b, &s); err != nil {
+		return data.FileMeta{}, err
+	}
+
+	vm := versionedMeta{}
+	if err := json.Unmarshal(s.Signed, &vm); err != nil {
+		return data.FileMeta{}, err
+	}
+
+	return data.FileMeta{
+		TargetFileMeta: meta,
+		Version:        vm.Version,
+	}, nil
 }
 
 func NormalizeTarget(p string) string {

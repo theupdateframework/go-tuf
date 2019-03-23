@@ -50,50 +50,120 @@ func (UtilSuite) TestGenerateTargetFileMetaExplicit(c *C) {
 	}
 }
 
-func (UtilSuite) TestTargetFileMetaEqual(c *C) {
-	type test struct {
-		name string
-		b    data.TargetFileMeta
-		a    data.TargetFileMeta
-		err  func(test) error
+func makeHashes(c *C, hashes map[string]string) data.Hashes {
+	h := make(map[string]data.HexBytes, len(hashes))
+	for typ, hash := range hashes {
+		v, err := hex.DecodeString(hash)
+		c.Assert(err, IsNil)
+		h[typ] = v
 	}
-	fileMeta := func(length int64, hashes map[string]string) data.TargetFileMeta {
-		m := data.TargetFileMeta{Length: length, Hashes: make(map[string]data.HexBytes, len(hashes))}
-		for typ, hash := range hashes {
-			v, err := hex.DecodeString(hash)
-			c.Assert(err, IsNil)
-			m.Hashes[typ] = v
+	return h
+}
+
+type testTargetMetaFile struct {
+	name     string
+	actual   data.TargetFileMeta
+	expected data.TargetFileMeta
+	err      func(testTargetMetaFile) error
+}
+
+func testTargetMetaFileCases(c *C) []testTargetMetaFile {
+	fileMeta := func(c *C, length int64, hashes map[string]string) data.TargetFileMeta {
+		return data.TargetFileMeta{
+			Length: length,
+			Hashes: makeHashes(c, hashes),
 		}
-		return m
 	}
+
+	return []testTargetMetaFile{
+		{
+			name:     "wrong length",
+			actual:   data.TargetFileMeta{Length: 1},
+			expected: data.TargetFileMeta{Length: 2},
+			err:      func(testTargetMetaFile) error { return ErrWrongLength{Actual: 1, Expected: 2} },
+		},
+		{
+			name:     "wrong sha512 hash",
+			actual:   fileMeta(c, 10, map[string]string{"sha512": "111111"}),
+			expected: fileMeta(c, 10, map[string]string{"sha512": "222222"}),
+			err: func(t testTargetMetaFile) error {
+				return ErrWrongHash{"sha512", t.expected.Hashes["sha512"], t.actual.Hashes["sha512"]}
+			},
+		},
+		{
+			name:     "intersecting hashes",
+			actual:   fileMeta(c, 10, map[string]string{"sha512": "111111", "md5": "222222"}),
+			expected: fileMeta(c, 10, map[string]string{"sha512": "111111", "sha256": "333333"}),
+			err:      func(testTargetMetaFile) error { return nil },
+		},
+		{
+			name:     "no common hashes",
+			actual:   fileMeta(c, 10, map[string]string{"sha512": "111111"}),
+			expected: fileMeta(c, 10, map[string]string{"sha256": "222222", "md5": "333333"}),
+			err:      func(t testTargetMetaFile) error { return ErrNoCommonHash{t.expected.Hashes, t.actual.Hashes} },
+		},
+	}
+}
+
+func (UtilSuite) TestFileMetaEqual(c *C) {
+	type test struct {
+		name     string
+		actual   data.FileMeta
+		expected data.FileMeta
+		err      func(test) error
+	}
+
+	fileMeta := func(version int, length int64, hashes map[string]string) data.FileMeta {
+		return data.FileMeta{
+			data.TargetFileMeta{
+				Length: length,
+				Hashes: makeHashes(c, hashes),
+			},
+			version,
+		}
+	}
+
 	tests := []test{
 		{
-			name: "wrong length",
-			a:    data.TargetFileMeta{Length: 1},
-			b:    data.TargetFileMeta{Length: 2},
-			err:  func(test) error { return ErrWrongLength{Actual: 1, Expected: 2} },
+			name:     "same version",
+			actual:   fileMeta(1, 10, map[string]string{"sha512": "111111"}),
+			expected: fileMeta(1, 10, map[string]string{"sha512": "111111"}),
+			err:      func(test) error { return nil },
 		},
 		{
-			name: "wrong sha512 hash",
-			a:    fileMeta(10, map[string]string{"sha512": "111111"}),
-			b:    fileMeta(10, map[string]string{"sha512": "222222"}),
-			err:  func(t test) error { return ErrWrongHash{"sha512", t.b.Hashes["sha512"], t.a.Hashes["sha512"]} },
+			name:     "wrong version",
+			actual:   fileMeta(0, 10, map[string]string{"sha512": "111111"}),
+			expected: fileMeta(1, 10, map[string]string{"sha512": "111111"}),
+			err:      func(test) error { return ErrWrongVersion{Expected: 1, Actual: 0} },
 		},
 		{
-			name: "intersecting hashes",
-			a:    fileMeta(10, map[string]string{"sha512": "111111", "md5": "222222"}),
-			b:    fileMeta(10, map[string]string{"sha512": "111111", "sha256": "333333"}),
-			err:  func(test) error { return nil },
+			name:     "wrong version",
+			actual:   fileMeta(1, 10, map[string]string{"sha512": "111111"}),
+			expected: fileMeta(2, 10, map[string]string{"sha512": "111111"}),
+			err:      func(test) error { return ErrWrongVersion{Expected: 2, Actual: 1} },
 		},
 		{
-			name: "no common hashes",
-			a:    fileMeta(10, map[string]string{"sha512": "111111"}),
-			b:    fileMeta(10, map[string]string{"sha256": "222222", "md5": "333333"}),
-			err:  func(t test) error { return ErrNoCommonHash{t.b.Hashes, t.a.Hashes} },
+			name:     "ignore version if not expected",
+			actual:   fileMeta(1, 10, map[string]string{"sha512": "111111"}),
+			expected: fileMeta(0, 10, map[string]string{"sha512": "111111"}),
+			err:      func(test) error { return nil },
 		},
 	}
+
 	for _, t := range tests {
-		c.Assert(TargetFileMetaEqual(t.a, t.b), DeepEquals, t.err(t), Commentf("name = %s", t.name))
+		c.Assert(FileMetaEqual(t.actual, t.expected), DeepEquals, t.err(t), Commentf("name = %s", t.name))
+	}
+
+	for _, t := range testTargetMetaFileCases(c) {
+		actual := data.FileMeta{TargetFileMeta: t.actual}
+		expected := data.FileMeta{TargetFileMeta: t.expected}
+		c.Assert(FileMetaEqual(actual, expected), DeepEquals, t.err(t), Commentf("name = %s", t.name))
+	}
+}
+
+func (UtilSuite) TestTargetFileMetaEqual(c *C) {
+	for _, t := range testTargetMetaFileCases(c) {
+		c.Assert(TargetFileMetaEqual(t.actual, t.expected), DeepEquals, t.err(t), Commentf("name = %s", t.name))
 	}
 }
 
