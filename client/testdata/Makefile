@@ -3,6 +3,6 @@ all:
 	docker run tuf-gen | tar x
 
 clean:
-	rm -rf with{,out}-consistent-snapshot
+	rm -rf python-tuf-0.9/with{,out}-consistent-snapshot
 
 .PHONY: all clean

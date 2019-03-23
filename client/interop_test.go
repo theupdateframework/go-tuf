@@ -32,7 +32,7 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 	// start file server
 	cwd, err := os.Getwd()
 	c.Assert(err, IsNil)
-	testDataDir := filepath.Join(cwd, "testdata")
+	testDataDir := filepath.Join(cwd, "testdata", "python-tuf-v0.9.9")
 	addr, cleanup := startFileServer(c, testDataDir)
 	defer cleanup()
 
@@ -45,7 +45,7 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 		c.Assert(err, IsNil)
 
 		// initiate a client with the root keys
-		f, err := os.Open(filepath.Join("testdata", dir, "keystore", "root_key.pub"))
+		f, err := os.Open(filepath.Join(testDataDir, dir, "keystore", "root_key.pub"))
 		c.Assert(err, IsNil)
 		key := &data.Key{}
 		c.Assert(json.NewDecoder(f).Decode(key), IsNil)
@@ -104,7 +104,7 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 	// clone the Python client if necessary
 	cwd, err := os.Getwd()
 	c.Assert(err, IsNil)
-	tufDir := filepath.Join(cwd, "testdata", "tuf")
+	tufDir := filepath.Join(cwd, "testdata", "python-tuf-v0.9.9", "tuf")
 	if _, err := os.Stat(tufDir); os.IsNotExist(err) {
 		c.Assert(exec.Command(
 			"git",
@@ -156,7 +156,7 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 		c.Assert(ioutil.WriteFile(filepath.Join(currDir, "root.json"), rootJSON, 0644), IsNil)
 
 		// run Python client update
-		cmd := exec.Command("python", filepath.Join(cwd, "testdata", "client.py"), "--repo=http://"+addr+"/"+name)
+		cmd := exec.Command("python", filepath.Join(cwd, "testdata", "python-tuf-v0.9.9", "client.py"), "--repo=http://"+addr+"/"+name)
 		cmd.Env = pythonEnv
 		cmd.Dir = clientDir
 		cmd.Stdout = os.Stdout
