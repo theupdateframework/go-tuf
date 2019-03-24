@@ -210,7 +210,7 @@ func (VerifySuite) Test(c *C) {
 		}
 		if t.roles == nil {
 			t.roles = map[string]*data.Role{
-				"root": &data.Role{
+				"root": {
 					KeyIDs:    []string{t.keys[0].ID()},
 					Threshold: 1,
 				},
