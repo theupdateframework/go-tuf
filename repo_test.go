@@ -745,7 +745,7 @@ func (RepoSuite) TestHashAlgorithm(c *C) {
 		timestamp, err := r.timestamp()
 		c.Assert(err, IsNil)
 		for name, file := range map[string]data.FileMeta{
-			"foo.txt": data.FileMeta{
+			"foo.txt": {
 				TargetFileMeta: targets.Targets["/foo.txt"],
 				Version:        0,
 			},
