@@ -20,24 +20,30 @@ func MemoryStore(meta map[string]json.RawMessage, files map[string][]byte) Local
 		meta = make(map[string]json.RawMessage)
 	}
 	return &memoryStore{
-		meta:    meta,
-		files:   files,
-		signers: make(map[string][]sign.Signer),
+		meta:       meta,
+		stagedMeta: make(map[string]json.RawMessage),
+		files:      files,
+		signers:    make(map[string][]sign.Signer),
 	}
 }
 
 type memoryStore struct {
-	meta    map[string]json.RawMessage
-	files   map[string][]byte
-	signers map[string][]sign.Signer
+	meta       map[string]json.RawMessage
+	stagedMeta map[string]json.RawMessage
+	files      map[string][]byte
+	signers    map[string][]sign.Signer
 }
 
 func (m *memoryStore) GetMeta() (map[string]json.RawMessage, error) {
 	return m.meta, nil
 }
 
-func (m *memoryStore) SetMeta(name string, meta json.RawMessage) error {
-	m.meta[name] = meta
+func (m *memoryStore) GetStagedMeta() (map[string]json.RawMessage, error) {
+	return m.stagedMeta, nil
+}
+
+func (m *memoryStore) SetStagedMeta(name string, meta json.RawMessage) error {
+	m.stagedMeta[name] = meta
 	return nil
 }
 
@@ -64,6 +70,9 @@ func (m *memoryStore) WalkStagedTargets(paths []string, targetsFn targetsWalkFun
 }
 
 func (m *memoryStore) Commit(bool, map[string]data.Hashes) error {
+	for name, meta := range m.stagedMeta {
+		m.meta[name] = meta
+	}
 	return nil
 }
 
@@ -112,17 +121,10 @@ func (f *fileSystemStore) stagedDir() string {
 func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 	meta := make(map[string]json.RawMessage)
 	var err error
-	notExists := func(path string) bool {
-		_, err := os.Stat(path)
-		return os.IsNotExist(err)
-	}
 	for _, name := range topLevelManifests {
-		path := filepath.Join(f.stagedDir(), name)
-		if notExists(path) {
-			path = filepath.Join(f.repoDir(), name)
-			if notExists(path) {
-				continue
-			}
+		path := filepath.Join(f.repoDir(), name)
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			continue
 		}
 		meta[name], err = ioutil.ReadFile(path)
 		if err != nil {
@@ -132,7 +134,23 @@ func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 	return meta, nil
 }
 
-func (f *fileSystemStore) SetMeta(name string, meta json.RawMessage) error {
+func (f *fileSystemStore) GetStagedMeta() (map[string]json.RawMessage, error) {
+	meta := make(map[string]json.RawMessage)
+	var err error
+	for _, name := range topLevelManifests {
+		path := filepath.Join(f.repoDir(), name)
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			continue
+		}
+		meta[name], err = ioutil.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return meta, nil
+}
+
+func (f *fileSystemStore) SetStagedMeta(name string, meta json.RawMessage) error {
 	if err := f.createDirs(); err != nil {
 		return err
 	}
