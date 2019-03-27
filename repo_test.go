@@ -234,7 +234,7 @@ func (RepoSuite) TestGenKey(c *C) {
 	}
 
 	// check root.json got staged
-	meta, err := local.GetMeta()
+	meta, err := local.GetStagedMeta()
 	c.Assert(err, IsNil)
 	rootJSON, ok := meta["root.json"]
 	if !ok {

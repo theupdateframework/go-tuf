@@ -696,7 +696,8 @@ func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
 	targets.Signatures[0].Method = "xxxxxxx"
 	tamperedJSON, err := json.Marshal(targets)
 	c.Assert(err, IsNil)
-	s.store.SetMeta("targets.json", tamperedJSON)
+	s.store.SetStagedMeta("targets.json", tamperedJSON)
+	s.store.Commit(true, nil)
 	s.syncRemote(c)
 	_, err = client.Update()
 	assertWrongHash(c, err)
@@ -705,7 +706,8 @@ func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
 	targets.Signatures[0].Method = "xxx"
 	tamperedJSON, err = json.Marshal(targets)
 	c.Assert(err, IsNil)
-	s.store.SetMeta("targets.json", tamperedJSON)
+	s.store.SetStagedMeta("targets.json", tamperedJSON)
+	s.store.Commit(true, nil)
 	s.syncRemote(c)
 	_, err = client.Update()
 	c.Assert(err, DeepEquals, ErrWrongSize{"targets.json", int64(len(tamperedJSON)), int64(len(targetsJSON))})
