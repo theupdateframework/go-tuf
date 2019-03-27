@@ -407,6 +407,85 @@ func (RepoSuite) TestCommit(c *C) {
 	c.Assert(r.Commit(), DeepEquals, ErrNotEnoughKeys{"timestamp", 0, 1})
 }
 
+func (RepoSuite) TestCommitVersions(c *C) {
+	files := map[string][]byte{"/foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	c.Assert(r.AddTarget("/foo.txt", nil), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	// on initial commit everything should be at version 1.
+	rootVersion, err := r.RootVersion()
+	c.Assert(err, IsNil)
+	c.Assert(rootVersion, Equals, 1)
+
+	targetsVersion, err := r.TargetsVersion()
+	c.Assert(err, IsNil)
+	c.Assert(targetsVersion, Equals, 1)
+
+	snapshotVersion, err := r.SnapshotVersion()
+	c.Assert(err, IsNil)
+	c.Assert(snapshotVersion, Equals, 1)
+
+	timestampVersion, err := r.SnapshotVersion()
+	c.Assert(err, IsNil)
+	c.Assert(timestampVersion, Equals, 1)
+
+	// taking a snapshot should only incremept snapshot and timestamp.
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	rootVersion, err = r.RootVersion()
+	c.Assert(err, IsNil)
+	c.Assert(rootVersion, Equals, 1)
+
+	targetsVersion, err = r.TargetsVersion()
+	c.Assert(err, IsNil)
+	c.Assert(targetsVersion, Equals, 1)
+
+	snapshotVersion, err = r.SnapshotVersion()
+	c.Assert(err, IsNil)
+	c.Assert(snapshotVersion, Equals, 2)
+
+	timestampVersion, err = r.SnapshotVersion()
+	c.Assert(err, IsNil)
+	c.Assert(timestampVersion, Equals, 2)
+
+	// rotating multiple keys should increment the root once.
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	rootVersion, err = r.RootVersion()
+	c.Assert(err, IsNil)
+	c.Assert(rootVersion, Equals, 2)
+
+	targetsVersion, err = r.TargetsVersion()
+	c.Assert(err, IsNil)
+	c.Assert(targetsVersion, Equals, 1)
+
+	snapshotVersion, err = r.SnapshotVersion()
+	c.Assert(err, IsNil)
+	c.Assert(snapshotVersion, Equals, 3)
+
+	timestampVersion, err = r.SnapshotVersion()
+	c.Assert(err, IsNil)
+	c.Assert(timestampVersion, Equals, 3)
+}
+
 type tmpDir struct {
 	path string
 	c    *C
@@ -640,6 +719,15 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	}
 
 	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	c.Assert(r.AddTargets([]string{}, nil), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
 	root, err := r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Version, Equals, 1)
@@ -647,6 +735,9 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	expires := time.Now().Add(24 * time.Hour)
 	_, err = r.GenKeyWithExpires("root", expires)
 	c.Assert(err, IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
 	root, err = r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Expires.Unix(), DeepEquals, expires.Round(time.Second).Unix())
@@ -659,33 +750,42 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	}
 	c.Assert(role.KeyIDs, HasLen, 2)
 	c.Assert(r.RevokeKeyWithExpires("root", role.KeyIDs[0], expires), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
 	root, err = r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Expires.Unix(), DeepEquals, expires.Round(time.Second).Unix())
 	c.Assert(root.Version, Equals, 3)
 
 	expires = time.Now().Add(6 * time.Hour)
-	genKey(c, r, "targets")
 	c.Assert(r.AddTargetWithExpires("foo.txt", nil, expires), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
 	targets, err := r.targets()
-	c.Assert(err, IsNil)
-	c.Assert(targets.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
-	c.Assert(targets.Version, Equals, 1)
-
-	expires = time.Now().Add(2 * time.Hour)
-	c.Assert(r.RemoveTargetWithExpires("foo.txt", expires), IsNil)
-	targets, err = r.targets()
 	c.Assert(err, IsNil)
 	c.Assert(targets.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
 	c.Assert(targets.Version, Equals, 2)
 
+	expires = time.Now().Add(2 * time.Hour)
+	c.Assert(r.RemoveTargetWithExpires("foo.txt", expires), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+	targets, err = r.targets()
+	c.Assert(err, IsNil)
+	c.Assert(targets.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
+	c.Assert(targets.Version, Equals, 3)
+
 	expires = time.Now().Add(time.Hour)
-	genKey(c, r, "snapshot")
 	c.Assert(r.SnapshotWithExpires(CompressionTypeNone, expires), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
 	snapshot, err := r.snapshot()
 	c.Assert(err, IsNil)
 	c.Assert(snapshot.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
-	c.Assert(snapshot.Version, Equals, 1)
+	c.Assert(snapshot.Version, Equals, 6)
 
 	root, err = r.root()
 	c.Assert(err, IsNil)
@@ -693,22 +793,25 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(snapshot.Meta["targets.json"].Version, Equals, targets.Version)
 
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
 	snapshot, err = r.snapshot()
 	c.Assert(err, IsNil)
-	c.Assert(snapshot.Version, Equals, 2)
+	c.Assert(snapshot.Version, Equals, 7)
 
 	expires = time.Now().Add(10 * time.Minute)
-	genKey(c, r, "timestamp")
 	c.Assert(r.TimestampWithExpires(expires), IsNil)
+	c.Assert(r.Commit(), IsNil)
 	timestamp, err := r.timestamp()
 	c.Assert(err, IsNil)
 	c.Assert(timestamp.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
-	c.Assert(timestamp.Version, Equals, 1)
+	c.Assert(timestamp.Version, Equals, 8)
 
 	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
 	timestamp, err = r.timestamp()
 	c.Assert(err, IsNil)
-	c.Assert(timestamp.Version, Equals, 2)
+	c.Assert(timestamp.Version, Equals, 9)
 	c.Assert(timestamp.Meta["snapshot.json"].Version, Equals, snapshot.Version)
 }
 
