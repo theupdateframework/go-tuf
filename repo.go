@@ -56,10 +56,19 @@ type Repo struct {
 	local          LocalStore
 	hashAlgorithms []string
 	meta           map[string]json.RawMessage
+
+	// TUF 1.0 requires that the root metadata version numbers in the
+	// repository does not have any gaps. To avoid this, we will only
+	// increment the number once until we commit.
+	versionUpdated map[string]struct{}
 }
 
 func NewRepo(local LocalStore, hashAlgorithms ...string) (*Repo, error) {
-	r := &Repo{local: local, hashAlgorithms: hashAlgorithms}
+	r := &Repo{
+		local:          local,
+		hashAlgorithms: hashAlgorithms,
+		versionUpdated: make(map[string]struct{}),
+	}
 
 	var err error
 	r.meta, err = local.GetMeta()
@@ -133,6 +142,14 @@ func (r *Repo) snapshot() (*data.Snapshot, error) {
 	return snapshot, nil
 }
 
+func (r *Repo) RootVersion() (int, error) {
+	root, err := r.root()
+	if err != nil {
+		return -1, err
+	}
+	return root.Version, nil
+}
+
 func (r *Repo) Targets() (data.TargetFiles, error) {
 	targets, err := r.targets()
 	if err != nil {
@@ -164,6 +181,7 @@ func (r *Repo) SetTimestampVersion(v int) error {
 		return err
 	}
 	ts.Version = v
+	r.versionUpdated["timestamp.json"] = struct{}{}
 	return r.setMeta("timestamp.json", ts)
 }
 
@@ -182,6 +200,7 @@ func (r *Repo) SetSnapshotVersion(v int) error {
 	}
 
 	s.Version = v
+	r.versionUpdated["snapshot.json"] = struct{}{}
 	return r.setMeta("snapshot.json", s)
 }
 
@@ -261,7 +280,10 @@ func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (string, err
 
 	root.Keys[pk.ID()] = pk
 	root.Expires = expires.Round(time.Second)
-	root.Version++
+	if _, ok := r.versionUpdated["root.json"]; !ok {
+		root.Version++
+		r.versionUpdated["root.json"] = struct{}{}
+	}
 
 	return pk.ID(), r.setMeta("root.json", root)
 }
@@ -332,7 +354,10 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 	delete(root.Keys, id)
 	root.Roles[keyRole] = role
 	root.Expires = expires.Round(time.Second)
-	root.Version++
+	if _, ok := r.versionUpdated["root.json"]; !ok {
+		root.Version++
+		r.versionUpdated["root.json"] = struct{}{}
+	}
 
 	return r.setMeta("root.json", root)
 }
@@ -485,7 +510,10 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom json.RawMessage, exp
 		return err
 	}
 	t.Expires = expires.Round(time.Second)
-	t.Version++
+	if _, ok := r.versionUpdated["targets.json"]; !ok {
+		t.Version++
+		r.versionUpdated["targets.json"] = struct{}{}
+	}
 	return r.setMeta("targets.json", t)
 }
 
@@ -528,7 +556,10 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 		}
 	}
 	t.Expires = expires.Round(time.Second)
-	t.Version++
+	if _, ok := r.versionUpdated["targets.json"]; !ok {
+		t.Version++
+		r.versionUpdated["targets.json"] = struct{}{}
+	}
 	return r.setMeta("targets.json", t)
 }
 
@@ -561,7 +592,10 @@ func (r *Repo) SnapshotWithExpires(t CompressionType, expires time.Time) error {
 		}
 	}
 	snapshot.Expires = expires.Round(time.Second)
-	snapshot.Version++
+	if _, ok := r.versionUpdated["snapshot.json"]; !ok {
+		snapshot.Version++
+		r.versionUpdated["snapshot.json"] = struct{}{}
+	}
 	return r.setMeta("snapshot.json", snapshot)
 }
 
@@ -590,7 +624,10 @@ func (r *Repo) TimestampWithExpires(expires time.Time) error {
 		return err
 	}
 	timestamp.Expires = expires.Round(time.Second)
-	timestamp.Version++
+	if _, ok := r.versionUpdated["timestamp.json"]; !ok {
+		timestamp.Version++
+		r.versionUpdated["timestamp.json"] = struct{}{}
+	}
 	return r.setMeta("timestamp.json", timestamp)
 }
 
@@ -688,7 +725,16 @@ func (r *Repo) Commit() error {
 	if err != nil {
 		return err
 	}
-	return r.local.Commit(r.meta, root.ConsistentSnapshot, hashes)
+
+	if err := r.local.Commit(r.meta, root.ConsistentSnapshot, hashes); err != nil {
+		return err
+	}
+
+	// We can start incrementing versin numbers again now that we've
+	// successfully committed the metadata to the local store.
+	r.versionUpdated = make(map[string]struct{})
+
+	return nil
 }
 
 func (r *Repo) Clean() error {

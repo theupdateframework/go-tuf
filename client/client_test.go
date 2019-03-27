@@ -105,6 +105,7 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	c.Assert(s.repo.AddTarget("foo.txt", nil), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 
 	// create a remote store containing valid repo files
 	s.remote = newFakeRemoteStore()
@@ -160,6 +161,7 @@ func (s *ClientSuite) addRemoteTarget(c *C, name string) {
 	c.Assert(s.repo.AddTarget(name, nil), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 }
 
