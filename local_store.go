@@ -63,7 +63,7 @@ func (m *memoryStore) WalkStagedTargets(paths []string, targetsFn targetsWalkFun
 	return nil
 }
 
-func (m *memoryStore) Commit(map[string]json.RawMessage, bool, map[string]data.Hashes) error {
+func (m *memoryStore) Commit(bool, map[string]data.Hashes) error {
 	return nil
 }
 
@@ -211,7 +211,7 @@ func (f *fileSystemStore) createRepoFile(path string) (*os.File, error) {
 	return os.Create(dst)
 }
 
-func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, consistentSnapshot bool, hashes map[string]data.Hashes) error {
+func (f *fileSystemStore) Commit(consistentSnapshot bool, hashes map[string]data.Hashes) error {
 	isTarget := func(path string) bool {
 		return strings.HasPrefix(path, "targets/")
 	}

@@ -46,7 +46,7 @@ type LocalStore interface {
 	// If paths is empty, all staged target files will be walked.
 	WalkStagedTargets(paths []string, targetsFn targetsWalkFunc) error
 
-	Commit(map[string]json.RawMessage, bool, map[string]data.Hashes) error
+	Commit(bool, map[string]data.Hashes) error
 	GetSigningKeys(string) ([]sign.Signer, error)
 	SavePrivateKey(string, *sign.PrivateKey) error
 	Clean() error
@@ -727,7 +727,7 @@ func (r *Repo) Commit() error {
 		return err
 	}
 
-	if err := r.local.Commit(r.meta, root.ConsistentSnapshot, hashes); err != nil {
+	if err := r.local.Commit(root.ConsistentSnapshot, hashes); err != nil {
 		return err
 	}
 
