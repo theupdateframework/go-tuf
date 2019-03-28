@@ -12,6 +12,14 @@ import (
 	"github.com/flynn/go-tuf/verify"
 )
 
+const (
+	// This is the upper limit in bytes we will use to limit the download
+	// size of the root/timestamp roles, since we might not don't know how
+	// big it is.
+	defaultRootDownloadLimit      = 512000
+	defaultTimestampDownloadLimit = 16384
+)
+
 // LocalStore is local storage for downloaded top-level metadata.
 type LocalStore interface {
 	// GetMeta returns top-level metadata from local storage. The keys are
@@ -91,7 +99,7 @@ func (c *Client) Init(rootKeys []*data.Key, threshold int) error {
 	if len(rootKeys) < threshold {
 		return ErrInsufficientKeys
 	}
-	rootJSON, err := c.downloadMetaUnsafe("root.json")
+	rootJSON, err := c.downloadMetaUnsafe("root.json", defaultRootDownloadLimit)
 	if err != nil {
 		return err
 	}
@@ -154,7 +162,7 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 
 	// Get timestamp.json, extract snapshot.json file meta and save the
 	// timestamp.json locally
-	timestampJSON, err := c.downloadMetaUnsafe("timestamp.json")
+	timestampJSON, err := c.downloadMetaUnsafe("timestamp.json", defaultTimestampDownloadLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +238,7 @@ func (c *Client) updateWithLatestRoot(m *data.SnapshotFileMeta) (data.TargetFile
 	var rootJSON json.RawMessage
 	var err error
 	if m == nil {
-		rootJSON, err = c.downloadMetaUnsafe("root.json")
+		rootJSON, err = c.downloadMetaUnsafe("root.json", defaultRootDownloadLimit)
 	} else {
 		rootJSON, err = c.downloadMetaFromSnapshot("root.json", *m)
 	}
@@ -328,14 +336,10 @@ func (c *Client) loadTargets(targets data.TargetFiles) {
 	}
 }
 
-// maxMetaSize is the maximum number of bytes that will be downloaded when
-// getting remote metadata without knowing it's length.
-const maxMetaSize = 50 * 1024
-
 // downloadMetaUnsafe downloads top-level metadata from remote storage without
 // verifying it's length and hashes (used for example to download timestamp.json
 // which has unknown size). It will download at most maxMetaSize bytes.
-func (c *Client) downloadMetaUnsafe(name string) ([]byte, error) {
+func (c *Client) downloadMetaUnsafe(name string, maxMetaSize int64) ([]byte, error) {
 	r, size, err := c.remote.GetMeta(name)
 	if err != nil {
 		if IsNotFound(err) {
@@ -347,7 +351,7 @@ func (c *Client) downloadMetaUnsafe(name string) ([]byte, error) {
 
 	// return ErrMetaTooLarge if the reported size is greater than maxMetaSize
 	if size > maxMetaSize {
-		return nil, ErrMetaTooLarge{name, size}
+		return nil, ErrMetaTooLarge{name, size, maxMetaSize}
 	}
 
 	// although the size has been checked above, use a LimitReader in case
