@@ -89,12 +89,13 @@ func (e ErrUnknownTarget) Error() string {
 }
 
 type ErrMetaTooLarge struct {
-	Name string
-	Size int64
+	Name    string
+	Size    int64
+	MaxSize int64
 }
 
 func (e ErrMetaTooLarge) Error() string {
-	return fmt.Sprintf("tuf: %s size %d bytes greater than maximum %d bytes", e.Name, e.Size, maxMetaSize)
+	return fmt.Sprintf("tuf: %s size %d bytes greater than maximum %d bytes", e.Name, e.Size, e.MaxSize)
 }
 
 type ErrInvalidURL struct {
