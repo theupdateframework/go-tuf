@@ -26,7 +26,7 @@ type ClientSuite struct {
 	local       LocalStore
 	remote      *fakeRemoteStore
 	expiredTime time.Time
-	keyIDs      map[string]string
+	keyIDs      map[string][]string
 }
 
 var _ = Suite(&ClientSuite{})
@@ -96,7 +96,7 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	// don't use consistent snapshots to make testing easier (consistent
 	// snapshots are tested explicitly elsewhere)
 	c.Assert(s.repo.Init(false), IsNil)
-	s.keyIDs = map[string]string{
+	s.keyIDs = map[string][]string{
 		"root":      s.genKey(c, "root"),
 		"targets":   s.genKey(c, "targets"),
 		"snapshot":  s.genKey(c, "snapshot"),
@@ -117,16 +117,16 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	s.expiredTime = time.Now().Add(time.Hour)
 }
 
-func (s *ClientSuite) genKey(c *C, role string) string {
-	id, err := s.repo.GenKey(role)
+func (s *ClientSuite) genKey(c *C, role string) []string {
+	ids, err := s.repo.GenKey(role)
 	c.Assert(err, IsNil)
-	return id
+	return ids
 }
 
-func (s *ClientSuite) genKeyExpired(c *C, role string) string {
-	id, err := s.repo.GenKeyWithExpires(role, s.expiredTime)
+func (s *ClientSuite) genKeyExpired(c *C, role string) []string {
+	ids, err := s.repo.GenKeyWithExpires(role, s.expiredTime)
 	c.Assert(err, IsNil)
-	return id
+	return ids
 }
 
 // withMetaExpired sets signed.IsExpired throughout the invocation of f so that
@@ -304,9 +304,10 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	client := s.newClient(c)
 
 	// replace all keys
-	newKeyIDs := make(map[string]string)
-	for role, id := range s.keyIDs {
-		c.Assert(s.repo.RevokeKey(role, id), IsNil)
+	newKeyIDs := make(map[string][]string)
+	for role, ids := range s.keyIDs {
+		c.Assert(len(ids) > 0, Equals, true)
+		c.Assert(s.repo.RevokeKey(role, ids[0]), IsNil)
 		newKeyIDs[role] = s.genKey(c, role)
 	}
 
@@ -325,18 +326,24 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	c.Assert(client.rootVer > version, Equals, true)
 
 	// check old keys are not in db
-	for _, id := range s.keyIDs {
-		c.Assert(client.db.GetKey(id), IsNil)
+	for _, ids := range s.keyIDs {
+		c.Assert(len(ids) > 0, Equals, true)
+		for _, id := range ids {
+			c.Assert(client.db.GetKey(id), IsNil)
+		}
 	}
 
 	// check new keys are in db
-	for name, id := range newKeyIDs {
-		key := client.db.GetKey(id)
-		c.Assert(key, NotNil)
-		c.Assert(key.ID(), Equals, id)
+	for name, ids := range newKeyIDs {
+		c.Assert(len(ids) > 0, Equals, true)
+		for _, id := range ids {
+			key := client.db.GetKey(id)
+			c.Assert(key, NotNil)
+			c.Assert(key.IDs(), DeepEquals, ids)
+		}
 		role := client.db.GetRole(name)
 		c.Assert(role, NotNil)
-		c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{id: {}})
+		c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(ids))
 	}
 }
 
@@ -364,9 +371,9 @@ func (s *ClientSuite) TestNewTimestampKey(c *C) {
 	client := s.newClient(c)
 
 	// replace key
-	oldID := s.keyIDs["timestamp"]
-	c.Assert(s.repo.RevokeKey("timestamp", oldID), IsNil)
-	newID := s.genKey(c, "timestamp")
+	oldIDs := s.keyIDs["timestamp"]
+	c.Assert(s.repo.RevokeKey("timestamp", oldIDs[0]), IsNil)
+	newIDs := s.genKey(c, "timestamp")
 
 	// generate new snapshot (because root has changed) and timestamp
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
@@ -383,22 +390,26 @@ func (s *ClientSuite) TestNewTimestampKey(c *C) {
 	c.Assert(client.timestampVer > timestampVer, Equals, true)
 
 	// check key has been replaced in db
-	c.Assert(client.db.GetKey(oldID), IsNil)
-	key := client.db.GetKey(newID)
-	c.Assert(key, NotNil)
-	c.Assert(key.ID(), Equals, newID)
+	for _, oldID := range oldIDs {
+		c.Assert(client.db.GetKey(oldID), IsNil)
+	}
+	for _, newID := range newIDs {
+		key := client.db.GetKey(newID)
+		c.Assert(key, NotNil)
+		c.Assert(key.IDs(), DeepEquals, newIDs)
+	}
 	role := client.db.GetRole("timestamp")
 	c.Assert(role, NotNil)
-	c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{newID: {}})
+	c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(newIDs))
 }
 
 func (s *ClientSuite) TestNewSnapshotKey(c *C) {
 	client := s.newClient(c)
 
 	// replace key
-	oldID := s.keyIDs["snapshot"]
-	c.Assert(s.repo.RevokeKey("snapshot", oldID), IsNil)
-	newID := s.genKey(c, "snapshot")
+	oldIDs := s.keyIDs["snapshot"]
+	c.Assert(s.repo.RevokeKey("snapshot", oldIDs[0]), IsNil)
+	newIDs := s.genKey(c, "snapshot")
 
 	// generate new snapshot and timestamp
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
@@ -417,22 +428,26 @@ func (s *ClientSuite) TestNewSnapshotKey(c *C) {
 	c.Assert(client.timestampVer > timestampVer, Equals, true)
 
 	// check key has been replaced in db
-	c.Assert(client.db.GetKey(oldID), IsNil)
-	key := client.db.GetKey(newID)
-	c.Assert(key, NotNil)
-	c.Assert(key.ID(), Equals, newID)
+	for _, oldID := range oldIDs {
+		c.Assert(client.db.GetKey(oldID), IsNil)
+	}
+	for _, newID := range newIDs {
+		key := client.db.GetKey(newID)
+		c.Assert(key, NotNil)
+		c.Assert(key.IDs(), DeepEquals, newIDs)
+	}
 	role := client.db.GetRole("snapshot")
 	c.Assert(role, NotNil)
-	c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{newID: {}})
+	c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(newIDs))
 }
 
 func (s *ClientSuite) TestNewTargetsKey(c *C) {
 	client := s.newClient(c)
 
 	// replace key
-	oldID := s.keyIDs["targets"]
-	c.Assert(s.repo.RevokeKey("targets", oldID), IsNil)
-	newID := s.genKey(c, "targets")
+	oldIDs := s.keyIDs["targets"]
+	c.Assert(s.repo.RevokeKey("targets", oldIDs[0]), IsNil)
+	newIDs := s.genKey(c, "targets")
 
 	// re-sign targets and generate new snapshot and timestamp
 	c.Assert(s.repo.Sign("targets.json"), IsNil)
@@ -454,13 +469,17 @@ func (s *ClientSuite) TestNewTargetsKey(c *C) {
 	c.Assert(client.timestampVer > timestampVer, Equals, true)
 
 	// check key has been replaced in db
-	c.Assert(client.db.GetKey(oldID), IsNil)
-	key := client.db.GetKey(newID)
-	c.Assert(key, NotNil)
-	c.Assert(key.ID(), Equals, newID)
+	for _, oldID := range oldIDs {
+		c.Assert(client.db.GetKey(oldID), IsNil)
+	}
+	for _, newID := range newIDs {
+		key := client.db.GetKey(newID)
+		c.Assert(key, NotNil)
+		c.Assert(key.IDs(), DeepEquals, newIDs)
+	}
 	role := client.db.GetRole("targets")
 	c.Assert(role, NotNil)
-	c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{newID: {}})
+	c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(newIDs))
 }
 
 func (s *ClientSuite) TestLocalExpired(c *C) {
@@ -587,9 +606,9 @@ func (s *ClientSuite) TestUpdateLocalRootExpiredKeyChange(c *C) {
 	s.syncLocal(c)
 
 	// replace all keys
-	newKeyIDs := make(map[string]string)
-	for role, id := range s.keyIDs {
-		c.Assert(s.repo.RevokeKey(role, id), IsNil)
+	newKeyIDs := make(map[string][]string)
+	for role, ids := range s.keyIDs {
+		c.Assert(s.repo.RevokeKey(role, ids[0]), IsNil)
 		newKeyIDs[role] = s.genKey(c, role)
 	}
 

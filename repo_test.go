@@ -120,10 +120,11 @@ func (RepoSuite) TestInit(c *C) {
 	c.Assert(r.Init(true), Equals, ErrInitNotAllowed)
 }
 
-func genKey(c *C, r *Repo, role string) string {
-	id, err := r.GenKey(role)
+func genKey(c *C, r *Repo, role string) []string {
+	keyids, err := r.GenKey(role)
 	c.Assert(err, IsNil)
-	return id
+	c.Assert(len(keyids) > 0, Equals, true)
+	return keyids
 }
 
 func (RepoSuite) TestGenKey(c *C) {
@@ -136,50 +137,55 @@ func (RepoSuite) TestGenKey(c *C) {
 	c.Assert(err, Equals, ErrInvalidRole{"foo"})
 
 	// generate a root key
-	id := genKey(c, r, "root")
+	ids := genKey(c, r, "root")
 
 	// check root metadata is correct
 	root, err := r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Roles, NotNil)
 	c.Assert(root.Roles, HasLen, 1)
-	c.Assert(root.Keys, NotNil)
-	c.Assert(root.Keys, HasLen, 1)
+	c.Assert(root.UniqueKeys(), HasLen, 1)
 	rootRole, ok := root.Roles["root"]
 	if !ok {
 		c.Fatal("missing root role")
 	}
 	c.Assert(rootRole.KeyIDs, HasLen, 1)
-	keyID := rootRole.KeyIDs[0]
-	c.Assert(keyID, Equals, id)
-	k, ok := root.Keys[keyID]
-	if !ok {
-		c.Fatal("missing key")
+	c.Assert(rootRole.KeyIDs, DeepEquals, ids)
+	for _, keyID := range ids {
+		k, ok := root.Keys[keyID]
+		if !ok {
+			c.Fatal("missing key")
+		}
+		c.Assert(k.IDs(), DeepEquals, ids)
+		c.Assert(k.Value.Public, HasLen, ed25519.PublicKeySize)
 	}
-	c.Assert(k.ID(), Equals, keyID)
-	c.Assert(k.Value.Public, HasLen, ed25519.PublicKeySize)
 
 	// check root key + role are in db
 	db, err := r.db()
 	c.Assert(err, IsNil)
-	rootKey := db.GetKey(keyID)
+	for _, keyID := range ids {
+		rootKey := db.GetKey(keyID)
+		c.Assert(rootKey, NotNil)
+		c.Assert(rootKey.IDs(), DeepEquals, ids)
+		role := db.GetRole("root")
+		c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(ids))
+
+		// check the key was saved correctly
+		localKeys, err := local.GetSigningKeys("root")
+		c.Assert(err, IsNil)
+		c.Assert(localKeys, HasLen, 1)
+		c.Assert(localKeys[0].IDs(), DeepEquals, ids)
+
+		// check RootKeys() is correct
+		rootKeys, err := r.RootKeys()
+		c.Assert(err, IsNil)
+		c.Assert(rootKeys, HasLen, 1)
+		c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
+		c.Assert(rootKeys[0].Value.Public, DeepEquals, rootKey.Value.Public)
+	}
+
+	rootKey := db.GetKey(ids[0])
 	c.Assert(rootKey, NotNil)
-	c.Assert(rootKey.ID(), Equals, keyID)
-	role := db.GetRole("root")
-	c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{keyID: {}})
-
-	// check the key was saved correctly
-	localKeys, err := local.GetSigningKeys("root")
-	c.Assert(err, IsNil)
-	c.Assert(localKeys, HasLen, 1)
-	c.Assert(localKeys[0].ID(), Equals, keyID)
-
-	// check RootKeys() is correct
-	rootKeys, err := r.RootKeys()
-	c.Assert(err, IsNil)
-	c.Assert(rootKeys, HasLen, 1)
-	c.Assert(rootKeys[0].ID(), Equals, rootKey.ID())
-	c.Assert(rootKeys[0].Value.Public, DeepEquals, rootKey.Value.Public)
 
 	// generate two targets keys
 	genKey(c, r, "targets")
@@ -189,7 +195,7 @@ func (RepoSuite) TestGenKey(c *C) {
 	root, err = r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Roles, HasLen, 2)
-	c.Assert(root.Keys, HasLen, 3)
+	c.Assert(root.UniqueKeys(), HasLen, 3)
 	targetsRole, ok := root.Roles["targets"]
 	if !ok {
 		c.Fatal("missing targets role")
@@ -206,26 +212,27 @@ func (RepoSuite) TestGenKey(c *C) {
 		}
 		key := db.GetKey(id)
 		c.Assert(key, NotNil)
-		c.Assert(key.ID(), Equals, id)
+		c.Assert(key.ContainsID(id), Equals, true)
 	}
-	role = db.GetRole("targets")
+	role := db.GetRole("targets")
 	c.Assert(role.KeyIDs, DeepEquals, targetKeyIDs)
 
 	// check RootKeys() is unchanged
-	rootKeys, err = r.RootKeys()
+	rootKeys, err := r.RootKeys()
 	c.Assert(err, IsNil)
 	c.Assert(rootKeys, HasLen, 1)
-	c.Assert(rootKeys[0].ID(), Equals, rootKey.ID())
+	c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
 
 	// check the keys were saved correctly
-	localKeys, err = local.GetSigningKeys("targets")
+	localKeys, err := local.GetSigningKeys("targets")
 	c.Assert(err, IsNil)
 	c.Assert(localKeys, HasLen, 2)
 	for _, key := range localKeys {
 		found := false
 		for _, id := range targetsRole.KeyIDs {
-			if id == key.ID() {
+			if key.ContainsID(id) {
 				found = true
+				break
 			}
 		}
 		if !found {
@@ -247,6 +254,16 @@ func (RepoSuite) TestGenKey(c *C) {
 	c.Assert(stagedRoot.Type, Equals, root.Type)
 	c.Assert(stagedRoot.Version, Equals, root.Version)
 	c.Assert(stagedRoot.Expires.UnixNano(), Equals, root.Expires.UnixNano())
+
+	// make sure both root and stagedRoot have evaluated IDs(), otherwise
+	// DeepEquals will fail because those values might not have been
+	// computed yet.
+	for _, key := range root.Keys {
+		key.IDs()
+	}
+	for _, key := range stagedRoot.Keys {
+		key.IDs()
+	}
 	c.Assert(stagedRoot.Keys, DeepEquals, root.Keys)
 	c.Assert(stagedRoot.Roles, DeepEquals, root.Roles)
 }
@@ -264,8 +281,8 @@ func (RepoSuite) TestRevokeKey(c *C) {
 
 	// generate keys
 	genKey(c, r, "root")
-	genKey(c, r, "targets")
-	genKey(c, r, "targets")
+	target1IDs := genKey(c, r, "targets")
+	target2IDs := genKey(c, r, "targets")
 	genKey(c, r, "snapshot")
 	genKey(c, r, "timestamp")
 	root, err := r.root()
@@ -280,9 +297,14 @@ func (RepoSuite) TestRevokeKey(c *C) {
 	if !ok {
 		c.Fatal("missing targets role")
 	}
-	c.Assert(targetsRole.KeyIDs, HasLen, 2)
+	c.Assert(targetsRole.KeyIDs, HasLen, len(target1IDs)+len(target2IDs))
 	id := targetsRole.KeyIDs[0]
 	c.Assert(r.RevokeKey("targets", id), IsNil)
+
+	// make sure all the other key ids were also revoked
+	for _, id := range target1IDs {
+		c.Assert(r.RevokeKey("targets", id), DeepEquals, ErrKeyNotFound{"targets", id})
+	}
 
 	// check root was updated
 	root, err = r.root()
@@ -296,7 +318,7 @@ func (RepoSuite) TestRevokeKey(c *C) {
 		c.Fatal("missing targets role")
 	}
 	c.Assert(targetsRole.KeyIDs, HasLen, 1)
-	c.Assert(targetsRole.KeyIDs[0], Not(Equals), id)
+	c.Assert(targetsRole.KeyIDs, DeepEquals, target2IDs)
 }
 
 func (RepoSuite) TestSign(c *C) {
@@ -326,18 +348,18 @@ func (RepoSuite) TestSign(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(local.SavePrivateKey("root", key), IsNil)
 	c.Assert(r.Sign("root.json"), IsNil)
-	checkSigIDs(key.PublicData().ID())
+	checkSigIDs(key.PublicData().IDs()...)
 
 	// signing again does not generate a duplicate signature
 	c.Assert(r.Sign("root.json"), IsNil)
-	checkSigIDs(key.PublicData().ID())
+	checkSigIDs(key.PublicData().IDs()...)
 
 	// signing with a new available key generates another signature
 	newKey, err := sign.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	c.Assert(local.SavePrivateKey("root", newKey), IsNil)
 	c.Assert(r.Sign("root.json"), IsNil)
-	checkSigIDs(key.PublicData().ID(), newKey.PublicData().ID())
+	checkSigIDs(append(key.PublicData().IDs(), newKey.PublicData().IDs()...)...)
 }
 
 func (RepoSuite) TestCommit(c *C) {
@@ -897,7 +919,7 @@ func (RepoSuite) TestKeyPersistence(c *C) {
 		c.Assert(err, IsNil)
 		c.Assert(signers, HasLen, len(expected))
 		for i, s := range signers {
-			c.Assert(s.ID(), Equals, expected[i].PublicData().ID())
+			c.Assert(s.IDs(), DeepEquals, expected[i].PublicData().IDs())
 		}
 	}
 

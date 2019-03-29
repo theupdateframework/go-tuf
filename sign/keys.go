@@ -46,15 +46,24 @@ func GenerateEd25519Key() (*PrivateKey, error) {
 type ed25519Signer struct {
 	ed25519.PrivateKey
 
-	id     string
+	ids    []string
 	idOnce sync.Once
 }
 
 var _ Signer = &ed25519Signer{}
 
-func (s *ed25519Signer) ID() string {
-	s.idOnce.Do(func() { s.id = s.publicData().ID() })
-	return s.id
+func (s *ed25519Signer) IDs() []string {
+	s.idOnce.Do(func() { s.ids = s.publicData().IDs() })
+	return s.ids
+}
+
+func (s *ed25519Signer) ContainsID(id string) bool {
+	for _, keyid := range s.IDs() {
+		if id == keyid {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *ed25519Signer) publicData() *data.Key {

@@ -97,12 +97,13 @@ func (c *Client) Init(rootKeys []*data.Key, threshold int) error {
 	}
 
 	c.db = verify.NewDB()
-	rootKeyIDs := make([]string, len(rootKeys))
-	for i, key := range rootKeys {
-		id := key.ID()
-		rootKeyIDs[i] = id
-		if err := c.db.AddKey(id, key); err != nil {
-			return err
+	rootKeyIDs := make([]string, 0, len(rootKeys))
+	for _, key := range rootKeys {
+		for _, id := range key.IDs() {
+			rootKeyIDs = append(rootKeyIDs, id)
+			if err := c.db.AddKey(id, key); err != nil {
+				return err
+			}
 		}
 	}
 	role := &data.Role{Threshold: threshold, KeyIDs: rootKeyIDs}

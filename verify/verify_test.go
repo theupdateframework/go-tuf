@@ -41,8 +41,12 @@ func (s ecdsaSigner) Sign(rand io.Reader, msg []byte, opts crypto.SignerOpts) ([
 	return s.PrivateKey.Sign(rand, hash[:], crypto.SHA256)
 }
 
-func (s ecdsaSigner) ID() string {
-	return s.PublicData().ID()
+func (s ecdsaSigner) IDs() []string {
+	return s.PublicData().IDs()
+}
+
+func (s ecdsaSigner) ContainsID(id string) bool {
+	return s.PublicData().ContainsID(id)
 }
 
 func (ecdsaSigner) Type() string {
@@ -105,7 +109,7 @@ func (VerifySuite) Test(c *C) {
 				k, _ := sign.GenerateEd25519Key()
 				sign.Sign(t.s, k.Signer())
 				t.keys = append(t.keys, k.PublicData())
-				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, k.PublicData().ID())
+				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, k.PublicData().IDs()...)
 			},
 		},
 		{
@@ -173,7 +177,7 @@ func (VerifySuite) Test(c *C) {
 				sign.Sign(t.s, s)
 				t.s.Signatures = t.s.Signatures[1:]
 				t.keys = []*data.Key{s.PublicData()}
-				t.roles["root"].KeyIDs = []string{s.PublicData().ID()}
+				t.roles["root"].KeyIDs = s.PublicData().IDs()
 			},
 		},
 		{
@@ -184,7 +188,7 @@ func (VerifySuite) Test(c *C) {
 				sign.Sign(t.s, s)
 				t.s.Signatures[1].Signature[0]++
 				t.keys = append(t.keys, s.PublicData())
-				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, s.PublicData().ID())
+				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, s.PublicData().IDs()...)
 			},
 			err: ErrInvalid,
 		},
@@ -211,7 +215,7 @@ func (VerifySuite) Test(c *C) {
 		if t.roles == nil {
 			t.roles = map[string]*data.Role{
 				"root": {
-					KeyIDs:    []string{t.keys[0].ID()},
+					KeyIDs:    t.keys[0].IDs(),
 					Threshold: 1,
 				},
 			}
@@ -222,7 +226,7 @@ func (VerifySuite) Test(c *C) {
 
 		db := NewDB()
 		for _, k := range t.keys {
-			err := db.AddKey(k.ID(), k)
+			err := db.AddKey(k.IDs()[0], k)
 			c.Assert(err, IsNil)
 		}
 		for n, r := range t.roles {

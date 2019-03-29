@@ -31,17 +31,26 @@ type Key struct {
 	Type  string   `json:"keytype"`
 	Value KeyValue `json:"keyval"`
 
-	id     string
+	ids    []string
 	idOnce sync.Once
 }
 
-func (k *Key) ID() string {
+func (k *Key) IDs() []string {
 	k.idOnce.Do(func() {
 		data, _ := cjson.Marshal(k)
 		digest := sha256.Sum256(data)
-		k.id = hex.EncodeToString(digest[:])
+		k.ids = []string{hex.EncodeToString(digest[:])}
 	})
-	return k.id
+	return k.ids
+}
+
+func (k *Key) ContainsID(id string) bool {
+	for _, keyid := range k.IDs() {
+		if id == keyid {
+			return true
+		}
+	}
+	return false
 }
 
 type KeyValue struct {
@@ -81,6 +90,37 @@ func NewRoot() *Root {
 		Roles:              make(map[string]*Role),
 		ConsistentSnapshot: true,
 	}
+}
+
+func (r *Root) AddKey(key *Key) {
+	for _, id := range key.IDs() {
+		r.Keys[id] = key
+	}
+}
+
+// We might have multiple keyids that correspond to the same key, so
+// make sure we only return unique keys.
+func (r Root) UniqueKeys() []*Key {
+	seen := make(map[string]struct{})
+	keys := []*Key{}
+	for _, key := range r.Keys {
+		found := false
+		for _, id := range key.IDs() {
+			if _, ok := seen[id]; ok {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			for _, id := range key.IDs() {
+				seen[id] = struct{}{}
+			}
+			keys = append(keys, key)
+		}
+	}
+
+	return keys
 }
 
 type Role struct {
