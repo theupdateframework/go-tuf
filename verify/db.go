@@ -31,7 +31,7 @@ func (db *DB) AddKey(id string, k *data.Key) error {
 	if !ok {
 		return nil
 	}
-	if id != k.ID() {
+	if !k.ContainsID(id) {
 		return ErrWrongID
 	}
 	if !v.ValidKey(k.Value.Public) {

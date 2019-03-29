@@ -222,3 +222,11 @@ func HashedPaths(p string, hashes data.Hashes) []string {
 	}
 	return paths
 }
+
+func StringSliceToSet(items []string) map[string]struct{} {
+	s := make(map[string]struct{})
+	for _, item := range items {
+		s[item] = struct{}{}
+	}
+	return s
+}

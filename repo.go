@@ -245,30 +245,30 @@ func (r *Repo) timestamp() (*data.Timestamp, error) {
 	return timestamp, nil
 }
 
-func (r *Repo) GenKey(role string) (string, error) {
+func (r *Repo) GenKey(role string) ([]string, error) {
 	return r.GenKeyWithExpires(role, data.DefaultExpires("root"))
 }
 
-func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (string, error) {
+func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) ([]string, error) {
 	if !verify.ValidRole(keyRole) {
-		return "", ErrInvalidRole{keyRole}
+		return []string{}, ErrInvalidRole{keyRole}
 	}
 
 	if !validExpires(expires) {
-		return "", ErrInvalidExpires{expires}
+		return []string{}, ErrInvalidExpires{expires}
 	}
 
 	root, err := r.root()
 	if err != nil {
-		return "", err
+		return []string{}, err
 	}
 
 	key, err := sign.GenerateEd25519Key()
 	if err != nil {
-		return "", err
+		return []string{}, err
 	}
 	if err := r.local.SavePrivateKey(keyRole, key); err != nil {
-		return "", err
+		return []string{}, err
 	}
 	pk := key.PublicData()
 
@@ -277,16 +277,16 @@ func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (string, err
 		role = &data.Role{KeyIDs: []string{}, Threshold: 1}
 		root.Roles[keyRole] = role
 	}
-	role.KeyIDs = append(role.KeyIDs, pk.ID())
+	role.KeyIDs = append(role.KeyIDs, pk.IDs()...)
 
-	root.Keys[pk.ID()] = pk
+	root.AddKey(pk)
 	root.Expires = expires.Round(time.Second)
 	if _, ok := r.versionUpdated["root.json"]; !ok {
 		root.Version++
 		r.versionUpdated["root.json"] = struct{}{}
 	}
 
-	return pk.ID(), r.setMeta("root.json", root)
+	return pk.IDs(), r.setMeta("root.json", root)
 }
 
 func validExpires(expires time.Time) bool {
@@ -302,13 +302,27 @@ func (r *Repo) RootKeys() ([]*data.Key, error) {
 	if !ok {
 		return nil, nil
 	}
-	rootKeys := make([]*data.Key, len(role.KeyIDs))
-	for i, id := range role.KeyIDs {
+
+	// We might have multiple key ids that correspond to the same key, so
+	// make sure we only return unique keys.
+	seen := make(map[string]struct{})
+	rootKeys := []*data.Key{}
+	for _, id := range role.KeyIDs {
 		key, ok := root.Keys[id]
 		if !ok {
 			return nil, fmt.Errorf("tuf: invalid root metadata")
 		}
-		rootKeys[i] = key
+		found := false
+		if _, ok := seen[id]; ok {
+			found = true
+			break
+		}
+		if !found {
+			for _, id := range key.IDs() {
+				seen[id] = struct{}{}
+			}
+			rootKeys = append(rootKeys, key)
+		}
 	}
 	return rootKeys, nil
 }
@@ -331,7 +345,8 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 		return err
 	}
 
-	if _, ok := root.Keys[id]; !ok {
+	key, ok := root.Keys[id]
+	if !ok {
 		return ErrKeyNotFound{keyRole, id}
 	}
 
@@ -341,8 +356,11 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 	}
 
 	keyIDs := make([]string, 0, len(role.KeyIDs))
+
+	// There may be multiple keyids that correspond to this key, so
+	// filter all of them out.
 	for _, keyID := range role.KeyIDs {
-		if keyID == id {
+		if key.ContainsID(keyID) {
 			continue
 		}
 		keyIDs = append(keyIDs, keyID)
@@ -352,7 +370,9 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 	}
 	role.KeyIDs = keyIDs
 
-	delete(root.Keys, id)
+	for _, keyID := range key.IDs() {
+		delete(root.Keys, keyID)
+	}
 	root.Roles[keyRole] = role
 	root.Expires = expires.Round(time.Second)
 	if _, ok := r.versionUpdated["root.json"]; !ok {
@@ -437,8 +457,10 @@ func (r *Repo) getSigningKeys(name string) ([]sign.Signer, error) {
 	}
 	keys := make([]sign.Signer, 0, len(role.KeyIDs))
 	for _, key := range signingKeys {
-		if _, ok := role.KeyIDs[key.ID()]; ok {
-			keys = append(keys, key)
+		for _, id := range key.IDs() {
+			if _, ok := role.KeyIDs[id]; ok {
+				keys = append(keys, key)
+			}
 		}
 	}
 	return keys, nil
