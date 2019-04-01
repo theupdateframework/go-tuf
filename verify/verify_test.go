@@ -31,8 +31,10 @@ type ecdsaSigner struct {
 func (s ecdsaSigner) PublicData() *data.Key {
 	pub := s.Public().(*ecdsa.PublicKey)
 	return &data.Key{
-		Type:  data.KeyTypeECDSA_SHA2_P256,
-		Value: data.KeyValue{Public: elliptic.Marshal(pub.Curve, pub.X, pub.Y)},
+		Type:       data.KeyTypeECDSA_SHA2_P256,
+		Scheme:     data.KeySchemeECDSA_SHA2_P256,
+		Algorithms: data.KeyAlgorithms,
+		Value:      data.KeyValue{Public: elliptic.Marshal(pub.Curve, pub.X, pub.Y)},
 	}
 }
 
@@ -51,6 +53,10 @@ func (s ecdsaSigner) ContainsID(id string) bool {
 
 func (ecdsaSigner) Type() string {
 	return data.KeyTypeECDSA_SHA2_P256
+}
+
+func (ecdsaSigner) Scheme() string {
+	return data.KeySchemeECDSA_SHA2_P256
 }
 
 func (VerifySuite) Test(c *C) {
