@@ -25,8 +25,8 @@ type Verifier interface {
 
 // Verifiers is used to map key types to Verifier instances.
 var Verifiers = map[string]Verifier{
-	data.KeyTypeEd25519:         ed25519Verifier{},
-	data.KeyTypeECDSA_SHA2_P256: p256Verifier{},
+	data.KeySchemeEd25519:         ed25519Verifier{},
+	data.KeySchemeECDSA_SHA2_P256: p256Verifier{},
 }
 
 type ed25519Verifier struct{}
