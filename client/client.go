@@ -300,7 +300,9 @@ func (c *Client) getLocalMeta() error {
 			return err
 		}
 		c.targetsVer = targets.Version
-		c.targets = targets.Targets
+		// FIXME(TUF-0.9) temporarily support files with leading path separators.
+		// c.targets = targets.Targets
+		c.loadTargets(targets.Targets)
 	}
 
 	if timestampJSON, ok := meta["timestamp.json"]; ok {
@@ -313,6 +315,17 @@ func (c *Client) getLocalMeta() error {
 
 	c.localMeta = meta
 	return nil
+}
+
+// FIXME(TUF-0.9) TUF is considering removing support for target files starting
+// with a leading path separator. In order to be backwards compatible, we'll
+// just remove leading separators for now.
+func (c *Client) loadTargets(targets data.TargetFiles) {
+	c.targets = make(data.TargetFiles)
+	for name, meta := range targets {
+		c.targets[name] = meta
+		c.targets[util.NormalizeTarget(name)] = meta
+	}
 }
 
 // maxMetaSize is the maximum number of bytes that will be downloaded when
@@ -513,7 +526,9 @@ func (c *Client) decodeTargets(b json.RawMessage) (data.TargetFiles, error) {
 		updatedTargets[path] = meta
 	}
 	c.targetsVer = targets.Version
-	c.targets = targets.Targets
+	// FIXME(TUF-0.9) temporarily support files with leading path separators.
+	// c.targets = targets.Targets
+	c.loadTargets(targets.Targets)
 	return updatedTargets, nil
 }
 
