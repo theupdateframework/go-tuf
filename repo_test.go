@@ -102,7 +102,7 @@ func (RepoSuite) TestNewRepo(c *C) {
 func (RepoSuite) TestInit(c *C) {
 	local := MemoryStore(
 		make(map[string]json.RawMessage),
-		map[string][]byte{"/foo.txt": []byte("foo")},
+		map[string][]byte{"foo.txt": []byte("foo")},
 	)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -363,7 +363,7 @@ func (RepoSuite) TestSign(c *C) {
 }
 
 func (RepoSuite) TestCommit(c *C) {
-	files := map[string][]byte{"/foo.txt": []byte("foo"), "/bar.txt": []byte("bar")}
+	files := map[string][]byte{"foo.txt": []byte("foo"), "bar.txt": []byte("bar")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -403,7 +403,7 @@ func (RepoSuite) TestCommit(c *C) {
 	// commit with an invalid targets hash in snapshot.json
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.AddTarget("bar.txt", nil), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 1209 got 1384"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 1208 got 1382"))
 
 	// commit with an invalid timestamp
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
@@ -430,7 +430,7 @@ func (RepoSuite) TestCommit(c *C) {
 }
 
 func (RepoSuite) TestCommitVersions(c *C) {
-	files := map[string][]byte{"/foo.txt": []byte("foo")}
+	files := map[string][]byte{"foo.txt": []byte("foo")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -440,7 +440,7 @@ func (RepoSuite) TestCommitVersions(c *C) {
 	genKey(c, r, "snapshot")
 	genKey(c, r, "timestamp")
 
-	c.Assert(r.AddTarget("/foo.txt", nil), IsNil)
+	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
@@ -617,8 +617,8 @@ func (RepoSuite) TestCommitFileSystem(c *C) {
 	t, err := r.targets()
 	c.Assert(err, IsNil)
 	c.Assert(t.Targets, HasLen, 1)
-	if _, ok := t.Targets["/foo.txt"]; !ok {
-		c.Fatal("missing target file: /foo.txt")
+	if _, ok := t.Targets["foo.txt"]; !ok {
+		c.Fatal("missing target file: foo.txt")
 	}
 
 	// Snapshot() stages snapshot.json
@@ -717,13 +717,13 @@ func (RepoSuite) TestConsistentSnapshot(c *C) {
 	t, err := newRepo.targets()
 	c.Assert(err, IsNil)
 	c.Assert(t.Targets, HasLen, 1)
-	if _, ok := t.Targets["/dir/bar.txt"]; !ok {
+	if _, ok := t.Targets["dir/bar.txt"]; !ok {
 		c.Fatal("missing targets file: dir/bar.txt")
 	}
 }
 
 func (RepoSuite) TestExpiresAndVersion(c *C) {
-	files := map[string][]byte{"/foo.txt": []byte("foo")}
+	files := map[string][]byte{"foo.txt": []byte("foo")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -838,7 +838,7 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 }
 
 func (RepoSuite) TestHashAlgorithm(c *C) {
-	files := map[string][]byte{"/foo.txt": []byte("foo")}
+	files := map[string][]byte{"foo.txt": []byte("foo")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	type hashTest struct {
 		args     []string
@@ -870,7 +870,7 @@ func (RepoSuite) TestHashAlgorithm(c *C) {
 		timestamp, err := r.timestamp()
 		c.Assert(err, IsNil)
 		for name, file := range map[string]data.FileMeta{
-			"foo.txt":       targets.Targets["/foo.txt"].FileMeta,
+			"foo.txt":       targets.Targets["foo.txt"].FileMeta,
 			"root.json":     snapshot.Meta["root.json"].FileMeta,
 			"targets.json":  snapshot.Meta["targets.json"].FileMeta,
 			"snapshot.json": timestamp.Meta["snapshot.json"].FileMeta,
@@ -977,7 +977,7 @@ func (RepoSuite) TestManageMultipleTargets(c *C) {
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
-	assertRepoTargets("/foo.txt", "/bar.txt")
+	assertRepoTargets("foo.txt", "bar.txt")
 	tmp.assertExists("repository/targets/foo.txt")
 	tmp.assertExists("repository/targets/bar.txt")
 
@@ -985,7 +985,7 @@ func (RepoSuite) TestManageMultipleTargets(c *C) {
 	count := 10
 	files := make([]string, count)
 	for i := 0; i < count; i++ {
-		files[i] = fmt.Sprintf("/file%d.txt", i)
+		files[i] = fmt.Sprintf("file%d.txt", i)
 		tmp.writeStagedTarget(files[i], "data")
 	}
 	c.Assert(r.AddTargets(nil, nil), IsNil)
@@ -1014,9 +1014,9 @@ func (RepoSuite) TestManageMultipleTargets(c *C) {
 
 func (RepoSuite) TestCustomTargetMetadata(c *C) {
 	files := map[string][]byte{
-		"/foo.txt": []byte("foo"),
-		"/bar.txt": []byte("bar"),
-		"/baz.txt": []byte("baz"),
+		"foo.txt": []byte("foo"),
+		"bar.txt": []byte("bar"),
+		"baz.txt": []byte("baz"),
 	}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
@@ -1026,7 +1026,7 @@ func (RepoSuite) TestCustomTargetMetadata(c *C) {
 	assertCustomMeta := func(file string, custom *json.RawMessage) {
 		t, err := r.targets()
 		c.Assert(err, IsNil)
-		target, ok := t.Targets["/"+file]
+		target, ok := t.Targets[file]
 		if !ok {
 			c.Fatalf("missing target file: %s", file)
 		}
