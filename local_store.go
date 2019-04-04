@@ -69,9 +69,24 @@ func (m *memoryStore) WalkStagedTargets(paths []string, targetsFn targetsWalkFun
 	return nil
 }
 
-func (m *memoryStore) Commit(bool, map[string]data.Hashes) error {
+func (m *memoryStore) Commit(consistentSnapshot bool, hashes map[string]data.Hashes) error {
+	shouldCopyHashed := func(path string) bool {
+		return consistentSnapshot && path != "timestamp.json"
+	}
+	shouldCopyUnhashed := func(path string) bool {
+		return !consistentSnapshot
+	}
 	for name, meta := range m.stagedMeta {
-		m.meta[name] = meta
+		var paths []string
+		if shouldCopyHashed(name) {
+			paths = append(paths, util.HashedPaths(name, hashes[name])...)
+		}
+		if shouldCopyUnhashed(name) {
+			paths = append(paths, name)
+		}
+		for _, path := range paths {
+			m.meta[path] = meta
+		}
 	}
 	return nil
 }
