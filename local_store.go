@@ -69,7 +69,10 @@ func (m *memoryStore) WalkStagedTargets(paths []string, targetsFn targetsWalkFun
 	return nil
 }
 
-func (m *memoryStore) Commit(consistentSnapshot bool, hashes map[string]data.Hashes) error {
+func (m *memoryStore) Commit(consistentSnapshot bool, versions map[string]int, hashes map[string]data.Hashes) error {
+	shouldCopyVersion := func(path string) bool {
+		return path == "root.json" || (consistentSnapshot && path != "timestamp.json")
+	}
 	shouldCopyHashed := func(path string) bool {
 		return consistentSnapshot && path != "timestamp.json"
 	}
@@ -78,6 +81,11 @@ func (m *memoryStore) Commit(consistentSnapshot bool, hashes map[string]data.Has
 	}
 	for name, meta := range m.stagedMeta {
 		var paths []string
+		if shouldCopyVersion(name) {
+			paths = append(paths, util.VersionedPath(name, versions[name]))
+		}
+		// FIXME(TUF-0.9) Also generate the TUF-0.9 hash prefixed files
+		// for backwards compatibility.
 		if shouldCopyHashed(name) {
 			paths = append(paths, util.HashedPaths(name, hashes[name])...)
 		}
@@ -244,9 +252,12 @@ func (f *fileSystemStore) createRepoFile(path string) (*os.File, error) {
 	return os.Create(dst)
 }
 
-func (f *fileSystemStore) Commit(consistentSnapshot bool, hashes map[string]data.Hashes) error {
+func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]int, hashes map[string]data.Hashes) error {
 	isTarget := func(path string) bool {
 		return strings.HasPrefix(path, "targets/")
+	}
+	shouldCopyVersion := func(path string) bool {
+		return path == "root.json" || (consistentSnapshot && path != "timestamp.json")
 	}
 	shouldCopyHashed := func(path string) bool {
 		return consistentSnapshot && path != "timestamp.json"
@@ -266,6 +277,11 @@ func (f *fileSystemStore) Commit(consistentSnapshot bool, hashes map[string]data
 			return err
 		}
 		var paths []string
+		if shouldCopyVersion(rel) {
+			paths = append(paths, util.VersionedPath(rel, versions[rel]))
+		}
+		// FIXME(TUF-0.9) Also generate the TUF-0.9 hash prefixed files
+		// for backwards compatibility.
 		if shouldCopyHashed(rel) {
 			paths = append(paths, util.HashedPaths(rel, hashes[rel])...)
 		}

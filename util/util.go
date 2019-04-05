@@ -12,6 +12,7 @@ import (
 	"io"
 	"io/ioutil"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/flynn/go-tuf/data"
@@ -220,6 +221,10 @@ func NormalizeTarget(p string) string {
 	// just strip them out, but eventually we should also consider turning
 	// them into an error.
 	return strings.TrimPrefix(path.Join("/", p), "/")
+}
+
+func VersionedPath(p string, version int) string {
+	return path.Join(path.Dir(p), strconv.Itoa(version)+"."+path.Base(p))
 }
 
 func HashedPaths(p string, hashes data.Hashes) []string {

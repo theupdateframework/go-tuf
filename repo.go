@@ -47,7 +47,7 @@ type LocalStore interface {
 	// If paths is empty, all staged target files will be walked.
 	WalkStagedTargets(paths []string, targetsFn targetsWalkFunc) error
 
-	Commit(bool, map[string]data.Hashes) error
+	Commit(bool, map[string]int, map[string]data.Hashes) error
 	GetSigningKeys(string) ([]sign.Signer, error)
 	SavePrivateKey(string, *sign.PrivateKey) error
 	Clean() error
@@ -654,6 +654,26 @@ func (r *Repo) TimestampWithExpires(expires time.Time) error {
 	return r.setMeta("timestamp.json", timestamp)
 }
 
+func (r *Repo) fileVersions() (map[string]int, error) {
+	root, err := r.root()
+	if err != nil {
+		return nil, err
+	}
+	targets, err := r.targets()
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err := r.snapshot()
+	if err != nil {
+		return nil, err
+	}
+	versions := make(map[string]int)
+	versions["root.json"] = root.Version
+	versions["targets.json"] = targets.Version
+	versions["snapshot.json"] = snapshot.Version
+	return versions, nil
+}
+
 func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 	hashes := make(map[string]data.Hashes)
 	timestamp, err := r.timestamp()
@@ -745,12 +765,16 @@ func (r *Repo) Commit() error {
 		}
 	}
 
+	versions, err := r.fileVersions()
+	if err != nil {
+		return err
+	}
 	hashes, err := r.fileHashes()
 	if err != nil {
 		return err
 	}
 
-	if err := r.local.Commit(root.ConsistentSnapshot, hashes); err != nil {
+	if err := r.local.Commit(root.ConsistentSnapshot, versions, hashes); err != nil {
 		return err
 	}
 

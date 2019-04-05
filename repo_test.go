@@ -543,6 +543,10 @@ func (t *tmpDir) assertHashedFilesNotExist(path string, hashes data.Hashes) {
 	}
 }
 
+func (t *tmpDir) assertVersionedFileExist(path string, version int) {
+	t.assertExists(util.VersionedPath(path, version))
+}
+
 func (t *tmpDir) assertEmpty(dir string) {
 	path := filepath.Join(t.path, dir)
 	f, err := os.Stat(path)
@@ -683,13 +687,20 @@ func (RepoSuite) TestConsistentSnapshot(c *C) {
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
 
+	versions, err := r.fileVersions()
+	c.Assert(err, IsNil)
+	c.Assert(versions["root.json"], Equals, 1)
+	c.Assert(versions["targets.json"], Equals, 1)
+	c.Assert(versions["snapshot.json"], Equals, 1)
+
 	hashes, err := r.fileHashes()
 	c.Assert(err, IsNil)
 
-	// root.json, targets.json and snapshot.json should exist at both hashed and unhashed paths
+	// root.json, targets.json and snapshot.json should exist at both hashed, versioned and unhashed paths
 	for _, path := range []string{"root.json", "targets.json", "snapshot.json"} {
 		repoPath := filepath.Join("repository", path)
 		tmp.assertHashedFilesExist(repoPath, hashes[path])
+		tmp.assertVersionedFileExist(repoPath, versions[path])
 		tmp.assertExists(repoPath)
 	}
 
@@ -708,7 +719,27 @@ func (RepoSuite) TestConsistentSnapshot(c *C) {
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
-	tmp.assertHashedFilesNotExist("repository/targets/foo.txt", hashes["targets/foo.txt"])
+
+	versions, err = r.fileVersions()
+	c.Assert(err, IsNil)
+	c.Assert(versions["root.json"], Equals, 1)
+	c.Assert(versions["targets.json"], Equals, 2)
+	c.Assert(versions["snapshot.json"], Equals, 2)
+
+	// Save the old hashes for foo.txt to make sure we can assert it doesn't exist later.
+	fooHashes := hashes["targets/foo.txt"]
+	hashes, err = r.fileHashes()
+	c.Assert(err, IsNil)
+
+	// root.json, targets.json and snapshot.json should exist at both hashed, versioned and unhashed paths
+	for _, path := range []string{"root.json", "targets.json", "snapshot.json"} {
+		repoPath := filepath.Join("repository", path)
+		tmp.assertHashedFilesExist(repoPath, hashes[path])
+		tmp.assertVersionedFileExist(repoPath, versions[path])
+		tmp.assertExists(repoPath)
+	}
+
+	tmp.assertHashedFilesNotExist("repository/targets/foo.txt", fooHashes)
 	tmp.assertNotExist("repository/targets/foo.txt")
 
 	// targets should be returned by new repo
