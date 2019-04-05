@@ -414,32 +414,62 @@ func (c *Client) getRootAndLocalVersionsUnsafe() error {
 // remote files
 type remoteGetFunc func(string) (io.ReadCloser, int64, error)
 
-// download downloads the given file from remote storage using the get function,
-// adding hashes to the path if consistent snapshots are in use
-func (c *Client) download(file string, get remoteGetFunc, hashes data.Hashes) (io.ReadCloser, int64, error) {
-	if c.consistentSnapshot {
-		// try each hashed path in turn, and either return the contents,
-		// try the next one if a 404 is returned, or return an error
-		for _, path := range util.HashedPaths(file, hashes) {
-			r, size, err := get(path)
-			if err != nil {
-				if IsNotFound(err) {
-					continue
-				}
-				return nil, 0, err
+// downloadHashed tries to download the hashed prefixed version of the file.
+func (c *Client) downloadHashed(file string, get remoteGetFunc, hashes data.Hashes) (io.ReadCloser, int64, error) {
+	// try each hashed path in turn, and either return the contents,
+	// try the next one if a 404 is returned, or return an error
+	for _, path := range util.HashedPaths(file, hashes) {
+		r, size, err := get(path)
+		if err != nil {
+			if IsNotFound(err) {
+				continue
 			}
-			return r, size, nil
+			return nil, 0, err
 		}
-		return nil, 0, ErrNotFound{file}
+		return r, size, nil
+	}
+	return nil, 0, ErrNotFound{file}
+}
+
+// download downloads the given target file from remote storage using the get
+// function, adding hashes to the path if consistent snapshots are in use
+func (c *Client) downloadTarget(file string, get remoteGetFunc, hashes data.Hashes) (io.ReadCloser, int64, error) {
+	if c.consistentSnapshot {
+		return c.downloadHashed(file, get, hashes)
 	} else {
 		return get(file)
 	}
 }
 
-// downloadVersionedMeta downloads top-level metadata from remote storage and verifies
-// it using the given file metadata.
-func (c *Client) downloadMeta(name string, m data.FileMeta) ([]byte, error) {
-	r, size, err := c.download(name, c.remote.GetMeta, m.Hashes)
+// downloadVersionedMeta downloads top-level metadata from remote storage and
+// verifies it using the given file metadata.
+func (c *Client) downloadMeta(name string, version int, m data.FileMeta) ([]byte, error) {
+	// FIXME(TUF-0.9) TUF-1.0 requires all consistent snapshot metadata to
+	// be prefixed with a version number (except the timestamp role).
+	// However, if the repository is still serving TUF-0.9 metadata, we
+	// need to fall back to fetching the hashed metadata.
+	r, size, err := func() (io.ReadCloser, int64, error) {
+		if c.consistentSnapshot {
+			// FIXME(TUF-0.9) Only try downloading the versioned
+			// metadata if we know the version we want. We might
+			// not know if we are dealing with a TUF-0.9 snapshot.
+			if version != 0 {
+				path := util.VersionedPath(name, version)
+				r, size, err := c.remote.GetMeta(path)
+				if err == nil {
+					return r, size, nil
+				}
+
+				if !IsNotFound(err) {
+					return nil, 0, err
+				}
+			}
+
+			return c.downloadHashed(name, c.remote.GetMeta, m.Hashes)
+		} else {
+			return c.remote.GetMeta(name)
+		}
+	}()
 	if err != nil {
 		if IsNotFound(err) {
 			return nil, ErrMissingRemoteMetadata{name}
@@ -449,18 +479,23 @@ func (c *Client) downloadMeta(name string, m data.FileMeta) ([]byte, error) {
 	defer r.Close()
 
 	// return ErrWrongSize if the reported size is known and incorrect
-	if size >= 0 && size != m.Length {
-		return nil, ErrWrongSize{name, size, m.Length}
-	}
+	var stream io.Reader
+	if m.Length != 0 {
+		if size >= 0 && size != m.Length {
+			return nil, ErrWrongSize{name, size, m.Length}
+		}
 
-	// wrap the data in a LimitReader so we download at most m.Length bytes
-	stream := io.LimitReader(r, m.Length)
+		// wrap the data in a LimitReader so we download at most m.Length bytes
+		stream = io.LimitReader(r, m.Length)
+	} else {
+		stream = r
+	}
 
 	return ioutil.ReadAll(stream)
 }
 
 func (c *Client) downloadMetaFromSnapshot(name string, m data.SnapshotFileMeta) ([]byte, error) {
-	b, err := c.downloadMeta(name, m.FileMeta)
+	b, err := c.downloadMeta(name, m.Version, m.FileMeta)
 	if err != nil {
 		return nil, err
 	}
@@ -476,7 +511,7 @@ func (c *Client) downloadMetaFromSnapshot(name string, m data.SnapshotFileMeta) 
 }
 
 func (c *Client) downloadMetaFromTimestamp(name string, m data.TimestampFileMeta) ([]byte, error) {
-	b, err := c.downloadMeta(name, m.FileMeta)
+	b, err := c.downloadMeta(name, m.Version, m.FileMeta)
 	if err != nil {
 		return nil, err
 	}
@@ -625,7 +660,7 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 	}
 
 	// get the data from remote storage
-	r, size, err := c.download(normalizedName, c.remote.GetTarget, localMeta.Hashes)
+	r, size, err := c.downloadTarget(normalizedName, c.remote.GetTarget, localMeta.Hashes)
 	if err != nil {
 		return err
 	}
