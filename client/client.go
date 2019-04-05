@@ -296,7 +296,7 @@ func (c *Client) getLocalMeta() error {
 
 	if snapshotJSON, ok := meta["snapshot.json"]; ok {
 		snapshot := &data.Snapshot{}
-		if err := verify.UnmarshalTrusted(snapshotJSON, snapshot, "snapshot", c.db); err != nil {
+		if err := c.db.UnmarshalTrusted(snapshotJSON, snapshot, "snapshot"); err != nil {
 			return err
 		}
 		c.snapshotVer = snapshot.Version
@@ -304,7 +304,7 @@ func (c *Client) getLocalMeta() error {
 
 	if targetsJSON, ok := meta["targets.json"]; ok {
 		targets := &data.Targets{}
-		if err := verify.UnmarshalTrusted(targetsJSON, targets, "targets", c.db); err != nil {
+		if err := c.db.UnmarshalTrusted(targetsJSON, targets, "targets"); err != nil {
 			return err
 		}
 		c.targetsVer = targets.Version
@@ -315,7 +315,7 @@ func (c *Client) getLocalMeta() error {
 
 	if timestampJSON, ok := meta["timestamp.json"]; ok {
 		timestamp := &data.Timestamp{}
-		if err := verify.UnmarshalTrusted(timestampJSON, timestamp, "timestamp", c.db); err != nil {
+		if err := c.db.UnmarshalTrusted(timestampJSON, timestamp, "timestamp"); err != nil {
 			return err
 		}
 		c.timestampVer = timestamp.Version
@@ -494,7 +494,7 @@ func (c *Client) downloadMetaFromTimestamp(name string, m data.TimestampFileMeta
 // decodeRoot decodes and verifies root metadata.
 func (c *Client) decodeRoot(b json.RawMessage) error {
 	root := &data.Root{}
-	if err := verify.Unmarshal(b, root, "root", c.rootVer, c.db); err != nil {
+	if err := c.db.Unmarshal(b, root, "root", c.rootVer); err != nil {
 		return ErrDecodeFailed{"root.json", err}
 	}
 	c.rootVer = root.Version
@@ -506,7 +506,7 @@ func (c *Client) decodeRoot(b json.RawMessage) error {
 // root and targets file meta.
 func (c *Client) decodeSnapshot(b json.RawMessage) (data.SnapshotFileMeta, data.SnapshotFileMeta, error) {
 	snapshot := &data.Snapshot{}
-	if err := verify.Unmarshal(b, snapshot, "snapshot", c.snapshotVer, c.db); err != nil {
+	if err := c.db.Unmarshal(b, snapshot, "snapshot", c.snapshotVer); err != nil {
 		return data.SnapshotFileMeta{}, data.SnapshotFileMeta{}, ErrDecodeFailed{"snapshot.json", err}
 	}
 	c.snapshotVer = snapshot.Version
@@ -517,7 +517,7 @@ func (c *Client) decodeSnapshot(b json.RawMessage) (data.SnapshotFileMeta, data.
 // returns updated targets.
 func (c *Client) decodeTargets(b json.RawMessage) (data.TargetFiles, error) {
 	targets := &data.Targets{}
-	if err := verify.Unmarshal(b, targets, "targets", c.targetsVer, c.db); err != nil {
+	if err := c.db.Unmarshal(b, targets, "targets", c.targetsVer); err != nil {
 		return nil, ErrDecodeFailed{"targets.json", err}
 	}
 	updatedTargets := make(data.TargetFiles)
@@ -540,7 +540,7 @@ func (c *Client) decodeTargets(b json.RawMessage) (data.TargetFiles, error) {
 // new snapshot file meta.
 func (c *Client) decodeTimestamp(b json.RawMessage) (data.TimestampFileMeta, error) {
 	timestamp := &data.Timestamp{}
-	if err := verify.Unmarshal(b, timestamp, "timestamp", c.timestampVer, c.db); err != nil {
+	if err := c.db.Unmarshal(b, timestamp, "timestamp", c.timestampVer); err != nil {
 		return data.TimestampFileMeta{}, ErrDecodeFailed{"timestamp.json", err}
 	}
 	c.timestampVer = timestamp.Version

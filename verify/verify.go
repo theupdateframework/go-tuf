@@ -82,7 +82,7 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 	return nil
 }
 
-func Unmarshal(b []byte, v interface{}, role string, minVersion int, db *DB) error {
+func (db *DB) Unmarshal(b []byte, v interface{}, role string, minVersion int) error {
 	s := &data.Signed{}
 	if err := json.Unmarshal(b, s); err != nil {
 		return err
@@ -93,7 +93,7 @@ func Unmarshal(b []byte, v interface{}, role string, minVersion int, db *DB) err
 	return json.Unmarshal(s.Signed, v)
 }
 
-func UnmarshalTrusted(b []byte, v interface{}, role string, db *DB) error {
+func (db *DB) UnmarshalTrusted(b []byte, v interface{}, role string) error {
 	s := &data.Signed{}
 	if err := json.Unmarshal(b, s); err != nil {
 		return err
