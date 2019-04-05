@@ -93,11 +93,12 @@ func DefaultExpires(role string) time.Time {
 }
 
 type Root struct {
-	Type    string           `json:"_type"`
-	Version int              `json:"version"`
-	Expires time.Time        `json:"expires"`
-	Keys    map[string]*Key  `json:"keys"`
-	Roles   map[string]*Role `json:"roles"`
+	Type        string           `json:"_type"`
+	SpecVersion string           `json:"spec_version"`
+	Version     int              `json:"version"`
+	Expires     time.Time        `json:"expires"`
+	Keys        map[string]*Key  `json:"keys"`
+	Roles       map[string]*Role `json:"roles"`
 
 	ConsistentSnapshot bool `json:"consistent_snapshot"`
 }
@@ -105,6 +106,7 @@ type Root struct {
 func NewRoot() *Root {
 	return &Root{
 		Type:               "Root",
+		SpecVersion:        "0.9",
 		Expires:            DefaultExpires("root"),
 		Keys:               make(map[string]*Key),
 		Roles:              make(map[string]*Role),
@@ -174,17 +176,19 @@ type SnapshotFileMeta struct {
 type SnapshotFiles map[string]SnapshotFileMeta
 
 type Snapshot struct {
-	Type    string        `json:"_type"`
-	Version int           `json:"version"`
-	Expires time.Time     `json:"expires"`
-	Meta    SnapshotFiles `json:"meta"`
+	Type        string        `json:"_type"`
+	SpecVersion string        `json:"spec_version"`
+	Version     int           `json:"version"`
+	Expires     time.Time     `json:"expires"`
+	Meta        SnapshotFiles `json:"meta"`
 }
 
 func NewSnapshot() *Snapshot {
 	return &Snapshot{
-		Type:    "Snapshot",
-		Expires: DefaultExpires("snapshot"),
-		Meta:    make(SnapshotFiles),
+		Type:        "Snapshot",
+		SpecVersion: "0.9",
+		Expires:     DefaultExpires("snapshot"),
+		Meta:        make(SnapshotFiles),
 	}
 }
 
@@ -199,17 +203,19 @@ func (f TargetFileMeta) HashAlgorithms() []string {
 }
 
 type Targets struct {
-	Type    string      `json:"_type"`
-	Version int         `json:"version"`
-	Expires time.Time   `json:"expires"`
-	Targets TargetFiles `json:"targets"`
+	Type        string      `json:"_type"`
+	SpecVersion string      `json:"spec_version"`
+	Version     int         `json:"version"`
+	Expires     time.Time   `json:"expires"`
+	Targets     TargetFiles `json:"targets"`
 }
 
 func NewTargets() *Targets {
 	return &Targets{
-		Type:    "Targets",
-		Expires: DefaultExpires("targets"),
-		Targets: make(TargetFiles),
+		Type:        "Targets",
+		SpecVersion: "0.9",
+		Expires:     DefaultExpires("targets"),
+		Targets:     make(TargetFiles),
 	}
 }
 
@@ -221,16 +227,18 @@ type TimestampFileMeta struct {
 type TimestampFiles map[string]TimestampFileMeta
 
 type Timestamp struct {
-	Type    string         `json:"_type"`
-	Version int            `json:"version"`
-	Expires time.Time      `json:"expires"`
-	Meta    TimestampFiles `json:"meta"`
+	Type        string         `json:"_type"`
+	SpecVersion string         `json:"spec_version"`
+	Version     int            `json:"version"`
+	Expires     time.Time      `json:"expires"`
+	Meta        TimestampFiles `json:"meta"`
 }
 
 func NewTimestamp() *Timestamp {
 	return &Timestamp{
-		Type:    "Timestamp",
-		Expires: DefaultExpires("timestamp"),
-		Meta:    make(TimestampFiles),
+		Type:        "Timestamp",
+		SpecVersion: "0.9",
+		Expires:     DefaultExpires("timestamp"),
+		Meta:        make(TimestampFiles),
 	}
 }
