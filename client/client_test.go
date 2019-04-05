@@ -236,6 +236,9 @@ func (s *ClientSuite) TestInitRootTooLarge(c *C) {
 
 func (s *ClientSuite) TestInitRootExpired(c *C) {
 	s.genKeyExpired(c, "targets")
+	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 	client := NewClient(MemoryLocalStore(), s.remote)
 	s.withMetaExpired(func() {
@@ -315,6 +318,7 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	c.Assert(s.repo.Sign("targets.json"), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 
 	// check update gets new root version
@@ -378,6 +382,7 @@ func (s *ClientSuite) TestNewTimestampKey(c *C) {
 	// generate new snapshot (because root has changed) and timestamp
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 
 	// check update gets new root and timestamp
@@ -414,6 +419,7 @@ func (s *ClientSuite) TestNewSnapshotKey(c *C) {
 	// generate new snapshot and timestamp
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 
 	// check update gets new root, snapshot and timestamp
@@ -453,6 +459,7 @@ func (s *ClientSuite) TestNewTargetsKey(c *C) {
 	c.Assert(s.repo.Sign("targets.json"), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 
 	// check update gets new metadata
@@ -590,6 +597,7 @@ func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
 	c.Assert(s.repo.RemoveTarget("bar.txt"), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 	s.withMetaExpired(func() {
 		_, err := client.Update()
@@ -616,6 +624,7 @@ func (s *ClientSuite) TestUpdateLocalRootExpiredKeyChange(c *C) {
 	c.Assert(s.repo.Sign("targets.json"), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 
 	// check the update downloads the non expired remote root.json and
