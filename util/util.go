@@ -76,9 +76,18 @@ func FileMetaEqual(actual data.FileMeta, expected data.FileMeta) error {
 	if actual.Length != expected.Length {
 		return ErrWrongLength{expected.Length, actual.Length}
 	}
+
+	if err := hashEqual(actual.Hashes, expected.Hashes); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func hashEqual(actual data.Hashes, expected data.Hashes) error {
 	hashChecked := false
-	for typ, hash := range expected.Hashes {
-		if h, ok := actual.Hashes[typ]; ok {
+	for typ, hash := range expected {
+		if h, ok := actual[typ]; ok {
 			hashChecked = true
 			if !hmac.Equal(h, hash) {
 				return ErrWrongHash{typ, hash, h}
@@ -86,7 +95,7 @@ func FileMetaEqual(actual data.FileMeta, expected data.FileMeta) error {
 		}
 	}
 	if !hashChecked {
-		return ErrNoCommonHash{expected.Hashes, actual.Hashes}
+		return ErrNoCommonHash{expected, actual}
 	}
 	return nil
 }
@@ -102,8 +111,19 @@ func versionEqual(actual int, expected int) error {
 }
 
 func SnapshotFileMetaEqual(actual data.SnapshotFileMeta, expected data.SnapshotFileMeta) error {
-	if err := FileMetaEqual(actual.FileMeta, expected.FileMeta); err != nil {
-		return err
+	// TUF-1.0 no longer considers the length and hashes to be a required
+	// member of snapshots. However they are considering requiring hashes
+	// for delegated roles to avoid an attack described in Section 5.6 of
+	// the Mercury paper:
+	// https://github.com/theupdateframework/specification/pull/40
+	if expected.Length != 0 && actual.Length != expected.Length {
+		return ErrWrongLength{expected.Length, actual.Length}
+	}
+
+	if len(expected.Hashes) != 0 {
+		if err := hashEqual(actual.Hashes, expected.Hashes); err != nil {
+			return err
+		}
 	}
 
 	if err := versionEqual(actual.Version, expected.Version); err != nil {
@@ -118,6 +138,9 @@ func TargetFileMetaEqual(actual data.TargetFileMeta, expected data.TargetFileMet
 }
 
 func TimestampFileMetaEqual(actual data.TimestampFileMeta, expected data.TimestampFileMeta) error {
+	// As opposed to snapshots, the length and hashes are still required in
+	// TUF-1.0. See:
+	// https://github.com/theupdateframework/specification/issues/38
 	if err := FileMetaEqual(actual.FileMeta, expected.FileMeta); err != nil {
 		return err
 	}
