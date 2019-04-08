@@ -1,0 +1,27 @@
+{
+	"encrypted": false,
+	"data": [
+		{
+			"keytype": "ed25519",
+			"scheme": "ed25519",
+			"keyid_hash_algorithms": [
+				"sha512"
+			],
+			"keyval": {
+				"public": "596b9c2929932df6f4d36cbc11b53e597fd606553e9951bee00dfaff47b902e9",
+				"private": "ff7607566ae178dafbb9e285c96f29c1d0569fe0160dd022208261e4a81722e1596b9c2929932df6f4d36cbc11b53e597fd606553e9951bee00dfaff47b902e9"
+			}
+		},
+		{
+			"keytype": "ed25519",
+			"scheme": "ed25519",
+			"keyid_hash_algorithms": [
+				"sha512"
+			],
+			"keyval": {
+				"public": "f1e41e6e253255dc11f225c06efacbbf34b912aaa1691e7a2d4cf8972381886f",
+				"private": "cb1c93ffd3ab645ea65aad1a100d3491976beb921e04df9de680965a4a0f1861f1e41e6e253255dc11f225c06efacbbf34b912aaa1691e7a2d4cf8972381886f"
+			}
+		}
+	]
+}
