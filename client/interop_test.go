@@ -78,6 +78,101 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 	}
 }
 
+func (InteropSuite) TestGoClientCompatibility(c *C) {
+	// start file server
+	cwd, err := os.Getwd()
+	c.Assert(err, IsNil)
+	testDataDir := filepath.Join(cwd, "testdata")
+	addr, cleanup := startFileServer(c, testDataDir)
+	defer cleanup()
+
+	type dataKeys struct {
+		Data []*data.Key `json:"data"`
+	}
+
+	versions := []string{
+		"go-tuf-transition-M0",
+		"go-tuf-transition-M1",
+		"go-tuf-transition-M2",
+		"go-tuf-transition-M3",
+	}
+
+	for _, version := range versions {
+		for _, consistentSnapshot := range []bool{false, true} {
+			dir := fmt.Sprintf("consistent-snapshot-%t", consistentSnapshot)
+			local := MemoryLocalStore()
+
+			init := false
+			targets := map[string][]byte{}
+
+			for _, step := range []string{"0", "1", "2", "3", "4", "5"} {
+				dir := filepath.Join(dir, step)
+
+				remote, err := HTTPRemoteStore(
+					fmt.Sprintf("http://%s/%s/%s/repository", addr, version, dir),
+					&HTTPRemoteOptions{MetadataPath: "", TargetsPath: "targets"},
+					nil,
+				)
+				c.Assert(err, IsNil)
+
+				client := NewClient(local, remote)
+
+				// initiate a client with the root keys
+				if !init {
+					init = true
+					f, err := os.Open(filepath.Join(testDataDir, version, dir, "keys", "root.json"))
+					c.Assert(err, IsNil)
+					keys := &dataKeys{}
+					c.Assert(json.NewDecoder(f).Decode(keys), IsNil)
+
+					for _, key := range keys.Data {
+						c.Assert(key.Type, Equals, "ed25519")
+						c.Assert(key.Value.Public, HasLen, ed25519.PublicKeySize)
+					}
+					c.Assert(client.Init(keys.Data, 1), IsNil)
+				}
+
+				// check update returns the correct updated targets
+				files, err := client.Update()
+				c.Assert(err, IsNil)
+				c.Assert(files, HasLen, 1)
+
+				name := step
+				targets[name] = []byte(step)
+
+				// FIXME(TUF-0.9) M0 and M1 contain leading
+				// slashes in order to be backwards compatible
+				// with go-tuf G0.
+				var file data.TargetFileMeta
+				var ok bool
+				if version == "go-tuf-transition-M0" || version == "go-tuf-transition-M1" {
+					file, ok = files["/"+name]
+				} else {
+					file, ok = files[name]
+				}
+				if !ok {
+					c.Fatalf("expected updated targets to contain %s", name)
+				}
+
+				data := targets[name]
+				meta, err := util.GenerateTargetFileMeta(bytes.NewReader(data), file.HashAlgorithms()...)
+				c.Assert(err, IsNil)
+				c.Assert(util.TargetFileMetaEqual(file, meta), IsNil)
+
+				// download the files and check they have the correct content
+				for name, data := range targets {
+					for _, prefix := range []string{"", "/"} {
+						var dest testDestination
+						c.Assert(client.Download(prefix+name, &dest), IsNil)
+						c.Assert(dest.deleted, Equals, false)
+						c.Assert(dest.String(), Equals, string(data))
+					}
+				}
+			}
+		}
+	}
+}
+
 func generateRepoFS(c *C, dir string, files map[string][]byte, consistentSnapshot bool) *tuf.Repo {
 	repo, err := tuf.NewRepo(tuf.FileSystemStore(dir, nil))
 	c.Assert(err, IsNil)

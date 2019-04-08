@@ -1,0 +1,19 @@
+{
+	"encrypted": false,
+	"data": [
+		{
+			"keytype": "ed25519",
+			"keyval": {
+				"public": "2cb8f268eecc8b71b24b46b76591814988f9a36f7d612fa15570356dfe6c8c03",
+				"private": "78c404e5d81e52eb181b7cdcc37830197a2de728b8bc41ea09b85948dbdcefdf2cb8f268eecc8b71b24b46b76591814988f9a36f7d612fa15570356dfe6c8c03"
+			}
+		},
+		{
+			"keytype": "ed25519",
+			"keyval": {
+				"public": "4cb867728dd3405ab20aed8e099f63d1ee4392ba9b4d17b6599988e552b8043f",
+				"private": "e0ea7a15adb7f80516d8385e152388a0eee10b46127971d3931390eac69e9d1e4cb867728dd3405ab20aed8e099f63d1ee4392ba9b4d17b6599988e552b8043f"
+			}
+		}
+	]
+}

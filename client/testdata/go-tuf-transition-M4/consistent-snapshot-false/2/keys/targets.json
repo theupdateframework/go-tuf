@@ -1,0 +1,16 @@
+{
+	"encrypted": false,
+	"data": [
+		{
+			"keytype": "ed25519",
+			"scheme": "ed25519",
+			"keyid_hash_algorithms": [
+				"sha512"
+			],
+			"keyval": {
+				"public": "03f9d7cb27b94b914fda338371cc525afefddf2075a179dc7927d17b79b453ef",
+				"private": "30d93aa3b83a5672dabfe4e8a0175491ae5051d02d6e049952c065169fe04b6c03f9d7cb27b94b914fda338371cc525afefddf2075a179dc7927d17b79b453ef"
+			}
+		}
+	]
+}
