@@ -278,7 +278,11 @@ func (c *Client) getLocalMeta() error {
 		c.db = verify.NewDB()
 		for id, k := range root.Keys {
 			if err := c.db.AddKey(id, k); err != nil {
-				return err
+				// FIXME(TUF-0.9) Ignore unknown keyids, which
+				// can happen during the transition to TUF-1.0.
+				if _, ok := err.(verify.ErrWrongID); !ok {
+					return err
+				}
 			}
 		}
 		for name, role := range root.Roles {
