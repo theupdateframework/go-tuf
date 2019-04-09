@@ -14,12 +14,17 @@ var (
 	ErrRoleThreshold    = errors.New("tuf: valid signatures did not meet threshold")
 	ErrWrongMetaType    = errors.New("tuf: meta file has wrong type")
 	ErrExists           = errors.New("tuf: key already in db")
-	ErrWrongID          = errors.New("tuf: key id mismatch")
 	ErrInvalidKey       = errors.New("tuf: invalid key")
 	ErrInvalidRole      = errors.New("tuf: invalid role")
 	ErrInvalidKeyID     = errors.New("tuf: invalid key id")
 	ErrInvalidThreshold = errors.New("tuf: invalid role threshold")
 )
+
+type ErrWrongID struct{}
+
+func (ErrWrongID) Error() string {
+	return "tuf: key id mismatch"
+}
 
 type ErrUnknownRole struct {
 	Role string

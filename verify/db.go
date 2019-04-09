@@ -32,7 +32,7 @@ func (db *DB) AddKey(id string, k *data.Key) error {
 		return nil
 	}
 	if !k.ContainsID(id) {
-		return ErrWrongID
+		return ErrWrongID{}
 	}
 	if !v.ValidKey(k.Value.Public) {
 		return ErrInvalidKey
