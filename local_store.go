@@ -161,7 +161,7 @@ func (f *fileSystemStore) GetStagedMeta() (map[string]json.RawMessage, error) {
 	meta := make(map[string]json.RawMessage)
 	var err error
 	for _, name := range topLevelManifests {
-		path := filepath.Join(f.repoDir(), name)
+		path := filepath.Join(f.stagedDir(), name)
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			continue
 		}
