@@ -110,8 +110,8 @@ type Root struct {
 
 func NewRoot() *Root {
 	return &Root{
-		Type:               "Root",
-		SpecVersion:        "0.9",
+		Type:               "root",
+		SpecVersion:        "1.0",
 		Expires:            DefaultExpires("root"),
 		Keys:               make(map[string]*Key),
 		Roles:              make(map[string]*Role),
@@ -190,8 +190,8 @@ type Snapshot struct {
 
 func NewSnapshot() *Snapshot {
 	return &Snapshot{
-		Type:        "Snapshot",
-		SpecVersion: "0.9",
+		Type:        "snapshot",
+		SpecVersion: "1.0",
 		Expires:     DefaultExpires("snapshot"),
 		Meta:        make(SnapshotFiles),
 	}
@@ -217,8 +217,8 @@ type Targets struct {
 
 func NewTargets() *Targets {
 	return &Targets{
-		Type:        "Targets",
-		SpecVersion: "0.9",
+		Type:        "targets",
+		SpecVersion: "1.0",
 		Expires:     DefaultExpires("targets"),
 		Targets:     make(TargetFiles),
 	}
@@ -241,8 +241,8 @@ type Timestamp struct {
 
 func NewTimestamp() *Timestamp {
 	return &Timestamp{
-		Type:        "Timestamp",
-		SpecVersion: "0.9",
+		Type:        "timestamp",
+		SpecVersion: "1.0",
 		Expires:     DefaultExpires("timestamp"),
 		Meta:        make(TimestampFiles),
 	}
