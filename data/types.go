@@ -28,18 +28,13 @@ type Signed struct {
 }
 
 type Signature struct {
-	KeyID string `json:"keyid"`
-
-	// FIXME(TUF-0.9) removed in TUF 1.0, keeping it around for backwards
-	// compatibility with TUF 0.9.
-	Method string `json:"method"`
-
+	KeyID     string   `json:"keyid"`
 	Signature HexBytes `json:"sig"`
 }
 
 type Key struct {
 	Type       string   `json:"keytype"`
-	Scheme     string   `json:"scheme,omitempty"`
+	Scheme     string   `json:"scheme"`
 	Algorithms []string `json:"keyid_hash_algorithms,omitempty"`
 	Value      KeyValue `json:"keyval"`
 
@@ -52,19 +47,6 @@ func (k *Key) IDs() []string {
 		data, _ := cjson.Marshal(k)
 		digest := sha256.Sum256(data)
 		k.ids = []string{hex.EncodeToString(digest[:])}
-
-		// FIXME(TUF-0.9) If we receive TUF-1.0 compatible metadata,
-		// the key id we just calculated won't be compatible with
-		// TUF-0.9. So we also need to calculate the TUF-0.9 key id to
-		// be backwards compatible.
-		if k.Scheme != "" || len(k.Algorithms) != 0 {
-			data, _ = cjson.Marshal(Key{
-				Type:  k.Type,
-				Value: k.Value,
-			})
-			digest = sha256.Sum256(data)
-			k.ids = append(k.ids, hex.EncodeToString(digest[:]))
-		}
 	})
 	return k.ids
 }

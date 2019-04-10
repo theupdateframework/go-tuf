@@ -164,7 +164,7 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 	if !ok {
 		c.Fatal("missing root role")
 	}
-	c.Assert(rootRole.KeyIDs, HasLen, 2)
+	c.Assert(rootRole.KeyIDs, HasLen, 1)
 	c.Assert(rootRole.KeyIDs, DeepEquals, ids)
 	for _, keyID := range ids {
 		k, ok := root.Keys[keyID]
@@ -216,7 +216,7 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 	if !ok {
 		c.Fatal("missing targets role")
 	}
-	c.Assert(targetsRole.KeyIDs, HasLen, 4)
+	c.Assert(targetsRole.KeyIDs, HasLen, 2)
 	targetKeyIDs := make(map[string]struct{}, 2)
 	db, err = r.db()
 	c.Assert(err, IsNil)
@@ -323,7 +323,7 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 	if !ok {
 		c.Fatal("missing root role")
 	}
-	c.Assert(rootRole.KeyIDs, HasLen, 2)
+	c.Assert(rootRole.KeyIDs, HasLen, 1)
 	c.Assert(rootRole.KeyIDs, DeepEquals, ids)
 	for _, keyID := range ids {
 		k, ok := root.Keys[keyID]
@@ -375,7 +375,7 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 	if !ok {
 		c.Fatal("missing targets role")
 	}
-	c.Assert(targetsRole.KeyIDs, HasLen, 4)
+	c.Assert(targetsRole.KeyIDs, HasLen, 2)
 	targetKeyIDs := make(map[string]struct{}, 2)
 	db, err = r.db()
 	c.Assert(err, IsNil)
@@ -517,7 +517,7 @@ func (rs *RepoSuite) TestRevokeKey(c *C) {
 	if !ok {
 		c.Fatal("missing targets role")
 	}
-	c.Assert(targetsRole.KeyIDs, HasLen, 2)
+	c.Assert(targetsRole.KeyIDs, HasLen, 1)
 	c.Assert(targetsRole.KeyIDs, DeepEquals, target2IDs)
 }
 
@@ -600,12 +600,12 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	// commit with an invalid root hash in snapshot.json due to new key creation
 	genKey(c, r, "targets")
 	c.Assert(r.Sign("targets.json"), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid root.json in snapshot.json: wrong length, expected 3216 got 3828"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid root.json in snapshot.json: wrong length, expected 1740 got 2046"))
 
 	// commit with an invalid targets hash in snapshot.json
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.AddTarget("bar.txt", nil), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 1229 got 1403"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 725 got 899"))
 
 	// commit with an invalid timestamp
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
@@ -623,7 +623,7 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	if !ok {
 		c.Fatal("missing timestamp role")
 	}
-	c.Assert(role.KeyIDs, HasLen, 2)
+	c.Assert(role.KeyIDs, HasLen, 1)
 	c.Assert(role.Threshold, Equals, 1)
 	c.Assert(r.RevokeKey("timestamp", role.KeyIDs[0]), IsNil)
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
@@ -1031,7 +1031,7 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 	if !ok {
 		c.Fatal("missing root role")
 	}
-	c.Assert(role.KeyIDs, HasLen, 4)
+	c.Assert(role.KeyIDs, HasLen, 2)
 	c.Assert(r.RevokeKeyWithExpires("root", role.KeyIDs[0], expires), IsNil)
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
