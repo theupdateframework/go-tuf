@@ -723,12 +723,16 @@ func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
 	if !ok {
 		c.Fatal("missing targets.json")
 	}
-	targets := &data.Signed{}
+
+	type signedTargets struct {
+		Signed     data.Targets     `json:"signed"`
+		Signatures []data.Signature `json:"signatures"`
+	}
+	targets := &signedTargets{}
 	c.Assert(json.Unmarshal(targetsJSON, targets), IsNil)
 
 	// update remote targets.json to have different content but same size
-	c.Assert(targets.Signatures, HasLen, 2)
-	targets.Signatures[0].Method = "xxxxxxx"
+	targets.Signed.Type = "xxxxxxx"
 	tamperedJSON, err := json.Marshal(targets)
 	c.Assert(err, IsNil)
 	s.store.SetMeta("targets.json", tamperedJSON)
@@ -738,7 +742,7 @@ func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
 	assertWrongHash(c, err)
 
 	// update remote targets.json to have the wrong size
-	targets.Signatures[0].Method = "xxx"
+	targets.Signed.Type = "xxx"
 	tamperedJSON, err = json.Marshal(targets)
 	c.Assert(err, IsNil)
 	s.store.SetMeta("targets.json", tamperedJSON)
