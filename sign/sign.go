@@ -52,7 +52,6 @@ func Sign(s *data.Signed, k Signer) error {
 	for _, id := range ids {
 		s.Signatures = append(s.Signatures, data.Signature{
 			KeyID:     id,
-			Method:    k.Type(),
 			Signature: sig,
 		})
 	}
