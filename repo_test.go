@@ -241,7 +241,7 @@ func (RepoSuite) TestGenKey(c *C) {
 	}
 
 	// check root.json got staged
-	meta, err := local.GetStagedMeta()
+	meta, err := local.GetMeta()
 	c.Assert(err, IsNil)
 	rootJSON, ok := meta["root.json"]
 	if !ok {
@@ -331,6 +331,8 @@ func (RepoSuite) TestSign(c *C) {
 	c.Assert(r.Sign("root.json"), Equals, ErrInsufficientKeys{"root.json"})
 
 	checkSigIDs := func(keyIDs ...string) {
+		meta, err := local.GetMeta()
+		c.Assert(err, IsNil)
 		rootJSON, ok := meta["root.json"]
 		if !ok {
 			c.Fatal("missing root.json")
@@ -667,6 +669,28 @@ func (RepoSuite) TestCommitFileSystem(c *C) {
 	tmp.assertFileContent("repository/targets/path/to/bar.txt", "bar")
 	tmp.assertEmpty("staged/targets")
 	tmp.assertEmpty("staged")
+}
+
+func (RepoSuite) TestCommitFileSystemWithNewRepositories(c *C) {
+	tmp := newTmpDir(c)
+
+	newRepo := func() *Repo {
+		local := FileSystemStore(tmp.path, nil)
+		r, err := NewRepo(local)
+		c.Assert(err, IsNil)
+		return r
+	}
+
+	genKey(c, newRepo(), "root")
+	genKey(c, newRepo(), "targets")
+	genKey(c, newRepo(), "snapshot")
+	genKey(c, newRepo(), "timestamp")
+
+	tmp.writeStagedTarget("foo.txt", "foo")
+	c.Assert(newRepo().AddTarget("foo.txt", nil), IsNil)
+	c.Assert(newRepo().Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(newRepo().Timestamp(), IsNil)
+	c.Assert(newRepo().Commit(), IsNil)
 }
 
 func (RepoSuite) TestConsistentSnapshot(c *C) {

@@ -39,8 +39,7 @@ type targetsWalkFunc func(path string, target io.Reader) error
 
 type LocalStore interface {
 	GetMeta() (map[string]json.RawMessage, error)
-	GetStagedMeta() (map[string]json.RawMessage, error)
-	SetStagedMeta(string, json.RawMessage) error
+	SetMeta(string, json.RawMessage) error
 
 	// WalkStagedTargets calls targetsFn for each staged target file in paths.
 	//
@@ -397,7 +396,7 @@ func (r *Repo) setMeta(name string, meta interface{}) error {
 		return err
 	}
 	r.meta[name] = b
-	return r.local.SetStagedMeta(name, b)
+	return r.local.SetMeta(name, b)
 }
 
 func (r *Repo) Sign(name string) error {
@@ -427,7 +426,7 @@ func (r *Repo) Sign(name string) error {
 		return err
 	}
 	r.meta[name] = b
-	return r.local.SetStagedMeta(name, b)
+	return r.local.SetMeta(name, b)
 }
 
 // getSigningKeys returns available signing keys.

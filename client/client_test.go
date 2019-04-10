@@ -724,7 +724,7 @@ func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
 	targets.Signatures[0].Method = "xxxxxxx"
 	tamperedJSON, err := json.Marshal(targets)
 	c.Assert(err, IsNil)
-	s.store.SetStagedMeta("targets.json", tamperedJSON)
+	s.store.SetMeta("targets.json", tamperedJSON)
 	s.store.Commit(false, nil, nil)
 	s.syncRemote(c)
 	_, err = client.Update()
@@ -734,7 +734,7 @@ func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
 	targets.Signatures[0].Method = "xxx"
 	tamperedJSON, err = json.Marshal(targets)
 	c.Assert(err, IsNil)
-	s.store.SetStagedMeta("targets.json", tamperedJSON)
+	s.store.SetMeta("targets.json", tamperedJSON)
 	s.store.Commit(false, nil, nil)
 	s.syncRemote(c)
 	_, err = client.Update()
