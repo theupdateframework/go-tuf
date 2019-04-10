@@ -35,14 +35,17 @@ type memoryStore struct {
 }
 
 func (m *memoryStore) GetMeta() (map[string]json.RawMessage, error) {
-	return m.meta, nil
+	meta := make(map[string]json.RawMessage, len(m.meta)+len(m.stagedMeta))
+	for key, value := range m.meta {
+		meta[key] = value
+	}
+	for key, value := range m.stagedMeta {
+		meta[key] = value
+	}
+	return meta, nil
 }
 
-func (m *memoryStore) GetStagedMeta() (map[string]json.RawMessage, error) {
-	return m.stagedMeta, nil
-}
-
-func (m *memoryStore) SetStagedMeta(name string, meta json.RawMessage) error {
+func (m *memoryStore) SetMeta(name string, meta json.RawMessage) error {
 	m.stagedMeta[name] = meta
 	return nil
 }
@@ -144,26 +147,17 @@ func (f *fileSystemStore) stagedDir() string {
 func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 	meta := make(map[string]json.RawMessage)
 	var err error
-	for _, name := range topLevelManifests {
-		path := filepath.Join(f.repoDir(), name)
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			continue
-		}
-		meta[name], err = ioutil.ReadFile(path)
-		if err != nil {
-			return nil, err
-		}
+	notExists := func(path string) bool {
+		_, err := os.Stat(path)
+		return os.IsNotExist(err)
 	}
-	return meta, nil
-}
-
-func (f *fileSystemStore) GetStagedMeta() (map[string]json.RawMessage, error) {
-	meta := make(map[string]json.RawMessage)
-	var err error
 	for _, name := range topLevelManifests {
 		path := filepath.Join(f.stagedDir(), name)
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			continue
+		if notExists(path) {
+			path = filepath.Join(f.repoDir(), name)
+			if notExists(path) {
+				continue
+			}
 		}
 		meta[name], err = ioutil.ReadFile(path)
 		if err != nil {
@@ -173,7 +167,7 @@ func (f *fileSystemStore) GetStagedMeta() (map[string]json.RawMessage, error) {
 	return meta, nil
 }
 
-func (f *fileSystemStore) SetStagedMeta(name string, meta json.RawMessage) error {
+func (f *fileSystemStore) SetMeta(name string, meta json.RawMessage) error {
 	if err := f.createDirs(); err != nil {
 		return err
 	}
