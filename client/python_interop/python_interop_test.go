@@ -26,8 +26,8 @@ type InteropSuite struct{}
 var _ = Suite(&InteropSuite{})
 
 var pythonTargets = map[string][]byte{
-	"/file1.txt":     []byte("file1.txt"),
-	"/dir/file2.txt": []byte("file2.txt"),
+	"file1.txt":     []byte("file1.txt"),
+	"dir/file2.txt": []byte("file2.txt"),
 }
 
 // Hook up gocheck into the "go test" runner.
@@ -47,7 +47,7 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 	// start file server
 	cwd, err := os.Getwd()
 	c.Assert(err, IsNil)
-	testDataDir := filepath.Join(cwd, "testdata", "python-tuf-v0.9.9")
+	testDataDir := filepath.Join(cwd, "testdata", "python-tuf-v0.11.1")
 	addr, cleanup := startFileServer(c, testDataDir)
 	defer cleanup()
 
@@ -119,13 +119,14 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 	// clone the Python client if necessary
 	cwd, err := os.Getwd()
 	c.Assert(err, IsNil)
-	tufDir := filepath.Join(cwd, "testdata", "python-tuf-v0.9.9", "tuf")
+	tufDir := filepath.Join(cwd, "testdata", "python-tuf-v0.11.1", "tuf")
 	if _, err := os.Stat(tufDir); os.IsNotExist(err) {
 		c.Assert(exec.Command(
 			"git",
 			"clone",
 			"--quiet",
-			"--branch=v0.9.9",
+			"--branch=v0.11.1",
+			"--single-branch",
 			"--depth=1",
 			"https://github.com/theupdateframework/tuf.git",
 			tufDir,
@@ -162,16 +163,25 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 
 		// create initial files for Python client
 		clientDir := filepath.Join(dir, "client")
-		currDir := filepath.Join(clientDir, "metadata", "current")
-		prevDir := filepath.Join(clientDir, "metadata", "previous")
+		currDir := filepath.Join(clientDir, "tufrepo", "metadata", "current")
+		prevDir := filepath.Join(clientDir, "tufrepo", "metadata", "previous")
 		c.Assert(os.MkdirAll(currDir, 0755), IsNil)
 		c.Assert(os.MkdirAll(prevDir, 0755), IsNil)
 		rootJSON, err := ioutil.ReadFile(filepath.Join(dir, "repository", "root.json"))
 		c.Assert(err, IsNil)
 		c.Assert(ioutil.WriteFile(filepath.Join(currDir, "root.json"), rootJSON, 0644), IsNil)
 
+		args := []string{
+			filepath.Join(cwd, "testdata", "python-tuf-v0.11.1", "client.py"),
+			"--repo=http://" + addr + "/" + name,
+			"--verbose=5",
+		}
+		for path := range files {
+			args = append(args, path)
+		}
+
 		// run Python client update
-		cmd := exec.Command("python", filepath.Join(cwd, "testdata", "python-tuf-v0.9.9", "client.py"), "--repo=http://"+addr+"/"+name)
+		cmd := exec.Command("python", args...)
 		cmd.Env = pythonEnv
 		cmd.Dir = clientDir
 		cmd.Stdout = os.Stdout
@@ -180,7 +190,7 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 
 		// check the target files got downloaded
 		for path, expected := range files {
-			actual, err := ioutil.ReadFile(filepath.Join(clientDir, "targets", path))
+			actual, err := ioutil.ReadFile(filepath.Join(clientDir, "tuftargets", path))
 			c.Assert(err, IsNil)
 			c.Assert(actual, DeepEquals, expected)
 		}
