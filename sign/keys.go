@@ -9,26 +9,19 @@ import (
 )
 
 type PrivateKey struct {
-	Type       string          `json:"keytype"`
-	Scheme     string          `json:"scheme,omitempty"`
-	Algorithms []string        `json:"keyid_hash_algorithms,omitempty"`
-	Value      PrivateKeyValue `json:"keyval"`
+	Type  string          `json:"keytype"`
+	Value PrivateKeyValue `json:"keyval"`
 }
 
 type PrivateKeyValue struct {
-	Public data.HexBytes `json:"public"`
-
-	// FIXME(TUF-0.9) This us removed in TUF 1.0, keeping around for
-	// compatibility with TUF 0.9.
+	Public  data.HexBytes `json:"public"`
 	Private data.HexBytes `json:"private"`
 }
 
 func (k *PrivateKey) PublicData() *data.Key {
 	return &data.Key{
-		Type:       k.Type,
-		Scheme:     k.Scheme,
-		Algorithms: k.Algorithms,
-		Value:      data.KeyValue{Public: k.Value.Public},
+		Type:  k.Type,
+		Value: data.KeyValue{Public: k.Value.Public},
 	}
 }
 
@@ -42,9 +35,7 @@ func GenerateEd25519Key() (*PrivateKey, error) {
 		return nil, err
 	}
 	return &PrivateKey{
-		Type:       data.KeyTypeEd25519,
-		Scheme:     data.KeySchemeEd25519,
-		Algorithms: data.KeyAlgorithms,
+		Type: data.KeyTypeEd25519,
 		Value: PrivateKeyValue{
 			Public:  data.HexBytes(public),
 			Private: data.HexBytes(private),
@@ -77,17 +68,11 @@ func (s *ed25519Signer) ContainsID(id string) bool {
 
 func (s *ed25519Signer) publicData() *data.Key {
 	return &data.Key{
-		Type:       data.KeyTypeEd25519,
-		Scheme:     data.KeySchemeEd25519,
-		Algorithms: data.KeyAlgorithms,
-		Value:      data.KeyValue{Public: []byte(s.PrivateKey.Public().(ed25519.PublicKey))},
+		Type:  data.KeyTypeEd25519,
+		Value: data.KeyValue{Public: []byte(s.PrivateKey.Public().(ed25519.PublicKey))},
 	}
 }
 
 func (s *ed25519Signer) Type() string {
 	return data.KeyTypeEd25519
-}
-
-func (s *ed25519Signer) Scheme() string {
-	return data.KeySchemeEd25519
 }
