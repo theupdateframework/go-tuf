@@ -15,6 +15,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/flynn/go-tuf/data"
 )
@@ -237,7 +238,14 @@ func GenerateTimestampFileMeta(r io.Reader, hashAlgorithms ...string) (data.Time
 }
 
 func NormalizeTarget(p string) string {
-	return path.Join("/", p)
+	// FIXME(TUF-0.9) TUF-1.0 is considering banning paths that begin with
+	// a leading path separator, to avoid surprising behavior when joining
+	// target and delgated paths. python-tuf raises an exception if any
+	// path starts with '/', but since we need to be cross compatible with
+	// TUF-0.9 we still need to support leading slashes. For now, we will
+	// just strip them out, but eventually we should also consider turning
+	// them into an error.
+	return strings.TrimPrefix(path.Join("/", p), "/")
 }
 
 func VersionedPath(p string, version int) string {
