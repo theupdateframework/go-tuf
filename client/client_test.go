@@ -262,7 +262,7 @@ func (s *ClientSuite) TestInit(c *C) {
 	// check Update() does not return ErrNoRootKeys after initialization
 	c.Assert(client.Init(s.rootKeys(c), 1), IsNil)
 	_, err = client.Update()
-	c.Assert(err, Not(Equals), ErrNoRootKeys)
+	c.Assert(err, IsNil)
 }
 
 func (s *ClientSuite) TestFirstUpdate(c *C) {
