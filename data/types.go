@@ -11,9 +11,15 @@ import (
 )
 
 const (
-	KeyIDLength            = sha256.Size * 2
-	KeyTypeEd25519         = "ed25519"
-	KeyTypeECDSA_SHA2_P256 = "ecdsa-sha2-nistp256"
+	KeyIDLength              = sha256.Size * 2
+	KeyTypeEd25519           = "ed25519"
+	KeyTypeECDSA_SHA2_P256   = "ecdsa-sha2-nistp256"
+	KeySchemeEd25519         = "ed25519"
+	KeySchemeECDSA_SHA2_P256 = "ecdsa-sha2-nistp256"
+)
+
+var (
+	KeyAlgorithms = []string{"sha256"}
 )
 
 type Signed struct {
@@ -22,14 +28,20 @@ type Signed struct {
 }
 
 type Signature struct {
-	KeyID     string   `json:"keyid"`
-	Method    string   `json:"method"`
+	KeyID string `json:"keyid"`
+
+	// FIXME(TUF-0.9) removed in TUF 1.0, keeping it around for backwards
+	// compatibility with TUF 0.9.
+	Method string `json:"method"`
+
 	Signature HexBytes `json:"sig"`
 }
 
 type Key struct {
-	Type  string   `json:"keytype"`
-	Value KeyValue `json:"keyval"`
+	Type       string   `json:"keytype"`
+	Scheme     string   `json:"scheme,omitempty"`
+	Algorithms []string `json:"keyid_hash_algorithms,omitempty"`
+	Value      KeyValue `json:"keyval"`
 
 	ids    []string
 	idOnce sync.Once
@@ -40,6 +52,19 @@ func (k *Key) IDs() []string {
 		data, _ := cjson.Marshal(k)
 		digest := sha256.Sum256(data)
 		k.ids = []string{hex.EncodeToString(digest[:])}
+
+		// FIXME(TUF-0.9) If we receive TUF-1.0 compatible metadata,
+		// the key id we just calculated won't be compatible with
+		// TUF-0.9. So we also need to calculate the TUF-0.9 key id to
+		// be backwards compatible.
+		if k.Scheme != "" || len(k.Algorithms) != 0 {
+			data, _ = cjson.Marshal(Key{
+				Type:  k.Type,
+				Value: k.Value,
+			})
+			digest = sha256.Sum256(data)
+			k.ids = append(k.ids, hex.EncodeToString(digest[:]))
+		}
 	})
 	return k.ids
 }
