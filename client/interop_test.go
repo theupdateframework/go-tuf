@@ -38,6 +38,7 @@ func (InteropSuite) TestGoClientCompatibility(c *C) {
 		"go-tuf-transition-M1",
 		"go-tuf-transition-M2",
 		"go-tuf-transition-M3",
+		"go-tuf-transition-M4",
 	}
 
 	for _, version := range versions {
