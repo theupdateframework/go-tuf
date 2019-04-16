@@ -88,7 +88,7 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "key missing from role",
 			mut:  func(t *test) { t.roles["root"].KeyIDs = nil },
-			err:  ErrRoleThreshold,
+			err:  ErrRoleThreshold{1, 0},
 		},
 		{
 			name: "invalid signature",
@@ -98,7 +98,7 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "not enough signatures",
 			mut:  func(t *test) { t.roles["root"].Threshold = 2 },
-			err:  ErrRoleThreshold,
+			err:  ErrRoleThreshold{2, 1},
 		},
 		{
 			name: "exactly enough signatures",
@@ -118,7 +118,7 @@ func (VerifySuite) Test(c *C) {
 				t.roles["root"].Threshold = 2
 				t.s.Signatures = append(t.s.Signatures, t.s.Signatures[0])
 			},
-			err: ErrRoleThreshold,
+			err: ErrRoleThreshold{2, 1},
 		},
 		{
 			name: "unknown key",
@@ -134,7 +134,7 @@ func (VerifySuite) Test(c *C) {
 				sign.Sign(t.s, k.Signer())
 				t.roles["root"].Threshold = 2
 			},
-			err: ErrRoleThreshold,
+			err: ErrRoleThreshold{2, 1},
 		},
 		{
 			name: "unknown keys in db",
@@ -152,7 +152,7 @@ func (VerifySuite) Test(c *C) {
 				t.keys = append(t.keys, k.PublicData())
 				t.roles["root"].Threshold = 2
 			},
-			err: ErrRoleThreshold,
+			err: ErrRoleThreshold{2, 1},
 		},
 		{
 			name: "wrong type",
@@ -226,8 +226,10 @@ func (VerifySuite) Test(c *C) {
 
 		db := NewDB()
 		for _, k := range t.keys {
-			err := db.AddKey(k.IDs()[0], k)
-			c.Assert(err, IsNil)
+			for _, id := range k.IDs() {
+				err := db.AddKey(id, k)
+				c.Assert(err, IsNil)
+			}
 		}
 		for n, r := range t.roles {
 			err := db.AddRole(n, r)
