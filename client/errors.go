@@ -3,6 +3,8 @@ package client
 import (
 	"errors"
 	"fmt"
+
+	"github.com/flynn/go-tuf/verify"
 )
 
 var (
@@ -36,12 +38,17 @@ func (e ErrDecodeFailed) Error() string {
 	return fmt.Sprintf("tuf: failed to decode %s: %s", e.File, e.Err)
 }
 
-func isDecodeFailedWithErr(err, expected error) bool {
+func isDecodeFailedWithErrRoleThreshold(err error) bool {
 	e, ok := err.(ErrDecodeFailed)
 	if !ok {
 		return false
 	}
-	return e.Err == expected
+	return isErrRoleThreshold(e.Err)
+}
+
+func isErrRoleThreshold(err error) bool {
+	_, ok := err.(verify.ErrRoleThreshold)
+	return ok
 }
 
 type ErrNotFound struct {

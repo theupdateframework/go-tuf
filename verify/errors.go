@@ -11,7 +11,6 @@ var (
 	ErrNoSignatures     = errors.New("tuf: data has no signatures")
 	ErrInvalid          = errors.New("tuf: signature verification failed")
 	ErrWrongMethod      = errors.New("tuf: invalid signature type")
-	ErrRoleThreshold    = errors.New("tuf: valid signatures did not meet threshold")
 	ErrWrongMetaType    = errors.New("tuf: meta file has wrong type")
 	ErrExists           = errors.New("tuf: key already in db")
 	ErrInvalidKey       = errors.New("tuf: invalid key")
@@ -49,4 +48,13 @@ type ErrLowVersion struct {
 
 func (e ErrLowVersion) Error() string {
 	return fmt.Sprintf("version %d is lower than current version %d", e.Actual, e.Current)
+}
+
+type ErrRoleThreshold struct {
+	Expected int
+	Actual   int
+}
+
+func (e ErrRoleThreshold) Error() string {
+	return "tuf: valid signatures did not meet threshold"
 }

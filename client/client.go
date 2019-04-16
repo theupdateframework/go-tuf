@@ -148,7 +148,7 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 			// should not have continued the update
 			return nil, err
 		}
-		if latestRoot && err == verify.ErrRoleThreshold {
+		if latestRoot && isErrRoleThreshold(err) {
 			// Root was updated with new keys, so our local metadata is no
 			// longer validating. Read only the versions from the local metadata
 			// and re-download everything.
@@ -170,7 +170,7 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 	if err != nil {
 		// ErrRoleThreshold could indicate timestamp keys have been
 		// revoked, so retry with the latest root.json
-		if isDecodeFailedWithErr(err, verify.ErrRoleThreshold) && !latestRoot {
+		if isDecodeFailedWithErrRoleThreshold(err) && !latestRoot {
 			return c.updateWithLatestRoot(nil)
 		}
 		return nil, err
@@ -197,7 +197,7 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 	if err != nil {
 		// ErrRoleThreshold could indicate snapshot keys have been
 		// revoked, so retry with the latest root.json
-		if isDecodeFailedWithErr(err, verify.ErrRoleThreshold) && !latestRoot {
+		if isDecodeFailedWithErrRoleThreshold(err) && !latestRoot {
 			return c.updateWithLatestRoot(nil)
 		}
 		return nil, err
