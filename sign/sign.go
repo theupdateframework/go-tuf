@@ -18,6 +18,9 @@ type Signer interface {
 	// Type returns the TUF key type
 	Type() string
 
+	// Scheme returns the TUF key scheme
+	Scheme() string
+
 	// Signer is used to sign messages and provides access to the public key.
 	// The signer is expected to do its own hashing, so the full message will be
 	// provided as the message to Sign with a zero opts.HashFunc().

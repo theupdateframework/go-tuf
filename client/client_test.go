@@ -726,7 +726,7 @@ func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
 	c.Assert(json.Unmarshal(targetsJSON, targets), IsNil)
 
 	// update remote targets.json to have different content but same size
-	c.Assert(targets.Signatures, HasLen, 1)
+	c.Assert(targets.Signatures, HasLen, 2)
 	targets.Signatures[0].Method = "xxxxxxx"
 	tamperedJSON, err := json.Marshal(targets)
 	c.Assert(err, IsNil)
