@@ -11,7 +11,9 @@ import (
 	"hash"
 	"io"
 	"io/ioutil"
+	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 
 	"github.com/flynn/go-tuf/data"
@@ -257,4 +259,37 @@ func StringSliceToSet(items []string) map[string]struct{} {
 		s[item] = struct{}{}
 	}
 	return s
+}
+
+func AtomicallyWriteFile(filename string, data []byte, perm os.FileMode) error {
+	dir, name := filepath.Split(filename)
+	f, err := ioutil.TempFile(dir, name)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Write(data)
+	if err != nil {
+		f.Close()
+		os.Remove(f.Name())
+		return err
+	}
+
+	if err = f.Chmod(perm); err != nil {
+		f.Close()
+		os.Remove(f.Name())
+		return err
+	}
+
+	if err := f.Close(); err != nil {
+		os.Remove(f.Name())
+		return err
+	}
+
+	if err := os.Rename(f.Name(), filename); err != nil {
+		os.Remove(f.Name())
+		return err
+	}
+
+	return nil
 }

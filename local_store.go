@@ -171,7 +171,7 @@ func (f *fileSystemStore) SetMeta(name string, meta json.RawMessage) error {
 	if err := f.createDirs(); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(filepath.Join(f.stagedDir(), name), meta, 0644); err != nil {
+	if err := util.AtomicallyWriteFile(filepath.Join(f.stagedDir(), name), meta, 0644); err != nil {
 		return err
 	}
 	return nil
@@ -393,7 +393,7 @@ func (f *fileSystemStore) SavePrivateKey(role string, key *sign.PrivateKey) erro
 	if err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(f.keysPath(role), append(data, '\n'), 0600); err != nil {
+	if err := util.AtomicallyWriteFile(f.keysPath(role), append(data, '\n'), 0600); err != nil {
 		return err
 	}
 	f.signers[role] = f.privateKeySigners(keys)
