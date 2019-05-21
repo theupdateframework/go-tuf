@@ -186,20 +186,26 @@ func (s *ClientSuite) updatedClient(c *C) *Client {
 	return client
 }
 
+func assertFile(c *C, file data.TargetFileMeta, name string) {
+	target, ok := targetFiles[name]
+	if !ok {
+		c.Fatalf("unknown target %s", name)
+	}
+
+	meta, err := util.GenerateTargetFileMeta(bytes.NewReader(target), file.HashAlgorithms()...)
+	c.Assert(err, IsNil)
+	c.Assert(util.TargetFileMetaEqual(file, meta), IsNil)
+}
+
 func assertFiles(c *C, files data.TargetFiles, names []string) {
 	c.Assert(files, HasLen, len(names))
 	for _, name := range names {
-		target, ok := targetFiles[name]
-		if !ok {
-			c.Fatalf("unknown target %s", name)
-		}
 		file, ok := files[name]
 		if !ok {
 			c.Fatalf("expected files to contain %s", name)
 		}
-		meta, err := util.GenerateTargetFileMeta(bytes.NewReader(target), file.HashAlgorithms()...)
-		c.Assert(err, IsNil)
-		c.Assert(util.TargetFileMetaEqual(file, meta), IsNil)
+
+		assertFile(c, file, name)
 	}
 }
 
@@ -866,4 +872,22 @@ func (s *ClientSuite) TestAvailableTargets(c *C) {
 	files, err = client.Targets()
 	c.Assert(err, IsNil)
 	assertFiles(c, files, []string{"/foo.txt", "/bar.txt", "/baz.txt"})
+}
+
+func (s *ClientSuite) TestAvailableTarget(c *C) {
+	client := s.updatedClient(c)
+
+	target, err := client.Target("foo.txt")
+	c.Assert(err, IsNil)
+	assertFile(c, target, "/foo.txt")
+
+	target, err = client.Target("/foo.txt")
+	c.Assert(err, IsNil)
+	assertFile(c, target, "/foo.txt")
+
+	_, err = client.Target("bar.txt")
+	c.Assert(err, Equals, ErrNotFound{"bar.txt"})
+
+	_, err = client.Target("/bar.txt")
+	c.Assert(err, Equals, ErrNotFound{"/bar.txt"})
 }
