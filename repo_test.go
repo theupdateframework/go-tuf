@@ -749,6 +749,10 @@ func (t *tmpDir) assertVersionedFileExist(path string, version int) {
 	t.assertExists(util.VersionedPath(path, version))
 }
 
+func (t *tmpDir) assertVersionedFileNotExist(path string, version int) {
+	t.assertNotExist(util.VersionedPath(path, version))
+}
+
 func (t *tmpDir) assertEmpty(dir string) {
 	path := filepath.Join(t.path, dir)
 	f, err := os.Stat(path)
@@ -920,10 +924,10 @@ func (rs *RepoSuite) TestConsistentSnapshot(c *C) {
 	hashes, err := r.fileHashes()
 	c.Assert(err, IsNil)
 
-	// root.json, targets.json and snapshot.json should exist at both hashed, versioned and unhashed paths
+	// root.json, targets.json and snapshot.json should exist at both versioned and unversioned paths
 	for _, path := range []string{"root.json", "targets.json", "snapshot.json"} {
 		repoPath := filepath.Join("repository", path)
-		tmp.assertHashedFilesExist(repoPath, hashes[path])
+		tmp.assertHashedFilesNotExist(repoPath, hashes[path])
 		tmp.assertVersionedFileExist(repoPath, versions[path])
 		tmp.assertExists(repoPath)
 	}
@@ -935,7 +939,9 @@ func (rs *RepoSuite) TestConsistentSnapshot(c *C) {
 		tmp.assertNotExist(repoPath)
 	}
 
-	// timestamp.json should exist at an unhashed path (it doesn't have a hash)
+	// timestamp.json should exist at an unversioned and unhashed path (it doesn't have a hash)
+	c.Assert(hashes["repository/timestamp.json"], IsNil)
+	tmp.assertVersionedFileNotExist("repository/timestamp.json", versions["repository/timestamp.json"])
 	tmp.assertExists("repository/timestamp.json")
 
 	// removing a file should remove the hashed files
@@ -955,10 +961,10 @@ func (rs *RepoSuite) TestConsistentSnapshot(c *C) {
 	hashes, err = r.fileHashes()
 	c.Assert(err, IsNil)
 
-	// root.json, targets.json and snapshot.json should exist at both hashed, versioned and unhashed paths
+	// root.json, targets.json and snapshot.json should exist at both versioned and unversioned paths
 	for _, path := range []string{"root.json", "targets.json", "snapshot.json"} {
 		repoPath := filepath.Join("repository", path)
-		tmp.assertHashedFilesExist(repoPath, hashes[path])
+		tmp.assertHashedFilesNotExist(repoPath, hashes[path])
 		tmp.assertVersionedFileExist(repoPath, versions[path])
 		tmp.assertExists(repoPath)
 	}

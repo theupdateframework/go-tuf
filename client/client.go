@@ -448,28 +448,15 @@ func (c *Client) downloadTarget(file string, get remoteGetFunc, hashes data.Hash
 // downloadVersionedMeta downloads top-level metadata from remote storage and
 // verifies it using the given file metadata.
 func (c *Client) downloadMeta(name string, version int, m data.FileMeta) ([]byte, error) {
-	// FIXME(TUF-0.9) TUF-1.0 requires all consistent snapshot metadata to
-	// be prefixed with a version number (except the timestamp role).
-	// However, if the repository is still serving TUF-0.9 metadata, we
-	// need to fall back to fetching the hashed metadata.
 	r, size, err := func() (io.ReadCloser, int64, error) {
 		if c.consistentSnapshot {
-			// FIXME(TUF-0.9) Only try downloading the versioned
-			// metadata if we know the version we want. We might
-			// not know if we are dealing with a TUF-0.9 snapshot.
-			if version != 0 {
-				path := util.VersionedPath(name, version)
-				r, size, err := c.remote.GetMeta(path)
-				if err == nil {
-					return r, size, nil
-				}
-
-				if !IsNotFound(err) {
-					return nil, 0, err
-				}
+			path := util.VersionedPath(name, version)
+			r, size, err := c.remote.GetMeta(path)
+			if err == nil {
+				return r, size, nil
 			}
 
-			return c.downloadHashed(name, c.remote.GetMeta, m.Hashes)
+			return nil, 0, err
 		} else {
 			return c.remote.GetMeta(name)
 		}
