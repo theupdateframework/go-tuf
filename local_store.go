@@ -73,28 +73,8 @@ func (m *memoryStore) WalkStagedTargets(paths []string, targetsFn targetsWalkFun
 }
 
 func (m *memoryStore) Commit(consistentSnapshot bool, versions map[string]int, hashes map[string]data.Hashes) error {
-	shouldCopyVersion := func(path string) bool {
-		return path == "root.json" || (consistentSnapshot && path != "timestamp.json")
-	}
-	shouldCopyHashed := func(path string) bool {
-		return consistentSnapshot && path != "timestamp.json"
-	}
-	shouldCopyUnhashed := func(path string) bool {
-		return !consistentSnapshot
-	}
 	for name, meta := range m.stagedMeta {
-		var paths []string
-		if shouldCopyVersion(name) {
-			paths = append(paths, util.VersionedPath(name, versions[name]))
-		}
-		// FIXME(TUF-0.9) Also generate the TUF-0.9 hash prefixed files
-		// for backwards compatibility.
-		if shouldCopyHashed(name) {
-			paths = append(paths, util.HashedPaths(name, hashes[name])...)
-		}
-		if shouldCopyUnhashed(name) {
-			paths = append(paths, name)
-		}
+		paths := computeMetadataPaths(consistentSnapshot, name, versions)
 		for _, path := range paths {
 			m.meta[path] = meta
 		}
@@ -250,15 +230,6 @@ func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]in
 	isTarget := func(path string) bool {
 		return strings.HasPrefix(path, "targets/")
 	}
-	shouldCopyVersion := func(path string) bool {
-		return path == "root.json" || (consistentSnapshot && path != "timestamp.json")
-	}
-	shouldCopyHashed := func(path string) bool {
-		return consistentSnapshot && path != "timestamp.json"
-	}
-	shouldCopyUnhashed := func(path string) bool {
-		return !consistentSnapshot || !isTarget(path)
-	}
 	copyToRepo := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -270,17 +241,12 @@ func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]in
 		if err != nil {
 			return err
 		}
+
 		var paths []string
-		if shouldCopyVersion(rel) {
-			paths = append(paths, util.VersionedPath(rel, versions[rel]))
-		}
-		// FIXME(TUF-0.9) Also generate the TUF-0.9 hash prefixed files
-		// for backwards compatibility.
-		if shouldCopyHashed(rel) {
-			paths = append(paths, util.HashedPaths(rel, hashes[rel])...)
-		}
-		if shouldCopyUnhashed(rel) {
-			paths = append(paths, rel)
+		if isTarget(rel) {
+			paths = computeTargetPaths(consistentSnapshot, rel, hashes)
+		} else {
+			paths = computeMetadataPaths(consistentSnapshot, rel, versions)
 		}
 		var files []io.Writer
 		for _, path := range paths {
@@ -464,4 +430,36 @@ func (f *fileSystemStore) Clean() error {
 		return err
 	}
 	return os.MkdirAll(filepath.Join(f.stagedDir(), "targets"), 0755)
+}
+
+func computeTargetPaths(consistentSnapshot bool, name string, hashes map[string]data.Hashes) []string {
+	if consistentSnapshot {
+		return util.HashedPaths(name, hashes[name])
+	} else {
+		return []string{name}
+	}
+}
+
+func computeMetadataPaths(consistentSnapshot bool, name string, versions map[string]int) []string {
+	copyVersion := false
+
+	switch name {
+	case "root.json":
+		copyVersion = true
+	case "timestamp.json":
+		copyVersion = false
+	default:
+		if consistentSnapshot {
+			copyVersion = true
+		} else {
+			copyVersion = false
+		}
+	}
+
+	paths := []string{name}
+	if copyVersion {
+		paths = append(paths, util.VersionedPath(name, versions[name]))
+	}
+
+	return paths
 }
