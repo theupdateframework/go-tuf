@@ -139,14 +139,14 @@ func (UtilSuite) TestSnapshotFileMetaEqual(c *C) {
 		{
 			name:     "wrong version",
 			actual:   fileMeta(1, 10, map[string]string{"sha512": "111111"}),
-			expected: fileMeta(2, 10, map[string]string{"sha512": "111111"}),
-			err:      func(test) error { return ErrWrongVersion{Expected: 2, Actual: 1} },
+			expected: fileMeta(0, 10, map[string]string{"sha512": "111111"}),
+			err:      func(test) error { return ErrWrongVersion{Expected: 0, Actual: 1} },
 		},
 		{
-			name:     "ignore version if not expected",
+			name:     "wrong version",
 			actual:   fileMeta(1, 10, map[string]string{"sha512": "111111"}),
-			expected: fileMeta(0, 10, map[string]string{"sha512": "111111"}),
-			err:      func(test) error { return nil },
+			expected: fileMeta(2, 10, map[string]string{"sha512": "111111"}),
+			err:      func(test) error { return ErrWrongVersion{Expected: 2, Actual: 1} },
 		},
 	}
 
