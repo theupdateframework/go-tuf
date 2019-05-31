@@ -103,10 +103,7 @@ func hashEqual(actual data.Hashes, expected data.Hashes) error {
 }
 
 func versionEqual(actual int, expected int) error {
-	// FIXME(TUF-0.9) TUF-0.9 does not contain version numbers in the
-	// metadata, so we only check them if we received TUF-1.0 compatible
-	// metadata.
-	if expected != 0 && actual != expected {
+	if actual != expected {
 		return ErrWrongVersion{expected, actual}
 	}
 	return nil
