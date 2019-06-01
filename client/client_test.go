@@ -218,7 +218,19 @@ func assertWrongHash(c *C, err error) {
 		c.Fatalf("expected err to have type ErrDownloadFailed, got %T", err)
 	}
 	if _, ok := e.Err.(util.ErrWrongHash); !ok {
-		c.Fatalf("expected err.Err to have type util.ErrWrongHash, got %T", err)
+		c.Fatalf("expected err.Err to have type util.ErrWrongHash, got %T", e.Err)
+	}
+}
+
+func assertVerificationFailed(c *C, err error) {
+	// just test the type of err rather using DeepEquals as it contains
+	// hashes we don't necessarily need to check.
+	e, ok := err.(ErrDownloadFailed)
+	if !ok {
+		c.Fatalf("expected err to have type ErrDecodeFailed, got %T", err)
+	}
+	if e.Err == verify.ErrInvalid {
+		c.Fatalf("expected err.Err to have type verify.ErrInvalid, got %T", e.Err)
 	}
 }
 
@@ -312,6 +324,8 @@ func (s *ClientSuite) TestNewTimestamp(c *C) {
 
 func (s *ClientSuite) TestNewRoot(c *C) {
 	client := s.newClient(c)
+	_, err := client.Update()
+	c.Assert(err, IsNil)
 
 	// replace all keys
 	newKeyIDs := make(map[string][]string)
@@ -332,7 +346,7 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	c.Assert(client.getLocalMeta(), IsNil)
 	version := client.rootVer
 	c.Assert(version > 0, Equals, true)
-	_, err := client.Update()
+	_, err = client.Update()
 	c.Assert(err, IsNil)
 	c.Assert(client.rootVer > version, Equals, true)
 
@@ -617,8 +631,10 @@ func (s *ClientSuite) TestUpdateLocalRootExpiredKeyChange(c *C) {
 
 	// add soon to expire root.json to local storage
 	s.genKeyExpired(c, "timestamp")
+	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncLocal(c)
+	s.syncRemote(c)
 
 	// replace all keys
 	newKeyIDs := make(map[string][]string)
@@ -740,6 +756,13 @@ func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
 	s.syncRemote(c)
 	_, err = client.Update()
 	assertWrongHash(c, err)
+
+	// increment the versions in the repo so tuf doesn't think we've
+	// already downloaded the data.
+	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
+	s.syncRemote(c)
 
 	// update remote targets.json to have the wrong size
 	targets.Signed.Type = "xxx"

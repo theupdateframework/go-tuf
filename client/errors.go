@@ -87,6 +87,19 @@ func IsLatestSnapshot(err error) bool {
 	return ok
 }
 
+type ErrOldRoot struct {
+	Version int
+}
+
+func (e ErrOldRoot) Error() string {
+	return fmt.Sprintf("tuf: the latest snapshot references a root version %d that is newer than the local version", e.Version)
+}
+
+func IsOldRoot(err error) bool {
+	_, ok := err.(ErrOldRoot)
+	return ok
+}
+
 type ErrUnknownTarget struct {
 	Name string
 }

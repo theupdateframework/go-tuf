@@ -848,7 +848,7 @@ func (r *Repo) verifySignature(name string, db *verify.DB) error {
 		return err
 	}
 	role := strings.TrimSuffix(name, ".json")
-	if err := db.Verify(s, role, 0); err != nil {
+	if err := db.VerifyWithMinVersion(s, role, 0); err != nil {
 		return ErrInsufficientSignatures{name, err}
 	}
 	return nil

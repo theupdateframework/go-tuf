@@ -58,3 +58,12 @@ type ErrRoleThreshold struct {
 func (e ErrRoleThreshold) Error() string {
 	return "tuf: valid signatures did not meet threshold"
 }
+
+type BadVersion struct {
+	Expected int
+	Actual   int
+}
+
+func (e BadVersion) Error() string {
+	return fmt.Sprintf("expected version %d but version must be %d", e.Expected, e.Actual)
+}

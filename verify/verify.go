@@ -15,26 +15,46 @@ type signedMeta struct {
 	Version int       `json:"version"`
 }
 
-func (db *DB) Verify(s *data.Signed, role string, minVersion int) error {
-	if err := db.VerifySignatures(s, role); err != nil {
+func (db *DB) VerifyWithMinVersion(s *data.Signed, role string, minVersion int) error {
+	sm, err := db.verify(s, role, 0)
+	if err != nil {
 		return err
-	}
-
-	sm := &signedMeta{}
-	if err := json.Unmarshal(s.Signed, sm); err != nil {
-		return err
-	}
-	if strings.ToLower(sm.Type) != strings.ToLower(role) {
-		return ErrWrongMetaType
-	}
-	if IsExpired(sm.Expires) {
-		return ErrExpired{sm.Expires}
 	}
 	if sm.Version < minVersion {
 		return ErrLowVersion{sm.Version, minVersion}
 	}
-
 	return nil
+}
+
+func (db *DB) verify(s *data.Signed, role string, expectedVersion int) (*signedMeta, error) {
+	sm, err := db.verifyTrusted(s, role, expectedVersion)
+	if err != nil {
+		return nil, err
+	}
+	if IsExpired(sm.Expires) {
+		return nil, ErrExpired{sm.Expires}
+	}
+
+	return sm, nil
+}
+
+func (db *DB) verifyTrusted(s *data.Signed, role string, expectedVersion int) (*signedMeta, error) {
+	if err := db.VerifySignatures(s, role); err != nil {
+		return nil, err
+	}
+
+	sm := &signedMeta{}
+	if err := json.Unmarshal(s.Signed, sm); err != nil {
+		return nil, err
+	}
+	if strings.ToLower(sm.Type) != strings.ToLower(role) {
+		return nil, ErrWrongMetaType
+	}
+	if expectedVersion != 0 && sm.Version != expectedVersion {
+		return nil, BadVersion{expectedVersion, sm.Version}
+	}
+
+	return sm, nil
 }
 
 var IsExpired = func(t time.Time) bool {
@@ -100,18 +120,19 @@ func (db *DB) Unmarshal(b []byte, v interface{}, role string, minVersion int) er
 	if err := json.Unmarshal(b, s); err != nil {
 		return err
 	}
-	if err := db.Verify(s, role, minVersion); err != nil {
+	if err := db.VerifyWithMinVersion(s, role, minVersion); err != nil {
 		return err
 	}
 	return json.Unmarshal(s.Signed, v)
 }
 
-func (db *DB) UnmarshalTrusted(b []byte, v interface{}, role string) error {
+func (db *DB) UnmarshalTrusted(b []byte, v interface{}, role string, expectedVersion int) error {
 	s := &data.Signed{}
 	if err := json.Unmarshal(b, s); err != nil {
 		return err
 	}
-	if err := db.VerifySignatures(s, role); err != nil {
+	_, err := db.verifyTrusted(s, role, expectedVersion)
+	if err != nil {
 		return err
 	}
 	return json.Unmarshal(s.Signed, v)

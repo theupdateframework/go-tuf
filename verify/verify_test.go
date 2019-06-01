@@ -242,7 +242,7 @@ func (VerifySuite) Test(c *C) {
 			c.Assert(err, IsNil)
 		}
 
-		err := db.Verify(t.s, t.role, minVer)
+		err := db.VerifyWithMinVersion(t.s, t.role, minVer)
 		if e, ok := t.err.(ErrExpired); ok {
 			assertErrExpired(c, err, e)
 		} else {
