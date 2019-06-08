@@ -526,6 +526,8 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom json.RawMessage, exp
 			meta.Custom = t.Custom
 		}
 
+		// G2 -> we no longer desire any readers to ever observe non-prefix targets.
+		delete(t.Targets, "/"+path)
 		t.Targets[path] = meta
 		return nil
 	}); err != nil {
@@ -571,6 +573,8 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 				continue
 			}
 			removed = true
+			// G2 -> we no longer desire any readers to ever observe non-prefix targets.
+			delete(t.Targets, "/"+path)
 			delete(t.Targets, path)
 		}
 		if !removed {
