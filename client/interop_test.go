@@ -10,10 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
-	tuf "github.com/flynn/go-tuf"
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/util"
-	"golang.org/x/crypto/ed25519"
 	. "gopkg.in/check.v1"
 )
 
@@ -22,118 +20,111 @@ type InteropSuite struct{}
 var _ = Suite(&InteropSuite{})
 
 func (InteropSuite) TestGoClientCompatibility(c *C) {
-	// start file server
-	cwd, err := os.Getwd()
-	c.Assert(err, IsNil)
-	testDataDir := filepath.Join(cwd, "testdata")
-	addr, cleanup := startFileServer(c, testDataDir)
-	defer cleanup()
-
-	type dataKeys struct {
-		Data []*data.Key `json:"data"`
-	}
-
-	versions := []string{
+	names := []string{
 		"go-tuf-transition-M3",
 		"go-tuf-transition-M4",
 	}
+	options := &HTTPRemoteOptions{MetadataPath: "", TargetsPath: "targets"}
 
-	for _, version := range versions {
+	for _, name := range names {
 		for _, consistentSnapshot := range []bool{false, true} {
-			dir := fmt.Sprintf("consistent-snapshot-%t", consistentSnapshot)
-			local := MemoryLocalStore()
-
-			init := false
-			targets := map[string][]byte{}
-
-			for _, step := range []string{"0", "1", "2", "3", "4", "5"} {
-				dir := filepath.Join(dir, step)
-
-				remote, err := HTTPRemoteStore(
-					fmt.Sprintf("http://%s/%s/%s/repository", addr, version, dir),
-					&HTTPRemoteOptions{MetadataPath: "", TargetsPath: "targets"},
-					nil,
-				)
-				c.Assert(err, IsNil)
-
-				client := NewClient(local, remote)
-
-				// initiate a client with the root keys
-				if !init {
-					init = true
-					f, err := os.Open(filepath.Join(testDataDir, version, dir, "keys", "root.json"))
-					c.Assert(err, IsNil)
-					keys := &dataKeys{}
-					c.Assert(json.NewDecoder(f).Decode(keys), IsNil)
-
-					for _, key := range keys.Data {
-						c.Assert(key.Type, Equals, "ed25519")
-						c.Assert(key.Value.Public, HasLen, ed25519.PublicKeySize)
-					}
-					c.Assert(client.Init(keys.Data, 1), IsNil)
-				}
-
-				// check update returns the correct updated targets
-				files, err := client.Update()
-				c.Assert(err, IsNil)
-				c.Assert(files, HasLen, 1)
-
-				name := step
-				targets[name] = []byte(step)
-
-				// FIXME(TUF-0.9) M0 and M1 contain leading
-				// slashes in order to be backwards compatible
-				// with go-tuf G0.
-				var file data.TargetFileMeta
-				var ok bool
-				if version == "go-tuf-transition-M0" || version == "go-tuf-transition-M1" {
-					file, ok = files["/"+name]
-				} else {
-					file, ok = files[name]
-				}
-				if !ok {
-					c.Fatalf("expected updated targets to contain %s", name)
-				}
-
-				data := targets[name]
-				meta, err := util.GenerateTargetFileMeta(bytes.NewReader(data), file.HashAlgorithms()...)
-				c.Assert(err, IsNil)
-				c.Assert(util.TargetFileMetaEqual(file, meta), IsNil)
-
-				// download the files and check they have the correct content
-				for name, data := range targets {
-					for _, prefix := range []string{"", "/"} {
-						var dest testDestination
-						c.Assert(client.Download(prefix+name, &dest), IsNil)
-						c.Assert(dest.deleted, Equals, false)
-						c.Assert(dest.String(), Equals, string(data))
-					}
-				}
-			}
+			t := newTestCase(c, name, consistentSnapshot, options)
+			t.run(c)
 		}
 	}
 }
 
-func generateRepoFS(c *C, dir string, files map[string][]byte, consistentSnapshot bool) *tuf.Repo {
-	repo, err := tuf.NewRepo(tuf.FileSystemStore(dir, nil))
+type testCase struct {
+	name               string
+	consistentSnapshot bool
+	options            *HTTPRemoteOptions
+	local              LocalStore
+	targets            map[string][]byte
+	testDir            string
+	testSteps          []string
+}
+
+func newTestCase(c *C, name string, consistentSnapshot bool, options *HTTPRemoteOptions) testCase {
+	cwd, err := os.Getwd()
 	c.Assert(err, IsNil)
-	if !consistentSnapshot {
-		c.Assert(repo.Init(false), IsNil)
+	testDir := filepath.Join(cwd, "testdata", name, fmt.Sprintf("consistent-snapshot-%t", consistentSnapshot))
+
+	dirEntries, err := ioutil.ReadDir(testDir)
+	c.Assert(err, IsNil)
+	c.Assert(dirEntries, Not(HasLen), 0)
+
+	testSteps := []string{}
+	for _, dirEntry := range dirEntries {
+		if dirEntry.IsDir() {
+			testSteps = append(testSteps, dirEntry.Name())
+		}
 	}
-	for _, role := range []string{"root", "snapshot", "targets", "timestamp"} {
-		_, err := repo.GenKey(role)
-		c.Assert(err, IsNil)
+
+	return testCase{
+		name:               name,
+		consistentSnapshot: consistentSnapshot,
+		options:            options,
+		local:              MemoryLocalStore(),
+		targets:            make(map[string][]byte),
+		testDir:            testDir,
+		testSteps:          testSteps,
 	}
-	for file, data := range files {
-		path := filepath.Join(dir, "staged", "targets", file)
-		c.Assert(os.MkdirAll(filepath.Dir(path), 0755), IsNil)
-		c.Assert(ioutil.WriteFile(path, data, 0644), IsNil)
-		c.Assert(repo.AddTarget(file, nil), IsNil)
+}
+
+func (t *testCase) run(c *C) {
+	c.Logf("test case: %s consistent-snapshot: %t", t.name, t.consistentSnapshot)
+
+	init := true
+	for _, stepName := range t.testSteps {
+		t.runStep(c, stepName, init)
+		init = false
 	}
-	c.Assert(repo.Snapshot(tuf.CompressionTypeNone), IsNil)
-	c.Assert(repo.Timestamp(), IsNil)
-	c.Assert(repo.Commit(), IsNil)
-	return repo
+}
+
+func (t *testCase) runStep(c *C, stepName string, init bool) {
+	c.Logf("step: %s", stepName)
+
+	addr, cleanup := startFileServer(c, t.testDir)
+	defer cleanup()
+
+	remote, err := HTTPRemoteStore(fmt.Sprintf("http://%s/%s/repository", addr, stepName), t.options, nil)
+	c.Assert(err, IsNil)
+
+	client := NewClient(t.local, remote)
+
+	// initiate a client with the root keys
+	if init {
+		keys := getKeys(c, remote)
+		c.Assert(client.Init(keys, 1), IsNil)
+	}
+
+	// check update returns the correct updated targets
+	files, err := client.Update()
+	c.Assert(err, IsNil)
+	c.Assert(files, HasLen, 1)
+
+	targetName := stepName
+	t.targets[targetName] = []byte(targetName)
+
+	file, ok := files[targetName]
+	if !ok {
+		c.Fatalf("expected updated targets to contain %s", targetName)
+	}
+
+	data := t.targets[targetName]
+	meta, err := util.GenerateTargetFileMeta(bytes.NewReader(data), file.HashAlgorithms()...)
+	c.Assert(err, IsNil)
+	c.Assert(util.TargetFileMetaEqual(file, meta), IsNil)
+
+	// download the files and check they have the correct content
+	for name, data := range t.targets {
+		for _, prefix := range []string{"", "/"} {
+			var dest testDestination
+			c.Assert(client.Download(prefix+name, &dest), IsNil)
+			c.Assert(dest.deleted, Equals, false)
+			c.Assert(dest.String(), Equals, string(data))
+		}
+	}
 }
 
 func startFileServer(c *C, dir string) (string, func() error) {
@@ -142,4 +133,32 @@ func startFileServer(c *C, dir string) (string, func() error) {
 	addr := l.Addr().String()
 	go http.Serve(l, http.FileServer(http.Dir(dir)))
 	return addr, l.Close
+}
+
+func getKeys(c *C, remote RemoteStore) []*data.Key {
+	r, _, err := remote.GetMeta("root.json")
+	c.Assert(err, IsNil)
+
+	type SignedRoot struct {
+		Signed data.Root
+	}
+	root := &SignedRoot{}
+	err = json.NewDecoder(r).Decode(&root)
+	c.Assert(err, IsNil)
+
+	rootRole, exists := root.Signed.Roles["root"]
+	c.Assert(exists, Equals, true)
+
+	rootKeys := []*data.Key{}
+
+	for _, keyID := range rootRole.KeyIDs {
+		key, exists := root.Signed.Keys[keyID]
+		c.Assert(exists, Equals, true)
+
+		rootKeys = append(rootKeys, key)
+	}
+
+	c.Assert(rootKeys, Not(HasLen), 0)
+
+	return rootKeys
 }
