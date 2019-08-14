@@ -1,0 +1,36 @@
+{
+ "signatures": [
+  {
+   "keyid": "808aa256a8172bb0cb961767c6768e55ccf732c99afccc6145752d7a328b7937",
+   "sig": "6131b33848ebda6632074d7801672d51b00771700b80e73f2cb2e8f007374386edb6120b0f23a28421486e3c8321eef53898b88232ca8bea40af93b83d7ed50d"
+  }
+ ],
+ "signed": {
+  "_type": "targets",
+  "delegations": {
+   "keys": {},
+   "roles": []
+  },
+  "expires": "2100-01-01T00:00:00Z",
+  "spec_version": "1.0.0",
+  "targets": {
+   "0": {
+    "custom": {},
+    "hashes": {
+     "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+     "sha512": "31bca02094eb78126a517b206a88c73cfa9ec6f704c7030d18212cace820f025f00bf0ea68dbf3f3a5436ca63b53bf7bf80ad8d5de7d8359d0b7fed9dbc3ab99"
+    },
+    "length": 1
+   },
+   "1": {
+    "custom": {},
+    "hashes": {
+     "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+     "sha512": "4dff4ea340f0a823f15d3f4f01ab62eae0e5da579ccb851f8db9dfe84c58b2b37b89903a740e1ee172da793a6e79d560e5f7f9bd058a12a280433ed6fa46510a"
+    },
+    "length": 1
+   }
+  },
+  "version": 2
+ }
+}
