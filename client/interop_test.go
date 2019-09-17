@@ -90,6 +90,15 @@ func (InteropSuite) TestGoClientCompatibility(c *C) {
 	}
 }
 
+func (InteropSuite) TestPythonClientCompatibility(c *C) {
+	options := &HTTPRemoteOptions{MetadataPath: "metadata", TargetsPath: "targets"}
+
+	for _, consistentSnapshot := range []bool{false, true} {
+		t := newTestCase(c, "python-tuf-v0.14", consistentSnapshot, options)
+		t.run(c)
+	}
+}
+
 type testCase struct {
 	name               string
 	consistentSnapshot bool
