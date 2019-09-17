@@ -33,7 +33,7 @@ func copyRepo(src string, dst string) {
 }
 
 func newRepo(dir string) *tuf.Repo {
-	repo, err := tuf.NewRepo(tuf.FileSystemStore(dir, nil))
+	repo, err := tuf.NewRepoIndent(tuf.FileSystemStore(dir, nil), "", "\t")
 	assertNotNil(err)
 
 	return repo
@@ -45,16 +45,12 @@ func commit(repo *tuf.Repo) {
 	assertNotNil(repo.Commit())
 }
 
-func genKeys(repo *tuf.Repo, roles []string) map[string][]string {
-	ids := make(map[string][]string)
-
-	for _, role := range roles {
-		id, err := repo.GenKeyWithExpires(role, expirationDate)
-		assertNotNil(err)
-		ids[role] = id
+func addKeys(repo *tuf.Repo, roleKeys map[string][]*sign.PrivateKey) {
+	for role, keys := range roleKeys {
+		for _, key := range keys {
+			assertNotNil(repo.AddPrivateKeyWithExpires(role, key, expirationDate))
+		}
 	}
-
-	return ids
 }
 
 func addTargets(repo *tuf.Repo, dir string, files map[string][]byte) {
@@ -68,22 +64,29 @@ func addTargets(repo *tuf.Repo, dir string, files map[string][]byte) {
 	assertNotNil(repo.AddTargetsWithExpires(paths, nil, expirationDate))
 }
 
-func revokeKey(repo *tuf.Repo, role string, ids []string) {
-	assertNotNil(repo.RevokeKeyWithExpires(role, ids[0], expirationDate))
+func revokeKeys(repo *tuf.Repo, role string, keys []*sign.PrivateKey) {
+	for _, key := range keys {
+		assertNotNil(repo.RevokeKeyWithExpires(role, key.PublicData().IDs()[0], expirationDate))
+	}
 }
 
 // repoFilteredKeys filters out a key to make sure we can't sign with it. This
 // is to make sure key rotation worked.
-func filterKeys(dir string, role string, ids []string) {
+func filterKeys(dir string, role string, keys []*sign.PrivateKey) {
+	var ids []string
+	for _, key := range keys {
+		ids = append(ids, key.PublicData().IDs()...)
+	}
+
 	path := filepath.Join(dir, "keys", fmt.Sprintf("%s.json", role))
 	b, err := ioutil.ReadFile(path)
 	assertNotNil(err)
 
-	keys := &persistedKeys{}
-	assertNotNil(json.Unmarshal(b, keys))
+	persistedKeys := &persistedKeys{}
+	assertNotNil(json.Unmarshal(b, persistedKeys))
 
 	newKeys := []*sign.PrivateKey{}
-	for _, key := range keys.Data {
+	for _, key := range persistedKeys.Data {
 		found := false
 		for _, id := range ids {
 			if key.PublicData().ContainsID(id) {
@@ -95,20 +98,32 @@ func filterKeys(dir string, role string, ids []string) {
 			newKeys = append(newKeys, key)
 		}
 	}
-	keys.Data = newKeys
+	persistedKeys.Data = newKeys
 
-	b, err = json.Marshal(keys)
+	b, err = json.Marshal(persistedKeys)
 	assertNotNil(err)
 
 	err = ioutil.WriteFile(path, b, 0644)
 	assertNotNil(err)
 }
 
-func generateRepos(dir string) {
+func generateRepos(dir string, consistentSnapshot bool) {
+	f, err := os.Open("../keys.json")
+	assertNotNil(err)
+
+	var roleKeys map[string][][]*sign.PrivateKey
+	assertNotNil(json.NewDecoder(f).Decode(&roleKeys))
+
 	// Create the initial repo.
 	dir0 := filepath.Join(dir, "0")
 	repo0 := newRepo(dir0)
-	ids := genKeys(repo0, []string{"root", "snapshot", "targets", "timestamp"})
+	repo0.Init(consistentSnapshot)
+	addKeys(repo0, map[string][]*sign.PrivateKey{
+		"root":      roleKeys["root"][0],
+		"targets":   roleKeys["targets"][0],
+		"snapshot":  roleKeys["snapshot"][0],
+		"timestamp": roleKeys["timestamp"][0],
+	})
 	addTargets(repo0, dir0, map[string][]byte{"0": []byte("0")})
 	commit(repo0)
 
@@ -116,15 +131,17 @@ func generateRepos(dir string) {
 	dir1 := filepath.Join(dir, "1")
 	copyRepo(dir0, dir1)
 	repo1 := newRepo(dir1)
-	revokeKey(repo1, "timestamp", ids["timestamp"])
-	genKeys(repo1, []string{"timestamp"})
+	revokeKeys(repo1, "timestamp", roleKeys["timestamp"][0])
+	addKeys(repo1, map[string][]*sign.PrivateKey{
+		"timestamp": roleKeys["timestamp"][1],
+	})
 	addTargets(repo1, dir1, map[string][]byte{"1": []byte("1")})
 	commit(repo1)
 
 	// Filter out the old timestamp key to make sure we can't use it.
 	dir2 := filepath.Join(dir, "2")
 	copyRepo(dir1, dir2)
-	filterKeys(dir2, "timestamp", ids["timestamp"])
+	filterKeys(dir2, "timestamp", roleKeys["timestamp"][0])
 	repo2 := newRepo(dir2)
 	addTargets(repo2, dir2, map[string][]byte{"2": []byte("2")})
 	commit(repo2)
@@ -133,20 +150,24 @@ func generateRepos(dir string) {
 	dir3 := filepath.Join(dir, "3")
 	copyRepo(dir2, dir3)
 	repo3 := newRepo(dir3)
-	revokeKey(repo3, "root", ids["root"])
-	genKeys(repo3, []string{"root"})
+	revokeKeys(repo3, "root", roleKeys["root"][0])
+	addKeys(repo3, map[string][]*sign.PrivateKey{
+		"root": roleKeys["root"][1],
+	})
 	addTargets(repo3, dir3, map[string][]byte{"3": []byte("3")})
 	commit(repo3)
 
 	// Filter out the old root key to make sure we can't use it.
 	dir4 := filepath.Join(dir, "4")
 	copyRepo(dir3, dir4)
-	filterKeys(dir4, "root", ids["root"])
+	filterKeys(dir4, "root", roleKeys["root"][0])
 	// The only way to force go-tuf to re-sign the root.json is to generate
 	// or revoke a key. So why not do both?
 	repo4 := newRepo(dir4)
-	ids = genKeys(repo4, []string{"snapshot"})
-	revokeKey(repo4, "snapshot", ids["snapshot"])
+	addKeys(repo4, map[string][]*sign.PrivateKey{
+		"snapshot": roleKeys["snapshot"][1],
+	})
+	revokeKeys(repo4, "snapshot", roleKeys["snapshot"][0])
 	addTargets(repo4, dir4, map[string][]byte{"4": []byte("4")})
 	commit(repo4)
 
@@ -165,7 +186,7 @@ func main() {
 	for _, consistentSnapshot := range []bool{false, true} {
 		name := fmt.Sprintf("consistent-snapshot-%t", consistentSnapshot)
 		log.Printf("generating %s", name)
-		generateRepos(filepath.Join(cwd, name))
+		generateRepos(filepath.Join(cwd, name), consistentSnapshot)
 	}
 
 }
