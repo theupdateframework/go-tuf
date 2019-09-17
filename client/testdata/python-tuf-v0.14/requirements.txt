@@ -1,0 +1,13 @@
+certifi==2020.6.20
+cffi==1.14.3
+chardet==3.0.4
+idna==2.10
+iso8601==0.1.13
+pycparser==2.20
+PyNaCl==1.4.0
+python-dateutil==2.8.1
+requests==2.24.0
+securesystemslib==0.16.0
+six==1.15.0
+tuf==0.14.0
+urllib3==1.25.10
