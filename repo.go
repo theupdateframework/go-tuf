@@ -56,6 +56,8 @@ type Repo struct {
 	local          LocalStore
 	hashAlgorithms []string
 	meta           map[string]json.RawMessage
+	prefix         string
+	indent         string
 
 	// TUF 1.0 requires that the root metadata version numbers in the
 	// repository does not have any gaps. To avoid this, we will only
@@ -64,9 +66,15 @@ type Repo struct {
 }
 
 func NewRepo(local LocalStore, hashAlgorithms ...string) (*Repo, error) {
+	return NewRepoIndent(local, "", "", hashAlgorithms...)
+}
+
+func NewRepoIndent(local LocalStore, prefix string, indent string, hashAlgorithms ...string) (*Repo, error) {
 	r := &Repo{
 		local:          local,
 		hashAlgorithms: hashAlgorithms,
+		prefix:         prefix,
+		indent:         indent,
 		versionUpdated: make(map[string]struct{}),
 	}
 
@@ -382,6 +390,14 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 	return r.setMeta("root.json", root)
 }
 
+func (r *Repo) jsonMarshal(v interface{}) ([]byte, error) {
+	if r.prefix == "" && r.indent == "" {
+		return json.Marshal(v)
+	} else {
+		return json.MarshalIndent(v, r.prefix, r.indent)
+	}
+}
+
 func (r *Repo) setMeta(name string, meta interface{}) error {
 	keys, err := r.getSigningKeys(strings.TrimSuffix(name, ".json"))
 	if err != nil {
@@ -391,7 +407,7 @@ func (r *Repo) setMeta(name string, meta interface{}) error {
 	if err != nil {
 		return err
 	}
-	b, err := json.Marshal(s)
+	b, err := r.jsonMarshal(s)
 	if err != nil {
 		return err
 	}
@@ -421,7 +437,7 @@ func (r *Repo) Sign(name string) error {
 		sign.Sign(s, k)
 	}
 
-	b, err := json.Marshal(s)
+	b, err := r.jsonMarshal(s)
 	if err != nil {
 		return err
 	}
