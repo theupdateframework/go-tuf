@@ -27,6 +27,16 @@ type RepoSuite struct{}
 var _ = Suite(&RepoSuite{})
 
 func (RepoSuite) TestNewRepo(c *C) {
+	testNewRepo(c, NewRepo)
+}
+
+func (RepoSuite) TestNewRepoIndent(c *C) {
+	testNewRepo(c, func(local LocalStore, hashAlgorithms ...string) (*Repo, error) {
+		return NewRepoIndent(local, "", "\t")
+	})
+}
+
+func testNewRepo(c *C, newRepo func(local LocalStore, hashAlgorithms ...string) (*Repo, error)) {
 	meta := map[string]json.RawMessage{
 		"root.json": []byte(`{
 		  "signed": {
@@ -67,7 +77,7 @@ func (RepoSuite) TestNewRepo(c *C) {
 		}`),
 	}
 	local := MemoryStore(meta, nil)
-	r, err := NewRepo(local)
+	r, err := newRepo(local)
 	c.Assert(err, IsNil)
 
 	root, err := r.root()
