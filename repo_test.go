@@ -278,6 +278,159 @@ func (RepoSuite) TestGenKey(c *C) {
 	c.Assert(stagedRoot.Roles, DeepEquals, root.Roles)
 }
 
+func addKey(c *C, r *Repo, role string) []string {
+	key, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	err = r.AddPrivateKey(role, key)
+	c.Assert(err, IsNil)
+	keyids := key.PublicData().IDs()
+	c.Assert(len(keyids) > 0, Equals, true)
+	return keyids
+}
+
+func (RepoSuite) TestAddKey(c *C) {
+	local := MemoryStore(make(map[string]json.RawMessage), nil)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// generate a key for an unknown role
+	key, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	err = r.AddPrivateKey("foo", key)
+	c.Assert(err, Equals, ErrInvalidRole{"foo"})
+
+	// generate a root key
+	ids := addKey(c, r, "root")
+
+	// check root metadata is correct
+	root, err := r.root()
+	c.Assert(err, IsNil)
+	c.Assert(root.Roles, NotNil)
+	c.Assert(root.Roles, HasLen, 1)
+	c.Assert(root.UniqueKeys(), HasLen, 1)
+	rootRole, ok := root.Roles["root"]
+	if !ok {
+		c.Fatal("missing root role")
+	}
+	c.Assert(rootRole.KeyIDs, HasLen, 2)
+	c.Assert(rootRole.KeyIDs, DeepEquals, ids)
+	for _, keyID := range ids {
+		k, ok := root.Keys[keyID]
+		if !ok {
+			c.Fatalf("missing key %s", keyID)
+		}
+		c.Assert(k.IDs(), DeepEquals, ids)
+		c.Assert(k.Value.Public, HasLen, ed25519.PublicKeySize)
+	}
+
+	// check root key + role are in db
+	db, err := r.db()
+	c.Assert(err, IsNil)
+	for _, keyID := range ids {
+		rootKey := db.GetKey(keyID)
+		c.Assert(rootKey, NotNil)
+		c.Assert(rootKey.IDs(), DeepEquals, ids)
+		role := db.GetRole("root")
+		c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(ids))
+
+		// check the key was saved correctly
+		localKeys, err := local.GetSigningKeys("root")
+		c.Assert(err, IsNil)
+		c.Assert(localKeys, HasLen, 1)
+		c.Assert(localKeys[0].IDs(), DeepEquals, ids)
+
+		// check RootKeys() is correct
+		rootKeys, err := r.RootKeys()
+		c.Assert(err, IsNil)
+		c.Assert(rootKeys, HasLen, 1)
+		c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
+		c.Assert(rootKeys[0].Value.Public, DeepEquals, rootKey.Value.Public)
+	}
+
+	rootKey := db.GetKey(ids[0])
+	c.Assert(rootKey, NotNil)
+
+	// generate two targets keys
+	addKey(c, r, "targets")
+	addKey(c, r, "targets")
+
+	// check root metadata is correct
+	root, err = r.root()
+	c.Assert(err, IsNil)
+	c.Assert(root.Roles, HasLen, 2)
+	c.Assert(root.UniqueKeys(), HasLen, 3)
+	targetsRole, ok := root.Roles["targets"]
+	if !ok {
+		c.Fatal("missing targets role")
+	}
+	c.Assert(targetsRole.KeyIDs, HasLen, 4)
+	targetKeyIDs := make(map[string]struct{}, 2)
+	db, err = r.db()
+	c.Assert(err, IsNil)
+	for _, id := range targetsRole.KeyIDs {
+		targetKeyIDs[id] = struct{}{}
+		_, ok = root.Keys[id]
+		if !ok {
+			c.Fatal("missing key")
+		}
+		key := db.GetKey(id)
+		c.Assert(key, NotNil)
+		c.Assert(key.ContainsID(id), Equals, true)
+	}
+	role := db.GetRole("targets")
+	c.Assert(role.KeyIDs, DeepEquals, targetKeyIDs)
+
+	// check RootKeys() is unchanged
+	rootKeys, err := r.RootKeys()
+	c.Assert(err, IsNil)
+	c.Assert(rootKeys, HasLen, 1)
+	c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
+
+	// check the keys were saved correctly
+	localKeys, err := local.GetSigningKeys("targets")
+	c.Assert(err, IsNil)
+	c.Assert(localKeys, HasLen, 2)
+	for _, key := range localKeys {
+		found := false
+		for _, id := range targetsRole.KeyIDs {
+			if key.ContainsID(id) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			c.Fatal("missing key")
+		}
+	}
+
+	// check root.json got staged
+	meta, err := local.GetMeta()
+	c.Assert(err, IsNil)
+	rootJSON, ok := meta["root.json"]
+	if !ok {
+		c.Fatal("missing root metadata")
+	}
+	s := &data.Signed{}
+	c.Assert(json.Unmarshal(rootJSON, s), IsNil)
+	stagedRoot := &data.Root{}
+	c.Assert(json.Unmarshal(s.Signed, stagedRoot), IsNil)
+	c.Assert(stagedRoot.Type, Equals, root.Type)
+	c.Assert(stagedRoot.Version, Equals, root.Version)
+	c.Assert(stagedRoot.Expires.UnixNano(), Equals, root.Expires.UnixNano())
+
+	// make sure both root and stagedRoot have evaluated IDs(), otherwise
+	// DeepEquals will fail because those values might not have been
+	// computed yet.
+	for _, key := range root.Keys {
+		key.IDs()
+	}
+	for _, key := range stagedRoot.Keys {
+		key.IDs()
+	}
+	c.Assert(stagedRoot.Keys, DeepEquals, root.Keys)
+	c.Assert(stagedRoot.Roles, DeepEquals, root.Roles)
+}
+
 func (RepoSuite) TestRevokeKey(c *C) {
 	local := MemoryStore(make(map[string]json.RawMessage), nil)
 	r, err := NewRepo(local)

@@ -257,25 +257,38 @@ func (r *Repo) GenKey(role string) ([]string, error) {
 }
 
 func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) ([]string, error) {
-	if !verify.ValidRole(keyRole) {
-		return []string{}, ErrInvalidRole{keyRole}
-	}
-
-	if !validExpires(expires) {
-		return []string{}, ErrInvalidExpires{expires}
-	}
-
-	root, err := r.root()
-	if err != nil {
-		return []string{}, err
-	}
-
 	key, err := sign.GenerateEd25519Key()
 	if err != nil {
 		return []string{}, err
 	}
-	if err := r.local.SavePrivateKey(keyRole, key); err != nil {
+
+	if err = r.AddPrivateKeyWithExpires(keyRole, key, expires); err != nil {
 		return []string{}, err
+	}
+
+	return key.PublicData().IDs(), nil
+}
+
+func (r *Repo) AddPrivateKey(role string, key *sign.PrivateKey) error {
+	return r.AddPrivateKeyWithExpires(role, key, data.DefaultExpires(role))
+}
+
+func (r *Repo) AddPrivateKeyWithExpires(keyRole string, key *sign.PrivateKey, expires time.Time) error {
+	root, err := r.root()
+	if err != nil {
+		return err
+	}
+
+	if !verify.ValidRole(keyRole) {
+		return ErrInvalidRole{keyRole}
+	}
+
+	if !validExpires(expires) {
+		return ErrInvalidExpires{expires}
+	}
+
+	if err := r.local.SavePrivateKey(keyRole, key); err != nil {
+		return err
 	}
 	pk := key.PublicData()
 
@@ -293,7 +306,7 @@ func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) ([]string, e
 		r.versionUpdated["root.json"] = struct{}{}
 	}
 
-	return pk.IDs(), r.setMeta("root.json", root)
+	return r.setMeta("root.json", root)
 }
 
 func validExpires(expires time.Time) bool {
