@@ -1,1 +1,29 @@
-{"signed":{"_type":"timestamp","expires":"2100-01-01T00:00:00Z","meta":{"snapshot.json":{"hashes":{"sha512":"8f58f3f272b5e33f1b2c7545dbef1ba0dddfba4f8b6c742164d9b89c8648cde4ecace9f392365426a688bc5d11a207d0fe248712f05927573f7f5c709ba457e8"},"length":972,"version":3}},"spec_version":"1.0","version":3},"signatures":[{"keyid":"cbd239974ec2e4bd66786abca74120384d0ea764c1cb62c4e306c5d54d58b25d","method":"ed25519","sig":"68baac4f6559684bdd05aeab21d713e3844e2d280228c5d8466e0695e42be9dae33e6c459b67fee4b815a4476961227462a80b84f086ba21fb7392094e977d0f"},{"keyid":"8e2011a62b98770b5b5162df49af5f791c42ef94bab814bf6db758b940482ea5","method":"ed25519","sig":"68baac4f6559684bdd05aeab21d713e3844e2d280228c5d8466e0695e42be9dae33e6c459b67fee4b815a4476961227462a80b84f086ba21fb7392094e977d0f"}]}
+{
+	"signed": {
+		"_type": "timestamp",
+		"expires": "2100-01-01T00:00:00Z",
+		"meta": {
+			"snapshot.json": {
+				"hashes": {
+					"sha512": "b6e5aa107d62973842336ce39bd8c12f21acecd11ee4b5054ddb6d033a0a81eaf0ca087611771fd53ee8639f00ab8657317832f4ae352ca42bc4ece39e08c949"
+				},
+				"length": 1126,
+				"version": 3
+			}
+		},
+		"spec_version": "1.0",
+		"version": 3
+	},
+	"signatures": [
+		{
+			"keyid": "79b5760e4c96b6becc12bec4260c9c1d533b9b70628ade2b229ef02b772b10b0",
+			"method": "ed25519",
+			"sig": "9f159f945f7c2dd7332bcc20647e71c2ebc285caa217477dee23dd1f3a74c73d5f7bcdd34bc8f91120141fbbfac732c3fc39cf2234fd49aed618031dbcba9901"
+		},
+		{
+			"keyid": "e23c19fb64db7146965700b9983df63d2dd4362b1f99d74da2383234da4ab20d",
+			"method": "ed25519",
+			"sig": "9f159f945f7c2dd7332bcc20647e71c2ebc285caa217477dee23dd1f3a74c73d5f7bcdd34bc8f91120141fbbfac732c3fc39cf2234fd49aed618031dbcba9901"
+		}
+	]
+}

@@ -5,22 +5,22 @@
 			"keytype": "ed25519",
 			"scheme": "ed25519",
 			"keyid_hash_algorithms": [
-				"sha512"
+				"sha256"
 			],
 			"keyval": {
-				"public": "ed4e0655e4167638c9c3170422cdbff02a5babffecb2bcce19c89d7ba9689517",
-				"private": "a36682d4e7d45d509b657c80bc808603e0ba2ce0cbf54694f7e58c2bb7fc381ded4e0655e4167638c9c3170422cdbff02a5babffecb2bcce19c89d7ba9689517"
+				"public": "d482fa4805a50870aa1356ace6b764f7ab47ed4dc38f49b1a189afa25f179e94",
+				"private": "28de1763cc4cc78702167bd6cf862fc3977afc2404c5eebbdfb948bab55f14f0d482fa4805a50870aa1356ace6b764f7ab47ed4dc38f49b1a189afa25f179e94"
 			}
 		},
 		{
 			"keytype": "ed25519",
 			"scheme": "ed25519",
 			"keyid_hash_algorithms": [
-				"sha512"
+				"sha256"
 			],
 			"keyval": {
-				"public": "87c25141eab312f8dd41e5d8519f9b7b10350e2834a39a0600ea3315d1701b83",
-				"private": "569e732e202041db3349b9fcb8e575f9e1d8171518856f2393bd1789baf9077187c25141eab312f8dd41e5d8519f9b7b10350e2834a39a0600ea3315d1701b83"
+				"public": "722dbc861813bb5b568524d62083e875c08e66fed1694d9161d253fa163dd86f",
+				"private": "fb85703e9c1c77cfe87c18eda24d5637d997503fef4107f6c04777b0fbec2b8c722dbc861813bb5b568524d62083e875c08e66fed1694d9161d253fa163dd86f"
 			}
 		}
 	]

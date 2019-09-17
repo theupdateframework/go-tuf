@@ -1,1 +1,36 @@
-{"signed":{"_type":"snapshot","expires":"2100-01-01T00:00:00Z","meta":{"root.json":{"hashes":{"sha512":"2d8f5b58d81972d935708c999dc6ce9c54979fe0ee7f8b0473eed4fc952d3ae83ab3ecb9aed8651d8126bd24e2b3f4a9753d0813c5597f8f3f146e3b16c16626"},"length":3144,"version":2},"targets.json":{"hashes":{"sha512":"6b0fa9a46e1596f6a6f6a5b2ae09e193ba85163effe5c529ea29b05fb7d2bd493d27b32a85a123267451e42e453432d81765f355a00e552d6c92b155db90d730"},"length":1093,"version":3}},"spec_version":"1.0","version":3},"signatures":[{"keyid":"f15db6ee96ebae96476ffab01b46904c43e7a24a4fcbdc1ff5e6489c12501f80","method":"ed25519","sig":"f89f4d7afd5abc3d4c95997f0550a837d72a42a82423ce36ddeceecda0416e48193395ebc96ebfa5c818ebe9f27812cc844ca34654287da0d81c1e3af9096206"},{"keyid":"8a520dc213d6b7996e9872507ba5d31bd8c3f612253fc7dfa4ec0e45d6bdd63f","method":"ed25519","sig":"f89f4d7afd5abc3d4c95997f0550a837d72a42a82423ce36ddeceecda0416e48193395ebc96ebfa5c818ebe9f27812cc844ca34654287da0d81c1e3af9096206"}]}
+{
+	"signed": {
+		"_type": "snapshot",
+		"expires": "2100-01-01T00:00:00Z",
+		"meta": {
+			"root.json": {
+				"hashes": {
+					"sha512": "c524226038aea1ef7b929eacee647d6306473e4bf121cf7fa6716a7afe67f4c60b3e9910b363f04e58effe7ce9ebedd1849cadc14dcdb8651a892c751f5ebe1d"
+				},
+				"length": 3831,
+				"version": 2
+			},
+			"targets.json": {
+				"hashes": {
+					"sha512": "d2678da14b885b502802ee9eb93853548cf0138c9a80f5e88fea99b26c152865a9638088fee1f90cf8c3319fbc58fc8c7384b88abf6d0cc6312859070356a22f"
+				},
+				"length": 1268,
+				"version": 3
+			}
+		},
+		"spec_version": "1.0",
+		"version": 3
+	},
+	"signatures": [
+		{
+			"keyid": "d792ff8cf3c5d9a8fe0fdfa585b25028fa9f49aa29c62a658140d4b98cc2c917",
+			"method": "ed25519",
+			"sig": "c5f5894259f50e0f17b831e0575410f803dedb113b8a55986aeb3004a73d274fe5c9a7e4614832cff7251d449b7096e00dc2331cde5817a771b84dc2216f2007"
+		},
+		{
+			"keyid": "7165b3cf2ad6a10d456498d958e80f2356b0d3a230d93a96a8dada5fdd8dd40d",
+			"method": "ed25519",
+			"sig": "c5f5894259f50e0f17b831e0575410f803dedb113b8a55986aeb3004a73d274fe5c9a7e4614832cff7251d449b7096e00dc2331cde5817a771b84dc2216f2007"
+		}
+	]
+}
