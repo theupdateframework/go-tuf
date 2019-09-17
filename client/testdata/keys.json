@@ -1,0 +1,114 @@
+{
+    "root": [
+        [
+            {
+                "keytype": "ed25519",
+                "scheme": "ed25519",
+                "keyid_hash_algorithms": [
+                    "sha256"
+                ],
+                "keyval": {
+                    "public": "bca152214dbfd3e7a1b7a7b3e2cc179fb00520fd7212c8a60ba99f14dfc0e1ca",
+                    "private": "68c2a06583ce83dabb1fc5d2b3697015b936f341f21be1be1397670a650ebd53bca152214dbfd3e7a1b7a7b3e2cc179fb00520fd7212c8a60ba99f14dfc0e1ca"
+                }
+            }
+        ],
+        [
+            {
+                "keytype": "ed25519",
+                "scheme": "ed25519",
+                "keyid_hash_algorithms": [
+                    "sha256"
+                ],
+                "keyval": {
+                    "public": "153986a7370e002f377dd68797e7466c421180c1571e233de2f8ab41c8af4f54",
+                    "private": "e53595d99a85a33d7c228d28b25c856148c65be36558d0d61faa7e018a51db5c153986a7370e002f377dd68797e7466c421180c1571e233de2f8ab41c8af4f54"
+                }
+            }
+        ]
+    ],
+    "snapshot": [
+        [
+            {
+                "keytype": "ed25519",
+                "scheme": "ed25519",
+                "keyid_hash_algorithms": [
+                    "sha256"
+                ],
+                "keyval": {
+                    "public": "d482fa4805a50870aa1356ace6b764f7ab47ed4dc38f49b1a189afa25f179e94",
+                    "private": "28de1763cc4cc78702167bd6cf862fc3977afc2404c5eebbdfb948bab55f14f0d482fa4805a50870aa1356ace6b764f7ab47ed4dc38f49b1a189afa25f179e94"
+                }
+            }
+        ],
+        [
+            {
+                "keytype": "ed25519",
+                "scheme": "ed25519",
+                "keyid_hash_algorithms": [
+                    "sha256"
+                ],
+                "keyval": {
+                    "public": "722dbc861813bb5b568524d62083e875c08e66fed1694d9161d253fa163dd86f",
+                    "private": "fb85703e9c1c77cfe87c18eda24d5637d997503fef4107f6c04777b0fbec2b8c722dbc861813bb5b568524d62083e875c08e66fed1694d9161d253fa163dd86f"
+                }
+            }
+        ]
+    ],
+    "targets": [
+        [
+            {
+                "keytype": "ed25519",
+                "scheme": "ed25519",
+                "keyid_hash_algorithms": [
+                    "sha256"
+                ],
+                "keyval": {
+                    "public": "62f71f99c788f16bcdc8bb252455e3a690350e4ddea5a6aab1f9a3aaabcf369a",
+                    "private": "dee6d1fa7f041bee48a4e783d416e12c72ecdbd164202a71b23149adbb1c3d1f62f71f99c788f16bcdc8bb252455e3a690350e4ddea5a6aab1f9a3aaabcf369a"
+                }
+            }
+        ],
+        [
+            {
+                "keytype": "ed25519",
+                "scheme": "ed25519",
+                "keyid_hash_algorithms": [
+                    "sha256"
+                ],
+                "keyval": {
+                    "public": "aee574e56780ea1709a8b56e02d4ffdd9a3a1deaed61e2eb0701f376a4422e42",
+                    "private": "9f51d6d05cda79b80dad73d7e1611df50555d5090bf9fe6bfac5ad3690b57e2aaee574e56780ea1709a8b56e02d4ffdd9a3a1deaed61e2eb0701f376a4422e42"
+                }
+            }
+        ]
+    ],
+    "timestamp": [
+        [
+            {
+                "keytype": "ed25519",
+                "scheme": "ed25519",
+                "keyid_hash_algorithms": [
+                    "sha256"
+                ],
+                "keyval": {
+                    "public": "8656ad20568cd3534c405e4d9a84b0c6e6163f7f66434df77416502835b9b160",
+                    "private": "2ef838a6f0aa4bc0a746b8086098683f96bb5118c4dca7d3caa3dee5c86ea8398656ad20568cd3534c405e4d9a84b0c6e6163f7f66434df77416502835b9b160"
+                }
+            }
+        ],
+        [
+            {
+                "keytype": "ed25519",
+                "scheme": "ed25519",
+                "keyid_hash_algorithms": [
+                    "sha256"
+                ],
+                "keyval": {
+                    "public": "3ab34b0c2d4eadccaa0f0cf22ced07b552394063a9de2806993d022360dffc76",
+                    "private": "1d9a579675ee85074a7c5d8a3e4a58a21e82bddc53bbfe1bef547d681d4049783ab34b0c2d4eadccaa0f0cf22ced07b552394063a9de2806993d022360dffc76"
+                }
+            }
+        ]
+    ]
+}

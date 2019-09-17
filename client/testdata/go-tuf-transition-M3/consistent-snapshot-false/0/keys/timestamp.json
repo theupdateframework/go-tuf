@@ -5,11 +5,11 @@
 			"keytype": "ed25519",
 			"scheme": "ed25519",
 			"keyid_hash_algorithms": [
-				"sha512"
+				"sha256"
 			],
 			"keyval": {
-				"public": "596b9c2929932df6f4d36cbc11b53e597fd606553e9951bee00dfaff47b902e9",
-				"private": "ff7607566ae178dafbb9e285c96f29c1d0569fe0160dd022208261e4a81722e1596b9c2929932df6f4d36cbc11b53e597fd606553e9951bee00dfaff47b902e9"
+				"public": "8656ad20568cd3534c405e4d9a84b0c6e6163f7f66434df77416502835b9b160",
+				"private": "2ef838a6f0aa4bc0a746b8086098683f96bb5118c4dca7d3caa3dee5c86ea8398656ad20568cd3534c405e4d9a84b0c6e6163f7f66434df77416502835b9b160"
 			}
 		}
 	]
