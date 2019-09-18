@@ -39,10 +39,13 @@ func newRepo(dir string) *tuf.Repo {
 	return repo
 }
 
-func commit(repo *tuf.Repo) {
+func commit(dir string, repo *tuf.Repo) {
 	assertNotNil(repo.SnapshotWithExpires(tuf.CompressionTypeNone, expirationDate))
 	assertNotNil(repo.TimestampWithExpires(expirationDate))
 	assertNotNil(repo.Commit())
+
+	// Remove the keys directory to make sure we don't accidentally use a key.
+	assertNotNil(os.RemoveAll(filepath.Join(dir, "keys")))
 }
 
 func addKeys(repo *tuf.Repo, roleKeys map[string][]*sign.PrivateKey) {
@@ -70,43 +73,6 @@ func revokeKeys(repo *tuf.Repo, role string, keys []*sign.PrivateKey) {
 	}
 }
 
-// repoFilteredKeys filters out a key to make sure we can't sign with it. This
-// is to make sure key rotation worked.
-func filterKeys(dir string, role string, keys []*sign.PrivateKey) {
-	var ids []string
-	for _, key := range keys {
-		ids = append(ids, key.PublicData().IDs()...)
-	}
-
-	path := filepath.Join(dir, "keys", fmt.Sprintf("%s.json", role))
-	b, err := ioutil.ReadFile(path)
-	assertNotNil(err)
-
-	persistedKeys := &persistedKeys{}
-	assertNotNil(json.Unmarshal(b, persistedKeys))
-
-	newKeys := []*sign.PrivateKey{}
-	for _, key := range persistedKeys.Data {
-		found := false
-		for _, id := range ids {
-			if key.PublicData().ContainsID(id) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			newKeys = append(newKeys, key)
-		}
-	}
-	persistedKeys.Data = newKeys
-
-	b, err = json.Marshal(persistedKeys)
-	assertNotNil(err)
-
-	err = ioutil.WriteFile(path, b, 0644)
-	assertNotNil(err)
-}
-
 func generateRepos(dir string, consistentSnapshot bool) {
 	f, err := os.Open("../keys.json")
 	assertNotNil(err)
@@ -125,58 +91,54 @@ func generateRepos(dir string, consistentSnapshot bool) {
 		"timestamp": roleKeys["timestamp"][0],
 	})
 	addTargets(repo0, dir0, map[string][]byte{"0": []byte("0")})
-	commit(repo0)
+	commit(dir0, repo0)
 
 	// Rotate the timestamp keys.
 	dir1 := filepath.Join(dir, "1")
 	copyRepo(dir0, dir1)
 	repo1 := newRepo(dir1)
+	addKeys(repo1, map[string][]*sign.PrivateKey{
+		"root":      roleKeys["root"][0],
+		"targets":   roleKeys["targets"][0],
+		"snapshot":  roleKeys["snapshot"][0],
+		"timestamp": roleKeys["timestamp"][0],
+	})
 	revokeKeys(repo1, "timestamp", roleKeys["timestamp"][0])
 	addKeys(repo1, map[string][]*sign.PrivateKey{
 		"timestamp": roleKeys["timestamp"][1],
 	})
 	addTargets(repo1, dir1, map[string][]byte{"1": []byte("1")})
-	commit(repo1)
+	commit(dir1, repo1)
 
-	// Filter out the old timestamp key to make sure we can't use it.
+	// Rotate the root keys.
 	dir2 := filepath.Join(dir, "2")
 	copyRepo(dir1, dir2)
-	filterKeys(dir2, "timestamp", roleKeys["timestamp"][0])
 	repo2 := newRepo(dir2)
+	addKeys(repo2, map[string][]*sign.PrivateKey{
+		"root":      roleKeys["root"][0],
+		"targets":   roleKeys["targets"][0],
+		"snapshot":  roleKeys["snapshot"][0],
+		"timestamp": roleKeys["timestamp"][1],
+	})
+	revokeKeys(repo2, "root", roleKeys["root"][0])
+	addKeys(repo2, map[string][]*sign.PrivateKey{
+		"root": roleKeys["root"][1],
+	})
 	addTargets(repo2, dir2, map[string][]byte{"2": []byte("2")})
-	commit(repo2)
+	commit(dir2, repo2)
 
-	// Now, actually rotate the root keys.
+	// Add another target file to make sure the workflow worked.
 	dir3 := filepath.Join(dir, "3")
 	copyRepo(dir2, dir3)
 	repo3 := newRepo(dir3)
-	revokeKeys(repo3, "root", roleKeys["root"][0])
 	addKeys(repo3, map[string][]*sign.PrivateKey{
-		"root": roleKeys["root"][1],
+		"root":      roleKeys["root"][1],
+		"targets":   roleKeys["targets"][0],
+		"snapshot":  roleKeys["snapshot"][0],
+		"timestamp": roleKeys["timestamp"][1],
 	})
 	addTargets(repo3, dir3, map[string][]byte{"3": []byte("3")})
-	commit(repo3)
-
-	// Filter out the old root key to make sure we can't use it.
-	dir4 := filepath.Join(dir, "4")
-	copyRepo(dir3, dir4)
-	filterKeys(dir4, "root", roleKeys["root"][0])
-	// The only way to force go-tuf to re-sign the root.json is to generate
-	// or revoke a key. So why not do both?
-	repo4 := newRepo(dir4)
-	addKeys(repo4, map[string][]*sign.PrivateKey{
-		"snapshot": roleKeys["snapshot"][1],
-	})
-	revokeKeys(repo4, "snapshot", roleKeys["snapshot"][0])
-	addTargets(repo4, dir4, map[string][]byte{"4": []byte("4")})
-	commit(repo4)
-
-	// Add another target file to make sure the workflow worked.
-	dir5 := filepath.Join(dir, "5")
-	copyRepo(dir4, dir5)
-	repo5 := newRepo(dir5)
-	addTargets(repo5, dir5, map[string][]byte{"5": []byte("5")})
-	commit(repo5)
+	commit(dir3, repo3)
 }
 
 func main() {
