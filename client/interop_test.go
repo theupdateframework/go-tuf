@@ -21,6 +21,7 @@ var _ = Suite(&InteropSuite{})
 
 func (InteropSuite) TestGoClientCompatibility(c *C) {
 	names := []string{
+		"go-tuf",
 		"go-tuf-transition-M3",
 		"go-tuf-transition-M4",
 	}
