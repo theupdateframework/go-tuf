@@ -13,11 +13,66 @@ import (
 	"github.com/flynn/go-tuf/data"
 	"github.com/flynn/go-tuf/util"
 	. "gopkg.in/check.v1"
+
+	goTufGenerator "github.com/flynn/go-tuf/client/testdata/go-tuf/generator"
 )
 
 type InteropSuite struct{}
 
 var _ = Suite(&InteropSuite{})
+
+func (InteropSuite) TestGoClientIdentityConsistentSnapshotFalse(c *C) {
+	checkGoIdentity(c, false)
+}
+
+func (InteropSuite) TestGoClientIdentityConsistentSnapshotTrue(c *C) {
+	checkGoIdentity(c, true)
+}
+
+func checkGoIdentity(c *C, consistentSnapshot bool) {
+	cwd, err := os.Getwd()
+	c.Assert(err, IsNil)
+	testDataDir := filepath.Join(cwd, "testdata")
+
+	tempDir, err := ioutil.TempDir("", "")
+	c.Assert(err, IsNil)
+	defer os.RemoveAll(tempDir)
+
+	// Generate the metadata and compute hashes for all the files.
+	goTufGenerator.Generate(tempDir, filepath.Join(testDataDir, "keys.json"), consistentSnapshot)
+	hashes := computeHashes(c, tempDir)
+
+	snapshotDir := filepath.Join(testDataDir, "go-tuf", fmt.Sprintf("consistent-snapshot-%t", consistentSnapshot))
+	snapshotHashes := computeHashes(c, snapshotDir)
+
+	c.Assert(hashes, DeepEquals, snapshotHashes, Commentf("metadata out of date, regenerate by running client/testdata/go-tuf/regenerate-metadata.sh"))
+}
+
+func computeHashes(c *C, dir string) map[string]string {
+	hashes := make(map[string]string)
+
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+
+		bytes, err := ioutil.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		path, err = filepath.Rel(dir, path)
+		if err != nil {
+			return err
+		}
+		hashes[path] = string(bytes)
+
+		return nil
+	})
+	c.Assert(err, IsNil)
+
+	return hashes
+}
 
 func (InteropSuite) TestGoClientCompatibility(c *C) {
 	names := []string{
