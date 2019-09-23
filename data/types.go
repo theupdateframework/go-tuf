@@ -155,6 +155,18 @@ type Role struct {
 	Threshold int      `json:"threshold"`
 }
 
+func (r *Role) AddKeyIDs(ids []string) {
+	roleIDs := make(map[string]struct{})
+	for _, id := range r.KeyIDs {
+		roleIDs[id] = struct{}{}
+	}
+	for _, id := range ids {
+		if _, ok := roleIDs[id]; !ok {
+			r.KeyIDs = append(r.KeyIDs, id)
+		}
+	}
+}
+
 type Files map[string]FileMeta
 
 type FileMeta struct {
