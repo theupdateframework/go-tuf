@@ -297,7 +297,7 @@ func (r *Repo) AddPrivateKeyWithExpires(keyRole string, key *sign.PrivateKey, ex
 		role = &data.Role{KeyIDs: []string{}, Threshold: 1}
 		root.Roles[keyRole] = role
 	}
-	role.KeyIDs = append(role.KeyIDs, pk.IDs()...)
+	role.AddKeyIDs(pk.IDs())
 
 	root.AddKey(pk)
 	root.Expires = expires.Round(time.Second)
