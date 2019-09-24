@@ -297,9 +297,19 @@ func (r *Repo) AddPrivateKeyWithExpires(keyRole string, key *sign.PrivateKey, ex
 		role = &data.Role{KeyIDs: []string{}, Threshold: 1}
 		root.Roles[keyRole] = role
 	}
-	role.AddKeyIDs(pk.IDs())
+	changed := false
+	if role.AddKeyIDs(pk.IDs()) {
+		changed = true
+	}
 
-	root.AddKey(pk)
+	if root.AddKey(pk) {
+		changed = true
+	}
+
+	if !changed {
+		return nil
+	}
+
 	root.Expires = expires.Round(time.Second)
 	if _, ok := r.versionUpdated["root.json"]; !ok {
 		root.Version++

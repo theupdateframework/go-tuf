@@ -52,6 +52,23 @@ func (TypesSuite) TestKeyIDs(c *C) {
 	c.Assert(key.IDs(), DeepEquals, []string{keyid10algos, keyid09})
 }
 
+func (TypesSuite) TestRootAddKey(c *C) {
+	var hexbytes HexBytes
+	err := json.Unmarshal([]byte(public), &hexbytes)
+	c.Assert(err, IsNil)
+
+	key := &Key{
+		Type:   KeyTypeEd25519,
+		Scheme: KeySchemeEd25519,
+		Value:  KeyValue{Public: hexbytes},
+	}
+
+	root := NewRoot()
+
+	c.Assert(root.AddKey(key), Equals, true)
+	c.Assert(root.AddKey(key), Equals, false)
+}
+
 func (TypesSuite) TestRoleAddKeyIDs(c *C) {
 	var hexbytes HexBytes
 	err := json.Unmarshal([]byte(public), &hexbytes)
@@ -66,11 +83,11 @@ func (TypesSuite) TestRoleAddKeyIDs(c *C) {
 	role := &Role{}
 	c.Assert(role.KeyIDs, HasLen, 0)
 
-	role.AddKeyIDs(key.IDs())
+	c.Assert(role.AddKeyIDs(key.IDs()), Equals, true)
 	c.Assert(role.KeyIDs, DeepEquals, []string{keyid10, keyid09})
 
 	// Adding the key again doesn't modify the array.
-	role.AddKeyIDs(key.IDs())
+	c.Assert(role.AddKeyIDs(key.IDs()), Equals, false)
 	c.Assert(role.KeyIDs, DeepEquals, []string{keyid10, keyid09})
 
 	// Add another key.
@@ -82,6 +99,6 @@ func (TypesSuite) TestRoleAddKeyIDs(c *C) {
 	}
 
 	// Adding the key again doesn't modify the array.
-	role.AddKeyIDs(key.IDs())
+	c.Assert(role.AddKeyIDs(key.IDs()), Equals, true)
 	c.Assert(role.KeyIDs, DeepEquals, []string{keyid10, keyid09, keyid10algos})
 }
