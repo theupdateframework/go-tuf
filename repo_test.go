@@ -278,17 +278,21 @@ func (RepoSuite) TestGenKey(c *C) {
 	c.Assert(stagedRoot.Roles, DeepEquals, root.Roles)
 }
 
-func addKey(c *C, r *Repo, role string) []string {
-	key, err := sign.GenerateEd25519Key()
-	c.Assert(err, IsNil)
-	err = r.AddPrivateKey(role, key)
+func addPrivateKey(c *C, r *Repo, role string, key *sign.PrivateKey) []string {
+	err := r.AddPrivateKey(role, key)
 	c.Assert(err, IsNil)
 	keyids := key.PublicData().IDs()
 	c.Assert(len(keyids) > 0, Equals, true)
 	return keyids
 }
 
-func (RepoSuite) TestAddKey(c *C) {
+func addGeneratedPrivateKey(c *C, r *Repo, role string) []string {
+	key, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	return addPrivateKey(c, r, role, key)
+}
+
+func (RepoSuite) TestAddPrivateKey(c *C) {
 	local := MemoryStore(make(map[string]json.RawMessage), nil)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -299,12 +303,13 @@ func (RepoSuite) TestAddKey(c *C) {
 	err = r.AddPrivateKey("foo", key)
 	c.Assert(err, Equals, ErrInvalidRole{"foo"})
 
-	// generate a root key
-	ids := addKey(c, r, "root")
+	// add a root key
+	ids := addPrivateKey(c, r, "root", key)
 
 	// check root metadata is correct
 	root, err := r.root()
 	c.Assert(err, IsNil)
+	c.Assert(root.Version, Equals, 1)
 	c.Assert(root.Roles, NotNil)
 	c.Assert(root.Roles, HasLen, 1)
 	c.Assert(root.UniqueKeys(), HasLen, 1)
@@ -351,8 +356,8 @@ func (RepoSuite) TestAddKey(c *C) {
 	c.Assert(rootKey, NotNil)
 
 	// generate two targets keys
-	addKey(c, r, "targets")
-	addKey(c, r, "targets")
+	addGeneratedPrivateKey(c, r, "targets")
+	addGeneratedPrivateKey(c, r, "targets")
 
 	// check root metadata is correct
 	root, err = r.root()
@@ -429,6 +434,25 @@ func (RepoSuite) TestAddKey(c *C) {
 	}
 	c.Assert(stagedRoot.Keys, DeepEquals, root.Keys)
 	c.Assert(stagedRoot.Roles, DeepEquals, root.Roles)
+
+	// commit to make sure we don't modify metadata after committing metadata.
+	addGeneratedPrivateKey(c, r, "snapshot")
+	addGeneratedPrivateKey(c, r, "timestamp")
+	c.Assert(r.AddTargets([]string{}, nil), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	// add the same root key to make sure the metadata is unmodified.
+	oldRoot, err := r.root()
+	c.Assert(err, IsNil)
+	addPrivateKey(c, r, "root", key)
+	newRoot, err := r.root()
+	c.Assert(err, IsNil)
+	c.Assert(oldRoot, DeepEquals, newRoot)
+	if _, ok := r.versionUpdated["root.json"]; ok {
+		c.Fatal("root should not be marked dirty")
+	}
 }
 
 func (RepoSuite) TestRevokeKey(c *C) {

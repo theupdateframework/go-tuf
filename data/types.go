@@ -119,10 +119,15 @@ func NewRoot() *Root {
 	}
 }
 
-func (r *Root) AddKey(key *Key) {
+func (r *Root) AddKey(key *Key) bool {
+	changed := false
 	for _, id := range key.IDs() {
-		r.Keys[id] = key
+		if _, ok := r.Keys[id]; !ok {
+			changed = true
+			r.Keys[id] = key
+		}
 	}
+	return changed
 }
 
 // We might have multiple keyids that correspond to the same key, so
@@ -155,16 +160,19 @@ type Role struct {
 	Threshold int      `json:"threshold"`
 }
 
-func (r *Role) AddKeyIDs(ids []string) {
+func (r *Role) AddKeyIDs(ids []string) bool {
 	roleIDs := make(map[string]struct{})
 	for _, id := range r.KeyIDs {
 		roleIDs[id] = struct{}{}
 	}
+	changed := false
 	for _, id := range ids {
 		if _, ok := roleIDs[id]; !ok {
+			changed = true
 			r.KeyIDs = append(r.KeyIDs, id)
 		}
 	}
+	return changed
 }
 
 type Files map[string]FileMeta
