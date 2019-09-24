@@ -80,65 +80,57 @@ func generateRepos(dir string, consistentSnapshot bool) {
 	var roleKeys map[string][][]*sign.PrivateKey
 	assertNotNil(json.NewDecoder(f).Decode(&roleKeys))
 
+	// Collect all the initial keys we'll use when creating repositories.
+	// We'll modify this to reflect rotated keys.
+	keys := map[string][]*sign.PrivateKey{
+		"root":      roleKeys["root"][0],
+		"targets":   roleKeys["targets"][0],
+		"snapshot":  roleKeys["snapshot"][0],
+		"timestamp": roleKeys["timestamp"][0],
+	}
+
 	// Create the initial repo.
 	dir0 := filepath.Join(dir, "0")
 	repo0 := newRepo(dir0)
 	repo0.Init(consistentSnapshot)
-	addKeys(repo0, map[string][]*sign.PrivateKey{
-		"root":      roleKeys["root"][0],
-		"targets":   roleKeys["targets"][0],
-		"snapshot":  roleKeys["snapshot"][0],
-		"timestamp": roleKeys["timestamp"][0],
-	})
+	addKeys(repo0, keys)
 	addTargets(repo0, dir0, map[string][]byte{"0": []byte("0")})
 	commit(dir0, repo0)
 
-	// Rotate the timestamp keys.
-	dir1 := filepath.Join(dir, "1")
-	copyRepo(dir0, dir1)
-	repo1 := newRepo(dir1)
-	addKeys(repo1, map[string][]*sign.PrivateKey{
-		"root":      roleKeys["root"][0],
-		"targets":   roleKeys["targets"][0],
-		"snapshot":  roleKeys["snapshot"][0],
-		"timestamp": roleKeys["timestamp"][0],
-	})
-	revokeKeys(repo1, "timestamp", roleKeys["timestamp"][0])
-	addKeys(repo1, map[string][]*sign.PrivateKey{
-		"timestamp": roleKeys["timestamp"][1],
-	})
-	addTargets(repo1, dir1, map[string][]byte{"1": []byte("1")})
-	commit(dir1, repo1)
+	// Rotate all the keys to make sure that works.
+	oldDir := dir0
+	i := 1
+	for _, role := range []string{"root", "targets", "snapshot", "timestamp"} {
+		// Setup the repo.
+		stepName := fmt.Sprintf("%d", i)
+		d := filepath.Join(dir, stepName)
+		copyRepo(oldDir, d)
+		repo := newRepo(d)
+		addKeys(repo, keys)
 
-	// Rotate the root keys.
-	dir2 := filepath.Join(dir, "2")
-	copyRepo(dir1, dir2)
-	repo2 := newRepo(dir2)
-	addKeys(repo2, map[string][]*sign.PrivateKey{
-		"root":      roleKeys["root"][0],
-		"targets":   roleKeys["targets"][0],
-		"snapshot":  roleKeys["snapshot"][0],
-		"timestamp": roleKeys["timestamp"][1],
-	})
-	revokeKeys(repo2, "root", roleKeys["root"][0])
-	addKeys(repo2, map[string][]*sign.PrivateKey{
-		"root": roleKeys["root"][1],
-	})
-	addTargets(repo2, dir2, map[string][]byte{"2": []byte("2")})
-	commit(dir2, repo2)
+		// Actually rotate the keys
+		revokeKeys(repo, role, roleKeys[role][0])
+		addKeys(repo, map[string][]*sign.PrivateKey{
+			role: roleKeys[role][1],
+		})
+		keys[role] = roleKeys[role][1]
+
+		// Add a target to make sure that works, then commit.
+		addTargets(repo, d, map[string][]byte{stepName: []byte(stepName)})
+		commit(d, repo)
+
+		i += 1
+		oldDir = d
+	}
 
 	// Add another target file to make sure the workflow worked.
-	dir3 := filepath.Join(dir, "3")
-	copyRepo(dir2, dir3)
-	repo3 := newRepo(dir3)
-	addKeys(repo3, map[string][]*sign.PrivateKey{
-		"root":      roleKeys["root"][1],
-		"targets":   roleKeys["targets"][0],
-		"snapshot":  roleKeys["snapshot"][0],
-		"timestamp": roleKeys["timestamp"][1],
-	})
-	addTargets(repo3, dir3, map[string][]byte{"3": []byte("3")})
-	commit(dir3, repo3)
+	stepName := fmt.Sprintf("%d", i)
+	d := filepath.Join(dir, stepName)
+	copyRepo(oldDir, d)
+	repo := newRepo(d)
+	addKeys(repo, keys)
+	addTargets(repo, d, map[string][]byte{stepName: []byte(stepName)})
+	commit(d, repo)
 }
 
 func main() {
