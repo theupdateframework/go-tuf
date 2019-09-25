@@ -33,28 +33,27 @@ func copyRepo(src string, dst string) {
 }
 
 func newRepo(dir string) *tuf.Repo {
-	repo, err := tuf.NewRepo(tuf.FileSystemStore(dir, nil))
+	repo, err := tuf.NewRepoIndent(tuf.FileSystemStore(dir, nil), "", "\t")
 	assertNotNil(err)
 
 	return repo
 }
 
-func commit(repo *tuf.Repo) {
+func commit(dir string, repo *tuf.Repo) {
 	assertNotNil(repo.SnapshotWithExpires(tuf.CompressionTypeNone, expirationDate))
 	assertNotNil(repo.TimestampWithExpires(expirationDate))
 	assertNotNil(repo.Commit())
+
+	// Remove the keys directory to make sure we don't accidentally use a key.
+	assertNotNil(os.RemoveAll(filepath.Join(dir, "keys")))
 }
 
-func genKeys(repo *tuf.Repo, roles []string) map[string][]string {
-	ids := make(map[string][]string)
-
-	for _, role := range roles {
-		id, err := repo.GenKeyWithExpires(role, expirationDate)
-		assertNotNil(err)
-		ids[role] = id
+func addKeys(repo *tuf.Repo, roleKeys map[string][]*sign.PrivateKey) {
+	for role, keys := range roleKeys {
+		for _, key := range keys {
+			assertNotNil(repo.AddPrivateKeyWithExpires(role, key, expirationDate))
+		}
 	}
-
-	return ids
 }
 
 func addTargets(repo *tuf.Repo, dir string, files map[string][]byte) {
@@ -68,94 +67,70 @@ func addTargets(repo *tuf.Repo, dir string, files map[string][]byte) {
 	assertNotNil(repo.AddTargetsWithExpires(paths, nil, expirationDate))
 }
 
-func revokeKey(repo *tuf.Repo, role string, ids []string) {
-	assertNotNil(repo.RevokeKeyWithExpires(role, ids[0], expirationDate))
-}
-
-// repoFilteredKeys filters out a key to make sure we can't sign with it. This
-// is to make sure key rotation worked.
-func filterKeys(dir string, role string, ids []string) {
-	path := filepath.Join(dir, "keys", fmt.Sprintf("%s.json", role))
-	b, err := ioutil.ReadFile(path)
-	assertNotNil(err)
-
-	keys := &persistedKeys{}
-	assertNotNil(json.Unmarshal(b, keys))
-
-	newKeys := []*sign.PrivateKey{}
-	for _, key := range keys.Data {
-		found := false
-		for _, id := range ids {
-			if key.PublicData().ContainsID(id) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			newKeys = append(newKeys, key)
-		}
+func revokeKeys(repo *tuf.Repo, role string, keys []*sign.PrivateKey) {
+	for _, key := range keys {
+		assertNotNil(repo.RevokeKeyWithExpires(role, key.PublicData().IDs()[0], expirationDate))
 	}
-	keys.Data = newKeys
-
-	b, err = json.Marshal(keys)
-	assertNotNil(err)
-
-	err = ioutil.WriteFile(path, b, 0644)
-	assertNotNil(err)
 }
 
-func generateRepos(dir string) {
+func generateRepos(dir string, consistentSnapshot bool) {
+	f, err := os.Open("../keys.json")
+	assertNotNil(err)
+
+	var roleKeys map[string][][]*sign.PrivateKey
+	assertNotNil(json.NewDecoder(f).Decode(&roleKeys))
+
+	// Collect all the initial keys we'll use when creating repositories.
+	// We'll modify this to reflect rotated keys.
+	keys := map[string][]*sign.PrivateKey{
+		"root":      roleKeys["root"][0],
+		"targets":   roleKeys["targets"][0],
+		"snapshot":  roleKeys["snapshot"][0],
+		"timestamp": roleKeys["timestamp"][0],
+	}
+
 	// Create the initial repo.
 	dir0 := filepath.Join(dir, "0")
 	repo0 := newRepo(dir0)
-	ids := genKeys(repo0, []string{"root", "snapshot", "targets", "timestamp"})
+	repo0.Init(consistentSnapshot)
+	addKeys(repo0, keys)
 	addTargets(repo0, dir0, map[string][]byte{"0": []byte("0")})
-	commit(repo0)
+	commit(dir0, repo0)
 
-	// Rotate the timestamp keys.
-	dir1 := filepath.Join(dir, "1")
-	copyRepo(dir0, dir1)
-	repo1 := newRepo(dir1)
-	revokeKey(repo1, "timestamp", ids["timestamp"])
-	genKeys(repo1, []string{"timestamp"})
-	addTargets(repo1, dir1, map[string][]byte{"1": []byte("1")})
-	commit(repo1)
+	// Rotate all the keys to make sure that works.
+	oldDir := dir0
+	i := 1
+	for _, role := range []string{"root", "targets", "snapshot", "timestamp"} {
+		// Setup the repo.
+		stepName := fmt.Sprintf("%d", i)
+		d := filepath.Join(dir, stepName)
+		copyRepo(oldDir, d)
+		repo := newRepo(d)
+		addKeys(repo, keys)
 
-	// Filter out the old timestamp key to make sure we can't use it.
-	dir2 := filepath.Join(dir, "2")
-	copyRepo(dir1, dir2)
-	filterKeys(dir2, "timestamp", ids["timestamp"])
-	repo2 := newRepo(dir2)
-	addTargets(repo2, dir2, map[string][]byte{"2": []byte("2")})
-	commit(repo2)
+		// Actually rotate the keys
+		revokeKeys(repo, role, roleKeys[role][0])
+		addKeys(repo, map[string][]*sign.PrivateKey{
+			role: roleKeys[role][1],
+		})
+		keys[role] = roleKeys[role][1]
 
-	// Now, actually rotate the root keys.
-	dir3 := filepath.Join(dir, "3")
-	copyRepo(dir2, dir3)
-	repo3 := newRepo(dir3)
-	revokeKey(repo3, "root", ids["root"])
-	genKeys(repo3, []string{"root"})
-	addTargets(repo3, dir3, map[string][]byte{"3": []byte("3")})
-	commit(repo3)
+		// Add a target to make sure that works, then commit.
+		addTargets(repo, d, map[string][]byte{stepName: []byte(stepName)})
+		commit(d, repo)
 
-	// Filter out the old root key to make sure we can't use it.
-	dir4 := filepath.Join(dir, "4")
-	copyRepo(dir3, dir4)
-	filterKeys(dir4, "root", ids["root"])
-	// The only way to force go-tuf to re-sign the root.json is to generate
-	// or revoke a key. So why not do both?
-	repo4 := newRepo(dir4)
-	ids = genKeys(repo4, []string{"snapshot"})
-	revokeKey(repo4, "snapshot", ids["snapshot"])
-	addTargets(repo4, dir4, map[string][]byte{"4": []byte("4")})
-	commit(repo4)
+		i += 1
+		oldDir = d
+	}
 
 	// Add another target file to make sure the workflow worked.
-	dir5 := filepath.Join(dir, "5")
-	copyRepo(dir4, dir5)
-	repo5 := newRepo(dir5)
-	addTargets(repo5, dir5, map[string][]byte{"5": []byte("5")})
-	commit(repo5)
+	stepName := fmt.Sprintf("%d", i)
+	d := filepath.Join(dir, stepName)
+	copyRepo(oldDir, d)
+	repo := newRepo(d)
+	addKeys(repo, keys)
+	addTargets(repo, d, map[string][]byte{stepName: []byte(stepName)})
+	commit(d, repo)
 }
 
 func main() {
@@ -165,7 +140,7 @@ func main() {
 	for _, consistentSnapshot := range []bool{false, true} {
 		name := fmt.Sprintf("consistent-snapshot-%t", consistentSnapshot)
 		log.Printf("generating %s", name)
-		generateRepos(filepath.Join(cwd, name))
+		generateRepos(filepath.Join(cwd, name), consistentSnapshot)
 	}
 
 }

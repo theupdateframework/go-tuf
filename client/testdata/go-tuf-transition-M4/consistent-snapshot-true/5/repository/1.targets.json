@@ -1,1 +1,1 @@
-{"signed":{"_type":"targets","expires":"2100-01-01T00:00:00Z","spec_version":"1.0","targets":{"0":{"hashes":{"sha512":"31bca02094eb78126a517b206a88c73cfa9ec6f704c7030d18212cace820f025f00bf0ea68dbf3f3a5436ca63b53bf7bf80ad8d5de7d8359d0b7fed9dbc3ab99"},"length":1}},"version":1},"signatures":[{"keyid":"eae325465e34f6a202a50b2eb42165366ca55b387ff686ce946f70d4cdb81b9f","sig":"09f3b7faeb4098137fd7fb365f1396307a7d9240d0df527f7fb4a2861c2bc869611636897146e0d2ba2afd9df348f4b99fb19dbe1ff16ce652d9617b09533806"}]}
+../../4/repository/1.targets.json
