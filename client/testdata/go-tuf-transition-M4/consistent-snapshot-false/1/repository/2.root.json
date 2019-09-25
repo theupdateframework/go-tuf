@@ -1,1 +1,87 @@
-{"signed":{"_type":"root","consistent_snapshot":true,"expires":"2100-01-01T00:00:00Z","keys":{"0e967871caf192a56fcaa893f0ea0ae853e92da3118a3122c7663dc16a2036d7":{"keyid_hash_algorithms":["sha512"],"keytype":"ed25519","keyval":{"public":"9d0a51a3b2c40f8bfb6a989787eebfd0b7af521f85ecfa74ce6a3036239b7518"},"scheme":"ed25519"},"c0569ca50993fef952e3c7ee0fc1220f04c312bd60a098638027f98f7dd57d0e":{"keyid_hash_algorithms":["sha512"],"keytype":"ed25519","keyval":{"public":"03f9d7cb27b94b914fda338371cc525afefddf2075a179dc7927d17b79b453ef"},"scheme":"ed25519"},"c9e06997f3e77a1c999ed35b41899790214e9669b3a5c900238b8ed7260b375b":{"keyid_hash_algorithms":["sha512"],"keytype":"ed25519","keyval":{"public":"0b4fd984ce719448735d51496f20bfeba6ce076efd3311f828baca405827a680"},"scheme":"ed25519"},"cf0618db7ba21084b308c7a3a46219aff05e2ec39d48d55baac5e0c9ae5f9a47":{"keyid_hash_algorithms":["sha512"],"keytype":"ed25519","keyval":{"public":"814f81f40a031f2543a29860dc1c3666416dbc424ae7c8dd79d3af3c61577e61"},"scheme":"ed25519"}},"roles":{"root":{"keyids":["c9e06997f3e77a1c999ed35b41899790214e9669b3a5c900238b8ed7260b375b"],"threshold":1},"snapshot":{"keyids":["0e967871caf192a56fcaa893f0ea0ae853e92da3118a3122c7663dc16a2036d7"],"threshold":1},"targets":{"keyids":["c0569ca50993fef952e3c7ee0fc1220f04c312bd60a098638027f98f7dd57d0e"],"threshold":1},"timestamp":{"keyids":["cf0618db7ba21084b308c7a3a46219aff05e2ec39d48d55baac5e0c9ae5f9a47"],"threshold":1}},"spec_version":"1.0","version":2},"signatures":[{"keyid":"c9e06997f3e77a1c999ed35b41899790214e9669b3a5c900238b8ed7260b375b","sig":"55463ef12660d470109117b2873e1c018aaf606b9b7918ec6362929db5312665a8697c83510212bac5ef236284342922a96a4ce88122470851a7b7cb7536a107"}]}
+{
+	"signatures": [
+		{
+			"keyid": "160f5ae5e7017bc783bbbe26c5419bbeeeb87f507b140ef474da0517d56549f7",
+			"sig": "2c7952346c8f899b15f33048bfc22db078a2ee5df5ae4dfc1c7e4eb303ee5dd99b6957d8bddd39ddddbc2e49b0abd76e27c0b0439984ae36e23db5bafb51d104"
+		},
+		{
+			"keyid": "4c663b6d0b9f2c74a19b6791c1417c8d1916e2d84461be1a8148e4386c89582d",
+			"sig": "a9ae363c57c79235e0fb646f364a747e88d61a25eef9e92e44f13f6849bb62ee1a91db6ba021cbef330e9a5b3e2131a45b5922bbd1a30596a11973743aedc404"
+		}
+	],
+	"signed": {
+		"_type": "root",
+		"consistent_snapshot": false,
+		"expires": "2100-01-01T00:00:00Z",
+		"keys": {
+			"4c663b6d0b9f2c74a19b6791c1417c8d1916e2d84461be1a8148e4386c89582d": {
+				"keyid_hash_algorithms": [
+					"sha256"
+				],
+				"keytype": "ed25519",
+				"keyval": {
+					"public": "153986a7370e002f377dd68797e7466c421180c1571e233de2f8ab41c8af4f54"
+				},
+				"scheme": "ed25519"
+			},
+			"b1eb1d74c0e65524c85f96f9badf09a4d2ed1259fb427fc689fc2279ebb4d867": {
+				"keyid_hash_algorithms": [
+					"sha256"
+				],
+				"keytype": "ed25519",
+				"keyval": {
+					"public": "62f71f99c788f16bcdc8bb252455e3a690350e4ddea5a6aab1f9a3aaabcf369a"
+				},
+				"scheme": "ed25519"
+			},
+			"b59406a55fbe2492022f2951dacd01fc7b400b7b41ec4028b8356161a5a71a33": {
+				"keyid_hash_algorithms": [
+					"sha256"
+				],
+				"keytype": "ed25519",
+				"keyval": {
+					"public": "8656ad20568cd3534c405e4d9a84b0c6e6163f7f66434df77416502835b9b160"
+				},
+				"scheme": "ed25519"
+			},
+			"d792ff8cf3c5d9a8fe0fdfa585b25028fa9f49aa29c62a658140d4b98cc2c917": {
+				"keyid_hash_algorithms": [
+					"sha256"
+				],
+				"keytype": "ed25519",
+				"keyval": {
+					"public": "d482fa4805a50870aa1356ace6b764f7ab47ed4dc38f49b1a189afa25f179e94"
+				},
+				"scheme": "ed25519"
+			}
+		},
+		"roles": {
+			"root": {
+				"keyids": [
+					"4c663b6d0b9f2c74a19b6791c1417c8d1916e2d84461be1a8148e4386c89582d"
+				],
+				"threshold": 1
+			},
+			"snapshot": {
+				"keyids": [
+					"d792ff8cf3c5d9a8fe0fdfa585b25028fa9f49aa29c62a658140d4b98cc2c917"
+				],
+				"threshold": 1
+			},
+			"targets": {
+				"keyids": [
+					"b1eb1d74c0e65524c85f96f9badf09a4d2ed1259fb427fc689fc2279ebb4d867"
+				],
+				"threshold": 1
+			},
+			"timestamp": {
+				"keyids": [
+					"b59406a55fbe2492022f2951dacd01fc7b400b7b41ec4028b8356161a5a71a33"
+				],
+				"threshold": 1
+			}
+		},
+		"spec_version": "1.0",
+		"version": 2
+	}
+}

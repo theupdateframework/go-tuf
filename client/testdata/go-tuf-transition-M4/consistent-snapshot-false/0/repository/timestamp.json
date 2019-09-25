@@ -1,1 +1,23 @@
-{"signed":{"_type":"timestamp","expires":"2100-01-01T00:00:00Z","meta":{"snapshot.json":{"hashes":{"sha512":"e92754ae7309051b870ced601ab9bb9817b457a7c48f010f6060d32aba60afaa88ac4d79a78bf79a2fe4602c74831fe1d402ddf109314793964486d4017fadee"},"length":719,"version":1}},"spec_version":"1.0","version":1},"signatures":[{"keyid":"4f6cbf068b19f3f876f0919eafb43f65e4899504fc18b822c6e6078b798c986b","sig":"af902cb1fb440577037ed550f708dd45ea368636a58b92cbe30cc8922c4791054e7d2fb375e09d297de6f35364e83a49da80189324adcf5842d23a1910278a05"}]}
+{
+	"signatures": [
+		{
+			"keyid": "b59406a55fbe2492022f2951dacd01fc7b400b7b41ec4028b8356161a5a71a33",
+			"sig": "cff803896a6af526281ad8ae7e3c3039bd850a4f56afc23e50564b9259719d2dd9e2f7956bf89f04d405a6f2c836db0ae98fa21846921bba39ed43adbf728c0e"
+		}
+	],
+	"signed": {
+		"_type": "timestamp",
+		"expires": "2100-01-01T00:00:00Z",
+		"meta": {
+			"snapshot.json": {
+				"hashes": {
+					"sha512": "9f96c109f0d6a53fa01567d1577fdbc02a34c4a755cba6cfb2e3dd9f6c87596755b9285317c6640a139abad25dcbac22da79208f37ecffd17c67fb87fc89ce1c"
+				},
+				"length": 847,
+				"version": 1
+			}
+		},
+		"spec_version": "1.0",
+		"version": 1
+	}
+}
