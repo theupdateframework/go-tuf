@@ -13,6 +13,7 @@ import (
 	"github.com/flynn/go-tuf/sign"
 	"github.com/flynn/go-tuf/util"
 	"github.com/flynn/go-tuf/verify"
+	"github.com/tent/canonical-json-go"
 )
 
 type CompressionType uint8
@@ -414,11 +415,21 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 }
 
 func (r *Repo) jsonMarshal(v interface{}) ([]byte, error) {
-	if r.prefix == "" && r.indent == "" {
-		return json.Marshal(v)
-	} else {
-		return json.MarshalIndent(v, r.prefix, r.indent)
+	b, err := cjson.Marshal(v)
+	if err != nil {
+		return []byte{}, err
 	}
+
+	if r.prefix == "" && r.indent == "" {
+		return b, nil
+	}
+
+	var out bytes.Buffer
+	if err := json.Indent(&out, b, r.prefix, r.indent); err != nil {
+		return []byte{}, err
+	}
+
+	return out.Bytes(), nil
 }
 
 func (r *Repo) setMeta(name string, meta interface{}) error {
