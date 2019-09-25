@@ -1,4 +1,26 @@
 {
+	"signatures": [
+		{
+			"keyid": "160f5ae5e7017bc783bbbe26c5419bbeeeb87f507b140ef474da0517d56549f7",
+			"method": "ed25519",
+			"sig": "61cfd8782175d6b88a05088ad57c4147d56328bfeac7a8d2f135e831bb1d9f37eaa32e61405baabec61ae280f5ca47af21a3b2a6ef9866889a0d5eb4ce00fa08"
+		},
+		{
+			"keyid": "f806b84c8763453d011c0ba830a3290ee4be587969f5325117c7626411a0f953",
+			"method": "ed25519",
+			"sig": "61cfd8782175d6b88a05088ad57c4147d56328bfeac7a8d2f135e831bb1d9f37eaa32e61405baabec61ae280f5ca47af21a3b2a6ef9866889a0d5eb4ce00fa08"
+		},
+		{
+			"keyid": "4c663b6d0b9f2c74a19b6791c1417c8d1916e2d84461be1a8148e4386c89582d",
+			"method": "ed25519",
+			"sig": "855ab125077b6a8e00f8224ef9e8bd595d8b5baeae7a4588605702b4279030f6a34dfa4ba544d6c66fcbec92dc7dc4d5df4f744b7b9962b281a24f7e5c264905"
+		},
+		{
+			"keyid": "a67ca94ed559c97db79999d32b79ca35b5ae1795d2f6be3eafa3bd5816a8f2c4",
+			"method": "ed25519",
+			"sig": "855ab125077b6a8e00f8224ef9e8bd595d8b5baeae7a4588605702b4279030f6a34dfa4ba544d6c66fcbec92dc7dc4d5df4f744b7b9962b281a24f7e5c264905"
+		}
+	],
 	"signed": {
 		"_type": "root",
 		"consistent_snapshot": false,
@@ -117,27 +139,5 @@
 		},
 		"spec_version": "1.0",
 		"version": 2
-	},
-	"signatures": [
-		{
-			"keyid": "160f5ae5e7017bc783bbbe26c5419bbeeeb87f507b140ef474da0517d56549f7",
-			"method": "ed25519",
-			"sig": "61cfd8782175d6b88a05088ad57c4147d56328bfeac7a8d2f135e831bb1d9f37eaa32e61405baabec61ae280f5ca47af21a3b2a6ef9866889a0d5eb4ce00fa08"
-		},
-		{
-			"keyid": "f806b84c8763453d011c0ba830a3290ee4be587969f5325117c7626411a0f953",
-			"method": "ed25519",
-			"sig": "61cfd8782175d6b88a05088ad57c4147d56328bfeac7a8d2f135e831bb1d9f37eaa32e61405baabec61ae280f5ca47af21a3b2a6ef9866889a0d5eb4ce00fa08"
-		},
-		{
-			"keyid": "4c663b6d0b9f2c74a19b6791c1417c8d1916e2d84461be1a8148e4386c89582d",
-			"method": "ed25519",
-			"sig": "855ab125077b6a8e00f8224ef9e8bd595d8b5baeae7a4588605702b4279030f6a34dfa4ba544d6c66fcbec92dc7dc4d5df4f744b7b9962b281a24f7e5c264905"
-		},
-		{
-			"keyid": "a67ca94ed559c97db79999d32b79ca35b5ae1795d2f6be3eafa3bd5816a8f2c4",
-			"method": "ed25519",
-			"sig": "855ab125077b6a8e00f8224ef9e8bd595d8b5baeae7a4588605702b4279030f6a34dfa4ba544d6c66fcbec92dc7dc4d5df4f744b7b9962b281a24f7e5c264905"
-		}
-	]
+	}
 }
