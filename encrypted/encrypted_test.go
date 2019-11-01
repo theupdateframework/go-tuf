@@ -44,8 +44,7 @@ func (EncryptedSuite) TestTamperedRoundtrip(c *C) {
 	err = json.Unmarshal(enc, data)
 	c.Assert(err, IsNil)
 
-	data.Ciphertext[0] = 0
-	data.Ciphertext[1] = 0
+	data.Ciphertext[0] = ^data.Ciphertext[0]
 
 	enc, _ = json.Marshal(data)
 
