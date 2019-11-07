@@ -36,6 +36,11 @@ func (RepoSuite) TestNewRepoIndent(c *C) {
 	})
 }
 
+// AssertNumUniqueKeys verifies that the number of unique root keys for a given role is as expected.
+func (*RepoSuite) assertNumUniqueKeys(c *C, root *data.Root, role string, num int) {
+	c.Assert(root.UniqueKeys()[role], HasLen, num)
+}
+
 func testNewRepo(c *C, newRepo func(local LocalStore, hashAlgorithms ...string) (*Repo, error)) {
 	meta := map[string]json.RawMessage{
 		"root.json": []byte(`{
@@ -109,7 +114,7 @@ func testNewRepo(c *C, newRepo func(local LocalStore, hashAlgorithms ...string) 
 	c.Assert(timestamp.Meta, HasLen, 0)
 }
 
-func (RepoSuite) TestInit(c *C) {
+func (rs *RepoSuite) TestInit(c *C) {
 	local := MemoryStore(
 		make(map[string]json.RawMessage),
 		map[string][]byte{"foo.txt": []byte("foo")},
@@ -137,7 +142,7 @@ func genKey(c *C, r *Repo, role string) []string {
 	return keyids
 }
 
-func (RepoSuite) TestGenKey(c *C) {
+func (rs *RepoSuite) TestGenKey(c *C) {
 	local := MemoryStore(make(map[string]json.RawMessage), nil)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -154,7 +159,7 @@ func (RepoSuite) TestGenKey(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(root.Roles, NotNil)
 	c.Assert(root.Roles, HasLen, 1)
-	c.Assert(root.UniqueKeys(), HasLen, 1)
+	rs.assertNumUniqueKeys(c, root, "root", 1)
 	rootRole, ok := root.Roles["root"]
 	if !ok {
 		c.Fatal("missing root role")
@@ -205,7 +210,8 @@ func (RepoSuite) TestGenKey(c *C) {
 	root, err = r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Roles, HasLen, 2)
-	c.Assert(root.UniqueKeys(), HasLen, 3)
+	rs.assertNumUniqueKeys(c, root, "root", 1)
+	rs.assertNumUniqueKeys(c, root, "targets", 2)
 	targetsRole, ok := root.Roles["targets"]
 	if !ok {
 		c.Fatal("missing targets role")
@@ -292,7 +298,7 @@ func addGeneratedPrivateKey(c *C, r *Repo, role string) []string {
 	return addPrivateKey(c, r, role, key)
 }
 
-func (RepoSuite) TestAddPrivateKey(c *C) {
+func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 	local := MemoryStore(make(map[string]json.RawMessage), nil)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -312,7 +318,7 @@ func (RepoSuite) TestAddPrivateKey(c *C) {
 	c.Assert(root.Version, Equals, 1)
 	c.Assert(root.Roles, NotNil)
 	c.Assert(root.Roles, HasLen, 1)
-	c.Assert(root.UniqueKeys(), HasLen, 1)
+	rs.assertNumUniqueKeys(c, root, "root", 1)
 	rootRole, ok := root.Roles["root"]
 	if !ok {
 		c.Fatal("missing root role")
@@ -363,7 +369,8 @@ func (RepoSuite) TestAddPrivateKey(c *C) {
 	root, err = r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Roles, HasLen, 2)
-	c.Assert(root.UniqueKeys(), HasLen, 3)
+	rs.assertNumUniqueKeys(c, root, "root", 1)
+	rs.assertNumUniqueKeys(c, root, "targets", 2)
 	targetsRole, ok := root.Roles["targets"]
 	if !ok {
 		c.Fatal("missing targets role")
@@ -455,7 +462,7 @@ func (RepoSuite) TestAddPrivateKey(c *C) {
 	}
 }
 
-func (RepoSuite) TestRevokeKey(c *C) {
+func (rs *RepoSuite) TestRevokeKey(c *C) {
 	local := MemoryStore(make(map[string]json.RawMessage), nil)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -477,7 +484,10 @@ func (RepoSuite) TestRevokeKey(c *C) {
 	c.Assert(root.Roles, NotNil)
 	c.Assert(root.Roles, HasLen, 4)
 	c.Assert(root.Keys, NotNil)
-	c.Assert(root.UniqueKeys(), HasLen, 5)
+	rs.assertNumUniqueKeys(c, root, "root", 1)
+	rs.assertNumUniqueKeys(c, root, "targets", 2)
+	rs.assertNumUniqueKeys(c, root, "snapshot", 1)
+	rs.assertNumUniqueKeys(c, root, "timestamp", 1)
 
 	// revoke a key
 	targetsRole, ok := root.Roles["targets"]
@@ -499,7 +509,10 @@ func (RepoSuite) TestRevokeKey(c *C) {
 	c.Assert(root.Roles, NotNil)
 	c.Assert(root.Roles, HasLen, 4)
 	c.Assert(root.Keys, NotNil)
-	c.Assert(root.UniqueKeys(), HasLen, 4)
+	rs.assertNumUniqueKeys(c, root, "root", 1)
+	rs.assertNumUniqueKeys(c, root, "targets", 1)
+	rs.assertNumUniqueKeys(c, root, "snapshot", 1)
+	rs.assertNumUniqueKeys(c, root, "timestamp", 1)
 	targetsRole, ok = root.Roles["targets"]
 	if !ok {
 		c.Fatal("missing targets role")
@@ -508,7 +521,7 @@ func (RepoSuite) TestRevokeKey(c *C) {
 	c.Assert(targetsRole.KeyIDs, DeepEquals, target2IDs)
 }
 
-func (RepoSuite) TestSign(c *C) {
+func (rs *RepoSuite) TestSign(c *C) {
 	meta := map[string]json.RawMessage{"root.json": []byte(`{"signed":{},"signatures":[]}`)}
 	local := MemoryStore(meta, nil)
 	r, err := NewRepo(local)
@@ -551,7 +564,7 @@ func (RepoSuite) TestSign(c *C) {
 	checkSigIDs(append(key.PublicData().IDs(), newKey.PublicData().IDs()...)...)
 }
 
-func (RepoSuite) TestCommit(c *C) {
+func (rs *RepoSuite) TestCommit(c *C) {
 	files := map[string][]byte{"foo.txt": []byte("foo"), "bar.txt": []byte("bar")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
@@ -618,7 +631,7 @@ func (RepoSuite) TestCommit(c *C) {
 	c.Assert(r.Commit(), DeepEquals, ErrNotEnoughKeys{"timestamp", 0, 1})
 }
 
-func (RepoSuite) TestCommitVersions(c *C) {
+func (rs *RepoSuite) TestCommitVersions(c *C) {
 	files := map[string][]byte{"foo.txt": []byte("foo")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
@@ -774,7 +787,7 @@ func (t *tmpDir) readFile(path string) []byte {
 	return data
 }
 
-func (RepoSuite) TestCommitFileSystem(c *C) {
+func (rs *RepoSuite) TestCommitFileSystem(c *C) {
 	tmp := newTmpDir(c)
 	local := FileSystemStore(tmp.path, nil)
 	r, err := NewRepo(local)
@@ -858,7 +871,7 @@ func (RepoSuite) TestCommitFileSystem(c *C) {
 	tmp.assertEmpty("staged")
 }
 
-func (RepoSuite) TestCommitFileSystemWithNewRepositories(c *C) {
+func (rs *RepoSuite) TestCommitFileSystemWithNewRepositories(c *C) {
 	tmp := newTmpDir(c)
 
 	newRepo := func() *Repo {
@@ -880,7 +893,7 @@ func (RepoSuite) TestCommitFileSystemWithNewRepositories(c *C) {
 	c.Assert(newRepo().Commit(), IsNil)
 }
 
-func (RepoSuite) TestConsistentSnapshot(c *C) {
+func (rs *RepoSuite) TestConsistentSnapshot(c *C) {
 	tmp := newTmpDir(c)
 	local := FileSystemStore(tmp.path, nil)
 	r, err := NewRepo(local, "sha512", "sha256")
@@ -964,7 +977,7 @@ func (RepoSuite) TestConsistentSnapshot(c *C) {
 	}
 }
 
-func (RepoSuite) TestExpiresAndVersion(c *C) {
+func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 	files := map[string][]byte{"foo.txt": []byte("foo")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
@@ -1079,7 +1092,7 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(timestamp.Meta["snapshot.json"].Version, Equals, snapshot.Version)
 }
 
-func (RepoSuite) TestHashAlgorithm(c *C) {
+func (rs *RepoSuite) TestHashAlgorithm(c *C) {
 	files := map[string][]byte{"foo.txt": []byte("foo")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	type hashTest struct {
@@ -1130,7 +1143,7 @@ func testPassphraseFunc(p []byte) util.PassphraseFunc {
 	return func(string, bool) ([]byte, error) { return p, nil }
 }
 
-func (RepoSuite) TestKeyPersistence(c *C) {
+func (rs *RepoSuite) TestKeyPersistence(c *C) {
 	tmp := newTmpDir(c)
 	passphrase := []byte("s3cr3t")
 	store := FileSystemStore(tmp.path, testPassphraseFunc(passphrase))
@@ -1190,7 +1203,7 @@ func (RepoSuite) TestKeyPersistence(c *C) {
 	assertKeys("targets", false, []*sign.PrivateKey{key})
 }
 
-func (RepoSuite) TestManageMultipleTargets(c *C) {
+func (rs *RepoSuite) TestManageMultipleTargets(c *C) {
 	tmp := newTmpDir(c)
 	local := FileSystemStore(tmp.path, nil)
 	r, err := NewRepo(local)
@@ -1254,7 +1267,7 @@ func (RepoSuite) TestManageMultipleTargets(c *C) {
 	c.Assert(t.Targets, HasLen, 0)
 }
 
-func (RepoSuite) TestCustomTargetMetadata(c *C) {
+func (rs *RepoSuite) TestCustomTargetMetadata(c *C) {
 	files := map[string][]byte{
 		"foo.txt": []byte("foo"),
 		"bar.txt": []byte("bar"),

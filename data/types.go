@@ -130,29 +130,27 @@ func (r *Root) AddKey(key *Key) bool {
 	return changed
 }
 
-// We might have multiple keyids that correspond to the same key, so
-// make sure we only return unique keys.
-func (r Root) UniqueKeys() []*Key {
-	seen := make(map[string]struct{})
-	keys := []*Key{}
-	for _, key := range r.Keys {
-		found := false
-		for _, id := range key.IDs() {
-			if _, ok := seen[id]; ok {
-				found = true
-				break
+// UniqueKeys returns the unique keys for each associated role.
+// We might have multiple key IDs that correspond to the same key.
+func (r Root) UniqueKeys() map[string][]*Key {
+	keysByRole := make(map[string][]*Key)
+	for name, role := range r.Roles {
+		seen := make(map[string]struct{})
+		keys := []*Key{}
+		for _, id := range role.KeyIDs {
+			// Double-check that there is actually a key with that ID.
+			if key, ok := r.Keys[id]; ok {
+				val := key.Value.Public.String()
+				if _, ok := seen[val]; ok {
+					continue
+				}
+				seen[val] = struct{}{}
+				keys = append(keys, key)
 			}
 		}
-
-		if !found {
-			for _, id := range key.IDs() {
-				seen[id] = struct{}{}
-			}
-			keys = append(keys, key)
-		}
+		keysByRole[name] = keys
 	}
-
-	return keys
+	return keysByRole
 }
 
 type Role struct {
