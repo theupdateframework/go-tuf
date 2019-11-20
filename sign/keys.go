@@ -17,9 +17,6 @@ type PrivateKey struct {
 
 type PrivateKeyValue struct {
 	Public data.HexBytes `json:"public"`
-
-	// FIXME(TUF-0.9) This is removed in TUF 1.0, keeping around for
-	// compatibility with TUF 0.9.
 	Private data.HexBytes `json:"private"`
 }
 
