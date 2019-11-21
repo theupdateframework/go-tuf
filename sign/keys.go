@@ -16,7 +16,7 @@ type PrivateKey struct {
 }
 
 type PrivateKeyValue struct {
-	Public data.HexBytes `json:"public"`
+	Public  data.HexBytes `json:"public"`
 	Private data.HexBytes `json:"private"`
 }
 

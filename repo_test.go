@@ -600,7 +600,7 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	// commit with an invalid root hash in snapshot.json due to new key creation
 	genKey(c, r, "targets")
 	c.Assert(r.Sign("targets.json"), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid root.json in snapshot.json: wrong length, expected 3144 got 3738"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid root.json in snapshot.json: wrong length, expected 3216 got 3828"))
 
 	// commit with an invalid targets hash in snapshot.json
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)

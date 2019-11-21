@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	KeyAlgorithms = []string{"sha256"}
+	KeyAlgorithms = []string{"sha256", "sha512"}
 )
 
 type Signed struct {
