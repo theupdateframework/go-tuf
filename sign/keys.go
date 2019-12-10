@@ -30,7 +30,12 @@ func (k *PrivateKey) PublicData() *data.Key {
 }
 
 func (k *PrivateKey) Signer() Signer {
-	return &ed25519Signer{PrivateKey: ed25519.PrivateKey(k.Value.Private)}
+	return &ed25519Signer{
+		PrivateKey:    ed25519.PrivateKey(k.Value.Private),
+		keyType:       k.Type,
+		keyScheme:     k.Scheme,
+		keyAlgorithms: k.Algorithms,
+	}
 }
 
 func GenerateEd25519Key() (*PrivateKey, error) {
@@ -52,8 +57,11 @@ func GenerateEd25519Key() (*PrivateKey, error) {
 type ed25519Signer struct {
 	ed25519.PrivateKey
 
-	ids    []string
-	idOnce sync.Once
+	keyType       string
+	keyScheme     string
+	keyAlgorithms []string
+	ids           []string
+	idOnce        sync.Once
 }
 
 var _ Signer = &ed25519Signer{}
@@ -74,17 +82,17 @@ func (s *ed25519Signer) ContainsID(id string) bool {
 
 func (s *ed25519Signer) publicData() *data.Key {
 	return &data.Key{
-		Type:       data.KeyTypeEd25519,
-		Scheme:     data.KeySchemeEd25519,
-		Algorithms: data.KeyAlgorithms,
+		Type:       s.keyType,
+		Scheme:     s.keyScheme,
+		Algorithms: s.keyAlgorithms,
 		Value:      data.KeyValue{Public: []byte(s.PrivateKey.Public().(ed25519.PublicKey))},
 	}
 }
 
 func (s *ed25519Signer) Type() string {
-	return data.KeyTypeEd25519
+	return s.keyType
 }
 
 func (s *ed25519Signer) Scheme() string {
-	return data.KeySchemeEd25519
+	return s.keyScheme
 }
