@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/flynn/go-tuf/client/testdata/go-tuf/generator"
+	"github.com/theupdateframework/go-tuf/client/testdata/go-tuf/generator"
 )
 
 func main() {

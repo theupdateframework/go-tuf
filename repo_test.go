@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/encrypted"
-	"github.com/flynn/go-tuf/sign"
-	"github.com/flynn/go-tuf/util"
-	"github.com/flynn/go-tuf/verify"
+	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/encrypted"
+	"github.com/theupdateframework/go-tuf/sign"
+	"github.com/theupdateframework/go-tuf/util"
+	"github.com/theupdateframework/go-tuf/verify"
 	"golang.org/x/crypto/ed25519"
 	. "gopkg.in/check.v1"
 )

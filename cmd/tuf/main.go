@@ -12,8 +12,8 @@ import (
 	"time"
 
 	docopt "github.com/flynn/go-docopt"
-	tuf "github.com/flynn/go-tuf"
-	"github.com/flynn/go-tuf/util"
+	tuf "github.com/theupdateframework/go-tuf"
+	"github.com/theupdateframework/go-tuf/util"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -126,8 +126,6 @@ func getPassphrase(role string, confirm bool) ([]byte, error) {
 	if pass := os.Getenv(fmt.Sprintf("TUF_%s_PASSPHRASE", strings.ToUpper(role))); pass != "" {
 		return []byte(pass), nil
 	}
-
-	stdin := bufio.NewReader(os.Stdin)
 
 	fmt.Printf("Enter %s keys passphrase: ", role)
 	passphrase, err := terminal.ReadPassword(int(syscall.Stdin))

@@ -10,11 +10,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/util"
+	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/util"
 	. "gopkg.in/check.v1"
 
-	goTufGenerator "github.com/flynn/go-tuf/client/testdata/go-tuf/generator"
+	goTufGenerator "github.com/theupdateframework/go-tuf/client/testdata/go-tuf/generator"
 )
 
 type InteropSuite struct{}

@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	tuf "github.com/flynn/go-tuf"
-	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/util"
-	"github.com/flynn/go-tuf/verify"
+	tuf "github.com/theupdateframework/go-tuf"
+	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/util"
+	"github.com/theupdateframework/go-tuf/verify"
 	. "gopkg.in/check.v1"
 )
 

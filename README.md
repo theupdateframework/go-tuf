@@ -31,7 +31,7 @@ The directories contain the following files:
 ### Install
 
 ```
-go get github.com/flynn/go-tuf/cmd/tuf
+go get github.com/theupdateframework/go-tuf/cmd/tuf
 ```
 
 ### Commands
@@ -506,6 +506,6 @@ TODO
 
 ## Client
 
-For the client package, see https://godoc.org/github.com/flynn/go-tuf/client.
+For the client package, see https://godoc.org/github.com/theupdateframework/go-tuf/client.
 
-For the client CLI, see https://github.com/flynn/go-tuf/tree/master/cmd/tuf-client.
+For the client CLI, see https://github.com/theupdateframework/go-tuf/tree/master/cmd/tuf-client.

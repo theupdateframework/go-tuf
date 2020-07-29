@@ -7,7 +7,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/flynn/go-docopt"
-	tuf "github.com/flynn/go-tuf/client"
+	tuf "github.com/theupdateframework/go-tuf/client"
 )
 
 func init() {

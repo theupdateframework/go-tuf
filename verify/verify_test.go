@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/sign"
+	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/sign"
 	"golang.org/x/crypto/ed25519"
 
 	. "gopkg.in/check.v1"

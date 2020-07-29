@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
-	tuf "github.com/flynn/go-tuf"
-	"github.com/flynn/go-tuf/sign"
+	tuf "github.com/theupdateframework/go-tuf"
+	"github.com/theupdateframework/go-tuf/sign"
 )
 
 var expirationDate = time.Date(2100, time.January, 1, 0, 0, 0, 0, time.UTC)
