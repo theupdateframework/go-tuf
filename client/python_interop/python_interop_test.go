@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	tuf "github.com/theupdateframework/go-tuf"
@@ -119,19 +118,6 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 	// clone the Python client if necessary
 	cwd, err := os.Getwd()
 	c.Assert(err, IsNil)
-	tufDir := filepath.Join(cwd, "testdata", "python-tuf-v0.11.1", "tuf")
-	if _, err := os.Stat(tufDir); os.IsNotExist(err) {
-		c.Assert(exec.Command(
-			"git",
-			"clone",
-			"--quiet",
-			"--branch=v0.11.1",
-			"--single-branch",
-			"--depth=1",
-			"https://github.com/theupdateframework/tuf.git",
-			tufDir,
-		).Run(), IsNil)
-	}
 
 	tmp := c.MkDir()
 	files := map[string][]byte{
@@ -142,18 +128,6 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 	// start file server
 	addr, cleanup := startFileServer(c, tmp)
 	defer cleanup()
-
-	// setup Python env
-	environ := os.Environ()
-	pythonEnv := make([]string, 0, len(environ)+1)
-	// remove any existing PYTHONPATH from the environment
-	for _, e := range environ {
-		if strings.HasPrefix(e, "PYTHONPATH=") {
-			continue
-		}
-		pythonEnv = append(pythonEnv, e)
-	}
-	pythonEnv = append(pythonEnv, "PYTHONPATH="+tufDir)
 
 	for _, consistentSnapshot := range []bool{false, true} {
 		// generate repository
@@ -182,7 +156,6 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 
 		// run Python client update
 		cmd := exec.Command("python", args...)
-		cmd.Env = pythonEnv
 		cmd.Dir = clientDir
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
