@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/flynn/go-docopt"
-	"github.com/flynn/go-tuf"
+	"github.com/theupdateframework/go-tuf"
 )
 
 func init() {

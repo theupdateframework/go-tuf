@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"sync"
 
-	"github.com/flynn/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/data"
 	"golang.org/x/crypto/ed25519"
 )
 

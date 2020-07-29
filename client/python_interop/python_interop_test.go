@@ -13,10 +13,10 @@ import (
 	"strings"
 	"testing"
 
-	tuf "github.com/flynn/go-tuf"
-	client "github.com/flynn/go-tuf/client"
-	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/util"
+	tuf "github.com/theupdateframework/go-tuf"
+	client "github.com/theupdateframework/go-tuf/client"
+	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/util"
 	"golang.org/x/crypto/ed25519"
 	. "gopkg.in/check.v1"
 )

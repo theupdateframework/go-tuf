@@ -4,8 +4,8 @@ import (
 	"crypto"
 	"crypto/rand"
 
-	"github.com/flynn/go-tuf/data"
-	"github.com/tent/canonical-json-go"
+	cjson "github.com/tent/canonical-json-go"
+	"github.com/theupdateframework/go-tuf/data"
 )
 
 type Signer interface {

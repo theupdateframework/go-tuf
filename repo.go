@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/sign"
-	"github.com/flynn/go-tuf/util"
-	"github.com/flynn/go-tuf/verify"
-	"github.com/tent/canonical-json-go"
+	cjson "github.com/tent/canonical-json-go"
+	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/sign"
+	"github.com/theupdateframework/go-tuf/util"
+	"github.com/theupdateframework/go-tuf/verify"
 )
 
 type CompressionType uint8
