@@ -177,7 +177,7 @@ type Files map[string]FileMeta
 
 type FileMeta struct {
 	Length int64            `json:"length",omitempty`
-	Hashes Hashes           `json:"hashes",ompitempty`
+	Hashes Hashes           `json:"hashes",omitempty`
 	Custom *json.RawMessage `json:"custom,omitempty"`
 }
 
