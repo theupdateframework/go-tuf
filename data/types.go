@@ -130,6 +130,32 @@ func (r *Root) AddKey(key *Key) bool {
 	return changed
 }
 
+//TargetAddKey checks existence of a key,
+//Add it to top Target's key filed if not exist
+func (t *Targets) TargetAddKey(key *Key) bool {
+	changed := false
+	for _, id := range key.IDs() {
+		if _, ok := t.Keys[id]; !ok {
+			changed = true
+			t.Keys[id] = key
+		}
+	}
+	return changed
+}
+
+//DelegationAddKey check existence of a key,
+//Add it to Delegation's key filed if not exist
+func (d *Delegation) DelegationAddKey(key *Key) bool {
+	changed := false
+	for _, id := range key.IDs() {
+		if _, ok := d.Keys[id]; !ok {
+			changed = true
+			d.Keys[id] = key
+		}
+	}
+	return changed
+}
+
 // UniqueKeys returns the unique keys for each associated role.
 // We might have multiple key IDs that correspond to the same key.
 func (r Root) UniqueKeys() map[string][]*Key {
@@ -225,20 +251,40 @@ func (f TargetFileMeta) HashAlgorithms() []string {
 	return f.FileMeta.HashAlgorithms()
 }
 
+//Targets instance
 type Targets struct {
-	Type        string      `json:"_type"`
-	SpecVersion string      `json:"spec_version"`
-	Version     int         `json:"version"`
-	Expires     time.Time   `json:"expires"`
-	Targets     TargetFiles `json:"targets"`
+	Type        string                 `json:"_type"`
+	SpecVersion string                 `json:"spec_version"`
+	Version     int                    `json:"version"`
+	Expires     time.Time              `json:"expires"`
+	Targets     TargetFiles            `json:"targets"`
+	Keys        map[string]*Key        `json:"keys"`
+	Roles       map[string]*Role       `json:"roles"`
+	Delegations map[string]*Delegation `json:"delegations"`
 }
 
+//NewTargets returns a ptr to a new Targets instances
 func NewTargets() *Targets {
 	return &Targets{
 		Type:        "targets",
 		SpecVersion: "1.0",
 		Expires:     DefaultExpires("targets"),
 		Targets:     make(TargetFiles),
+		Keys:        make(map[string]*Key),
+		Roles:       make(map[string]*Role),
+		Delegations: make(map[string]*Delegation),
+	}
+}
+
+//Delegation item in Targets.json
+type Delegation struct {
+	Keys map[string]*Key `json:"keys"`
+}
+
+//NewDelegations returns a ptr to a Delegation instance
+func NewDelegations() *Delegation {
+	return &Delegation{
+		Keys: make(map[string]*Key),
 	}
 }
 

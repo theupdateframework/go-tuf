@@ -57,8 +57,11 @@ func testNewRepo(c *C, newRepo func(local LocalStore, hashAlgorithms ...string) 
 		  "signed": {
 		    "_type": "targets",
 		    "version": 1,
-		    "expires": "2015-03-26T03:26:55.82155686Z",
-		    "targets": {}
+			"expires": "2015-03-26T03:26:55.82155686Z",
+			"keys":{},
+			"targets": {},
+			"roles": {},
+			"delegations":{}
 		  },
 		  "signatures": []
 		}`),
@@ -98,6 +101,8 @@ func testNewRepo(c *C, newRepo func(local LocalStore, hashAlgorithms ...string) 
 	c.Assert(targets.Version, Equals, 1)
 	c.Assert(targets.Targets, NotNil)
 	c.Assert(targets.Targets, HasLen, 0)
+	c.Assert(targets.Keys, NotNil)
+	c.Assert(targets.Keys, HasLen, 0)
 
 	snapshot, err := r.snapshot()
 	c.Assert(err, IsNil)
@@ -133,6 +138,9 @@ func (rs *RepoSuite) TestInit(c *C) {
 	// Init() fails if targets have been added
 	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
 	c.Assert(r.Init(true), Equals, ErrInitNotAllowed)
+
+	//Init() fails if targets have delegations already
+
 }
 
 func genKey(c *C, r *Repo, role string) []string {
@@ -564,8 +572,172 @@ func (rs *RepoSuite) TestSign(c *C) {
 	checkSigIDs(append(key.PublicData().IDs(), newKey.PublicData().IDs()...)...)
 }
 
+func (rs *RepoSuite) TestDelegation(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo"), "bar.txt": []byte("ear"), "dar.txt": []byte("ear")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	//generate root and target
+	genKey(c, r, "root")
+	ids1 := genKey(c, r, "targets")
+
+	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+
+	//initialize new target toles
+	r.DelegateInit("role01")
+	keyids, err := r.DelegateGenKey("role01")
+	c.Assert(err, IsNil)
+	c.Assert(len(keyids) > 0, Equals, true)
+
+	//basic test root and target
+	root, err := r.root()
+	c.Assert(err, IsNil)
+	c.Assert(root.Roles, NotNil)
+	c.Assert(root.Roles, HasLen, 2)
+	rs.assertNumUniqueKeys(c, root, "root", 1)
+	target, err := r.targets()
+	c.Assert(err, IsNil)
+	c.Assert(target.Roles, NotNil)
+	c.Assert(target.Roles, HasLen, 1)
+	rs.assertNumUniqueKeys(c, root, "targets", 1)
+
+	//check top target stores keys of delegated target role
+	targetRole, ok := root.Roles["targets"]
+	if !ok {
+		c.Fatal("missing target role")
+	}
+	c.Assert(targetRole.KeyIDs, HasLen, 2)
+	c.Assert(targetRole.KeyIDs, DeepEquals, ids1)
+	for _, keyID := range ids1 {
+		k, ok := root.Keys[keyID]
+		if !ok {
+			c.Fatal("missing key")
+		}
+		c.Assert(k.IDs(), DeepEquals, ids1)
+		c.Assert(k.Value.Public, HasLen, ed25519.PublicKeySize)
+	}
+
+	//Check add target file function of delegation
+	c.Assert(r.DelegateAddTarget("role01.json", "foo.txt", nil), IsNil)
+	tempRole, ok := target.Roles["role01"]
+	if !ok {
+		c.Fatal("missing target role")
+	}
+	c.Assert(tempRole.KeyIDs, HasLen, 2)
+	c.Assert(tempRole.KeyIDs, DeepEquals, keyids)
+	for _, keyID := range keyids {
+		k, ok := target.Keys[keyID]
+		if !ok {
+			c.Fatal("missing key")
+		}
+		c.Assert(k.IDs(), DeepEquals, keyids)
+		c.Assert(k.Value.Public, HasLen, ed25519.PublicKeySize)
+	}
+
+	//check non-top target role in db
+	db, err := r.db()
+	c.Assert(err, IsNil)
+	tempKeyIDs := make(map[string]struct{}, 2)
+	for _, id := range tempRole.KeyIDs {
+		tempKeyIDs[id] = struct{}{}
+		_, ok = target.Keys[id]
+		if !ok {
+			c.Fatal("missing key")
+		}
+		key := db.GetKey(id)
+		c.Assert(key, NotNil)
+		c.Assert(key.ContainsID(id), Equals, true)
+	}
+	role := db.GetRole("role01")
+	c.Assert(role.KeyIDs, DeepEquals, tempKeyIDs)
+
+	// check the keys were saved correctly
+	localKeys, err := local.GetSigningKeys("role01")
+	c.Assert(err, IsNil)
+	c.Assert(localKeys, HasLen, 1)
+	for _, key := range localKeys {
+		found := false
+		for _, id := range tempRole.KeyIDs {
+			if key.ContainsID(id) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			c.Fatal("missing key")
+		}
+	}
+
+	// check target.json got staged
+	meta, err := local.GetMeta()
+	c.Assert(err, IsNil)
+	tarJSON, ok := meta["targets.json"]
+	if !ok {
+		c.Fatal("missing root metadata")
+	}
+	s := &data.Signed{}
+	c.Assert(json.Unmarshal(tarJSON, s), IsNil)
+	stagedTarget := &data.Targets{}
+	c.Assert(json.Unmarshal(s.Signed, stagedTarget), IsNil)
+	c.Assert(stagedTarget.Type, Equals, target.Type)
+	c.Assert(stagedTarget.Version, Equals, target.Version)
+	c.Assert(stagedTarget.Expires.UnixNano(), Equals, target.Expires.UnixNano())
+
+	//check role01.json got staged
+	tempTarget, err := r.delegationTargets("role01.json")
+	c.Assert(err, IsNil)
+	tempJSON, ok := meta["role01.json"]
+	if !ok {
+		c.Fatal("missing root metadata")
+	}
+	s1 := &data.Signed{}
+	c.Assert(json.Unmarshal(tempJSON, s1), IsNil)
+	stagedTempTarget := &data.Targets{}
+	c.Assert(json.Unmarshal(s1.Signed, stagedTempTarget), IsNil)
+	c.Assert(stagedTempTarget.Type, Equals, tempTarget.Type)
+	c.Assert(stagedTempTarget.Version, Equals, tempTarget.Version)
+	c.Assert(stagedTempTarget.Expires.UnixNano(), Equals, tempTarget.Expires.UnixNano())
+
+	// make sure both top-target and staged top-target have evaluated IDs(), otherwise
+	// DeepEquals will fail because those values might not have been
+	// computed yet.
+	for _, key := range target.Keys {
+		key.IDs()
+	}
+	for _, key := range stagedTarget.Keys {
+		key.IDs()
+	}
+	c.Assert(stagedTarget.Keys, DeepEquals, target.Keys)
+	c.Assert(stagedTarget.Roles, DeepEquals, target.Roles)
+
+	// make sure both top-target and staged top-target have evaluated IDs(), otherwise
+	// DeepEquals will fail because those values might not have been
+	// computed yet.
+	for _, key := range tempTarget.Keys {
+		key.IDs()
+	}
+	for _, key := range stagedTempTarget.Keys {
+		key.IDs()
+	}
+	c.Assert(stagedTempTarget.Keys, DeepEquals, tempTarget.Keys)
+	c.Assert(stagedTempTarget.Roles, DeepEquals, tempTarget.Roles)
+
+	// commit to make sure we don't modify metadata after committing metadata.
+	addGeneratedPrivateKey(c, r, "snapshot")
+	addGeneratedPrivateKey(c, r, "timestamp")
+	c.Assert(r.AddTargets([]string{}, nil), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	r.restoreTopLevelManifest()
+	verify.RestoreValidRole()
+}
+
 func (rs *RepoSuite) TestCommit(c *C) {
-	files := map[string][]byte{"foo.txt": []byte("foo"), "bar.txt": []byte("bar")}
+	files := map[string][]byte{
+		"foo.txt": []byte("foo"), "bar.txt": []byte("bar"), "ear.txt": []byte("ear")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -605,7 +777,7 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	// commit with an invalid targets hash in snapshot.json
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.AddTarget("bar.txt", nil), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 1229 got 1403"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 1267 got 1441"))
 
 	// commit with an invalid timestamp
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)

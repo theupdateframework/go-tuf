@@ -24,9 +24,12 @@ func (db *DB) Verify(s *data.Signed, role string, minVersion int) error {
 	if err := json.Unmarshal(s.Signed, sm); err != nil {
 		return err
 	}
-	if strings.ToLower(sm.Type) != strings.ToLower(role) {
-		return ErrWrongMetaType
+	if role == "root" || role == "targets" || role == "snapshot" || role == "timestamp" {
+		if strings.ToLower(sm.Type) != strings.ToLower(role) {
+			return ErrWrongMetaType
+		}
 	}
+
 	if IsExpired(sm.Expires) {
 		return ErrExpired{sm.Expires}
 	}
