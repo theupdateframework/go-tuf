@@ -731,8 +731,7 @@ func (rs *RepoSuite) TestDelegation(c *C) {
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
 
-	r.restoreTopLevelManifest()
-	verify.RestoreValidRole()
+	r.RestoreAll()
 }
 
 func (rs *RepoSuite) TestCommit(c *C) {

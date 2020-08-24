@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stretchr/stew/slice"
 	cjson "github.com/tent/canonical-json-go"
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/sign"
@@ -597,6 +596,15 @@ func validManifest(name string) bool {
 	return false
 }
 
+func validSnapManifest(name string) bool {
+	for _, m := range snapshotManifests {
+		if m == name {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *Repo) AddTarget(path string, custom json.RawMessage) error {
 	return r.AddTargets([]string{path}, custom)
 }
@@ -836,6 +844,17 @@ func (r *Repo) Commit() error {
 		}
 	}
 
+	//check roles of top-target
+	target, err := r.targets()
+	if err != nil {
+		return err
+	}
+	for name, role := range target.Roles {
+		if len(role.KeyIDs) < role.Threshold {
+			return ErrNotEnoughKeys{name, len(role.KeyIDs), role.Threshold}
+		}
+	}
+
 	// verify hashes in snapshot.json are up to date
 	snapshot, err := r.snapshot()
 	if err != nil {
@@ -931,16 +950,11 @@ func (r *Repo) timestampFileMeta(name string) (data.TimestampFileMeta, error) {
 	return util.GenerateTimestampFileMeta(bytes.NewReader(b), r.hashAlgorithms...)
 }
 
-//ValidTopLevelElement checks if a name.json already exists in topLevelManifest
-func ValidTopLevelElement(nameJSON string) bool {
-	ok := slice.Contains(topLevelManifests, nameJSON)
-	return ok
-}
-
 //AddTopLevelManifest adds a new .json entry to topLevelManifest
 //so that this metafile can be comitted
+//Need this fnc when initialze a non-top target
 func (r *Repo) addTopLevelManifest(nameJSON string) bool {
-	if ValidTopLevelElement(nameJSON) {
+	if validManifest(nameJSON) {
 		return false
 	}
 	topLevelManifests = append(topLevelManifests, nameJSON)
@@ -962,16 +976,50 @@ func (r *Repo) restoreTopLevelManifest() {
 	topLevelManifests = topLevelManifests[:4]
 }
 
+func (r *Repo) addSnapManifest(nameJSON string) bool {
+	if validSnapManifest(nameJSON) {
+		return false
+	}
+	snapshotManifests = append(snapshotManifests, nameJSON)
+	return true
+}
+
+func (r *Repo) deleteSnapManifest(nameJSON string) bool {
+	for i := 1; i < len(snapshotManifests); i++ {
+		if snapshotManifests[i] == nameJSON {
+			snapshotManifests = append(snapshotManifests[:i], snapshotManifests[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Repo) restoreSnapManifests() {
+	snapshotManifests = snapshotManifests[:2]
+}
+
 //DelegateInit put the name of new Role to the Validated Roles
 //name is simply the name of role without .json
 func (r *Repo) DelegateInit(name string) {
 	verify.AddValidRole(name)
 	r.addTopLevelManifest(name + ".json")
+	r.addSnapManifest(name + ".json")
 }
 
+//RemoveDeleRole removes a delegation target role and
+//edits related variables
 func (r *Repo) RemoveDeleRole(name string) {
 	verify.DeleteValidRole(name)
 	r.deleteTopLevelManifest(name + ".json")
+	r.deleteSnapManifest(name + ".json")
+}
+
+//RestoreAll variables changed when a non-top target
+//is created
+func (r *Repo) RestoreAll() {
+	verify.RestoreValidRole()
+	r.restoreTopLevelManifest()
+	r.restoreSnapManifests()
 }
 
 //delegationTargets is a getter for those delegation target roles
