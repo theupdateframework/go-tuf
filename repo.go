@@ -789,15 +789,24 @@ func (r *Repo) fileVersions() (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
+	extraTar := verify.ExportTargetRoles()
 	versions := make(map[string]int)
 	versions["root.json"] = root.Version
 	versions["targets.json"] = targets.Version
 	versions["snapshot.json"] = snapshot.Version
+	for _, tar := range extraTar {
+		temp, err := r.delegationTargets(tar)
+		if err != nil {
+			return nil, err
+		}
+		versions[tar] = temp.Version
+	}
 	return versions, nil
 }
 
 func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 	hashes := make(map[string]data.Hashes)
+	tarList := verify.ExportTargetRoles()
 	timestamp, err := r.timestamp()
 	if err != nil {
 		return nil, err
@@ -812,6 +821,11 @@ func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 	if m, ok := snapshot.Meta["targets.json"]; ok {
 		hashes["targets.json"] = m.Hashes
 	}
+	for _, tar := range tarList {
+		if m, ok := snapshot.Meta[tar]; ok {
+			hashes[tar] = m.Hashes
+		}
+	}
 	if m, ok := timestamp.Meta["snapshot.json"]; ok {
 		hashes["snapshot.json"] = m.Hashes
 	}
@@ -821,6 +835,15 @@ func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 	}
 	for name, meta := range t.Targets {
 		hashes[path.Join("targets", name)] = meta.Hashes
+	}
+	for _, tar := range tarList {
+		temp, err := r.delegationTargets(tar)
+		if err != nil {
+			return nil, err
+		}
+		for name, meta := range temp.Targets {
+			hashes[path.Join("targets", name)] = meta.Hashes
+		}
 	}
 	return hashes, nil
 }
@@ -1026,7 +1049,9 @@ func (r *Repo) RestoreAll() {
 //Used for delegation only, create new target when not exist
 //Name entry here is in format "roleName.json"
 func (r *Repo) delegationTargets(nameJSON string) (*data.Targets, error) {
-
+	if !strings.Contains(nameJSON, ".json") {
+		nameJSON = nameJSON + ".json"
+	}
 	targetsJSON, ok := r.meta[nameJSON]
 	if !ok {
 		return data.NewTargets(), nil
@@ -1040,6 +1065,38 @@ func (r *Repo) delegationTargets(nameJSON string) (*data.Targets, error) {
 		return nil, err
 	}
 	return targets, nil
+}
+
+// DelegateTargetVersion is a getter for a non-top target meta
+func (r *Repo) DelegateTargetVersion(nameJSON string) (int, error) {
+	if !strings.Contains(nameJSON, ".json") {
+		nameJSON = nameJSON + ".json"
+	}
+	if !validManifest(nameJSON) {
+		return -1, ErrInvalidRole{nameJSON}
+	}
+	d, err := r.delegationTargets(nameJSON)
+	if err != nil {
+		return -1, err
+	}
+	return d.Version, nil
+}
+
+//SetDelegateTargetVersion is a setter of version
+//for non-top target meta
+func (r *Repo) SetDelegateTargetVersion(nameJSON string, v int) error {
+	if !strings.Contains(nameJSON, ".json") {
+		nameJSON = nameJSON + ".json"
+	}
+	if !validManifest(nameJSON) {
+		return ErrInvalidRole{nameJSON}
+	}
+	d, err := r.delegationTargets(nameJSON)
+	if err != nil {
+		return err
+	}
+	d.Version = v
+	return r.setMeta(nameJSON, d)
 }
 
 //DelegateGenKey invokes DelegateGenKeyWithExpires with default expire time
@@ -1071,11 +1128,14 @@ func (r *Repo) DelegateAddPrivateKey(role string, key *sign.PrivateKey) error {
 //Add new role information and key info,
 //Update the top targets.json
 func (r *Repo) DelegateAddPrivateKeyWithExpires(nameJSON string, key *sign.PrivateKey, expires time.Time) error {
+	if !strings.Contains(nameJSON, ".json") {
+		nameJSON = nameJSON + ".json"
+	}
 	name := strings.TrimSuffix(nameJSON, ".json")
 	if !verify.ValidRole(name) {
 		return ErrInvalidRole{nameJSON}
 	}
-	target, err := r.delegationTargets(nameJSON)
+	target, err := r.targets()
 	if err != nil {
 		return err
 	}
@@ -1129,21 +1189,33 @@ func (r *Repo) DelegateAddPrivateKeyWithExpires(nameJSON string, key *sign.Priva
 
 //DelegateAddTarget add a target to non-top target role
 func (r *Repo) DelegateAddTarget(nameJSON, path string, custom json.RawMessage) error {
+	if !strings.Contains(nameJSON, ".json") {
+		nameJSON = nameJSON + ".json"
+	}
 	return r.DelegateAddTargets(nameJSON, []string{path}, custom)
 }
 
 //DelegateAddTargets add targets to non-top target role
 func (r *Repo) DelegateAddTargets(nameJSON string, paths []string, custom json.RawMessage) error {
+	if !strings.Contains(nameJSON, ".json") {
+		nameJSON = nameJSON + ".json"
+	}
 	return r.DelegateAddTargetsWithExpires(nameJSON, paths, custom, data.DefaultExpires("targets"))
 }
 
 //DelegateAddTargetWithExpires adds single target to non-top target  role
 func (r *Repo) DelegateAddTargetWithExpires(nameJSON string, path string, custom json.RawMessage, expires time.Time) error {
+	if !strings.Contains(nameJSON, ".json") {
+		nameJSON = nameJSON + ".json"
+	}
 	return r.DelegateAddTargetsWithExpires(nameJSON, []string{path}, custom, expires)
 }
 
 //DelegateAddTargetsWithExpires add targets to non-top target role with expire date
 func (r *Repo) DelegateAddTargetsWithExpires(nameJSON string, paths []string, custom json.RawMessage, expires time.Time) error {
+	if !strings.Contains(nameJSON, ".json") {
+		nameJSON = nameJSON + ".json"
+	}
 	if !verify.ValidRole(strings.TrimSuffix(nameJSON, ".json")) {
 		return ErrInvalidRole{nameJSON}
 	}
@@ -1190,22 +1262,34 @@ func (r *Repo) DelegateAddTargetsWithExpires(nameJSON string, paths []string, cu
 
 //DelegateRemoveTarget remove target for non-top target role
 func (r *Repo) DelegateRemoveTarget(nameJSON, path string) error {
+	if !strings.Contains(nameJSON, ".json") {
+		nameJSON = nameJSON + ".json"
+	}
 	return r.DelegateRemoveTargets(nameJSON, []string{path})
 }
 
 //DelegateRemoveTargets remove targets for non-top target role
 func (r *Repo) DelegateRemoveTargets(nameJSON string, paths []string) error {
+	if !strings.Contains(nameJSON, ".json") {
+		nameJSON = nameJSON + ".json"
+	}
 	return r.DelegateRemoveTargetsWithExpires(nameJSON, paths, data.DefaultExpires("targets"))
 }
 
 //DelegateRemoveTargetWithExpires calls the next function
 func (r *Repo) DelegateRemoveTargetWithExpires(nameJSON string, path string, expires time.Time) error {
+	if !strings.Contains(nameJSON, ".json") {
+		nameJSON = nameJSON + ".json"
+	}
 	return r.DelegateRemoveTargetsWithExpires(nameJSON, []string{path}, expires)
 }
 
 // DelegateRemoveTargetsWithExpires remove
 // If paths is empty, all targets will be removed
 func (r *Repo) DelegateRemoveTargetsWithExpires(nameJSON string, paths []string, expires time.Time) error {
+	if !strings.Contains(nameJSON, ".json") {
+		nameJSON = nameJSON + ".json"
+	}
 	if !verify.ValidRole(strings.TrimSuffix(nameJSON, ".json")) {
 		return ErrInvalidRole{nameJSON}
 	}
