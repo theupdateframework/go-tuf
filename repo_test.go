@@ -858,6 +858,8 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), DeepEquals, ErrNotEnoughKeys{"timestamp", 0, 1})
+
+	r.RestoreAll()
 }
 
 func (rs *RepoSuite) TestCommitVersions(c *C) {

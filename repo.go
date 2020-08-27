@@ -801,7 +801,6 @@ func (r *Repo) fileVersions() (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	versions := make(map[string]int)
 	versions["root.json"] = root.Version
 	versions["targets.json"] = targets.Version

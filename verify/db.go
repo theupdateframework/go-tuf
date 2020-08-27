@@ -85,6 +85,19 @@ func RestoreValidRole() {
 	}
 }
 
+//ExportTargetRoles export all roles contain target files need to be commited
+//Include both top and non-top target roles
+func ExportTargetRoles() []string {
+	targetRoleNames := make([]string, 2)
+	//targetRoleNames = append(targetRoleNames, "targets")
+	for k := range validRoles {
+		if k != "root" && k != "snapshot" && k != "timestamp" {
+			targetRoleNames = append(targetRoleNames, k+".json")
+		}
+	}
+	return targetRoleNames
+}
+
 func (db *DB) AddRole(name string, r *data.Role) error {
 	if r.Threshold < 1 {
 		return ErrInvalidThreshold

@@ -252,6 +252,21 @@ func (f *fileSystemStore) createRepoFile(path string) (*os.File, error) {
 
 func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]int, hashes map[string]data.Hashes) error {
 	isTarget := func(path string) bool {
+		/*targetList := verify.ExportTargetRoles()
+		for _, name := range targetList {
+			if strings.HasPrefix(path, name) {
+				return true
+			}
+		}
+		return false*/
+		/*tarList := []string{"targets/", "role01/"}
+		for _, name := range tarList {
+			if strings.HasPrefix(path, name) {
+				return true
+			}
+		}
+		return false */
+		//return strings.HasPrefix(path, "targets/") || strings.HasPrefix(path, "role01/")
 		return strings.HasPrefix(path, "targets/")
 
 	}
