@@ -31,7 +31,7 @@ The directories contain the following files:
 ### Install
 
 ```
-go get github.com/theupdateframework/go-tuf/cmd/tuf
+go get github.com/theupdateframework/go-tuf/cmd/tuf@delegation
 ```
 
 ### Commands
@@ -64,6 +64,29 @@ Stages the removal of files with the given path(s) from the `targets` manifest
 (they get removed from the filesystem when the change is committed). Specifying
 no paths removes all files from the `targets` manifest.
 
+#### `tuf dele-init <name>`
+
+Initialize a new non-top target role for delegation.
+
+#### `dele-gen-key [--expires=<days>] <role>`
+
+Prompts the user for an encryption passphrase (unless the
+`--insecure-plaintext` flag is set), then generates a new signing key and
+writes it to the relevant key file in the `keys` directory. It also stages
+the addition of the new key to the `target` manifest.
+
+#### `dele-add <names>  [<path>...]`
+
+Hashes files in the `staged/targets` directory at the given path(s), then
+updates and stages the delegated target manifest. Specifying no paths hashes all
+files in the `staged/targets` directory.
+
+#### `dele-remove <name> [<path>...]`
+
+Stages the removal of files with the given path(s) from the certain non-top target manifest
+(they get removed from the filesystem when the change is committed). Specifying
+no paths removes all files from the certain non-top target manifest.
+
 #### `tuf snapshot [--compression=<format>]`
 
 Expects a staged, fully signed `targets` manifest and stages an appropriate
@@ -83,12 +106,13 @@ directory for that role.
 
 Verifies that all staged changes contain the correct information and are signed
 to the correct threshold, then moves the staged files into the `repository`
-directory. It also removes any target files which are not in the `targets`
-manifest.
+directory. It also removes any target files which are not in the top-level `targets`
+and non-top target manifests.
 
 #### `tuf regenerate [--consistent-snapshot=false]`
 
 Recreates the `targets` manifest based on the files in `repository/targets`.
+This function has not been implemented yet.
 
 #### `tuf clean`
 

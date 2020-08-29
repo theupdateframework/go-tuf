@@ -8,8 +8,8 @@ import (
 )
 
 func init() {
-	register("delegationRemove", cmdDelegationRemove, `
-usage: tuf deleRemove [--role-name=<name>] [--expires=<days>] [--all] [<path>...]
+	register("dele-remove", cmdDelegationRemove, `
+usage: tuf dele-remove <name> [--expires=<days>] [--all] [<path>...]
 
 Remove target file(s).
 
@@ -24,7 +24,7 @@ func cmdDelegationRemove(args *docopt.Args, repo *tuf.Repo) error {
 	if len(paths) == 0 && !args.Bool["--all"] {
 		return errors.New("either specify some paths or set the --all flag to remove all targets")
 	}
-	argv := args.String["--role-name"]
+	argv := args.String["<name>"]
 	if arg := args.String["--expires"]; arg != "" {
 		expires, err := parseExpires(arg)
 		if err != nil {

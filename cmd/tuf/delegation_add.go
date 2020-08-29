@@ -8,8 +8,8 @@ import (
 )
 
 func init() {
-	register("add", cmdDelegateAdd, `
-usage: tuf add [--role-name=<names>] [--expires=<days>] [--custom=<data>] [<path>...]
+	register("dele-add", cmdDelegateAdd, `
+usage: tuf dele-add <names> [--expires=<days>] [--custom=<data>] [<path>...]
 
 Add target file(s) for a non-top target role, a name must be provided.
 
@@ -24,7 +24,7 @@ func cmdDelegateAdd(args *docopt.Args, repo *tuf.Repo) error {
 		custom = json.RawMessage(c)
 	}
 	paths := args.All["<path>"].([]string)
-	argv := args.String["--role-name"]
+	argv := args.String["<names>"]
 	if arg := args.String["--expires"]; arg != "" {
 		expires, err := parseExpires(arg)
 		if err != nil {

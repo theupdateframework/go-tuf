@@ -7,7 +7,7 @@ import (
 
 func delegationInit() {
 	register("dele-init", cmdDeleInit, `
-usage: tuf dele-init [--role-name=<data>]
+usage: tuf dele-init <name>
 
 Initialize a new non-top target role.
 
@@ -18,7 +18,7 @@ is required.
 }
 
 func cmdDeleInit(args *docopt.Args, repo *tuf.Repo) error {
-	if c := args.String["--role-name"]; c != "" {
+	if c := args.String["<name>"]; c != "" {
 		repo.DelegateInit(c)
 	}
 	return nil
