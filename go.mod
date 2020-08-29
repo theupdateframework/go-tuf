@@ -1,4 +1,4 @@
-module github.com/SimonMen65/go-tuf
+module github.com/theupdateframework/go-tuf
 
 go 1.14
 
