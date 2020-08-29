@@ -9,7 +9,7 @@ func init() {
 	register("sign", cmdSign, `
 usage: tuf sign <manifest>
 
-Sign a manifest.
+Sign a manifest. Note that manifest is in format of "role.json"
 `)
 }
 

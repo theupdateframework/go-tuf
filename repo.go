@@ -1031,10 +1031,14 @@ func (r *Repo) DelegateInit(name string) {
 
 //RemoveDeleRole removes a delegation target role and
 //edits related variables
-func (r *Repo) RemoveDeleRole(name string) {
-	verify.DeleteValidRole(name)
+func (r *Repo) RemoveDeleRole(name string) error {
+	err := verify.DeleteValidRole(name)
 	r.deleteTopLevelManifest(name + ".json")
 	r.deleteSnapManifest(name + ".json")
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 //RestoreAll variables changed when a non-top target
