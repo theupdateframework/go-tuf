@@ -11,7 +11,7 @@ func init() {
 	register("dele-remove", cmdDelegationRemove, `
 usage: tuf dele-remove <name> [--expires=<days>] [--all] [<path>...]
 
-Remove target file(s).
+Remove target file(s) from a delegated role
 
 Options:
   --all              Remove all target files.

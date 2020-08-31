@@ -7,7 +7,7 @@ import (
 
 func delegationDelete() {
 	register("delegateDelete", cmdDelegationDelete, `
-usage: tuf deleDelete [--role-name=<data>]
+usage: tuf dele-delete [--role-name=<data>]
 
 Delete an existing non-top target role.
 

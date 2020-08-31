@@ -179,6 +179,28 @@ func (r Root) UniqueKeys() map[string][]*Key {
 	return keysByRole
 }
 
+//TargetUniqueKeys checks how many unique keys in top target role
+func (t Targets) TargetUniqueKeys() map[string][]*Key {
+	keysByRole := make(map[string][]*Key)
+	for name, role := range t.Roles {
+		seen := make(map[string]struct{})
+		keys := []*Key{}
+		for _, id := range role.KeyIDs {
+			// Double-check that there is actually a key with that ID.
+			if key, ok := t.Keys[id]; ok {
+				val := key.Value.Public.String()
+				if _, ok := seen[val]; ok {
+					continue
+				}
+				seen[val] = struct{}{}
+				keys = append(keys, key)
+			}
+		}
+		keysByRole[name] = keys
+	}
+	return keysByRole
+}
+
 type Role struct {
 	KeyIDs    []string `json:"keyids"`
 	Threshold int      `json:"threshold"`

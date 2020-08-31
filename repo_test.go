@@ -41,6 +41,10 @@ func (*RepoSuite) assertNumUniqueKeys(c *C, root *data.Root, role string, num in
 	c.Assert(root.UniqueKeys()[role], HasLen, num)
 }
 
+func (*RepoSuite) targetAssertUniqueKeys(c *C, targ *data.Targets, role string, num int) {
+	c.Assert(targ.TargetUniqueKeys()[role], HasLen, num)
+}
+
 func testNewRepo(c *C, newRepo func(local LocalStore, hashAlgorithms ...string) (*Repo, error)) {
 	meta := map[string]json.RawMessage{
 		"root.json": []byte(`{
@@ -150,6 +154,8 @@ func genKey(c *C, r *Repo, role string) []string {
 	return keyids
 }
 
+//Generate a key for a certain delegated role
+//default tests are contained
 func delegateGenKey(c *C, r *Repo, roleName string) []string {
 	r.DelegateInit(roleName)
 	keyids, err := r.DelegateGenKey(roleName)
@@ -493,6 +499,10 @@ func (rs *RepoSuite) TestRevokeKey(c *C) {
 	genKey(c, r, "root")
 	target1IDs := genKey(c, r, "targets")
 	target2IDs := genKey(c, r, "targets")
+	r.DelegateInit("role01")
+	delek1 := delegateGenKey(c, r, "role01")
+	delek2 := delegateGenKey(c, r, "role01")
+	defer r.RestoreAll()
 	genKey(c, r, "snapshot")
 	genKey(c, r, "timestamp")
 	root, err := r.root()
@@ -505,7 +515,13 @@ func (rs *RepoSuite) TestRevokeKey(c *C) {
 	rs.assertNumUniqueKeys(c, root, "snapshot", 1)
 	rs.assertNumUniqueKeys(c, root, "timestamp", 1)
 
-	// revoke a key
+	target, err := r.targets()
+	c.Assert(err, IsNil)
+	c.Assert(target.Roles, HasLen, 1)
+	c.Assert(target.Keys, NotNil)
+	rs.targetAssertUniqueKeys(c, target, "role01", 2)
+
+	// revoke a key of Top target role
 	targetsRole, ok := root.Roles["targets"]
 	if !ok {
 		c.Fatal("missing targets role")
@@ -517,6 +533,18 @@ func (rs *RepoSuite) TestRevokeKey(c *C) {
 	// make sure all the other key ids were also revoked
 	for _, id := range target1IDs {
 		c.Assert(r.RevokeKey("targets", id), DeepEquals, ErrKeyNotFound{"targets", id})
+	}
+
+	//Revoke a Key for the delegated role
+	tempRole, ok := target.Roles["role01"]
+	if !ok {
+		c.Fatal("missing targets role")
+	}
+	c.Assert(tempRole.KeyIDs, HasLen, len(delek1)+len(delek2))
+	id2 := tempRole.KeyIDs[0]
+	c.Assert(r.DelegateRevokeKey("role01", id2), IsNil)
+	for _, id := range delek1 {
+		c.Assert(r.RevokeKey("role01", id), DeepEquals, ErrKeyNotFound{"role01", id})
 	}
 
 	// check root was updated
@@ -535,6 +563,21 @@ func (rs *RepoSuite) TestRevokeKey(c *C) {
 	}
 	c.Assert(targetsRole.KeyIDs, HasLen, 2)
 	c.Assert(targetsRole.KeyIDs, DeepEquals, target2IDs)
+
+	// check target is updated
+	target, err = r.targets()
+	c.Assert(err, IsNil)
+	c.Assert(target.Roles, NotNil)
+	c.Assert(target.Roles, HasLen, 1)
+	c.Assert(target.Keys, NotNil)
+	rs.targetAssertUniqueKeys(c, target, "role01", 1)
+
+	tempRole, ok = target.Roles["role01"]
+	if !ok {
+		c.Fatal("missing delegated targets role")
+	}
+	c.Assert(tempRole.KeyIDs, HasLen, 2)
+	c.Assert(tempRole.KeyIDs, DeepEquals, delek2)
 }
 
 func (rs *RepoSuite) TestSign(c *C) {

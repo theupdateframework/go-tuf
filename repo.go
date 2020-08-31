@@ -386,7 +386,7 @@ func (r *Repo) RootKeys() ([]*data.Key, error) {
 	return rootKeys, nil
 }
 
-//TargetKeys return Key objects in root metadata
+//TargetKeys return Key objects in Top Targets metadata
 func (r *Repo) TargetKeys() ([]*data.Key, error) {
 	root, err := r.root()
 	if err != nil {
@@ -1189,6 +1189,64 @@ func (r *Repo) DelegateAddPrivateKeyWithExpires(nameJSON string, key *sign.Priva
 	}
 
 	return r.setMeta("targets.json", target)
+}
+
+//DelegateRevokeKey revoke a key for a certain delegated role
+func (r *Repo) DelegateRevokeKey(role, id string) error {
+	return r.DelegateRevokeKeyWithExpires(role, id, data.DefaultExpires("targets"))
+}
+
+//DelegateRevokeKeyWithExpires revoke a key with new expire set
+func (r *Repo) DelegateRevokeKeyWithExpires(keyRole, id string, expires time.Time) error {
+	if !verify.ValidRole(keyRole) {
+		return ErrInvalidRole{keyRole}
+	}
+
+	if !validExpires(expires) {
+		return ErrInvalidExpires{expires}
+	}
+
+	targ, err := r.targets()
+	if err != nil {
+		return err
+	}
+
+	key, ok := targ.Keys[id]
+	if !ok {
+		return ErrKeyNotFound{keyRole, id}
+	}
+
+	role, ok := targ.Roles[keyRole]
+	if !ok {
+		return ErrKeyNotFound{keyRole, id}
+	}
+
+	keyIDs := make([]string, 0, len(role.KeyIDs))
+
+	// There may be multiple keyids that correspond to this key, so
+	// filter all of them out.
+	for _, keyID := range role.KeyIDs {
+		if key.ContainsID(keyID) {
+			continue
+		}
+		keyIDs = append(keyIDs, keyID)
+	}
+	if len(keyIDs) == len(role.KeyIDs) {
+		return ErrKeyNotFound{keyRole, id}
+	}
+	role.KeyIDs = keyIDs
+
+	for _, keyID := range key.IDs() {
+		delete(targ.Keys, keyID)
+	}
+	targ.Roles[keyRole] = role
+	targ.Expires = expires.Round(time.Second)
+	if _, ok := r.versionUpdated["targets.json"]; !ok {
+		targ.Version++
+		r.versionUpdated["targets.json"] = struct{}{}
+	}
+
+	return r.setMeta("targets.json", targ)
 }
 
 //DelegateAddTarget add a target to non-top target role

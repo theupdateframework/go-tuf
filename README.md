@@ -123,7 +123,18 @@ Removes all staged manifests and targets.
 Outputs a JSON serialized array of root keys to STDOUT. The resulting JSON
 should be distributed to clients for performing initial updates.
 
+#### `tuf target-keys`
+
+Outputs a JSON serialized array of target keys to STDOUT. The resulting JSON
+should be distributed to clients for performing initial updates.
+
+#### `tuf restore`
+
+Restore all registration of delegated role from database
+
+
 For a list of supported commands, run `tuf help` from the command line.
+
 
 ### Examples
 

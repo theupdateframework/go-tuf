@@ -28,18 +28,27 @@ Options:
   --insecure-plaintext  Don't encrypt signing keys
 
 Commands:
-  help         Show usage for a specific command
-  gen-key      Generate a new signing key for a specific manifest
-  revoke-key   Revoke a signing key
-  add          Add target file(s)
-  remove       Remove a target file
-  snapshot     Update the snapshot manifest
-  timestamp    Update the timestamp manifest
-  sign         Sign a manifest
-  commit       Commit staged files to the repository
-  regenerate   Recreate the targets manifest
-  clean        Remove all staged manifests
-  root-keys    Output a JSON serialized array of root keys to STDOUT
+  help           Show usage for a specific command
+  init 			 Initialize a new repository.
+  gen-key        Generate a new signing key for a specific manifest
+  revoke-key     Revoke a signing key
+  add            Add target file(s)
+  remove         Remove a target file
+  snapshot       Update the snapshot manifest
+  timestamp      Update the timestamp manifest
+  sign           Sign a manifest
+  commit         Commit staged files to the repository
+  regenerate     Recreate the targets manifest
+  clean          Remove all staged manifests
+  root-keys      Output a JSON serialized array of root keys to STDOUT
+  target-leys    Outputs a JSON serialized array of targets keys to STDOUT.
+  dele-init      Initialize a new non-top target role
+  dele-delete    Delete an existing non-top target role
+  dele-gen-key   Generate a new signing key for a specific delegated role
+  dele-add		 Add target file(s) for a delegated role
+  dele-remove    Remove a delegated target file
+  dele-revoke    Revoke a signing key of the delegated role
+  restore        Restore all registration of delegated role from database
 
 See "tuf help <command>" for more information on a specific command
 `
