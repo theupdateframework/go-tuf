@@ -1,4 +1,5 @@
-# go-tuf [![Build Status](https://travis-ci.org/flynn/go-tuf.svg?branch=master)](https://travis-ci.org/flynn/go-tuf)
+# go-tuf
+[![build](https://github.com/theupdateframework/go-tuf/workflows/build/badge.svg)](https://github.com/theupdateframework/go-tuf/actions?query=workflow%3Abuild) [![Coverage Status](https://coveralls.io/repos/github/theupdateframework/go-tuf/badge.svg)](https://coveralls.io/github/theupdateframework/go-tuf) [![PkgGoDev](https://pkg.go.dev/badge/github.com/theupdateframework/go-tuf)](https://pkg.go.dev/github.com/theupdateframework/go-tuf) [![Go Report Card](https://goreportcard.com/badge/github.com/theupdateframework/go-tuf)](https://goreportcard.com/report/github.com/theupdateframework/go-tuf)  
 
 This is a Go implementation of [The Update Framework (TUF)](http://theupdateframework.com/),
 a framework for securing software update systems.
