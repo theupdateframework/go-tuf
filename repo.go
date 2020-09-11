@@ -25,7 +25,7 @@ const (
 
 // topLevelManifests determines the order signatures are verified when committing.
 var topLevelManifests = []string{
-	"root.json",
+	//"root.json",
 	"targets.json",
 	"snapshot.json",
 	"timestamp.json",
@@ -307,9 +307,9 @@ func (r *Repo) AddPrivateKeyWithExpires(keyRole string, key *sign.PrivateKey, ex
 		return err
 	}
 
-	if !verify.ValidRole(keyRole) {
-		return ErrInvalidRole{keyRole}
-	}
+	//if !verify.ValidRole(keyRole) {
+	//	return ErrInvalidRole{keyRole}
+	//}
 
 	if !validExpires(expires) {
 		return ErrInvalidExpires{expires}
@@ -423,9 +423,9 @@ func (r *Repo) RevokeKey(role, id string) error {
 }
 
 func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error {
-	if !verify.ValidRole(keyRole) {
-		return ErrInvalidRole{keyRole}
-	}
+	//if !verify.ValidRole(keyRole) {
+	//	return ErrInvalidRole{keyRole}
+	//}
 
 	if !validExpires(expires) {
 		return ErrInvalidExpires{expires}
@@ -511,9 +511,9 @@ func (r *Repo) setMeta(name string, meta interface{}) error {
 
 func (r *Repo) Sign(name string) error {
 	role := strings.TrimSuffix(name, ".json")
-	if !verify.ValidRole(role) {
-		return ErrInvalidRole{role}
-	}
+	//if !verify.ValidRole(role) {
+	//	return ErrInvalidRole{role}
+	//}
 
 	s, err := r.signedMeta(name)
 	if err != nil {
@@ -725,6 +725,17 @@ func (r *Repo) SnapshotWithExpires(t CompressionType, expires time.Time) error {
 	if err != nil {
 		return err
 	}
+
+	//Expand snapshotManifest to include delegated roles
+	targ, err := r.targets()
+	if err != nil {
+		return err
+	}
+
+	for name := range targ.Roles {
+		snapshotManifests = append(snapshotManifests, name+".json")
+	}
+
 	// TODO: generate compressed manifests
 	for _, name := range snapshotManifests {
 		if err := r.verifySignature(name, db); err != nil {
@@ -849,6 +860,21 @@ func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 }
 
 func (r *Repo) Commit() error {
+	root, err := r.root()
+	if err != nil {
+		return err
+	}
+
+	target, err := r.targets()
+	if err != nil {
+		return err
+	}
+
+	//Expand topLevelMenifest to include delegated roles
+	//Otherwise delegations won't be committed
+	for name := range target.Roles {
+		topLevelManifests = append(topLevelManifests, name+".json")
+	}
 	// check we have all the metadata
 	for _, name := range topLevelManifests {
 		if _, ok := r.meta[name]; !ok {
@@ -856,22 +882,14 @@ func (r *Repo) Commit() error {
 		}
 	}
 
-	// check roles are valid
-	root, err := r.root()
-	if err != nil {
-		return err
-	}
+	// check roles in root are valid
 	for name, role := range root.Roles {
 		if len(role.KeyIDs) < role.Threshold {
 			return ErrNotEnoughKeys{name, len(role.KeyIDs), role.Threshold}
 		}
 	}
 
-	//check roles of top-target
-	target, err := r.targets()
-	if err != nil {
-		return err
-	}
+	//check roles in top-target are valid
 	for name, role := range target.Roles {
 		if len(role.KeyIDs) < role.Threshold {
 			return ErrNotEnoughKeys{name, len(role.KeyIDs), role.Threshold}
@@ -1024,7 +1042,7 @@ func (r *Repo) restoreSnapManifests() {
 //DelegateInit put the name of new Role to the Validated Roles
 //name is simply the name of role without .json
 func (r *Repo) DelegateInit(name string) {
-	verify.AddValidRole(name)
+	//verify.AddValidRole(name)
 	r.addTopLevelManifest(name + ".json")
 	r.addSnapManifest(name + ".json")
 }
@@ -1032,12 +1050,12 @@ func (r *Repo) DelegateInit(name string) {
 //RemoveDeleRole removes a delegation target role and
 //edits related variables
 func (r *Repo) RemoveDeleRole(name string) error {
-	err := verify.DeleteValidRole(name)
+	//err := verify.DeleteValidRole(name)
 	r.deleteTopLevelManifest(name + ".json")
 	r.deleteSnapManifest(name + ".json")
-	if err != nil {
-		return err
-	}
+	//if err != nil {
+	//	return err
+	//}
 	return nil
 }
 
@@ -1076,9 +1094,9 @@ func (r *Repo) DelegateTargetVersion(nameJSON string) (int, error) {
 	if !strings.Contains(nameJSON, ".json") {
 		nameJSON = nameJSON + ".json"
 	}
-	if !validManifest(nameJSON) {
-		return -1, ErrInvalidRole{nameJSON}
-	}
+	//if !validManifest(nameJSON) {
+	//	return -1, ErrInvalidRole{nameJSON}
+	//}
 	d, err := r.delegationTargets(nameJSON)
 	if err != nil {
 		return -1, err
@@ -1092,9 +1110,9 @@ func (r *Repo) SetDelegateTargetVersion(nameJSON string, v int) error {
 	if !strings.Contains(nameJSON, ".json") {
 		nameJSON = nameJSON + ".json"
 	}
-	if !validManifest(nameJSON) {
-		return ErrInvalidRole{nameJSON}
-	}
+	//if !validManifest(nameJSON) {
+	//	return ErrInvalidRole{nameJSON}
+	//}
 	d, err := r.delegationTargets(nameJSON)
 	if err != nil {
 		return err
@@ -1136,9 +1154,9 @@ func (r *Repo) DelegateAddPrivateKeyWithExpires(nameJSON string, key *sign.Priva
 		nameJSON = nameJSON + ".json"
 	}
 	name := strings.TrimSuffix(nameJSON, ".json")
-	if !verify.ValidRole(name) {
-		return ErrInvalidRole{nameJSON}
-	}
+	//if !verify.ValidRole(name) {
+	//	return ErrInvalidRole{nameJSON}
+	//}
 	target, err := r.targets()
 	if err != nil {
 		return err
@@ -1198,9 +1216,9 @@ func (r *Repo) DelegateRevokeKey(role, id string) error {
 
 //DelegateRevokeKeyWithExpires revoke a key with new expire set
 func (r *Repo) DelegateRevokeKeyWithExpires(keyRole, id string, expires time.Time) error {
-	if !verify.ValidRole(keyRole) {
-		return ErrInvalidRole{keyRole}
-	}
+	//if !verify.ValidRole(keyRole) {
+	//	return ErrInvalidRole{keyRole}
+	//}
 
 	if !validExpires(expires) {
 		return ErrInvalidExpires{expires}
@@ -1278,9 +1296,9 @@ func (r *Repo) DelegateAddTargetsWithExpires(nameJSON string, paths []string, cu
 	if !strings.Contains(nameJSON, ".json") {
 		nameJSON = nameJSON + ".json"
 	}
-	if !verify.ValidRole(strings.TrimSuffix(nameJSON, ".json")) {
-		return ErrInvalidRole{nameJSON}
-	}
+	//if !verify.ValidRole(strings.TrimSuffix(nameJSON, ".json")) {
+	//	return ErrInvalidRole{nameJSON}
+	//}
 	if !validExpires(expires) {
 		return ErrInvalidExpires{expires}
 	}
@@ -1352,9 +1370,9 @@ func (r *Repo) DelegateRemoveTargetsWithExpires(nameJSON string, paths []string,
 	if !strings.Contains(nameJSON, ".json") {
 		nameJSON = nameJSON + ".json"
 	}
-	if !verify.ValidRole(strings.TrimSuffix(nameJSON, ".json")) {
-		return ErrInvalidRole{nameJSON}
-	}
+	//if !verify.ValidRole(strings.TrimSuffix(nameJSON, ".json")) {
+	//	return ErrInvalidRole{nameJSON}
+	//}
 	if !validExpires(expires) {
 		return ErrInvalidExpires{expires}
 	}
@@ -1386,4 +1404,12 @@ func (r *Repo) DelegateRemoveTargetsWithExpires(nameJSON string, paths []string,
 		r.versionUpdated[nameJSON] = struct{}{}
 	}
 	return r.setMeta(nameJSON, d)
+}
+
+func (r *Repo) ListMeta() []string {
+	res := make([]string, 0)
+	for name := range r.meta {
+		res = append(res, name)
+	}
+	return res
 }

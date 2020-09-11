@@ -52,28 +52,28 @@ var validRoles = map[string]struct{}{
 
 //ValidRole checks if the role can be operated
 //Parameter: name of a Role
-func ValidRole(name string) bool {
-	_, ok := validRoles[name]
-	return ok
-}
+//func ValidRole(name string) bool {
+//	_, ok := validRoles[name]
+//	return ok
+//}
 
 //AddValidRole is used when creating a delegation
 //Parameter: name of a new Role
-func AddValidRole(name string) {
-	if !ValidRole(name) {
-		validRoles[name] = struct{}{}
-	}
-}
+//func AddValidRole(name string) {
+//	if !ValidRole(name) {
+//		validRoles[name] = struct{}{}
+//	}
+//}
 
 //DeleteValidRole deletes an existing role
 //Checks availibility first
-func DeleteValidRole(name string) error {
-	if !ValidRole(name) {
-		return ErrInvalidRole
-	}
-	delete(validRoles, name)
-	return nil
-}
+//func DeleteValidRole(name string) error {
+// if !ValidRole(name) {
+// 	return ErrInvalidRole
+// }
+// delete(validRoles, name)
+// return nil
+//}
 
 //RestoreValidRole restores validRoles to original four items
 func RestoreValidRole() {
@@ -99,9 +99,9 @@ func ExportTargetRoles() []string {
 }
 
 func (db *DB) AddRole(name string, r *data.Role) error {
-	if !ValidRole(name) {
-		return ErrInvalidRole
-	}
+	//if !ValidRole(name) {
+	//	return ErrInvalidRole
+	//}
 	if r.Threshold < 1 {
 		return ErrInvalidThreshold
 	}
