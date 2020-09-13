@@ -131,6 +131,20 @@ func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 		_, err := os.Stat(path)
 		return os.IsNotExist(err)
 	}
+	if !notExists(f.stagedDir()) {
+		dir, err := ioutil.ReadDir(f.stagedDir())
+		if err != nil {
+			return meta, err
+		}
+		for _, fileInfo := range dir {
+			nameJSON := fileInfo.Name()
+			if nameJSON != "root.json" && nameJSON != "targets.json" && nameJSON != "snapshot.json" && nameJSON != "timestamp.json" && strings.HasSuffix(nameJSON, ".json") {
+				topLevelManifests = append(topLevelManifests, nameJSON)
+			}
+
+		}
+	}
+
 	for _, name := range topLevelManifests {
 		path := filepath.Join(f.stagedDir(), name)
 		if notExists(path) {

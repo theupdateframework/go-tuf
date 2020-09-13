@@ -25,7 +25,7 @@ const (
 
 // topLevelManifests determines the order signatures are verified when committing.
 var topLevelManifests = []string{
-	//"root.json",
+	"root.json",
 	"targets.json",
 	"snapshot.json",
 	"timestamp.json",
