@@ -124,6 +124,10 @@ func (f *fileSystemStore) stagedDir() string {
 	return filepath.Join(f.dir, "staged")
 }
 
+func (f *fileSystemStore) keysDir() string {
+	return filepath.Join(f.dir, "keys")
+}
+
 func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 	meta := make(map[string]json.RawMessage)
 	var err error
@@ -132,7 +136,7 @@ func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 		return os.IsNotExist(err)
 	}
 	if !notExists(f.stagedDir()) {
-		dir, err := ioutil.ReadDir(f.stagedDir())
+		dir, err := ioutil.ReadDir(f.keysDir())
 		if err != nil {
 			return meta, err
 		}
@@ -242,21 +246,6 @@ func (f *fileSystemStore) createRepoFile(path string) (*os.File, error) {
 
 func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]int, hashes map[string]data.Hashes) error {
 	isTarget := func(path string) bool {
-		/*targetList := verify.ExportTargetRoles()
-		for _, name := range targetList {
-			if strings.HasPrefix(path, name) {
-				return true
-			}
-		}
-		return false*/
-		/*tarList := []string{"targets/", "role01/"}
-		for _, name := range tarList {
-			if strings.HasPrefix(path, name) {
-				return true
-			}
-		}
-		return false */
-		//return strings.HasPrefix(path, "targets/") || strings.HasPrefix(path, "role01/")
 		return strings.HasPrefix(path, "targets/")
 
 	}

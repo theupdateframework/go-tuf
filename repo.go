@@ -800,24 +800,27 @@ func (r *Repo) fileVersions() (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	extraTar := verify.ExportTargetRoles()
+
 	versions := make(map[string]int)
 	versions["root.json"] = root.Version
 	versions["targets.json"] = targets.Version
 	versions["snapshot.json"] = snapshot.Version
-	for _, tar := range extraTar {
-		temp, err := r.delegationTargets(tar)
+	for tar := range targets.Roles {
+		temp, err := r.delegationTargets(tar + ".json")
 		if err != nil {
 			return nil, err
 		}
-		versions[tar] = temp.Version
+		versions[tar+".json"] = temp.Version
 	}
 	return versions, nil
 }
 
 func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 	hashes := make(map[string]data.Hashes)
-	tarList := verify.ExportTargetRoles()
+	target, err := r.targets()
+	if err != nil {
+		return nil, err
+	}
 	timestamp, err := r.timestamp()
 	if err != nil {
 		return nil, err
@@ -832,9 +835,9 @@ func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 	if m, ok := snapshot.Meta["targets.json"]; ok {
 		hashes["targets.json"] = m.Hashes
 	}
-	for _, tar := range tarList {
-		if m, ok := snapshot.Meta[tar]; ok {
-			hashes[tar] = m.Hashes
+	for tar := range target.Roles {
+		if m, ok := snapshot.Meta[tar+".json"]; ok {
+			hashes[tar+".json"] = m.Hashes
 		}
 	}
 	if m, ok := timestamp.Meta["snapshot.json"]; ok {
@@ -847,8 +850,8 @@ func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 	for name, meta := range t.Targets {
 		hashes[path.Join("targets", name)] = meta.Hashes
 	}
-	for _, tar := range tarList {
-		temp, err := r.delegationTargets(tar)
+	for tar := range target.Roles {
+		temp, err := r.delegationTargets(tar + ".json")
 		if err != nil {
 			return nil, err
 		}
@@ -874,6 +877,7 @@ func (r *Repo) Commit() error {
 	//Otherwise delegations won't be committed
 	for name := range target.Roles {
 		topLevelManifests = append(topLevelManifests, name+".json")
+		snapshotManifests = append(snapshotManifests, name+".json")
 	}
 	// check we have all the metadata
 	for _, name := range topLevelManifests {
