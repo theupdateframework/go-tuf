@@ -140,6 +140,8 @@ func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 		if err != nil {
 			return meta, err
 		}
+		//adding all delegated role names into top level manifests
+		//so that it can be initiated in the system
 		for _, fileInfo := range dir {
 			nameJSON := fileInfo.Name()
 			if nameJSON != "root.json" && nameJSON != "targets.json" && nameJSON != "snapshot.json" && nameJSON != "timestamp.json" && strings.HasSuffix(nameJSON, ".json") {

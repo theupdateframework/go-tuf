@@ -48,7 +48,7 @@ Commands:
   dele-add		 Add target file(s) for a delegated role
   dele-remove    Remove a delegated target file
   dele-revoke    Revoke a signing key of the delegated role
-  restore        Restore all registration of delegated role from database
+  list 			 List all metadata with keys
 
 See "tuf help <command>" for more information on a specific command
 `

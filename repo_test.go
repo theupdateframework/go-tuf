@@ -157,7 +157,6 @@ func genKey(c *C, r *Repo, role string) []string {
 //Generate a key for a certain delegated role
 //default tests are contained
 func delegateGenKey(c *C, r *Repo, roleName string) []string {
-	r.DelegateInit(roleName)
 	keyids, err := r.DelegateGenKey(roleName)
 	c.Assert(err, IsNil)
 	c.Assert(len(keyids) > 0, Equals, true)
@@ -329,7 +328,7 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 	key, err := sign.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	err = r.AddPrivateKey("foo", key)
-	c.Assert(err, Equals, ErrInvalidExpires{Expires: time.Time{}})
+	c.Assert(err, Equals, ErrInvalidRole{Role: "foo"})
 
 	// add a root key
 	ids := addPrivateKey(c, r, "root", key)
@@ -490,7 +489,7 @@ func (rs *RepoSuite) TestRevokeKey(c *C) {
 	c.Assert(err, IsNil)
 
 	// revoking a key for an unknown role returns ErrInvalidRole
-	c.Assert(r.RevokeKey("foo", ""), DeepEquals, ErrKeyNotFound{Role: "foo", KeyID: ""})
+	c.Assert(r.RevokeKey("foo", ""), DeepEquals, ErrInvalidRole{Role: "foo"})
 
 	// revoking a key which doesn't exist returns ErrKeyNotFound
 	c.Assert(r.RevokeKey("root", "nonexistent"), DeepEquals, ErrKeyNotFound{"root", "nonexistent"})
@@ -499,10 +498,8 @@ func (rs *RepoSuite) TestRevokeKey(c *C) {
 	genKey(c, r, "root")
 	target1IDs := genKey(c, r, "targets")
 	target2IDs := genKey(c, r, "targets")
-	r.DelegateInit("role01")
 	delek1 := delegateGenKey(c, r, "role01")
 	delek2 := delegateGenKey(c, r, "role01")
-	defer r.RestoreAll()
 	genKey(c, r, "snapshot")
 	genKey(c, r, "timestamp")
 	root, err := r.root()
@@ -544,7 +541,7 @@ func (rs *RepoSuite) TestRevokeKey(c *C) {
 	id2 := tempRole.KeyIDs[0]
 	c.Assert(r.DelegateRevokeKey("role01", id2), IsNil)
 	for _, id := range delek1 {
-		c.Assert(r.RevokeKey("role01", id), DeepEquals, ErrKeyNotFound{"role01", id})
+		c.Assert(r.RevokeKey("role01", id), DeepEquals, ErrInvalidRole{Role: "role01"})
 	}
 
 	// check root was updated
@@ -636,7 +633,6 @@ func (rs *RepoSuite) TestDelegation(c *C) {
 	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
 
 	//initialize new target toles
-	r.DelegateInit("role01")
 	keyids, err := r.DelegateGenKey("role01")
 	c.Assert(err, IsNil)
 	c.Assert(len(keyids) > 0, Equals, true)
@@ -781,8 +777,6 @@ func (rs *RepoSuite) TestDelegation(c *C) {
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
-
-	r.RestoreAll()
 }
 
 func (rs *RepoSuite) TestCommit(c *C) {
@@ -800,7 +794,6 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	c.Assert(r.Commit(), DeepEquals, ErrMissingMetadata{"targets.json"})
 
 	//Add non-top target role
-	r.DelegateInit("role01")
 	keyids, err := r.DelegateGenKey("role01")
 	c.Assert(err, IsNil)
 	c.Assert(len(keyids) > 0, Equals, true)
@@ -865,8 +858,6 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), DeepEquals, ErrNotEnoughKeys{"timestamp", 0, 1})
-
-	r.RestoreAll()
 }
 
 func (rs *RepoSuite) TestCommitVersions(c *C) {
@@ -880,7 +871,6 @@ func (rs *RepoSuite) TestCommitVersions(c *C) {
 	genKey(c, r, "snapshot")
 	genKey(c, r, "timestamp")
 	delegateGenKey(c, r, "role01")
-	defer r.RestoreAll()
 
 	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
 	c.Assert(r.DelegateAddTarget("role01.json", "bar.txt", nil), IsNil)
@@ -1079,7 +1069,6 @@ func (rs *RepoSuite) TestCommitFileSystem(c *C) {
 	genKey(c, r, "root")
 	genKey(c, r, "targets")
 	delegateGenKey(c, r, "role01")
-	defer r.RestoreAll()
 	genKey(c, r, "snapshot")
 	genKey(c, r, "timestamp")
 	tmp.assertExists("staged/root.json")
@@ -1187,7 +1176,6 @@ func (rs *RepoSuite) TestCommitFileSystemWithNewRepositories(c *C) {
 	genKey(c, newRepo(), "root")
 	genKey(c, newRepo(), "targets")
 	delegateGenKey(c, newRepo(), "role01")
-	defer newRepo().RestoreAll()
 	genKey(c, newRepo(), "snapshot")
 	genKey(c, newRepo(), "timestamp")
 
@@ -1209,7 +1197,6 @@ func (rs *RepoSuite) TestConsistentSnapshot(c *C) {
 	genKey(c, r, "root")
 	genKey(c, r, "targets")
 	delegateGenKey(c, r, "role01")
-	defer r.RestoreAll()
 	genKey(c, r, "snapshot")
 	genKey(c, r, "timestamp")
 	tmp.writeStagedTarget("foo.txt", "foo")
@@ -1326,7 +1313,6 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 	genKey(c, r, "root")
 	genKey(c, r, "targets")
 	delegateGenKey(c, r, "role01")
-	defer r.RestoreAll()
 	genKey(c, r, "snapshot")
 	genKey(c, r, "timestamp")
 
@@ -1461,7 +1447,6 @@ func (rs *RepoSuite) TestHashAlgorithm(c *C) {
 		genKey(c, r, "root")
 		genKey(c, r, "targets")
 		delegateGenKey(c, r, "role01")
-		defer r.RestoreAll()
 		genKey(c, r, "snapshot")
 		c.Assert(r.AddTarget("foo.txt", nil), IsNil)
 		c.Assert(r.DelegateAddTarget("role01.json", "bar.txt", nil), IsNil)
@@ -1571,7 +1556,6 @@ func (rs *RepoSuite) TestManageMultipleTargets(c *C) {
 	genKey(c, r, "root")
 	genKey(c, r, "targets")
 	delegateGenKey(c, r, "role01")
-	defer r.RestoreAll()
 	genKey(c, r, "snapshot")
 	genKey(c, r, "timestamp")
 
@@ -1656,7 +1640,6 @@ func (rs *RepoSuite) TestCustomTargetMetadata(c *C) {
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
 	delegateGenKey(c, r, "role01")
-	defer r.RestoreAll()
 
 	custom := json.RawMessage(`{"foo":"bar"}`)
 	assertCustomMeta := func(file string, custom *json.RawMessage) {
