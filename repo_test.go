@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/encrypted"
-	"github.com/flynn/go-tuf/sign"
-	"github.com/flynn/go-tuf/util"
-	"github.com/flynn/go-tuf/verify"
+	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/encrypted"
+	"github.com/theupdateframework/go-tuf/sign"
+	"github.com/theupdateframework/go-tuf/util"
+	"github.com/theupdateframework/go-tuf/verify"
 	"golang.org/x/crypto/ed25519"
 	. "gopkg.in/check.v1"
 )
@@ -27,6 +27,21 @@ type RepoSuite struct{}
 var _ = Suite(&RepoSuite{})
 
 func (RepoSuite) TestNewRepo(c *C) {
+	testNewRepo(c, NewRepo)
+}
+
+func (RepoSuite) TestNewRepoIndent(c *C) {
+	testNewRepo(c, func(local LocalStore, hashAlgorithms ...string) (*Repo, error) {
+		return NewRepoIndent(local, "", "\t")
+	})
+}
+
+// AssertNumUniqueKeys verifies that the number of unique root keys for a given role is as expected.
+func (*RepoSuite) assertNumUniqueKeys(c *C, root *data.Root, role string, num int) {
+	c.Assert(root.UniqueKeys()[role], HasLen, num)
+}
+
+func testNewRepo(c *C, newRepo func(local LocalStore, hashAlgorithms ...string) (*Repo, error)) {
 	meta := map[string]json.RawMessage{
 		"root.json": []byte(`{
 		  "signed": {
@@ -67,7 +82,7 @@ func (RepoSuite) TestNewRepo(c *C) {
 		}`),
 	}
 	local := MemoryStore(meta, nil)
-	r, err := NewRepo(local)
+	r, err := newRepo(local)
 	c.Assert(err, IsNil)
 
 	root, err := r.root()
@@ -99,10 +114,10 @@ func (RepoSuite) TestNewRepo(c *C) {
 	c.Assert(timestamp.Meta, HasLen, 0)
 }
 
-func (RepoSuite) TestInit(c *C) {
+func (rs *RepoSuite) TestInit(c *C) {
 	local := MemoryStore(
 		make(map[string]json.RawMessage),
-		map[string][]byte{"/foo.txt": []byte("foo")},
+		map[string][]byte{"foo.txt": []byte("foo")},
 	)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -120,13 +135,14 @@ func (RepoSuite) TestInit(c *C) {
 	c.Assert(r.Init(true), Equals, ErrInitNotAllowed)
 }
 
-func genKey(c *C, r *Repo, role string) string {
-	id, err := r.GenKey(role)
+func genKey(c *C, r *Repo, role string) []string {
+	keyids, err := r.GenKey(role)
 	c.Assert(err, IsNil)
-	return id
+	c.Assert(len(keyids) > 0, Equals, true)
+	return keyids
 }
 
-func (RepoSuite) TestGenKey(c *C) {
+func (rs *RepoSuite) TestGenKey(c *C) {
 	local := MemoryStore(make(map[string]json.RawMessage), nil)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -136,50 +152,55 @@ func (RepoSuite) TestGenKey(c *C) {
 	c.Assert(err, Equals, ErrInvalidRole{"foo"})
 
 	// generate a root key
-	id := genKey(c, r, "root")
+	ids := genKey(c, r, "root")
 
 	// check root metadata is correct
 	root, err := r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Roles, NotNil)
 	c.Assert(root.Roles, HasLen, 1)
-	c.Assert(root.Keys, NotNil)
-	c.Assert(root.Keys, HasLen, 1)
+	rs.assertNumUniqueKeys(c, root, "root", 1)
 	rootRole, ok := root.Roles["root"]
 	if !ok {
 		c.Fatal("missing root role")
 	}
-	c.Assert(rootRole.KeyIDs, HasLen, 1)
-	keyID := rootRole.KeyIDs[0]
-	c.Assert(keyID, Equals, id)
-	k, ok := root.Keys[keyID]
-	if !ok {
-		c.Fatal("missing key")
+	c.Assert(rootRole.KeyIDs, HasLen, 2)
+	c.Assert(rootRole.KeyIDs, DeepEquals, ids)
+	for _, keyID := range ids {
+		k, ok := root.Keys[keyID]
+		if !ok {
+			c.Fatal("missing key")
+		}
+		c.Assert(k.IDs(), DeepEquals, ids)
+		c.Assert(k.Value.Public, HasLen, ed25519.PublicKeySize)
 	}
-	c.Assert(k.ID(), Equals, keyID)
-	c.Assert(k.Value.Public, HasLen, ed25519.PublicKeySize)
 
 	// check root key + role are in db
 	db, err := r.db()
 	c.Assert(err, IsNil)
-	rootKey := db.GetKey(keyID)
+	for _, keyID := range ids {
+		rootKey := db.GetKey(keyID)
+		c.Assert(rootKey, NotNil)
+		c.Assert(rootKey.IDs(), DeepEquals, ids)
+		role := db.GetRole("root")
+		c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(ids))
+
+		// check the key was saved correctly
+		localKeys, err := local.GetSigningKeys("root")
+		c.Assert(err, IsNil)
+		c.Assert(localKeys, HasLen, 1)
+		c.Assert(localKeys[0].IDs(), DeepEquals, ids)
+
+		// check RootKeys() is correct
+		rootKeys, err := r.RootKeys()
+		c.Assert(err, IsNil)
+		c.Assert(rootKeys, HasLen, 1)
+		c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
+		c.Assert(rootKeys[0].Value.Public, DeepEquals, rootKey.Value.Public)
+	}
+
+	rootKey := db.GetKey(ids[0])
 	c.Assert(rootKey, NotNil)
-	c.Assert(rootKey.ID(), Equals, keyID)
-	role := db.GetRole("root")
-	c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{keyID: {}})
-
-	// check the key was saved correctly
-	localKeys, err := local.GetSigningKeys("root")
-	c.Assert(err, IsNil)
-	c.Assert(localKeys, HasLen, 1)
-	c.Assert(localKeys[0].ID(), Equals, keyID)
-
-	// check RootKeys() is correct
-	rootKeys, err := r.RootKeys()
-	c.Assert(err, IsNil)
-	c.Assert(rootKeys, HasLen, 1)
-	c.Assert(rootKeys[0].ID(), Equals, rootKey.ID())
-	c.Assert(rootKeys[0].Value.Public, DeepEquals, rootKey.Value.Public)
 
 	// generate two targets keys
 	genKey(c, r, "targets")
@@ -189,12 +210,13 @@ func (RepoSuite) TestGenKey(c *C) {
 	root, err = r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Roles, HasLen, 2)
-	c.Assert(root.Keys, HasLen, 3)
+	rs.assertNumUniqueKeys(c, root, "root", 1)
+	rs.assertNumUniqueKeys(c, root, "targets", 2)
 	targetsRole, ok := root.Roles["targets"]
 	if !ok {
 		c.Fatal("missing targets role")
 	}
-	c.Assert(targetsRole.KeyIDs, HasLen, 2)
+	c.Assert(targetsRole.KeyIDs, HasLen, 4)
 	targetKeyIDs := make(map[string]struct{}, 2)
 	db, err = r.db()
 	c.Assert(err, IsNil)
@@ -206,26 +228,27 @@ func (RepoSuite) TestGenKey(c *C) {
 		}
 		key := db.GetKey(id)
 		c.Assert(key, NotNil)
-		c.Assert(key.ID(), Equals, id)
+		c.Assert(key.ContainsID(id), Equals, true)
 	}
-	role = db.GetRole("targets")
+	role := db.GetRole("targets")
 	c.Assert(role.KeyIDs, DeepEquals, targetKeyIDs)
 
 	// check RootKeys() is unchanged
-	rootKeys, err = r.RootKeys()
+	rootKeys, err := r.RootKeys()
 	c.Assert(err, IsNil)
 	c.Assert(rootKeys, HasLen, 1)
-	c.Assert(rootKeys[0].ID(), Equals, rootKey.ID())
+	c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
 
 	// check the keys were saved correctly
-	localKeys, err = local.GetSigningKeys("targets")
+	localKeys, err := local.GetSigningKeys("targets")
 	c.Assert(err, IsNil)
 	c.Assert(localKeys, HasLen, 2)
 	for _, key := range localKeys {
 		found := false
 		for _, id := range targetsRole.KeyIDs {
-			if id == key.ID() {
+			if key.ContainsID(id) {
 				found = true
+				break
 			}
 		}
 		if !found {
@@ -247,11 +270,199 @@ func (RepoSuite) TestGenKey(c *C) {
 	c.Assert(stagedRoot.Type, Equals, root.Type)
 	c.Assert(stagedRoot.Version, Equals, root.Version)
 	c.Assert(stagedRoot.Expires.UnixNano(), Equals, root.Expires.UnixNano())
+
+	// make sure both root and stagedRoot have evaluated IDs(), otherwise
+	// DeepEquals will fail because those values might not have been
+	// computed yet.
+	for _, key := range root.Keys {
+		key.IDs()
+	}
+	for _, key := range stagedRoot.Keys {
+		key.IDs()
+	}
 	c.Assert(stagedRoot.Keys, DeepEquals, root.Keys)
 	c.Assert(stagedRoot.Roles, DeepEquals, root.Roles)
 }
 
-func (RepoSuite) TestRevokeKey(c *C) {
+func addPrivateKey(c *C, r *Repo, role string, key *sign.PrivateKey) []string {
+	err := r.AddPrivateKey(role, key)
+	c.Assert(err, IsNil)
+	keyids := key.PublicData().IDs()
+	c.Assert(len(keyids) > 0, Equals, true)
+	return keyids
+}
+
+func addGeneratedPrivateKey(c *C, r *Repo, role string) []string {
+	key, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	return addPrivateKey(c, r, role, key)
+}
+
+func (rs *RepoSuite) TestAddPrivateKey(c *C) {
+	local := MemoryStore(make(map[string]json.RawMessage), nil)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// generate a key for an unknown role
+	key, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	err = r.AddPrivateKey("foo", key)
+	c.Assert(err, Equals, ErrInvalidRole{"foo"})
+
+	// add a root key
+	ids := addPrivateKey(c, r, "root", key)
+
+	// check root metadata is correct
+	root, err := r.root()
+	c.Assert(err, IsNil)
+	c.Assert(root.Version, Equals, 1)
+	c.Assert(root.Roles, NotNil)
+	c.Assert(root.Roles, HasLen, 1)
+	rs.assertNumUniqueKeys(c, root, "root", 1)
+	rootRole, ok := root.Roles["root"]
+	if !ok {
+		c.Fatal("missing root role")
+	}
+	c.Assert(rootRole.KeyIDs, HasLen, 2)
+	c.Assert(rootRole.KeyIDs, DeepEquals, ids)
+	for _, keyID := range ids {
+		k, ok := root.Keys[keyID]
+		if !ok {
+			c.Fatalf("missing key %s", keyID)
+		}
+		c.Assert(k.IDs(), DeepEquals, ids)
+		c.Assert(k.Value.Public, HasLen, ed25519.PublicKeySize)
+	}
+
+	// check root key + role are in db
+	db, err := r.db()
+	c.Assert(err, IsNil)
+	for _, keyID := range ids {
+		rootKey := db.GetKey(keyID)
+		c.Assert(rootKey, NotNil)
+		c.Assert(rootKey.IDs(), DeepEquals, ids)
+		role := db.GetRole("root")
+		c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(ids))
+
+		// check the key was saved correctly
+		localKeys, err := local.GetSigningKeys("root")
+		c.Assert(err, IsNil)
+		c.Assert(localKeys, HasLen, 1)
+		c.Assert(localKeys[0].IDs(), DeepEquals, ids)
+
+		// check RootKeys() is correct
+		rootKeys, err := r.RootKeys()
+		c.Assert(err, IsNil)
+		c.Assert(rootKeys, HasLen, 1)
+		c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
+		c.Assert(rootKeys[0].Value.Public, DeepEquals, rootKey.Value.Public)
+	}
+
+	rootKey := db.GetKey(ids[0])
+	c.Assert(rootKey, NotNil)
+
+	// generate two targets keys
+	addGeneratedPrivateKey(c, r, "targets")
+	addGeneratedPrivateKey(c, r, "targets")
+
+	// check root metadata is correct
+	root, err = r.root()
+	c.Assert(err, IsNil)
+	c.Assert(root.Roles, HasLen, 2)
+	rs.assertNumUniqueKeys(c, root, "root", 1)
+	rs.assertNumUniqueKeys(c, root, "targets", 2)
+	targetsRole, ok := root.Roles["targets"]
+	if !ok {
+		c.Fatal("missing targets role")
+	}
+	c.Assert(targetsRole.KeyIDs, HasLen, 4)
+	targetKeyIDs := make(map[string]struct{}, 2)
+	db, err = r.db()
+	c.Assert(err, IsNil)
+	for _, id := range targetsRole.KeyIDs {
+		targetKeyIDs[id] = struct{}{}
+		_, ok = root.Keys[id]
+		if !ok {
+			c.Fatal("missing key")
+		}
+		key := db.GetKey(id)
+		c.Assert(key, NotNil)
+		c.Assert(key.ContainsID(id), Equals, true)
+	}
+	role := db.GetRole("targets")
+	c.Assert(role.KeyIDs, DeepEquals, targetKeyIDs)
+
+	// check RootKeys() is unchanged
+	rootKeys, err := r.RootKeys()
+	c.Assert(err, IsNil)
+	c.Assert(rootKeys, HasLen, 1)
+	c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
+
+	// check the keys were saved correctly
+	localKeys, err := local.GetSigningKeys("targets")
+	c.Assert(err, IsNil)
+	c.Assert(localKeys, HasLen, 2)
+	for _, key := range localKeys {
+		found := false
+		for _, id := range targetsRole.KeyIDs {
+			if key.ContainsID(id) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			c.Fatal("missing key")
+		}
+	}
+
+	// check root.json got staged
+	meta, err := local.GetMeta()
+	c.Assert(err, IsNil)
+	rootJSON, ok := meta["root.json"]
+	if !ok {
+		c.Fatal("missing root metadata")
+	}
+	s := &data.Signed{}
+	c.Assert(json.Unmarshal(rootJSON, s), IsNil)
+	stagedRoot := &data.Root{}
+	c.Assert(json.Unmarshal(s.Signed, stagedRoot), IsNil)
+	c.Assert(stagedRoot.Type, Equals, root.Type)
+	c.Assert(stagedRoot.Version, Equals, root.Version)
+	c.Assert(stagedRoot.Expires.UnixNano(), Equals, root.Expires.UnixNano())
+
+	// make sure both root and stagedRoot have evaluated IDs(), otherwise
+	// DeepEquals will fail because those values might not have been
+	// computed yet.
+	for _, key := range root.Keys {
+		key.IDs()
+	}
+	for _, key := range stagedRoot.Keys {
+		key.IDs()
+	}
+	c.Assert(stagedRoot.Keys, DeepEquals, root.Keys)
+	c.Assert(stagedRoot.Roles, DeepEquals, root.Roles)
+
+	// commit to make sure we don't modify metadata after committing metadata.
+	addGeneratedPrivateKey(c, r, "snapshot")
+	addGeneratedPrivateKey(c, r, "timestamp")
+	c.Assert(r.AddTargets([]string{}, nil), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	// add the same root key to make sure the metadata is unmodified.
+	oldRoot, err := r.root()
+	c.Assert(err, IsNil)
+	addPrivateKey(c, r, "root", key)
+	newRoot, err := r.root()
+	c.Assert(err, IsNil)
+	c.Assert(oldRoot, DeepEquals, newRoot)
+	if _, ok := r.versionUpdated["root.json"]; ok {
+		c.Fatal("root should not be marked dirty")
+	}
+}
+
+func (rs *RepoSuite) TestRevokeKey(c *C) {
 	local := MemoryStore(make(map[string]json.RawMessage), nil)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -264,8 +475,8 @@ func (RepoSuite) TestRevokeKey(c *C) {
 
 	// generate keys
 	genKey(c, r, "root")
-	genKey(c, r, "targets")
-	genKey(c, r, "targets")
+	target1IDs := genKey(c, r, "targets")
+	target2IDs := genKey(c, r, "targets")
 	genKey(c, r, "snapshot")
 	genKey(c, r, "timestamp")
 	root, err := r.root()
@@ -273,16 +484,24 @@ func (RepoSuite) TestRevokeKey(c *C) {
 	c.Assert(root.Roles, NotNil)
 	c.Assert(root.Roles, HasLen, 4)
 	c.Assert(root.Keys, NotNil)
-	c.Assert(root.Keys, HasLen, 5)
+	rs.assertNumUniqueKeys(c, root, "root", 1)
+	rs.assertNumUniqueKeys(c, root, "targets", 2)
+	rs.assertNumUniqueKeys(c, root, "snapshot", 1)
+	rs.assertNumUniqueKeys(c, root, "timestamp", 1)
 
 	// revoke a key
 	targetsRole, ok := root.Roles["targets"]
 	if !ok {
 		c.Fatal("missing targets role")
 	}
-	c.Assert(targetsRole.KeyIDs, HasLen, 2)
+	c.Assert(targetsRole.KeyIDs, HasLen, len(target1IDs)+len(target2IDs))
 	id := targetsRole.KeyIDs[0]
 	c.Assert(r.RevokeKey("targets", id), IsNil)
+
+	// make sure all the other key ids were also revoked
+	for _, id := range target1IDs {
+		c.Assert(r.RevokeKey("targets", id), DeepEquals, ErrKeyNotFound{"targets", id})
+	}
 
 	// check root was updated
 	root, err = r.root()
@@ -290,16 +509,19 @@ func (RepoSuite) TestRevokeKey(c *C) {
 	c.Assert(root.Roles, NotNil)
 	c.Assert(root.Roles, HasLen, 4)
 	c.Assert(root.Keys, NotNil)
-	c.Assert(root.Keys, HasLen, 4)
+	rs.assertNumUniqueKeys(c, root, "root", 1)
+	rs.assertNumUniqueKeys(c, root, "targets", 1)
+	rs.assertNumUniqueKeys(c, root, "snapshot", 1)
+	rs.assertNumUniqueKeys(c, root, "timestamp", 1)
 	targetsRole, ok = root.Roles["targets"]
 	if !ok {
 		c.Fatal("missing targets role")
 	}
-	c.Assert(targetsRole.KeyIDs, HasLen, 1)
-	c.Assert(targetsRole.KeyIDs[0], Not(Equals), id)
+	c.Assert(targetsRole.KeyIDs, HasLen, 2)
+	c.Assert(targetsRole.KeyIDs, DeepEquals, target2IDs)
 }
 
-func (RepoSuite) TestSign(c *C) {
+func (rs *RepoSuite) TestSign(c *C) {
 	meta := map[string]json.RawMessage{"root.json": []byte(`{"signed":{},"signatures":[]}`)}
 	local := MemoryStore(meta, nil)
 	r, err := NewRepo(local)
@@ -309,6 +531,8 @@ func (RepoSuite) TestSign(c *C) {
 	c.Assert(r.Sign("root.json"), Equals, ErrInsufficientKeys{"root.json"})
 
 	checkSigIDs := func(keyIDs ...string) {
+		meta, err := local.GetMeta()
+		c.Assert(err, IsNil)
 		rootJSON, ok := meta["root.json"]
 		if !ok {
 			c.Fatal("missing root.json")
@@ -326,22 +550,22 @@ func (RepoSuite) TestSign(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(local.SavePrivateKey("root", key), IsNil)
 	c.Assert(r.Sign("root.json"), IsNil)
-	checkSigIDs(key.PublicData().ID())
+	checkSigIDs(key.PublicData().IDs()...)
 
 	// signing again does not generate a duplicate signature
 	c.Assert(r.Sign("root.json"), IsNil)
-	checkSigIDs(key.PublicData().ID())
+	checkSigIDs(key.PublicData().IDs()...)
 
 	// signing with a new available key generates another signature
 	newKey, err := sign.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	c.Assert(local.SavePrivateKey("root", newKey), IsNil)
 	c.Assert(r.Sign("root.json"), IsNil)
-	checkSigIDs(key.PublicData().ID(), newKey.PublicData().ID())
+	checkSigIDs(append(key.PublicData().IDs(), newKey.PublicData().IDs()...)...)
 }
 
-func (RepoSuite) TestCommit(c *C) {
-	files := map[string][]byte{"/foo.txt": []byte("foo"), "/bar.txt": []byte("bar")}
+func (rs *RepoSuite) TestCommit(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo"), "bar.txt": []byte("bar")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -376,12 +600,12 @@ func (RepoSuite) TestCommit(c *C) {
 	// commit with an invalid root hash in snapshot.json due to new key creation
 	genKey(c, r, "targets")
 	c.Assert(r.Sign("targets.json"), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid root.json in snapshot.json: wrong length"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid root.json in snapshot.json: wrong length, expected 3216 got 3828"))
 
 	// commit with an invalid targets hash in snapshot.json
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.AddTarget("bar.txt", nil), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 1229 got 1403"))
 
 	// commit with an invalid timestamp
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
@@ -399,12 +623,91 @@ func (RepoSuite) TestCommit(c *C) {
 	if !ok {
 		c.Fatal("missing timestamp role")
 	}
-	c.Assert(role.KeyIDs, HasLen, 1)
+	c.Assert(role.KeyIDs, HasLen, 2)
 	c.Assert(role.Threshold, Equals, 1)
 	c.Assert(r.RevokeKey("timestamp", role.KeyIDs[0]), IsNil)
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), DeepEquals, ErrNotEnoughKeys{"timestamp", 0, 1})
+}
+
+func (rs *RepoSuite) TestCommitVersions(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	// on initial commit everything should be at version 1.
+	rootVersion, err := r.RootVersion()
+	c.Assert(err, IsNil)
+	c.Assert(rootVersion, Equals, 1)
+
+	targetsVersion, err := r.TargetsVersion()
+	c.Assert(err, IsNil)
+	c.Assert(targetsVersion, Equals, 1)
+
+	snapshotVersion, err := r.SnapshotVersion()
+	c.Assert(err, IsNil)
+	c.Assert(snapshotVersion, Equals, 1)
+
+	timestampVersion, err := r.SnapshotVersion()
+	c.Assert(err, IsNil)
+	c.Assert(timestampVersion, Equals, 1)
+
+	// taking a snapshot should only incremept snapshot and timestamp.
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	rootVersion, err = r.RootVersion()
+	c.Assert(err, IsNil)
+	c.Assert(rootVersion, Equals, 1)
+
+	targetsVersion, err = r.TargetsVersion()
+	c.Assert(err, IsNil)
+	c.Assert(targetsVersion, Equals, 1)
+
+	snapshotVersion, err = r.SnapshotVersion()
+	c.Assert(err, IsNil)
+	c.Assert(snapshotVersion, Equals, 2)
+
+	timestampVersion, err = r.SnapshotVersion()
+	c.Assert(err, IsNil)
+	c.Assert(timestampVersion, Equals, 2)
+
+	// rotating multiple keys should increment the root once.
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	rootVersion, err = r.RootVersion()
+	c.Assert(err, IsNil)
+	c.Assert(rootVersion, Equals, 2)
+
+	targetsVersion, err = r.TargetsVersion()
+	c.Assert(err, IsNil)
+	c.Assert(targetsVersion, Equals, 1)
+
+	snapshotVersion, err = r.SnapshotVersion()
+	c.Assert(err, IsNil)
+	c.Assert(snapshotVersion, Equals, 3)
+
+	timestampVersion, err = r.SnapshotVersion()
+	c.Assert(err, IsNil)
+	c.Assert(timestampVersion, Equals, 3)
 }
 
 type tmpDir struct {
@@ -440,6 +743,14 @@ func (t *tmpDir) assertHashedFilesNotExist(path string, hashes data.Hashes) {
 	for _, path := range util.HashedPaths(path, hashes) {
 		t.assertNotExist(path)
 	}
+}
+
+func (t *tmpDir) assertVersionedFileExist(path string, version int) {
+	t.assertExists(util.VersionedPath(path, version))
+}
+
+func (t *tmpDir) assertVersionedFileNotExist(path string, version int) {
+	t.assertNotExist(util.VersionedPath(path, version))
 }
 
 func (t *tmpDir) assertEmpty(dir string) {
@@ -480,7 +791,7 @@ func (t *tmpDir) readFile(path string) []byte {
 	return data
 }
 
-func (RepoSuite) TestCommitFileSystem(c *C) {
+func (rs *RepoSuite) TestCommitFileSystem(c *C) {
 	tmp := newTmpDir(c)
 	local := FileSystemStore(tmp.path, nil)
 	r, err := NewRepo(local)
@@ -516,8 +827,8 @@ func (RepoSuite) TestCommitFileSystem(c *C) {
 	t, err := r.targets()
 	c.Assert(err, IsNil)
 	c.Assert(t.Targets, HasLen, 1)
-	if _, ok := t.Targets["/foo.txt"]; !ok {
-		c.Fatal("missing target file: /foo.txt")
+	if _, ok := t.Targets["foo.txt"]; !ok {
+		c.Fatal("missing target file: foo.txt")
 	}
 
 	// Snapshot() stages snapshot.json
@@ -564,7 +875,29 @@ func (RepoSuite) TestCommitFileSystem(c *C) {
 	tmp.assertEmpty("staged")
 }
 
-func (RepoSuite) TestConsistentSnapshot(c *C) {
+func (rs *RepoSuite) TestCommitFileSystemWithNewRepositories(c *C) {
+	tmp := newTmpDir(c)
+
+	newRepo := func() *Repo {
+		local := FileSystemStore(tmp.path, nil)
+		r, err := NewRepo(local)
+		c.Assert(err, IsNil)
+		return r
+	}
+
+	genKey(c, newRepo(), "root")
+	genKey(c, newRepo(), "targets")
+	genKey(c, newRepo(), "snapshot")
+	genKey(c, newRepo(), "timestamp")
+
+	tmp.writeStagedTarget("foo.txt", "foo")
+	c.Assert(newRepo().AddTarget("foo.txt", nil), IsNil)
+	c.Assert(newRepo().Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(newRepo().Timestamp(), IsNil)
+	c.Assert(newRepo().Commit(), IsNil)
+}
+
+func (rs *RepoSuite) TestConsistentSnapshot(c *C) {
 	tmp := newTmpDir(c)
 	local := FileSystemStore(tmp.path, nil)
 	r, err := NewRepo(local, "sha512", "sha256")
@@ -582,13 +915,20 @@ func (RepoSuite) TestConsistentSnapshot(c *C) {
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
 
+	versions, err := r.fileVersions()
+	c.Assert(err, IsNil)
+	c.Assert(versions["root.json"], Equals, 1)
+	c.Assert(versions["targets.json"], Equals, 1)
+	c.Assert(versions["snapshot.json"], Equals, 1)
+
 	hashes, err := r.fileHashes()
 	c.Assert(err, IsNil)
 
-	// root.json, targets.json and snapshot.json should exist at both hashed and unhashed paths
+	// root.json, targets.json and snapshot.json should exist at both versioned and unversioned paths
 	for _, path := range []string{"root.json", "targets.json", "snapshot.json"} {
 		repoPath := filepath.Join("repository", path)
-		tmp.assertHashedFilesExist(repoPath, hashes[path])
+		tmp.assertHashedFilesNotExist(repoPath, hashes[path])
+		tmp.assertVersionedFileExist(repoPath, versions[path])
 		tmp.assertExists(repoPath)
 	}
 
@@ -599,7 +939,9 @@ func (RepoSuite) TestConsistentSnapshot(c *C) {
 		tmp.assertNotExist(repoPath)
 	}
 
-	// timestamp.json should exist at an unhashed path (it doesn't have a hash)
+	// timestamp.json should exist at an unversioned and unhashed path (it doesn't have a hash)
+	c.Assert(hashes["repository/timestamp.json"], IsNil)
+	tmp.assertVersionedFileNotExist("repository/timestamp.json", versions["repository/timestamp.json"])
 	tmp.assertExists("repository/timestamp.json")
 
 	// removing a file should remove the hashed files
@@ -607,7 +949,27 @@ func (RepoSuite) TestConsistentSnapshot(c *C) {
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
-	tmp.assertHashedFilesNotExist("repository/targets/foo.txt", hashes["targets/foo.txt"])
+
+	versions, err = r.fileVersions()
+	c.Assert(err, IsNil)
+	c.Assert(versions["root.json"], Equals, 1)
+	c.Assert(versions["targets.json"], Equals, 2)
+	c.Assert(versions["snapshot.json"], Equals, 2)
+
+	// Save the old hashes for foo.txt to make sure we can assert it doesn't exist later.
+	fooHashes := hashes["targets/foo.txt"]
+	hashes, err = r.fileHashes()
+	c.Assert(err, IsNil)
+
+	// root.json, targets.json and snapshot.json should exist at both versioned and unversioned paths
+	for _, path := range []string{"root.json", "targets.json", "snapshot.json"} {
+		repoPath := filepath.Join("repository", path)
+		tmp.assertHashedFilesNotExist(repoPath, hashes[path])
+		tmp.assertVersionedFileExist(repoPath, versions[path])
+		tmp.assertExists(repoPath)
+	}
+
+	tmp.assertHashedFilesNotExist("repository/targets/foo.txt", fooHashes)
 	tmp.assertNotExist("repository/targets/foo.txt")
 
 	// targets should be returned by new repo
@@ -616,13 +978,13 @@ func (RepoSuite) TestConsistentSnapshot(c *C) {
 	t, err := newRepo.targets()
 	c.Assert(err, IsNil)
 	c.Assert(t.Targets, HasLen, 1)
-	if _, ok := t.Targets["/dir/bar.txt"]; !ok {
+	if _, ok := t.Targets["dir/bar.txt"]; !ok {
 		c.Fatal("missing targets file: dir/bar.txt")
 	}
 }
 
-func (RepoSuite) TestExpiresAndVersion(c *C) {
-	files := map[string][]byte{"/foo.txt": []byte("foo")}
+func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -640,6 +1002,15 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	}
 
 	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	c.Assert(r.AddTargets([]string{}, nil), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
 	root, err := r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Version, Equals, 1)
@@ -647,6 +1018,9 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	expires := time.Now().Add(24 * time.Hour)
 	_, err = r.GenKeyWithExpires("root", expires)
 	c.Assert(err, IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
 	root, err = r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Expires.Unix(), DeepEquals, expires.Round(time.Second).Unix())
@@ -657,57 +1031,75 @@ func (RepoSuite) TestExpiresAndVersion(c *C) {
 	if !ok {
 		c.Fatal("missing root role")
 	}
-	c.Assert(role.KeyIDs, HasLen, 2)
+	c.Assert(role.KeyIDs, HasLen, 4)
 	c.Assert(r.RevokeKeyWithExpires("root", role.KeyIDs[0], expires), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
 	root, err = r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Expires.Unix(), DeepEquals, expires.Round(time.Second).Unix())
 	c.Assert(root.Version, Equals, 3)
 
 	expires = time.Now().Add(6 * time.Hour)
-	genKey(c, r, "targets")
 	c.Assert(r.AddTargetWithExpires("foo.txt", nil, expires), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
 	targets, err := r.targets()
-	c.Assert(err, IsNil)
-	c.Assert(targets.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
-	c.Assert(targets.Version, Equals, 1)
-
-	expires = time.Now().Add(2 * time.Hour)
-	c.Assert(r.RemoveTargetWithExpires("foo.txt", expires), IsNil)
-	targets, err = r.targets()
 	c.Assert(err, IsNil)
 	c.Assert(targets.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
 	c.Assert(targets.Version, Equals, 2)
 
+	expires = time.Now().Add(2 * time.Hour)
+	c.Assert(r.RemoveTargetWithExpires("foo.txt", expires), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+	targets, err = r.targets()
+	c.Assert(err, IsNil)
+	c.Assert(targets.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
+	c.Assert(targets.Version, Equals, 3)
+
 	expires = time.Now().Add(time.Hour)
-	genKey(c, r, "snapshot")
 	c.Assert(r.SnapshotWithExpires(CompressionTypeNone, expires), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
 	snapshot, err := r.snapshot()
 	c.Assert(err, IsNil)
 	c.Assert(snapshot.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
-	c.Assert(snapshot.Version, Equals, 1)
+	c.Assert(snapshot.Version, Equals, 6)
+
+	root, err = r.root()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Meta["root.json"].Version, Equals, root.Version)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, targets.Version)
 
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
 	snapshot, err = r.snapshot()
 	c.Assert(err, IsNil)
-	c.Assert(snapshot.Version, Equals, 2)
+	c.Assert(snapshot.Version, Equals, 7)
 
 	expires = time.Now().Add(10 * time.Minute)
-	genKey(c, r, "timestamp")
 	c.Assert(r.TimestampWithExpires(expires), IsNil)
+	c.Assert(r.Commit(), IsNil)
 	timestamp, err := r.timestamp()
 	c.Assert(err, IsNil)
 	c.Assert(timestamp.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
-	c.Assert(timestamp.Version, Equals, 1)
+	c.Assert(timestamp.Version, Equals, 8)
 
 	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
 	timestamp, err = r.timestamp()
 	c.Assert(err, IsNil)
-	c.Assert(timestamp.Version, Equals, 2)
+	c.Assert(timestamp.Version, Equals, 9)
+	c.Assert(timestamp.Meta["snapshot.json"].Version, Equals, snapshot.Version)
 }
 
-func (RepoSuite) TestHashAlgorithm(c *C) {
-	files := map[string][]byte{"/foo.txt": []byte("foo")}
+func (rs *RepoSuite) TestHashAlgorithm(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	type hashTest struct {
 		args     []string
@@ -739,10 +1131,10 @@ func (RepoSuite) TestHashAlgorithm(c *C) {
 		timestamp, err := r.timestamp()
 		c.Assert(err, IsNil)
 		for name, file := range map[string]data.FileMeta{
-			"foo.txt":       targets.Targets["/foo.txt"],
-			"root.json":     snapshot.Meta["root.json"],
-			"targets.json":  snapshot.Meta["targets.json"],
-			"snapshot.json": timestamp.Meta["snapshot.json"],
+			"foo.txt":       targets.Targets["foo.txt"].FileMeta,
+			"root.json":     snapshot.Meta["root.json"].FileMeta,
+			"targets.json":  snapshot.Meta["targets.json"].FileMeta,
+			"snapshot.json": timestamp.Meta["snapshot.json"].FileMeta,
 		} {
 			for _, hashAlgorithm := range test.expected {
 				if _, ok := file.Hashes[hashAlgorithm]; !ok {
@@ -757,7 +1149,7 @@ func testPassphraseFunc(p []byte) util.PassphraseFunc {
 	return func(string, bool) ([]byte, error) { return p, nil }
 }
 
-func (RepoSuite) TestKeyPersistence(c *C) {
+func (rs *RepoSuite) TestKeyPersistence(c *C) {
 	tmp := newTmpDir(c)
 	passphrase := []byte("s3cr3t")
 	store := FileSystemStore(tmp.path, testPassphraseFunc(passphrase))
@@ -788,7 +1180,7 @@ func (RepoSuite) TestKeyPersistence(c *C) {
 		c.Assert(err, IsNil)
 		c.Assert(signers, HasLen, len(expected))
 		for i, s := range signers {
-			c.Assert(s.ID(), Equals, expected[i].PublicData().ID())
+			c.Assert(s.IDs(), DeepEquals, expected[i].PublicData().IDs())
 		}
 	}
 
@@ -817,7 +1209,7 @@ func (RepoSuite) TestKeyPersistence(c *C) {
 	assertKeys("targets", false, []*sign.PrivateKey{key})
 }
 
-func (RepoSuite) TestManageMultipleTargets(c *C) {
+func (rs *RepoSuite) TestManageMultipleTargets(c *C) {
 	tmp := newTmpDir(c)
 	local := FileSystemStore(tmp.path, nil)
 	r, err := NewRepo(local)
@@ -846,7 +1238,7 @@ func (RepoSuite) TestManageMultipleTargets(c *C) {
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
-	assertRepoTargets("/foo.txt", "/bar.txt")
+	assertRepoTargets("foo.txt", "bar.txt")
 	tmp.assertExists("repository/targets/foo.txt")
 	tmp.assertExists("repository/targets/bar.txt")
 
@@ -854,7 +1246,7 @@ func (RepoSuite) TestManageMultipleTargets(c *C) {
 	count := 10
 	files := make([]string, count)
 	for i := 0; i < count; i++ {
-		files[i] = fmt.Sprintf("/file%d.txt", i)
+		files[i] = fmt.Sprintf("file%d.txt", i)
 		tmp.writeStagedTarget(files[i], "data")
 	}
 	c.Assert(r.AddTargets(nil, nil), IsNil)
@@ -881,11 +1273,11 @@ func (RepoSuite) TestManageMultipleTargets(c *C) {
 	c.Assert(t.Targets, HasLen, 0)
 }
 
-func (RepoSuite) TestCustomTargetMetadata(c *C) {
+func (rs *RepoSuite) TestCustomTargetMetadata(c *C) {
 	files := map[string][]byte{
-		"/foo.txt": []byte("foo"),
-		"/bar.txt": []byte("bar"),
-		"/baz.txt": []byte("baz"),
+		"foo.txt": []byte("foo"),
+		"bar.txt": []byte("bar"),
+		"baz.txt": []byte("baz"),
 	}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
@@ -895,7 +1287,7 @@ func (RepoSuite) TestCustomTargetMetadata(c *C) {
 	assertCustomMeta := func(file string, custom *json.RawMessage) {
 		t, err := r.targets()
 		c.Assert(err, IsNil)
-		target, ok := t.Targets["/"+file]
+		target, ok := t.Targets[file]
 		if !ok {
 			c.Fatalf("missing target file: %s", file)
 		}

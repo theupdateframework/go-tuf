@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/encrypted"
-	"github.com/flynn/go-tuf/sign"
-	"github.com/flynn/go-tuf/util"
+	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/encrypted"
+	"github.com/theupdateframework/go-tuf/sign"
+	"github.com/theupdateframework/go-tuf/util"
 )
 
 func MemoryStore(meta map[string]json.RawMessage, files map[string][]byte) LocalStore {
@@ -20,24 +20,33 @@ func MemoryStore(meta map[string]json.RawMessage, files map[string][]byte) Local
 		meta = make(map[string]json.RawMessage)
 	}
 	return &memoryStore{
-		meta:    meta,
-		files:   files,
-		signers: make(map[string][]sign.Signer),
+		meta:       meta,
+		stagedMeta: make(map[string]json.RawMessage),
+		files:      files,
+		signers:    make(map[string][]sign.Signer),
 	}
 }
 
 type memoryStore struct {
-	meta    map[string]json.RawMessage
-	files   map[string][]byte
-	signers map[string][]sign.Signer
+	meta       map[string]json.RawMessage
+	stagedMeta map[string]json.RawMessage
+	files      map[string][]byte
+	signers    map[string][]sign.Signer
 }
 
 func (m *memoryStore) GetMeta() (map[string]json.RawMessage, error) {
-	return m.meta, nil
+	meta := make(map[string]json.RawMessage, len(m.meta)+len(m.stagedMeta))
+	for key, value := range m.meta {
+		meta[key] = value
+	}
+	for key, value := range m.stagedMeta {
+		meta[key] = value
+	}
+	return meta, nil
 }
 
 func (m *memoryStore) SetMeta(name string, meta json.RawMessage) error {
-	m.meta[name] = meta
+	m.stagedMeta[name] = meta
 	return nil
 }
 
@@ -63,7 +72,13 @@ func (m *memoryStore) WalkStagedTargets(paths []string, targetsFn targetsWalkFun
 	return nil
 }
 
-func (m *memoryStore) Commit(map[string]json.RawMessage, bool, map[string]data.Hashes) error {
+func (m *memoryStore) Commit(consistentSnapshot bool, versions map[string]int, hashes map[string]data.Hashes) error {
+	for name, meta := range m.stagedMeta {
+		paths := computeMetadataPaths(consistentSnapshot, name, versions)
+		for _, path := range paths {
+			m.meta[path] = meta
+		}
+	}
 	return nil
 }
 
@@ -136,7 +151,7 @@ func (f *fileSystemStore) SetMeta(name string, meta json.RawMessage) error {
 	if err := f.createDirs(); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(filepath.Join(f.stagedDir(), name), meta, 0644); err != nil {
+	if err := util.AtomicallyWriteFile(filepath.Join(f.stagedDir(), name), meta, 0644); err != nil {
 		return err
 	}
 	return nil
@@ -211,15 +226,9 @@ func (f *fileSystemStore) createRepoFile(path string) (*os.File, error) {
 	return os.Create(dst)
 }
 
-func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, consistentSnapshot bool, hashes map[string]data.Hashes) error {
+func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]int, hashes map[string]data.Hashes) error {
 	isTarget := func(path string) bool {
 		return strings.HasPrefix(path, "targets/")
-	}
-	shouldCopyHashed := func(path string) bool {
-		return consistentSnapshot && path != "timestamp.json"
-	}
-	shouldCopyUnhashed := func(path string) bool {
-		return !consistentSnapshot || !isTarget(path)
 	}
 	copyToRepo := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -232,12 +241,12 @@ func (f *fileSystemStore) Commit(meta map[string]json.RawMessage, consistentSnap
 		if err != nil {
 			return err
 		}
+
 		var paths []string
-		if shouldCopyHashed(rel) {
-			paths = append(paths, util.HashedPaths(rel, hashes[rel])...)
-		}
-		if shouldCopyUnhashed(rel) {
-			paths = append(paths, rel)
+		if isTarget(rel) {
+			paths = computeTargetPaths(consistentSnapshot, rel, hashes)
+		} else {
+			paths = computeMetadataPaths(consistentSnapshot, rel, versions)
 		}
 		var files []io.Writer
 		for _, path := range paths {
@@ -350,7 +359,7 @@ func (f *fileSystemStore) SavePrivateKey(role string, key *sign.PrivateKey) erro
 	if err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(f.keysPath(role), append(data, '\n'), 0600); err != nil {
+	if err := util.AtomicallyWriteFile(f.keysPath(role), append(data, '\n'), 0600); err != nil {
 		return err
 	}
 	f.signers[role] = f.privateKeySigners(keys)
@@ -392,12 +401,16 @@ func (f *fileSystemStore) loadKeys(role string) ([]*sign.PrivateKey, []byte, err
 		return nil, nil, ErrPassphraseRequired{role}
 	}
 
-	pass, err := f.passphraseFunc(role, false)
-	if err != nil {
-		return nil, nil, err
-	}
+	// try the empty string as the password first
+	pass := []byte("")
 	if err := encrypted.Unmarshal(pk.Data, &keys, pass); err != nil {
-		return nil, nil, err
+		pass, err = f.passphraseFunc(role, false)
+		if err != nil {
+			return nil, nil, err
+		}
+		if err = encrypted.Unmarshal(pk.Data, &keys, pass); err != nil {
+			return nil, nil, err
+		}
 	}
 	return keys, pass, nil
 }
@@ -417,4 +430,36 @@ func (f *fileSystemStore) Clean() error {
 		return err
 	}
 	return os.MkdirAll(filepath.Join(f.stagedDir(), "targets"), 0755)
+}
+
+func computeTargetPaths(consistentSnapshot bool, name string, hashes map[string]data.Hashes) []string {
+	if consistentSnapshot {
+		return util.HashedPaths(name, hashes[name])
+	} else {
+		return []string{name}
+	}
+}
+
+func computeMetadataPaths(consistentSnapshot bool, name string, versions map[string]int) []string {
+	copyVersion := false
+
+	switch name {
+	case "root.json":
+		copyVersion = true
+	case "timestamp.json":
+		copyVersion = false
+	default:
+		if consistentSnapshot {
+			copyVersion = true
+		} else {
+			copyVersion = false
+		}
+	}
+
+	paths := []string{name}
+	if copyVersion {
+		paths = append(paths, util.VersionedPath(name, versions[name]))
+	}
+
+	return paths
 }

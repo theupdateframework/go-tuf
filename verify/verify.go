@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flynn/go-tuf/data"
-	"github.com/tent/canonical-json-go"
+	cjson "github.com/tent/canonical-json-go"
+	"github.com/theupdateframework/go-tuf/data"
 )
 
 type signedMeta struct {
@@ -48,7 +48,7 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 
 	roleData := db.GetRole(role)
 	if roleData == nil {
-		return ErrUnknownRole
+		return ErrUnknownRole{role}
 	}
 
 	var decoded map[string]interface{}
@@ -60,7 +60,11 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 		return err
 	}
 
-	valid := make(map[string]struct{})
+	// Verify that a threshold of keys signed the data. Since keys can have
+	// multiple key ids, we need to protect against multiple attached
+	// signatures that just differ on the key id.
+	seen := make(map[string]struct{})
+	valid := 0
 	for _, sig := range s.Signatures {
 		if !roleData.ValidKey(sig.KeyID) {
 			continue
@@ -73,16 +77,25 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 		if err := Verifiers[key.Type].Verify(key.Value.Public, msg, sig.Signature); err != nil {
 			return err
 		}
-		valid[sig.KeyID] = struct{}{}
+
+		// Only consider this key valid if we haven't seen any of it's
+		// key ids before.
+		if _, ok := seen[sig.KeyID]; !ok {
+			for _, id := range key.IDs() {
+				seen[id] = struct{}{}
+			}
+
+			valid++
+		}
 	}
-	if len(valid) < roleData.Threshold {
-		return ErrRoleThreshold
+	if valid < roleData.Threshold {
+		return ErrRoleThreshold{roleData.Threshold, valid}
 	}
 
 	return nil
 }
 
-func Unmarshal(b []byte, v interface{}, role string, minVersion int, db *DB) error {
+func (db *DB) Unmarshal(b []byte, v interface{}, role string, minVersion int) error {
 	s := &data.Signed{}
 	if err := json.Unmarshal(b, s); err != nil {
 		return err
@@ -93,7 +106,7 @@ func Unmarshal(b []byte, v interface{}, role string, minVersion int, db *DB) err
 	return json.Unmarshal(s.Signed, v)
 }
 
-func UnmarshalTrusted(b []byte, v interface{}, role string, db *DB) error {
+func (db *DB) UnmarshalTrusted(b []byte, v interface{}, role string) error {
 	s := &data.Signed{}
 	if err := json.Unmarshal(b, s); err != nil {
 		return err

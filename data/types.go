@@ -11,9 +11,15 @@ import (
 )
 
 const (
-	KeyIDLength            = sha256.Size * 2
-	KeyTypeEd25519         = "ed25519"
-	KeyTypeECDSA_SHA2_P256 = "ecdsa-sha2-nistp256"
+	KeyIDLength              = sha256.Size * 2
+	KeyTypeEd25519           = "ed25519"
+	KeyTypeECDSA_SHA2_P256   = "ecdsa-sha2-nistp256"
+	KeySchemeEd25519         = "ed25519"
+	KeySchemeECDSA_SHA2_P256 = "ecdsa-sha2-nistp256"
+)
+
+var (
+	KeyAlgorithms = []string{"sha256", "sha512"}
 )
 
 type Signed struct {
@@ -22,26 +28,54 @@ type Signed struct {
 }
 
 type Signature struct {
-	KeyID     string   `json:"keyid"`
-	Method    string   `json:"method"`
+	KeyID string `json:"keyid"`
+
+	// FIXME(TUF-0.9) removed in TUF 1.0, keeping it around for backwards
+	// compatibility with TUF 0.9.
+	Method string `json:"method"`
+
 	Signature HexBytes `json:"sig"`
 }
 
 type Key struct {
-	Type  string   `json:"keytype"`
-	Value KeyValue `json:"keyval"`
+	Type       string   `json:"keytype"`
+	Scheme     string   `json:"scheme,omitempty"`
+	Algorithms []string `json:"keyid_hash_algorithms,omitempty"`
+	Value      KeyValue `json:"keyval"`
 
-	id     string
+	ids    []string
 	idOnce sync.Once
 }
 
-func (k *Key) ID() string {
+func (k *Key) IDs() []string {
 	k.idOnce.Do(func() {
 		data, _ := cjson.Marshal(k)
 		digest := sha256.Sum256(data)
-		k.id = hex.EncodeToString(digest[:])
+		k.ids = []string{hex.EncodeToString(digest[:])}
+
+		// FIXME(TUF-0.9) If we receive TUF-1.0 compatible metadata,
+		// the key id we just calculated won't be compatible with
+		// TUF-0.9. So we also need to calculate the TUF-0.9 key id to
+		// be backwards compatible.
+		if k.Scheme != "" || len(k.Algorithms) != 0 {
+			data, _ = cjson.Marshal(Key{
+				Type:  k.Type,
+				Value: k.Value,
+			})
+			digest = sha256.Sum256(data)
+			k.ids = append(k.ids, hex.EncodeToString(digest[:]))
+		}
 	})
-	return k.id
+	return k.ids
+}
+
+func (k *Key) ContainsID(id string) bool {
+	for _, keyid := range k.IDs() {
+		if id == keyid {
+			return true
+		}
+	}
+	return false
 }
 
 type KeyValue struct {
@@ -64,18 +98,20 @@ func DefaultExpires(role string) time.Time {
 }
 
 type Root struct {
-	Type    string           `json:"_type"`
-	Version int              `json:"version"`
-	Expires time.Time        `json:"expires"`
-	Keys    map[string]*Key  `json:"keys"`
-	Roles   map[string]*Role `json:"roles"`
+	Type        string           `json:"_type"`
+	SpecVersion string           `json:"spec_version"`
+	Version     int              `json:"version"`
+	Expires     time.Time        `json:"expires"`
+	Keys        map[string]*Key  `json:"keys"`
+	Roles       map[string]*Role `json:"roles"`
 
 	ConsistentSnapshot bool `json:"consistent_snapshot"`
 }
 
 func NewRoot() *Root {
 	return &Root{
-		Type:               "Root",
+		Type:               "root",
+		SpecVersion:        "1.0",
 		Expires:            DefaultExpires("root"),
 		Keys:               make(map[string]*Key),
 		Roles:              make(map[string]*Role),
@@ -83,35 +119,69 @@ func NewRoot() *Root {
 	}
 }
 
+func (r *Root) AddKey(key *Key) bool {
+	changed := false
+	for _, id := range key.IDs() {
+		if _, ok := r.Keys[id]; !ok {
+			changed = true
+			r.Keys[id] = key
+		}
+	}
+	return changed
+}
+
+// UniqueKeys returns the unique keys for each associated role.
+// We might have multiple key IDs that correspond to the same key.
+func (r Root) UniqueKeys() map[string][]*Key {
+	keysByRole := make(map[string][]*Key)
+	for name, role := range r.Roles {
+		seen := make(map[string]struct{})
+		keys := []*Key{}
+		for _, id := range role.KeyIDs {
+			// Double-check that there is actually a key with that ID.
+			if key, ok := r.Keys[id]; ok {
+				val := key.Value.Public.String()
+				if _, ok := seen[val]; ok {
+					continue
+				}
+				seen[val] = struct{}{}
+				keys = append(keys, key)
+			}
+		}
+		keysByRole[name] = keys
+	}
+	return keysByRole
+}
+
 type Role struct {
 	KeyIDs    []string `json:"keyids"`
 	Threshold int      `json:"threshold"`
 }
 
-type Files map[string]FileMeta
-
-type Snapshot struct {
-	Type    string    `json:"_type"`
-	Version int       `json:"version"`
-	Expires time.Time `json:"expires"`
-	Meta    Files     `json:"meta"`
+func (r *Role) AddKeyIDs(ids []string) bool {
+	roleIDs := make(map[string]struct{})
+	for _, id := range r.KeyIDs {
+		roleIDs[id] = struct{}{}
+	}
+	changed := false
+	for _, id := range ids {
+		if _, ok := roleIDs[id]; !ok {
+			changed = true
+			r.KeyIDs = append(r.KeyIDs, id)
+		}
+	}
+	return changed
 }
 
-func NewSnapshot() *Snapshot {
-	return &Snapshot{
-		Type:    "Snapshot",
-		Expires: DefaultExpires("snapshot"),
-		Meta:    make(Files),
-	}
+type Files map[string]FileMeta
+
+type FileMeta struct {
+	Length int64            `json:"length",omitempty`
+	Hashes Hashes           `json:"hashes",omitempty`
+	Custom *json.RawMessage `json:"custom,omitempty"`
 }
 
 type Hashes map[string]HexBytes
-
-type FileMeta struct {
-	Length int64            `json:"length"`
-	Hashes Hashes           `json:"hashes"`
-	Custom *json.RawMessage `json:"custom,omitempty"`
-}
 
 func (f FileMeta) HashAlgorithms() []string {
 	funcs := make([]string, 0, len(f.Hashes))
@@ -121,32 +191,77 @@ func (f FileMeta) HashAlgorithms() []string {
 	return funcs
 }
 
+type SnapshotFileMeta struct {
+	FileMeta
+	Version int `json:"version"`
+}
+
+type SnapshotFiles map[string]SnapshotFileMeta
+
+type Snapshot struct {
+	Type        string        `json:"_type"`
+	SpecVersion string        `json:"spec_version"`
+	Version     int           `json:"version"`
+	Expires     time.Time     `json:"expires"`
+	Meta        SnapshotFiles `json:"meta"`
+}
+
+func NewSnapshot() *Snapshot {
+	return &Snapshot{
+		Type:        "snapshot",
+		SpecVersion: "1.0",
+		Expires:     DefaultExpires("snapshot"),
+		Meta:        make(SnapshotFiles),
+	}
+}
+
+type TargetFiles map[string]TargetFileMeta
+
+type TargetFileMeta struct {
+	FileMeta
+}
+
+func (f TargetFileMeta) HashAlgorithms() []string {
+	return f.FileMeta.HashAlgorithms()
+}
+
 type Targets struct {
-	Type    string    `json:"_type"`
-	Version int       `json:"version"`
-	Expires time.Time `json:"expires"`
-	Targets Files     `json:"targets"`
+	Type        string      `json:"_type"`
+	SpecVersion string      `json:"spec_version"`
+	Version     int         `json:"version"`
+	Expires     time.Time   `json:"expires"`
+	Targets     TargetFiles `json:"targets"`
 }
 
 func NewTargets() *Targets {
 	return &Targets{
-		Type:    "Targets",
-		Expires: DefaultExpires("targets"),
-		Targets: make(Files),
+		Type:        "targets",
+		SpecVersion: "1.0",
+		Expires:     DefaultExpires("targets"),
+		Targets:     make(TargetFiles),
 	}
 }
 
+type TimestampFileMeta struct {
+	FileMeta
+	Version int `json:"version"`
+}
+
+type TimestampFiles map[string]TimestampFileMeta
+
 type Timestamp struct {
-	Type    string    `json:"_type"`
-	Version int       `json:"version"`
-	Expires time.Time `json:"expires"`
-	Meta    Files     `json:"meta"`
+	Type        string         `json:"_type"`
+	SpecVersion string         `json:"spec_version"`
+	Version     int            `json:"version"`
+	Expires     time.Time      `json:"expires"`
+	Meta        TimestampFiles `json:"meta"`
 }
 
 func NewTimestamp() *Timestamp {
 	return &Timestamp{
-		Type:    "Timestamp",
-		Expires: DefaultExpires("timestamp"),
-		Meta:    make(Files),
+		Type:        "timestamp",
+		SpecVersion: "1.0",
+		Expires:     DefaultExpires("timestamp"),
+		Meta:        make(TimestampFiles),
 	}
 }

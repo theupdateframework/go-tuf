@@ -9,10 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/sign"
-	"github.com/flynn/go-tuf/util"
-	"github.com/flynn/go-tuf/verify"
+	cjson "github.com/tent/canonical-json-go"
+	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/sign"
+	"github.com/theupdateframework/go-tuf/util"
+	"github.com/theupdateframework/go-tuf/verify"
 )
 
 type CompressionType uint8
@@ -46,7 +47,7 @@ type LocalStore interface {
 	// If paths is empty, all staged target files will be walked.
 	WalkStagedTargets(paths []string, targetsFn targetsWalkFunc) error
 
-	Commit(map[string]json.RawMessage, bool, map[string]data.Hashes) error
+	Commit(bool, map[string]int, map[string]data.Hashes) error
 	GetSigningKeys(string) ([]sign.Signer, error)
 	SavePrivateKey(string, *sign.PrivateKey) error
 	Clean() error
@@ -56,10 +57,27 @@ type Repo struct {
 	local          LocalStore
 	hashAlgorithms []string
 	meta           map[string]json.RawMessage
+	prefix         string
+	indent         string
+
+	// TUF 1.0 requires that the root metadata version numbers in the
+	// repository does not have any gaps. To avoid this, we will only
+	// increment the number once until we commit.
+	versionUpdated map[string]struct{}
 }
 
 func NewRepo(local LocalStore, hashAlgorithms ...string) (*Repo, error) {
-	r := &Repo{local: local, hashAlgorithms: hashAlgorithms}
+	return NewRepoIndent(local, "", "", hashAlgorithms...)
+}
+
+func NewRepoIndent(local LocalStore, prefix string, indent string, hashAlgorithms ...string) (*Repo, error) {
+	r := &Repo{
+		local:          local,
+		hashAlgorithms: hashAlgorithms,
+		prefix:         prefix,
+		indent:         indent,
+		versionUpdated: make(map[string]struct{}),
+	}
 
 	var err error
 	r.meta, err = local.GetMeta()
@@ -133,12 +151,74 @@ func (r *Repo) snapshot() (*data.Snapshot, error) {
 	return snapshot, nil
 }
 
-func (r *Repo) Targets() (data.Files, error) {
+func (r *Repo) RootVersion() (int, error) {
+	root, err := r.root()
+	if err != nil {
+		return -1, err
+	}
+	return root.Version, nil
+}
+
+func (r *Repo) Targets() (data.TargetFiles, error) {
 	targets, err := r.targets()
 	if err != nil {
 		return nil, err
 	}
 	return targets.Targets, nil
+}
+
+func (r *Repo) SetTargetsVersion(v int) error {
+	t, err := r.targets()
+	if err != nil {
+		return err
+	}
+	t.Version = v
+	return r.setMeta("targets.json", t)
+}
+
+func (r *Repo) TargetsVersion() (int, error) {
+	t, err := r.targets()
+	if err != nil {
+		return -1, err
+	}
+	return t.Version, nil
+}
+
+func (r *Repo) SetTimestampVersion(v int) error {
+	ts, err := r.timestamp()
+	if err != nil {
+		return err
+	}
+	ts.Version = v
+	r.versionUpdated["timestamp.json"] = struct{}{}
+	return r.setMeta("timestamp.json", ts)
+}
+
+func (r *Repo) TimestampVersion() (int, error) {
+	ts, err := r.timestamp()
+	if err != nil {
+		return -1, err
+	}
+	return ts.Version, nil
+}
+
+func (r *Repo) SetSnapshotVersion(v int) error {
+	s, err := r.snapshot()
+	if err != nil {
+		return err
+	}
+
+	s.Version = v
+	r.versionUpdated["snapshot.json"] = struct{}{}
+	return r.setMeta("snapshot.json", s)
+}
+
+func (r *Repo) SnapshotVersion() (int, error) {
+	s, err := r.snapshot()
+	if err != nil {
+		return -1, err
+	}
+	return s.Version, nil
 }
 
 func (r *Repo) targets() (*data.Targets, error) {
@@ -173,30 +253,43 @@ func (r *Repo) timestamp() (*data.Timestamp, error) {
 	return timestamp, nil
 }
 
-func (r *Repo) GenKey(role string) (string, error) {
+func (r *Repo) GenKey(role string) ([]string, error) {
 	return r.GenKeyWithExpires(role, data.DefaultExpires("root"))
 }
 
-func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (string, error) {
+func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) ([]string, error) {
+	key, err := sign.GenerateEd25519Key()
+	if err != nil {
+		return []string{}, err
+	}
+
+	if err = r.AddPrivateKeyWithExpires(keyRole, key, expires); err != nil {
+		return []string{}, err
+	}
+
+	return key.PublicData().IDs(), nil
+}
+
+func (r *Repo) AddPrivateKey(role string, key *sign.PrivateKey) error {
+	return r.AddPrivateKeyWithExpires(role, key, data.DefaultExpires(role))
+}
+
+func (r *Repo) AddPrivateKeyWithExpires(keyRole string, key *sign.PrivateKey, expires time.Time) error {
+	root, err := r.root()
+	if err != nil {
+		return err
+	}
+
 	if !verify.ValidRole(keyRole) {
-		return "", ErrInvalidRole{keyRole}
+		return ErrInvalidRole{keyRole}
 	}
 
 	if !validExpires(expires) {
-		return "", ErrInvalidExpires{expires}
+		return ErrInvalidExpires{expires}
 	}
 
-	root, err := r.root()
-	if err != nil {
-		return "", err
-	}
-
-	key, err := sign.GenerateEd25519Key()
-	if err != nil {
-		return "", err
-	}
 	if err := r.local.SavePrivateKey(keyRole, key); err != nil {
-		return "", err
+		return err
 	}
 	pk := key.PublicData()
 
@@ -205,13 +298,26 @@ func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (string, err
 		role = &data.Role{KeyIDs: []string{}, Threshold: 1}
 		root.Roles[keyRole] = role
 	}
-	role.KeyIDs = append(role.KeyIDs, pk.ID())
+	changed := false
+	if role.AddKeyIDs(pk.IDs()) {
+		changed = true
+	}
 
-	root.Keys[pk.ID()] = pk
+	if root.AddKey(pk) {
+		changed = true
+	}
+
+	if !changed {
+		return nil
+	}
+
 	root.Expires = expires.Round(time.Second)
-	root.Version++
+	if _, ok := r.versionUpdated["root.json"]; !ok {
+		root.Version++
+		r.versionUpdated["root.json"] = struct{}{}
+	}
 
-	return pk.ID(), r.setMeta("root.json", root)
+	return r.setMeta("root.json", root)
 }
 
 func validExpires(expires time.Time) bool {
@@ -227,13 +333,27 @@ func (r *Repo) RootKeys() ([]*data.Key, error) {
 	if !ok {
 		return nil, nil
 	}
-	rootKeys := make([]*data.Key, len(role.KeyIDs))
-	for i, id := range role.KeyIDs {
+
+	// We might have multiple key ids that correspond to the same key, so
+	// make sure we only return unique keys.
+	seen := make(map[string]struct{})
+	rootKeys := []*data.Key{}
+	for _, id := range role.KeyIDs {
 		key, ok := root.Keys[id]
 		if !ok {
 			return nil, fmt.Errorf("tuf: invalid root metadata")
 		}
-		rootKeys[i] = key
+		found := false
+		if _, ok := seen[id]; ok {
+			found = true
+			break
+		}
+		if !found {
+			for _, id := range key.IDs() {
+				seen[id] = struct{}{}
+			}
+			rootKeys = append(rootKeys, key)
+		}
 	}
 	return rootKeys, nil
 }
@@ -256,7 +376,8 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 		return err
 	}
 
-	if _, ok := root.Keys[id]; !ok {
+	key, ok := root.Keys[id]
+	if !ok {
 		return ErrKeyNotFound{keyRole, id}
 	}
 
@@ -266,8 +387,11 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 	}
 
 	keyIDs := make([]string, 0, len(role.KeyIDs))
+
+	// There may be multiple keyids that correspond to this key, so
+	// filter all of them out.
 	for _, keyID := range role.KeyIDs {
-		if keyID == id {
+		if key.ContainsID(keyID) {
 			continue
 		}
 		keyIDs = append(keyIDs, keyID)
@@ -277,12 +401,35 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 	}
 	role.KeyIDs = keyIDs
 
-	delete(root.Keys, id)
+	for _, keyID := range key.IDs() {
+		delete(root.Keys, keyID)
+	}
 	root.Roles[keyRole] = role
 	root.Expires = expires.Round(time.Second)
-	root.Version++
+	if _, ok := r.versionUpdated["root.json"]; !ok {
+		root.Version++
+		r.versionUpdated["root.json"] = struct{}{}
+	}
 
 	return r.setMeta("root.json", root)
+}
+
+func (r *Repo) jsonMarshal(v interface{}) ([]byte, error) {
+	b, err := cjson.Marshal(v)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	if r.prefix == "" && r.indent == "" {
+		return b, nil
+	}
+
+	var out bytes.Buffer
+	if err := json.Indent(&out, b, r.prefix, r.indent); err != nil {
+		return []byte{}, err
+	}
+
+	return out.Bytes(), nil
 }
 
 func (r *Repo) setMeta(name string, meta interface{}) error {
@@ -294,7 +441,7 @@ func (r *Repo) setMeta(name string, meta interface{}) error {
 	if err != nil {
 		return err
 	}
-	b, err := json.Marshal(s)
+	b, err := r.jsonMarshal(s)
 	if err != nil {
 		return err
 	}
@@ -324,7 +471,7 @@ func (r *Repo) Sign(name string) error {
 		sign.Sign(s, k)
 	}
 
-	b, err := json.Marshal(s)
+	b, err := r.jsonMarshal(s)
 	if err != nil {
 		return err
 	}
@@ -359,8 +506,10 @@ func (r *Repo) getSigningKeys(name string) ([]sign.Signer, error) {
 	}
 	keys := make([]sign.Signer, 0, len(role.KeyIDs))
 	for _, key := range signingKeys {
-		if _, ok := role.KeyIDs[key.ID()]; ok {
-			keys = append(keys, key)
+		for _, id := range key.IDs() {
+			if _, ok := role.KeyIDs[id]; ok {
+				keys = append(keys, key)
+			}
 		}
 	}
 	return keys, nil
@@ -413,7 +562,7 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom json.RawMessage, exp
 		normalizedPaths[i] = util.NormalizeTarget(path)
 	}
 	if err := r.local.WalkStagedTargets(normalizedPaths, func(path string, target io.Reader) (err error) {
-		meta, err := util.GenerateFileMeta(target, r.hashAlgorithms...)
+		meta, err := util.GenerateTargetFileMeta(target, r.hashAlgorithms...)
 		if err != nil {
 			return err
 		}
@@ -427,13 +576,18 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom json.RawMessage, exp
 			meta.Custom = t.Custom
 		}
 
+		// G2 -> we no longer desire any readers to ever observe non-prefix targets.
+		delete(t.Targets, "/"+path)
 		t.Targets[path] = meta
 		return nil
 	}); err != nil {
 		return err
 	}
 	t.Expires = expires.Round(time.Second)
-	t.Version++
+	if _, ok := r.versionUpdated["targets.json"]; !ok {
+		t.Version++
+		r.versionUpdated["targets.json"] = struct{}{}
+	}
 	return r.setMeta("targets.json", t)
 }
 
@@ -460,7 +614,7 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 		return err
 	}
 	if len(paths) == 0 {
-		t.Targets = make(data.Files)
+		t.Targets = make(data.TargetFiles)
 	} else {
 		removed := false
 		for _, path := range paths {
@@ -469,6 +623,8 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 				continue
 			}
 			removed = true
+			// G2 -> we no longer desire any readers to ever observe non-prefix targets.
+			delete(t.Targets, "/"+path)
 			delete(t.Targets, path)
 		}
 		if !removed {
@@ -476,7 +632,10 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 		}
 	}
 	t.Expires = expires.Round(time.Second)
-	t.Version++
+	if _, ok := r.versionUpdated["targets.json"]; !ok {
+		t.Version++
+		r.versionUpdated["targets.json"] = struct{}{}
+	}
 	return r.setMeta("targets.json", t)
 }
 
@@ -503,13 +662,16 @@ func (r *Repo) SnapshotWithExpires(t CompressionType, expires time.Time) error {
 			return err
 		}
 		var err error
-		snapshot.Meta[name], err = r.fileMeta(name)
+		snapshot.Meta[name], err = r.snapshotFileMeta(name)
 		if err != nil {
 			return err
 		}
 	}
 	snapshot.Expires = expires.Round(time.Second)
-	snapshot.Version++
+	if _, ok := r.versionUpdated["snapshot.json"]; !ok {
+		snapshot.Version++
+		r.versionUpdated["snapshot.json"] = struct{}{}
+	}
 	return r.setMeta("snapshot.json", snapshot)
 }
 
@@ -533,22 +695,40 @@ func (r *Repo) TimestampWithExpires(expires time.Time) error {
 	if err != nil {
 		return err
 	}
-	timestamp.Meta["snapshot.json"], err = r.fileMeta("snapshot.json")
+	timestamp.Meta["snapshot.json"], err = r.timestampFileMeta("snapshot.json")
 	if err != nil {
 		return err
 	}
 	timestamp.Expires = expires.Round(time.Second)
-	timestamp.Version++
+	if _, ok := r.versionUpdated["timestamp.json"]; !ok {
+		timestamp.Version++
+		r.versionUpdated["timestamp.json"] = struct{}{}
+	}
 	return r.setMeta("timestamp.json", timestamp)
+}
+
+func (r *Repo) fileVersions() (map[string]int, error) {
+	root, err := r.root()
+	if err != nil {
+		return nil, err
+	}
+	targets, err := r.targets()
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err := r.snapshot()
+	if err != nil {
+		return nil, err
+	}
+	versions := make(map[string]int)
+	versions["root.json"] = root.Version
+	versions["targets.json"] = targets.Version
+	versions["snapshot.json"] = snapshot.Version
+	return versions, nil
 }
 
 func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 	hashes := make(map[string]data.Hashes)
-	addHashes := func(name string, meta data.Files) {
-		if m, ok := meta[name]; ok {
-			hashes[name] = m.Hashes
-		}
-	}
 	timestamp, err := r.timestamp()
 	if err != nil {
 		return nil, err
@@ -557,9 +737,15 @@ func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 	if err != nil {
 		return nil, err
 	}
-	addHashes("root.json", snapshot.Meta)
-	addHashes("targets.json", snapshot.Meta)
-	addHashes("snapshot.json", timestamp.Meta)
+	if m, ok := snapshot.Meta["root.json"]; ok {
+		hashes["root.json"] = m.Hashes
+	}
+	if m, ok := snapshot.Meta["targets.json"]; ok {
+		hashes["targets.json"] = m.Hashes
+	}
+	if m, ok := timestamp.Meta["snapshot.json"]; ok {
+		hashes["snapshot.json"] = m.Hashes
+	}
 	t, err := r.targets()
 	if err != nil {
 		return nil, err
@@ -599,11 +785,11 @@ func (r *Repo) Commit() error {
 		if !ok {
 			return fmt.Errorf("tuf: snapshot.json missing hash for %s", name)
 		}
-		actual, err := r.fileMeta(name)
+		actual, err := r.snapshotFileMeta(name)
 		if err != nil {
 			return err
 		}
-		if err := util.FileMetaEqual(actual, expected); err != nil {
+		if err := util.SnapshotFileMetaEqual(actual, expected); err != nil {
 			return fmt.Errorf("tuf: invalid %s in snapshot.json: %s", name, err)
 		}
 	}
@@ -613,11 +799,11 @@ func (r *Repo) Commit() error {
 	if err != nil {
 		return err
 	}
-	snapshotMeta, err := r.fileMeta("snapshot.json")
+	snapshotMeta, err := r.timestampFileMeta("snapshot.json")
 	if err != nil {
 		return err
 	}
-	if err := util.FileMetaEqual(snapshotMeta, timestamp.Meta["snapshot.json"]); err != nil {
+	if err := util.TimestampFileMetaEqual(snapshotMeta, timestamp.Meta["snapshot.json"]); err != nil {
 		return fmt.Errorf("tuf: invalid snapshot.json in timestamp.json: %s", err)
 	}
 
@@ -632,11 +818,24 @@ func (r *Repo) Commit() error {
 		}
 	}
 
+	versions, err := r.fileVersions()
+	if err != nil {
+		return err
+	}
 	hashes, err := r.fileHashes()
 	if err != nil {
 		return err
 	}
-	return r.local.Commit(r.meta, root.ConsistentSnapshot, hashes)
+
+	if err := r.local.Commit(root.ConsistentSnapshot, versions, hashes); err != nil {
+		return err
+	}
+
+	// We can start incrementing versin numbers again now that we've
+	// successfully committed the metadata to the local store.
+	r.versionUpdated = make(map[string]struct{})
+
+	return nil
 }
 
 func (r *Repo) Clean() error {
@@ -655,10 +854,18 @@ func (r *Repo) verifySignature(name string, db *verify.DB) error {
 	return nil
 }
 
-func (r *Repo) fileMeta(name string) (data.FileMeta, error) {
+func (r *Repo) snapshotFileMeta(name string) (data.SnapshotFileMeta, error) {
 	b, ok := r.meta[name]
 	if !ok {
-		return data.FileMeta{}, ErrMissingMetadata{name}
+		return data.SnapshotFileMeta{}, ErrMissingMetadata{name}
 	}
-	return util.GenerateFileMeta(bytes.NewReader(b), r.hashAlgorithms...)
+	return util.GenerateSnapshotFileMeta(bytes.NewReader(b), r.hashAlgorithms...)
+}
+
+func (r *Repo) timestampFileMeta(name string) (data.TimestampFileMeta, error) {
+	b, ok := r.meta[name]
+	if !ok {
+		return data.TimestampFileMeta{}, ErrMissingMetadata{name}
+	}
+	return util.GenerateTimestampFileMeta(bytes.NewReader(b), r.hashAlgorithms...)
 }

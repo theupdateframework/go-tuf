@@ -3,7 +3,7 @@
 ## Install
 
 ```
-go get github.com/flynn/go-tuf/cmd/tuf-client
+go get github.com/theupdateframework/go-tuf/cmd/tuf-client
 ```
 
 ## Usage

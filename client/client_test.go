@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/flynn/go-tuf"
-	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/util"
-	"github.com/flynn/go-tuf/verify"
+	tuf "github.com/theupdateframework/go-tuf"
+	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/util"
+	"github.com/theupdateframework/go-tuf/verify"
 	. "gopkg.in/check.v1"
 )
 
@@ -26,7 +27,7 @@ type ClientSuite struct {
 	local       LocalStore
 	remote      *fakeRemoteStore
 	expiredTime time.Time
-	keyIDs      map[string]string
+	keyIDs      map[string][]string
 }
 
 var _ = Suite(&ClientSuite{})
@@ -81,9 +82,9 @@ func (f *fakeFile) Close() error {
 }
 
 var targetFiles = map[string][]byte{
-	"/foo.txt": []byte("foo"),
-	"/bar.txt": []byte("bar"),
-	"/baz.txt": []byte("baz"),
+	"foo.txt": []byte("foo"),
+	"bar.txt": []byte("bar"),
+	"baz.txt": []byte("baz"),
 }
 
 func (s *ClientSuite) SetUpTest(c *C) {
@@ -96,7 +97,7 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	// don't use consistent snapshots to make testing easier (consistent
 	// snapshots are tested explicitly elsewhere)
 	c.Assert(s.repo.Init(false), IsNil)
-	s.keyIDs = map[string]string{
+	s.keyIDs = map[string][]string{
 		"root":      s.genKey(c, "root"),
 		"targets":   s.genKey(c, "targets"),
 		"snapshot":  s.genKey(c, "snapshot"),
@@ -105,6 +106,7 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	c.Assert(s.repo.AddTarget("foo.txt", nil), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 
 	// create a remote store containing valid repo files
 	s.remote = newFakeRemoteStore()
@@ -116,16 +118,16 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	s.expiredTime = time.Now().Add(time.Hour)
 }
 
-func (s *ClientSuite) genKey(c *C, role string) string {
-	id, err := s.repo.GenKey(role)
+func (s *ClientSuite) genKey(c *C, role string) []string {
+	ids, err := s.repo.GenKey(role)
 	c.Assert(err, IsNil)
-	return id
+	return ids
 }
 
-func (s *ClientSuite) genKeyExpired(c *C, role string) string {
-	id, err := s.repo.GenKeyWithExpires(role, s.expiredTime)
+func (s *ClientSuite) genKeyExpired(c *C, role string) []string {
+	ids, err := s.repo.GenKeyWithExpires(role, s.expiredTime)
 	c.Assert(err, IsNil)
-	return id
+	return ids
 }
 
 // withMetaExpired sets signed.IsExpired throughout the invocation of f so that
@@ -160,6 +162,7 @@ func (s *ClientSuite) addRemoteTarget(c *C, name string) {
 	c.Assert(s.repo.AddTarget(name, nil), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 }
 
@@ -184,20 +187,26 @@ func (s *ClientSuite) updatedClient(c *C) *Client {
 	return client
 }
 
-func assertFiles(c *C, files data.Files, names []string) {
+func assertFile(c *C, file data.TargetFileMeta, name string) {
+	target, ok := targetFiles[name]
+	if !ok {
+		c.Fatalf("unknown target %s", name)
+	}
+
+	meta, err := util.GenerateTargetFileMeta(bytes.NewReader(target), file.HashAlgorithms()...)
+	c.Assert(err, IsNil)
+	c.Assert(util.TargetFileMetaEqual(file, meta), IsNil)
+}
+
+func assertFiles(c *C, files data.TargetFiles, names []string) {
 	c.Assert(files, HasLen, len(names))
 	for _, name := range names {
-		target, ok := targetFiles[name]
-		if !ok {
-			c.Fatalf("unknown target %s", name)
-		}
 		file, ok := files[name]
 		if !ok {
 			c.Fatalf("expected files to contain %s", name)
 		}
-		meta, err := util.GenerateFileMeta(bytes.NewReader(target), file.HashAlgorithms()...)
-		c.Assert(err, IsNil)
-		c.Assert(util.FileMetaEqual(file, meta), IsNil)
+
+		assertFile(c, file, name)
 	}
 }
 
@@ -228,12 +237,15 @@ func (s *ClientSuite) assertErrExpired(c *C, err error, file string) {
 
 func (s *ClientSuite) TestInitRootTooLarge(c *C) {
 	client := NewClient(MemoryLocalStore(), s.remote)
-	s.remote.meta["root.json"] = newFakeFile(make([]byte, maxMetaSize+1))
-	c.Assert(client.Init(s.rootKeys(c), 0), Equals, ErrMetaTooLarge{"root.json", maxMetaSize + 1})
+	s.remote.meta["root.json"] = newFakeFile(make([]byte, defaultRootDownloadLimit+1))
+	c.Assert(client.Init(s.rootKeys(c), 0), Equals, ErrMetaTooLarge{"root.json", defaultRootDownloadLimit + 1, defaultRootDownloadLimit})
 }
 
 func (s *ClientSuite) TestInitRootExpired(c *C) {
 	s.genKeyExpired(c, "targets")
+	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 	client := NewClient(MemoryLocalStore(), s.remote)
 	s.withMetaExpired(func() {
@@ -257,14 +269,14 @@ func (s *ClientSuite) TestInit(c *C) {
 	// check Update() does not return ErrNoRootKeys after initialization
 	c.Assert(client.Init(s.rootKeys(c), 1), IsNil)
 	_, err = client.Update()
-	c.Assert(err, Not(Equals), ErrNoRootKeys)
+	c.Assert(err, IsNil)
 }
 
 func (s *ClientSuite) TestFirstUpdate(c *C) {
 	files, err := s.newClient(c).Update()
 	c.Assert(err, IsNil)
 	c.Assert(files, HasLen, 1)
-	assertFiles(c, files, []string{"/foo.txt"})
+	assertFiles(c, files, []string{"foo.txt"})
 }
 
 func (s *ClientSuite) TestMissingRemoteMetadata(c *C) {
@@ -302,9 +314,10 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	client := s.newClient(c)
 
 	// replace all keys
-	newKeyIDs := make(map[string]string)
-	for role, id := range s.keyIDs {
-		c.Assert(s.repo.RevokeKey(role, id), IsNil)
+	newKeyIDs := make(map[string][]string)
+	for role, ids := range s.keyIDs {
+		c.Assert(len(ids) > 0, Equals, true)
+		c.Assert(s.repo.RevokeKey(role, ids[0]), IsNil)
 		newKeyIDs[role] = s.genKey(c, role)
 	}
 
@@ -312,6 +325,7 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	c.Assert(s.repo.Sign("targets.json"), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 
 	// check update gets new root version
@@ -323,18 +337,24 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	c.Assert(client.rootVer > version, Equals, true)
 
 	// check old keys are not in db
-	for _, id := range s.keyIDs {
-		c.Assert(client.db.GetKey(id), IsNil)
+	for _, ids := range s.keyIDs {
+		c.Assert(len(ids) > 0, Equals, true)
+		for _, id := range ids {
+			c.Assert(client.db.GetKey(id), IsNil)
+		}
 	}
 
 	// check new keys are in db
-	for name, id := range newKeyIDs {
-		key := client.db.GetKey(id)
-		c.Assert(key, NotNil)
-		c.Assert(key.ID(), Equals, id)
+	for name, ids := range newKeyIDs {
+		c.Assert(len(ids) > 0, Equals, true)
+		for _, id := range ids {
+			key := client.db.GetKey(id)
+			c.Assert(key, NotNil)
+			c.Assert(key.IDs(), DeepEquals, ids)
+		}
 		role := client.db.GetRole(name)
 		c.Assert(role, NotNil)
-		c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{id: {}})
+		c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(ids))
 	}
 }
 
@@ -342,14 +362,14 @@ func (s *ClientSuite) TestNewTargets(c *C) {
 	client := s.newClient(c)
 	files, err := client.Update()
 	c.Assert(err, IsNil)
-	assertFiles(c, files, []string{"/foo.txt"})
+	assertFiles(c, files, []string{"foo.txt"})
 
 	s.addRemoteTarget(c, "bar.txt")
 	s.addRemoteTarget(c, "baz.txt")
 
 	files, err = client.Update()
 	c.Assert(err, IsNil)
-	assertFiles(c, files, []string{"/bar.txt", "/baz.txt"})
+	assertFiles(c, files, []string{"bar.txt", "baz.txt"})
 
 	// Adding the same exact file should not lead to an update
 	s.addRemoteTarget(c, "bar.txt")
@@ -362,13 +382,14 @@ func (s *ClientSuite) TestNewTimestampKey(c *C) {
 	client := s.newClient(c)
 
 	// replace key
-	oldID := s.keyIDs["timestamp"]
-	c.Assert(s.repo.RevokeKey("timestamp", oldID), IsNil)
-	newID := s.genKey(c, "timestamp")
+	oldIDs := s.keyIDs["timestamp"]
+	c.Assert(s.repo.RevokeKey("timestamp", oldIDs[0]), IsNil)
+	newIDs := s.genKey(c, "timestamp")
 
 	// generate new snapshot (because root has changed) and timestamp
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 
 	// check update gets new root and timestamp
@@ -381,26 +402,31 @@ func (s *ClientSuite) TestNewTimestampKey(c *C) {
 	c.Assert(client.timestampVer > timestampVer, Equals, true)
 
 	// check key has been replaced in db
-	c.Assert(client.db.GetKey(oldID), IsNil)
-	key := client.db.GetKey(newID)
-	c.Assert(key, NotNil)
-	c.Assert(key.ID(), Equals, newID)
+	for _, oldID := range oldIDs {
+		c.Assert(client.db.GetKey(oldID), IsNil)
+	}
+	for _, newID := range newIDs {
+		key := client.db.GetKey(newID)
+		c.Assert(key, NotNil)
+		c.Assert(key.IDs(), DeepEquals, newIDs)
+	}
 	role := client.db.GetRole("timestamp")
 	c.Assert(role, NotNil)
-	c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{newID: {}})
+	c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(newIDs))
 }
 
 func (s *ClientSuite) TestNewSnapshotKey(c *C) {
 	client := s.newClient(c)
 
 	// replace key
-	oldID := s.keyIDs["snapshot"]
-	c.Assert(s.repo.RevokeKey("snapshot", oldID), IsNil)
-	newID := s.genKey(c, "snapshot")
+	oldIDs := s.keyIDs["snapshot"]
+	c.Assert(s.repo.RevokeKey("snapshot", oldIDs[0]), IsNil)
+	newIDs := s.genKey(c, "snapshot")
 
 	// generate new snapshot and timestamp
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 
 	// check update gets new root, snapshot and timestamp
@@ -415,27 +441,32 @@ func (s *ClientSuite) TestNewSnapshotKey(c *C) {
 	c.Assert(client.timestampVer > timestampVer, Equals, true)
 
 	// check key has been replaced in db
-	c.Assert(client.db.GetKey(oldID), IsNil)
-	key := client.db.GetKey(newID)
-	c.Assert(key, NotNil)
-	c.Assert(key.ID(), Equals, newID)
+	for _, oldID := range oldIDs {
+		c.Assert(client.db.GetKey(oldID), IsNil)
+	}
+	for _, newID := range newIDs {
+		key := client.db.GetKey(newID)
+		c.Assert(key, NotNil)
+		c.Assert(key.IDs(), DeepEquals, newIDs)
+	}
 	role := client.db.GetRole("snapshot")
 	c.Assert(role, NotNil)
-	c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{newID: {}})
+	c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(newIDs))
 }
 
 func (s *ClientSuite) TestNewTargetsKey(c *C) {
 	client := s.newClient(c)
 
 	// replace key
-	oldID := s.keyIDs["targets"]
-	c.Assert(s.repo.RevokeKey("targets", oldID), IsNil)
-	newID := s.genKey(c, "targets")
+	oldIDs := s.keyIDs["targets"]
+	c.Assert(s.repo.RevokeKey("targets", oldIDs[0]), IsNil)
+	newIDs := s.genKey(c, "targets")
 
 	// re-sign targets and generate new snapshot and timestamp
 	c.Assert(s.repo.Sign("targets.json"), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 
 	// check update gets new metadata
@@ -452,13 +483,17 @@ func (s *ClientSuite) TestNewTargetsKey(c *C) {
 	c.Assert(client.timestampVer > timestampVer, Equals, true)
 
 	// check key has been replaced in db
-	c.Assert(client.db.GetKey(oldID), IsNil)
-	key := client.db.GetKey(newID)
-	c.Assert(key, NotNil)
-	c.Assert(key.ID(), Equals, newID)
+	for _, oldID := range oldIDs {
+		c.Assert(client.db.GetKey(oldID), IsNil)
+	}
+	for _, newID := range newIDs {
+		key := client.db.GetKey(newID)
+		c.Assert(key, NotNil)
+		c.Assert(key.IDs(), DeepEquals, newIDs)
+	}
 	role := client.db.GetRole("targets")
 	c.Assert(role, NotNil)
-	c.Assert(role.KeyIDs, DeepEquals, map[string]struct{}{newID: {}})
+	c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(newIDs))
 }
 
 func (s *ClientSuite) TestLocalExpired(c *C) {
@@ -505,9 +540,9 @@ func (s *ClientSuite) TestLocalExpired(c *C) {
 }
 
 func (s *ClientSuite) TestTimestampTooLarge(c *C) {
-	s.remote.meta["timestamp.json"] = newFakeFile(make([]byte, maxMetaSize+1))
+	s.remote.meta["timestamp.json"] = newFakeFile(make([]byte, defaultTimestampDownloadLimit+1))
 	_, err := s.newClient(c).Update()
-	c.Assert(err, Equals, ErrMetaTooLarge{"timestamp.json", maxMetaSize + 1})
+	c.Assert(err, Equals, ErrMetaTooLarge{"timestamp.json", defaultTimestampDownloadLimit + 1, defaultTimestampDownloadLimit})
 }
 
 func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
@@ -569,6 +604,7 @@ func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
 	c.Assert(s.repo.RemoveTarget("bar.txt"), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 	s.withMetaExpired(func() {
 		_, err := client.Update()
@@ -585,9 +621,9 @@ func (s *ClientSuite) TestUpdateLocalRootExpiredKeyChange(c *C) {
 	s.syncLocal(c)
 
 	// replace all keys
-	newKeyIDs := make(map[string]string)
-	for role, id := range s.keyIDs {
-		c.Assert(s.repo.RevokeKey(role, id), IsNil)
+	newKeyIDs := make(map[string][]string)
+	for role, ids := range s.keyIDs {
+		c.Assert(s.repo.RevokeKey(role, ids[0]), IsNil)
 		newKeyIDs[role] = s.genKey(c, role)
 	}
 
@@ -595,6 +631,7 @@ func (s *ClientSuite) TestUpdateLocalRootExpiredKeyChange(c *C) {
 	c.Assert(s.repo.Sign("targets.json"), IsNil)
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 
 	// check the update downloads the non expired remote root.json and
@@ -690,11 +727,12 @@ func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
 	c.Assert(json.Unmarshal(targetsJSON, targets), IsNil)
 
 	// update remote targets.json to have different content but same size
-	c.Assert(targets.Signatures, HasLen, 1)
+	c.Assert(targets.Signatures, HasLen, 2)
 	targets.Signatures[0].Method = "xxxxxxx"
 	tamperedJSON, err := json.Marshal(targets)
 	c.Assert(err, IsNil)
 	s.store.SetMeta("targets.json", tamperedJSON)
+	s.store.Commit(false, nil, nil)
 	s.syncRemote(c)
 	_, err = client.Update()
 	assertWrongHash(c, err)
@@ -704,6 +742,7 @@ func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
 	tamperedJSON, err = json.Marshal(targets)
 	c.Assert(err, IsNil)
 	s.store.SetMeta("targets.json", tamperedJSON)
+	s.store.Commit(false, nil, nil)
 	s.syncRemote(c)
 	_, err = client.Update()
 	c.Assert(err, DeepEquals, ErrWrongSize{"targets.json", int64(len(tamperedJSON)), int64(len(targetsJSON))})
@@ -723,7 +762,7 @@ func (s *ClientSuite) TestUpdateHTTP(c *C) {
 		repo := generateRepoFS(c, filepath.Join(tmp, dir), targetFiles, consistentSnapshot)
 
 		// initialize a client
-		remote, err := HTTPRemoteStore(fmt.Sprintf("http://%s/%s/repository", addr, dir), nil)
+		remote, err := HTTPRemoteStore(fmt.Sprintf("http://%s/%s/repository", addr, dir), nil, nil)
 		c.Assert(err, IsNil)
 		client := NewClient(MemoryLocalStore(), remote)
 		rootKeys, err := repo.RootKeys()
@@ -734,7 +773,7 @@ func (s *ClientSuite) TestUpdateHTTP(c *C) {
 		// check update is ok
 		targets, err := client.Update()
 		c.Assert(err, IsNil)
-		assertFiles(c, targets, []string{"/foo.txt", "/bar.txt", "/baz.txt"})
+		assertFiles(c, targets, []string{"foo.txt", "bar.txt", "baz.txt"})
 
 		// check can download files
 		for name, data := range targetFiles {
@@ -759,15 +798,15 @@ func (t *testDestination) Delete() error {
 func (s *ClientSuite) TestDownloadUnknownTarget(c *C) {
 	client := s.updatedClient(c)
 	var dest testDestination
-	c.Assert(client.Download("/nonexistent", &dest), Equals, ErrUnknownTarget{"/nonexistent"})
+	c.Assert(client.Download("nonexistent", &dest), Equals, ErrUnknownTarget{"nonexistent"})
 	c.Assert(dest.deleted, Equals, true)
 }
 
 func (s *ClientSuite) TestDownloadNoExist(c *C) {
 	client := s.updatedClient(c)
-	delete(s.remote.targets, "/foo.txt")
+	delete(s.remote.targets, "foo.txt")
 	var dest testDestination
-	c.Assert(client.Download("/foo.txt", &dest), Equals, ErrNotFound{"/foo.txt"})
+	c.Assert(client.Download("foo.txt", &dest), Equals, ErrNotFound{"foo.txt"})
 	c.Assert(dest.deleted, Equals, true)
 }
 
@@ -785,19 +824,19 @@ func (s *ClientSuite) TestDownloadOK(c *C) {
 func (s *ClientSuite) TestDownloadWrongSize(c *C) {
 	client := s.updatedClient(c)
 	remoteFile := &fakeFile{buf: bytes.NewReader([]byte("wrong-size")), size: 10}
-	s.remote.targets["/foo.txt"] = remoteFile
+	s.remote.targets["foo.txt"] = remoteFile
 	var dest testDestination
-	c.Assert(client.Download("/foo.txt", &dest), DeepEquals, ErrWrongSize{"/foo.txt", 10, 3})
+	c.Assert(client.Download("foo.txt", &dest), DeepEquals, ErrWrongSize{"foo.txt", 10, 3})
 	c.Assert(remoteFile.bytesRead, Equals, 0)
 	c.Assert(dest.deleted, Equals, true)
 }
 
 func (s *ClientSuite) TestDownloadTargetTooLong(c *C) {
 	client := s.updatedClient(c)
-	remoteFile := s.remote.targets["/foo.txt"]
+	remoteFile := s.remote.targets["foo.txt"]
 	remoteFile.buf = bytes.NewReader([]byte("foo-ooo"))
 	var dest testDestination
-	c.Assert(client.Download("/foo.txt", &dest), IsNil)
+	c.Assert(client.Download("foo.txt", &dest), IsNil)
 	c.Assert(remoteFile.bytesRead, Equals, 3)
 	c.Assert(dest.deleted, Equals, false)
 	c.Assert(dest.String(), Equals, "foo")
@@ -805,19 +844,19 @@ func (s *ClientSuite) TestDownloadTargetTooLong(c *C) {
 
 func (s *ClientSuite) TestDownloadTargetTooShort(c *C) {
 	client := s.updatedClient(c)
-	remoteFile := s.remote.targets["/foo.txt"]
+	remoteFile := s.remote.targets["foo.txt"]
 	remoteFile.buf = bytes.NewReader([]byte("fo"))
 	var dest testDestination
-	c.Assert(client.Download("/foo.txt", &dest), DeepEquals, ErrWrongSize{"/foo.txt", 2, 3})
+	c.Assert(client.Download("foo.txt", &dest), DeepEquals, ErrWrongSize{"foo.txt", 2, 3})
 	c.Assert(dest.deleted, Equals, true)
 }
 
 func (s *ClientSuite) TestDownloadTargetCorruptData(c *C) {
 	client := s.updatedClient(c)
-	remoteFile := s.remote.targets["/foo.txt"]
+	remoteFile := s.remote.targets["foo.txt"]
 	remoteFile.buf = bytes.NewReader([]byte("corrupt"))
 	var dest testDestination
-	assertWrongHash(c, client.Download("/foo.txt", &dest))
+	assertWrongHash(c, client.Download("foo.txt", &dest))
 	c.Assert(dest.deleted, Equals, true)
 }
 
@@ -825,7 +864,7 @@ func (s *ClientSuite) TestAvailableTargets(c *C) {
 	client := s.updatedClient(c)
 	files, err := client.Targets()
 	c.Assert(err, IsNil)
-	assertFiles(c, files, []string{"/foo.txt"})
+	assertFiles(c, files, []string{"foo.txt"})
 
 	s.addRemoteTarget(c, "bar.txt")
 	s.addRemoteTarget(c, "baz.txt")
@@ -833,5 +872,45 @@ func (s *ClientSuite) TestAvailableTargets(c *C) {
 	c.Assert(err, IsNil)
 	files, err = client.Targets()
 	c.Assert(err, IsNil)
-	assertFiles(c, files, []string{"/foo.txt", "/bar.txt", "/baz.txt"})
+	assertFiles(c, files, []string{"foo.txt", "bar.txt", "baz.txt"})
+}
+
+func (s *ClientSuite) TestAvailableTarget(c *C) {
+	client := s.updatedClient(c)
+
+	target, err := client.Target("foo.txt")
+	c.Assert(err, IsNil)
+	assertFile(c, target, "foo.txt")
+
+	target, err = client.Target("/foo.txt")
+	c.Assert(err, IsNil)
+	assertFile(c, target, "foo.txt")
+
+	_, err = client.Target("bar.txt")
+	c.Assert(err, Equals, ErrNotFound{"bar.txt"})
+
+	_, err = client.Target("/bar.txt")
+	c.Assert(err, Equals, ErrNotFound{"/bar.txt"})
+}
+
+func generateRepoFS(c *C, dir string, files map[string][]byte, consistentSnapshot bool) *tuf.Repo {
+	repo, err := tuf.NewRepo(tuf.FileSystemStore(dir, nil))
+	c.Assert(err, IsNil)
+	if !consistentSnapshot {
+		c.Assert(repo.Init(false), IsNil)
+	}
+	for _, role := range []string{"root", "snapshot", "targets", "timestamp"} {
+		_, err := repo.GenKey(role)
+		c.Assert(err, IsNil)
+	}
+	for file, data := range files {
+		path := filepath.Join(dir, "staged", "targets", file)
+		c.Assert(os.MkdirAll(filepath.Dir(path), 0755), IsNil)
+		c.Assert(ioutil.WriteFile(path, data, 0644), IsNil)
+		c.Assert(repo.AddTarget(file, nil), IsNil)
+	}
+	c.Assert(repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+	c.Assert(repo.Timestamp(), IsNil)
+	c.Assert(repo.Commit(), IsNil)
+	return repo
 }

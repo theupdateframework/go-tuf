@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/flynn/go-docopt"
-	tuf "github.com/flynn/go-tuf/client"
+	docopt "github.com/flynn/go-docopt"
+	tuf "github.com/theupdateframework/go-tuf/client"
+	tuf_leveldbstore "github.com/theupdateframework/go-tuf/client/leveldbstore"
 )
 
 func main() {
@@ -84,11 +85,11 @@ func tufClient(args *docopt.Args) (*tuf.Client, error) {
 	if !ok {
 		store = args.String["-s"]
 	}
-	local, err := tuf.FileLocalStore(store)
+	local, err := tuf_leveldbstore.FileLocalStore(store)
 	if err != nil {
 		return nil, err
 	}
-	remote, err := tuf.HTTPRemoteStore(args.String["<url>"], nil)
+	remote, err := tuf.HTTPRemoteStore(args.String["<url>"], nil, nil)
 	if err != nil {
 		return nil, err
 	}

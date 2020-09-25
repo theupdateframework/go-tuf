@@ -1,7 +1,7 @@
 package verify
 
 import (
-	"github.com/flynn/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/data"
 )
 
 type Role struct {
@@ -31,8 +31,8 @@ func (db *DB) AddKey(id string, k *data.Key) error {
 	if !ok {
 		return nil
 	}
-	if id != k.ID() {
-		return ErrWrongID
+	if !k.ContainsID(id) {
+		return ErrWrongID{}
 	}
 	if !v.ValidKey(k.Value.Public) {
 		return ErrInvalidKey

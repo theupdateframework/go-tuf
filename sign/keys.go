@@ -4,13 +4,15 @@ import (
 	"crypto/rand"
 	"sync"
 
-	"github.com/flynn/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/data"
 	"golang.org/x/crypto/ed25519"
 )
 
 type PrivateKey struct {
-	Type  string          `json:"keytype"`
-	Value PrivateKeyValue `json:"keyval"`
+	Type       string          `json:"keytype"`
+	Scheme     string          `json:"scheme,omitempty"`
+	Algorithms []string        `json:"keyid_hash_algorithms,omitempty"`
+	Value      PrivateKeyValue `json:"keyval"`
 }
 
 type PrivateKeyValue struct {
@@ -20,13 +22,20 @@ type PrivateKeyValue struct {
 
 func (k *PrivateKey) PublicData() *data.Key {
 	return &data.Key{
-		Type:  k.Type,
-		Value: data.KeyValue{Public: k.Value.Public},
+		Type:       k.Type,
+		Scheme:     k.Scheme,
+		Algorithms: k.Algorithms,
+		Value:      data.KeyValue{Public: k.Value.Public},
 	}
 }
 
 func (k *PrivateKey) Signer() Signer {
-	return &ed25519Signer{PrivateKey: ed25519.PrivateKey(k.Value.Private)}
+	return &ed25519Signer{
+		PrivateKey:    ed25519.PrivateKey(k.Value.Private),
+		keyType:       k.Type,
+		keyScheme:     k.Scheme,
+		keyAlgorithms: k.Algorithms,
+	}
 }
 
 func GenerateEd25519Key() (*PrivateKey, error) {
@@ -35,7 +44,9 @@ func GenerateEd25519Key() (*PrivateKey, error) {
 		return nil, err
 	}
 	return &PrivateKey{
-		Type: data.KeyTypeEd25519,
+		Type:       data.KeyTypeEd25519,
+		Scheme:     data.KeySchemeEd25519,
+		Algorithms: data.KeyAlgorithms,
 		Value: PrivateKeyValue{
 			Public:  data.HexBytes(public),
 			Private: data.HexBytes(private),
@@ -46,24 +57,42 @@ func GenerateEd25519Key() (*PrivateKey, error) {
 type ed25519Signer struct {
 	ed25519.PrivateKey
 
-	id     string
-	idOnce sync.Once
+	keyType       string
+	keyScheme     string
+	keyAlgorithms []string
+	ids           []string
+	idOnce        sync.Once
 }
 
 var _ Signer = &ed25519Signer{}
 
-func (s *ed25519Signer) ID() string {
-	s.idOnce.Do(func() { s.id = s.publicData().ID() })
-	return s.id
+func (s *ed25519Signer) IDs() []string {
+	s.idOnce.Do(func() { s.ids = s.publicData().IDs() })
+	return s.ids
+}
+
+func (s *ed25519Signer) ContainsID(id string) bool {
+	for _, keyid := range s.IDs() {
+		if id == keyid {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *ed25519Signer) publicData() *data.Key {
 	return &data.Key{
-		Type:  data.KeyTypeEd25519,
-		Value: data.KeyValue{Public: []byte(s.PrivateKey.Public().(ed25519.PublicKey))},
+		Type:       s.keyType,
+		Scheme:     s.keyScheme,
+		Algorithms: s.keyAlgorithms,
+		Value:      data.KeyValue{Public: []byte(s.PrivateKey.Public().(ed25519.PublicKey))},
 	}
 }
 
 func (s *ed25519Signer) Type() string {
-	return data.KeyTypeEd25519
+	return s.keyType
+}
+
+func (s *ed25519Signer) Scheme() string {
+	return s.keyScheme
 }

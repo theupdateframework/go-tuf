@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/sign"
+	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/sign"
 	"golang.org/x/crypto/ed25519"
 
 	. "gopkg.in/check.v1"
@@ -31,8 +31,10 @@ type ecdsaSigner struct {
 func (s ecdsaSigner) PublicData() *data.Key {
 	pub := s.Public().(*ecdsa.PublicKey)
 	return &data.Key{
-		Type:  data.KeyTypeECDSA_SHA2_P256,
-		Value: data.KeyValue{Public: elliptic.Marshal(pub.Curve, pub.X, pub.Y)},
+		Type:       data.KeyTypeECDSA_SHA2_P256,
+		Scheme:     data.KeySchemeECDSA_SHA2_P256,
+		Algorithms: data.KeyAlgorithms,
+		Value:      data.KeyValue{Public: elliptic.Marshal(pub.Curve, pub.X, pub.Y)},
 	}
 }
 
@@ -41,12 +43,20 @@ func (s ecdsaSigner) Sign(rand io.Reader, msg []byte, opts crypto.SignerOpts) ([
 	return s.PrivateKey.Sign(rand, hash[:], crypto.SHA256)
 }
 
-func (s ecdsaSigner) ID() string {
-	return s.PublicData().ID()
+func (s ecdsaSigner) IDs() []string {
+	return s.PublicData().IDs()
+}
+
+func (s ecdsaSigner) ContainsID(id string) bool {
+	return s.PublicData().ContainsID(id)
 }
 
 func (ecdsaSigner) Type() string {
 	return data.KeyTypeECDSA_SHA2_P256
+}
+
+func (ecdsaSigner) Scheme() string {
+	return data.KeySchemeECDSA_SHA2_P256
 }
 
 func (VerifySuite) Test(c *C) {
@@ -74,7 +84,7 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "unknown role",
 			role: "foo",
-			err:  ErrUnknownRole,
+			err:  ErrUnknownRole{"foo"},
 		},
 		{
 			name: "signature wrong length",
@@ -84,7 +94,7 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "key missing from role",
 			mut:  func(t *test) { t.roles["root"].KeyIDs = nil },
-			err:  ErrRoleThreshold,
+			err:  ErrRoleThreshold{1, 0},
 		},
 		{
 			name: "invalid signature",
@@ -94,7 +104,7 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "not enough signatures",
 			mut:  func(t *test) { t.roles["root"].Threshold = 2 },
-			err:  ErrRoleThreshold,
+			err:  ErrRoleThreshold{2, 1},
 		},
 		{
 			name: "exactly enough signatures",
@@ -105,7 +115,7 @@ func (VerifySuite) Test(c *C) {
 				k, _ := sign.GenerateEd25519Key()
 				sign.Sign(t.s, k.Signer())
 				t.keys = append(t.keys, k.PublicData())
-				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, k.PublicData().ID())
+				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, k.PublicData().IDs()...)
 			},
 		},
 		{
@@ -114,7 +124,7 @@ func (VerifySuite) Test(c *C) {
 				t.roles["root"].Threshold = 2
 				t.s.Signatures = append(t.s.Signatures, t.s.Signatures[0])
 			},
-			err: ErrRoleThreshold,
+			err: ErrRoleThreshold{2, 1},
 		},
 		{
 			name: "unknown key",
@@ -130,7 +140,7 @@ func (VerifySuite) Test(c *C) {
 				sign.Sign(t.s, k.Signer())
 				t.roles["root"].Threshold = 2
 			},
-			err: ErrRoleThreshold,
+			err: ErrRoleThreshold{2, 1},
 		},
 		{
 			name: "unknown keys in db",
@@ -148,7 +158,7 @@ func (VerifySuite) Test(c *C) {
 				t.keys = append(t.keys, k.PublicData())
 				t.roles["root"].Threshold = 2
 			},
-			err: ErrRoleThreshold,
+			err: ErrRoleThreshold{2, 1},
 		},
 		{
 			name: "wrong type",
@@ -173,7 +183,7 @@ func (VerifySuite) Test(c *C) {
 				sign.Sign(t.s, s)
 				t.s.Signatures = t.s.Signatures[1:]
 				t.keys = []*data.Key{s.PublicData()}
-				t.roles["root"].KeyIDs = []string{s.PublicData().ID()}
+				t.roles["root"].KeyIDs = s.PublicData().IDs()
 			},
 		},
 		{
@@ -184,7 +194,7 @@ func (VerifySuite) Test(c *C) {
 				sign.Sign(t.s, s)
 				t.s.Signatures[1].Signature[0]++
 				t.keys = append(t.keys, s.PublicData())
-				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, s.PublicData().ID())
+				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, s.PublicData().IDs()...)
 			},
 			err: ErrInvalid,
 		},
@@ -210,8 +220,8 @@ func (VerifySuite) Test(c *C) {
 		}
 		if t.roles == nil {
 			t.roles = map[string]*data.Role{
-				"root": &data.Role{
-					KeyIDs:    []string{t.keys[0].ID()},
+				"root": {
+					KeyIDs:    t.keys[0].IDs(),
 					Threshold: 1,
 				},
 			}
@@ -222,8 +232,10 @@ func (VerifySuite) Test(c *C) {
 
 		db := NewDB()
 		for _, k := range t.keys {
-			err := db.AddKey(k.ID(), k)
-			c.Assert(err, IsNil)
+			for _, id := range k.IDs() {
+				err := db.AddKey(id, k)
+				c.Assert(err, IsNil)
+			}
 		}
 		for n, r := range t.roles {
 			err := db.AddRole(n, r)

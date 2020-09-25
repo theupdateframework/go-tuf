@@ -7,9 +7,17 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/flynn/go-tuf/data"
-	"github.com/flynn/go-tuf/util"
-	"github.com/flynn/go-tuf/verify"
+	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/util"
+	"github.com/theupdateframework/go-tuf/verify"
+)
+
+const (
+	// This is the upper limit in bytes we will use to limit the download
+	// size of the root/timestamp roles, since we might not don't know how
+	// big it is.
+	defaultRootDownloadLimit      = 512000
+	defaultTimestampDownloadLimit = 16384
 )
 
 // LocalStore is local storage for downloaded top-level metadata.
@@ -61,7 +69,7 @@ type Client struct {
 
 	// targets is the list of available targets, either from local storage
 	// or from recently downloaded targets metadata
-	targets data.Files
+	targets data.TargetFiles
 
 	// localMeta is the raw metadata from local storage and is used to
 	// check whether remote metadata is present locally
@@ -91,18 +99,19 @@ func (c *Client) Init(rootKeys []*data.Key, threshold int) error {
 	if len(rootKeys) < threshold {
 		return ErrInsufficientKeys
 	}
-	rootJSON, err := c.downloadMetaUnsafe("root.json")
+	rootJSON, err := c.downloadMetaUnsafe("root.json", defaultRootDownloadLimit)
 	if err != nil {
 		return err
 	}
 
 	c.db = verify.NewDB()
-	rootKeyIDs := make([]string, len(rootKeys))
-	for i, key := range rootKeys {
-		id := key.ID()
-		rootKeyIDs[i] = id
-		if err := c.db.AddKey(id, key); err != nil {
-			return err
+	rootKeyIDs := make([]string, 0, len(rootKeys))
+	for _, key := range rootKeys {
+		for _, id := range key.IDs() {
+			rootKeyIDs = append(rootKeyIDs, id)
+			if err := c.db.AddKey(id, key); err != nil {
+				return err
+			}
 		}
 	}
 	role := &data.Role{Threshold: threshold, KeyIDs: rootKeyIDs}
@@ -123,11 +132,11 @@ func (c *Client) Init(rootKeys []*data.Key, threshold int) error {
 // section 5.1 of the TUF spec:
 //
 // https://github.com/theupdateframework/tuf/blob/v0.9.9/docs/tuf-spec.txt#L714
-func (c *Client) Update() (data.Files, error) {
+func (c *Client) Update() (data.TargetFiles, error) {
 	return c.update(false)
 }
 
-func (c *Client) update(latestRoot bool) (data.Files, error) {
+func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 	// Always start the update using local metadata
 	if err := c.getLocalMeta(); err != nil {
 		if _, ok := err.(verify.ErrExpired); ok {
@@ -139,7 +148,7 @@ func (c *Client) update(latestRoot bool) (data.Files, error) {
 			// should not have continued the update
 			return nil, err
 		}
-		if latestRoot && err == verify.ErrRoleThreshold {
+		if latestRoot && isErrRoleThreshold(err) {
 			// Root was updated with new keys, so our local metadata is no
 			// longer validating. Read only the versions from the local metadata
 			// and re-download everything.
@@ -153,7 +162,7 @@ func (c *Client) update(latestRoot bool) (data.Files, error) {
 
 	// Get timestamp.json, extract snapshot.json file meta and save the
 	// timestamp.json locally
-	timestampJSON, err := c.downloadMetaUnsafe("timestamp.json")
+	timestampJSON, err := c.downloadMetaUnsafe("timestamp.json", defaultTimestampDownloadLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +170,7 @@ func (c *Client) update(latestRoot bool) (data.Files, error) {
 	if err != nil {
 		// ErrRoleThreshold could indicate timestamp keys have been
 		// revoked, so retry with the latest root.json
-		if isDecodeFailedWithErr(err, verify.ErrRoleThreshold) && !latestRoot {
+		if isDecodeFailedWithErrRoleThreshold(err) && !latestRoot {
 			return c.updateWithLatestRoot(nil)
 		}
 		return nil, err
@@ -171,7 +180,7 @@ func (c *Client) update(latestRoot bool) (data.Files, error) {
 	}
 
 	// Return ErrLatestSnapshot if we already have the latest snapshot.json
-	if c.hasMeta("snapshot.json", snapshotMeta) {
+	if c.hasMetaFromTimestamp("snapshot.json", snapshotMeta) {
 		return nil, ErrLatestSnapshot{c.snapshotVer}
 	}
 
@@ -180,7 +189,7 @@ func (c *Client) update(latestRoot bool) (data.Files, error) {
 	// The snapshot.json is only saved locally after checking root.json and
 	// targets.json so that it will be re-downloaded on subsequent updates
 	// if this update fails.
-	snapshotJSON, err := c.downloadMeta("snapshot.json", snapshotMeta)
+	snapshotJSON, err := c.downloadMetaFromTimestamp("snapshot.json", snapshotMeta)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +197,7 @@ func (c *Client) update(latestRoot bool) (data.Files, error) {
 	if err != nil {
 		// ErrRoleThreshold could indicate snapshot keys have been
 		// revoked, so retry with the latest root.json
-		if isDecodeFailedWithErr(err, verify.ErrRoleThreshold) && !latestRoot {
+		if isDecodeFailedWithErrRoleThreshold(err) && !latestRoot {
 			return c.updateWithLatestRoot(nil)
 		}
 		return nil, err
@@ -196,15 +205,15 @@ func (c *Client) update(latestRoot bool) (data.Files, error) {
 
 	// If we don't have the root.json, download it, save it in local
 	// storage and restart the update
-	if !c.hasMeta("root.json", rootMeta) {
+	if !c.hasMetaFromSnapshot("root.json", rootMeta) {
 		return c.updateWithLatestRoot(&rootMeta)
 	}
 
 	// If we don't have the targets.json, download it, determine updated
 	// targets and save targets.json in local storage
-	var updatedTargets data.Files
-	if !c.hasMeta("targets.json", targetsMeta) {
-		targetsJSON, err := c.downloadMeta("targets.json", targetsMeta)
+	var updatedTargets data.TargetFiles
+	if !c.hasMetaFromSnapshot("targets.json", targetsMeta) {
+		targetsJSON, err := c.downloadMetaFromSnapshot("targets.json", targetsMeta)
 		if err != nil {
 			return nil, err
 		}
@@ -225,13 +234,13 @@ func (c *Client) update(latestRoot bool) (data.Files, error) {
 	return updatedTargets, nil
 }
 
-func (c *Client) updateWithLatestRoot(m *data.FileMeta) (data.Files, error) {
+func (c *Client) updateWithLatestRoot(m *data.SnapshotFileMeta) (data.TargetFiles, error) {
 	var rootJSON json.RawMessage
 	var err error
 	if m == nil {
-		rootJSON, err = c.downloadMetaUnsafe("root.json")
+		rootJSON, err = c.downloadMetaUnsafe("root.json", defaultRootDownloadLimit)
 	} else {
-		rootJSON, err = c.downloadMeta("root.json", *m)
+		rootJSON, err = c.downloadMetaFromSnapshot("root.json", *m)
 	}
 	if err != nil {
 		return nil, err
@@ -269,7 +278,11 @@ func (c *Client) getLocalMeta() error {
 		c.db = verify.NewDB()
 		for id, k := range root.Keys {
 			if err := c.db.AddKey(id, k); err != nil {
-				return err
+				// FIXME(TUF-0.9) Ignore unknown keyids, which
+				// can happen during the transition to TUF-1.0.
+				if _, ok := err.(verify.ErrWrongID); !ok {
+					return err
+				}
 			}
 		}
 		for name, role := range root.Roles {
@@ -287,7 +300,7 @@ func (c *Client) getLocalMeta() error {
 
 	if snapshotJSON, ok := meta["snapshot.json"]; ok {
 		snapshot := &data.Snapshot{}
-		if err := verify.UnmarshalTrusted(snapshotJSON, snapshot, "snapshot", c.db); err != nil {
+		if err := c.db.UnmarshalTrusted(snapshotJSON, snapshot, "snapshot"); err != nil {
 			return err
 		}
 		c.snapshotVer = snapshot.Version
@@ -295,16 +308,18 @@ func (c *Client) getLocalMeta() error {
 
 	if targetsJSON, ok := meta["targets.json"]; ok {
 		targets := &data.Targets{}
-		if err := verify.UnmarshalTrusted(targetsJSON, targets, "targets", c.db); err != nil {
+		if err := c.db.UnmarshalTrusted(targetsJSON, targets, "targets"); err != nil {
 			return err
 		}
 		c.targetsVer = targets.Version
-		c.targets = targets.Targets
+		// FIXME(TUF-0.9) temporarily support files with leading path separators.
+		// c.targets = targets.Targets
+		c.loadTargets(targets.Targets)
 	}
 
 	if timestampJSON, ok := meta["timestamp.json"]; ok {
 		timestamp := &data.Timestamp{}
-		if err := verify.UnmarshalTrusted(timestampJSON, timestamp, "timestamp", c.db); err != nil {
+		if err := c.db.UnmarshalTrusted(timestampJSON, timestamp, "timestamp"); err != nil {
 			return err
 		}
 		c.timestampVer = timestamp.Version
@@ -314,14 +329,21 @@ func (c *Client) getLocalMeta() error {
 	return nil
 }
 
-// maxMetaSize is the maximum number of bytes that will be downloaded when
-// getting remote metadata without knowing it's length.
-const maxMetaSize = 50 * 1024
+// FIXME(TUF-0.9) TUF is considering removing support for target files starting
+// with a leading path separator. In order to be backwards compatible, we'll
+// just remove leading separators for now.
+func (c *Client) loadTargets(targets data.TargetFiles) {
+	c.targets = make(data.TargetFiles)
+	for name, meta := range targets {
+		c.targets[name] = meta
+		c.targets[util.NormalizeTarget(name)] = meta
+	}
+}
 
 // downloadMetaUnsafe downloads top-level metadata from remote storage without
 // verifying it's length and hashes (used for example to download timestamp.json
 // which has unknown size). It will download at most maxMetaSize bytes.
-func (c *Client) downloadMetaUnsafe(name string) ([]byte, error) {
+func (c *Client) downloadMetaUnsafe(name string, maxMetaSize int64) ([]byte, error) {
 	r, size, err := c.remote.GetMeta(name)
 	if err != nil {
 		if IsNotFound(err) {
@@ -333,7 +355,7 @@ func (c *Client) downloadMetaUnsafe(name string) ([]byte, error) {
 
 	// return ErrMetaTooLarge if the reported size is greater than maxMetaSize
 	if size > maxMetaSize {
-		return nil, ErrMetaTooLarge{name, size}
+		return nil, ErrMetaTooLarge{name, size, maxMetaSize}
 	}
 
 	// although the size has been checked above, use a LimitReader in case
@@ -396,32 +418,49 @@ func (c *Client) getRootAndLocalVersionsUnsafe() error {
 // remote files
 type remoteGetFunc func(string) (io.ReadCloser, int64, error)
 
-// download downloads the given file from remote storage using the get function,
-// adding hashes to the path if consistent snapshots are in use
-func (c *Client) download(file string, get remoteGetFunc, hashes data.Hashes) (io.ReadCloser, int64, error) {
-	if c.consistentSnapshot {
-		// try each hashed path in turn, and either return the contents,
-		// try the next one if a 404 is returned, or return an error
-		for _, path := range util.HashedPaths(file, hashes) {
-			r, size, err := get(path)
-			if err != nil {
-				if IsNotFound(err) {
-					continue
-				}
-				return nil, 0, err
+// downloadHashed tries to download the hashed prefixed version of the file.
+func (c *Client) downloadHashed(file string, get remoteGetFunc, hashes data.Hashes) (io.ReadCloser, int64, error) {
+	// try each hashed path in turn, and either return the contents,
+	// try the next one if a 404 is returned, or return an error
+	for _, path := range util.HashedPaths(file, hashes) {
+		r, size, err := get(path)
+		if err != nil {
+			if IsNotFound(err) {
+				continue
 			}
-			return r, size, nil
+			return nil, 0, err
 		}
-		return nil, 0, ErrNotFound{file}
+		return r, size, nil
+	}
+	return nil, 0, ErrNotFound{file}
+}
+
+// download downloads the given target file from remote storage using the get
+// function, adding hashes to the path if consistent snapshots are in use
+func (c *Client) downloadTarget(file string, get remoteGetFunc, hashes data.Hashes) (io.ReadCloser, int64, error) {
+	if c.consistentSnapshot {
+		return c.downloadHashed(file, get, hashes)
 	} else {
 		return get(file)
 	}
 }
 
-// downloadMeta downloads top-level metadata from remote storage and verifies
-// it using the given file metadata.
-func (c *Client) downloadMeta(name string, m data.FileMeta) ([]byte, error) {
-	r, size, err := c.download(name, c.remote.GetMeta, m.Hashes)
+// downloadVersionedMeta downloads top-level metadata from remote storage and
+// verifies it using the given file metadata.
+func (c *Client) downloadMeta(name string, version int, m data.FileMeta) ([]byte, error) {
+	r, size, err := func() (io.ReadCloser, int64, error) {
+		if c.consistentSnapshot {
+			path := util.VersionedPath(name, version)
+			r, size, err := c.remote.GetMeta(path)
+			if err == nil {
+				return r, size, nil
+			}
+
+			return nil, 0, err
+		} else {
+			return c.remote.GetMeta(name)
+		}
+	}()
 	if err != nil {
 		if IsNotFound(err) {
 			return nil, ErrMissingRemoteMetadata{name}
@@ -431,29 +470,57 @@ func (c *Client) downloadMeta(name string, m data.FileMeta) ([]byte, error) {
 	defer r.Close()
 
 	// return ErrWrongSize if the reported size is known and incorrect
-	if size >= 0 && size != m.Length {
-		return nil, ErrWrongSize{name, size, m.Length}
+	var stream io.Reader
+	if m.Length != 0 {
+		if size >= 0 && size != m.Length {
+			return nil, ErrWrongSize{name, size, m.Length}
+		}
+
+		// wrap the data in a LimitReader so we download at most m.Length bytes
+		stream = io.LimitReader(r, m.Length)
+	} else {
+		stream = r
 	}
 
-	// wrap the data in a LimitReader so we download at most m.Length bytes
-	stream := io.LimitReader(r, m.Length)
+	return ioutil.ReadAll(stream)
+}
 
-	// read the data, simultaneously writing it to buf and generating metadata
-	var buf bytes.Buffer
-	meta, err := util.GenerateFileMeta(io.TeeReader(stream, &buf), m.HashAlgorithms()...)
+func (c *Client) downloadMetaFromSnapshot(name string, m data.SnapshotFileMeta) ([]byte, error) {
+	b, err := c.downloadMeta(name, m.Version, m.FileMeta)
 	if err != nil {
 		return nil, err
 	}
-	if err := util.FileMetaEqual(meta, m); err != nil {
+
+	meta, err := util.GenerateSnapshotFileMeta(bytes.NewReader(b), m.HashAlgorithms()...)
+	if err != nil {
+		return nil, err
+	}
+	if err := util.SnapshotFileMetaEqual(meta, m); err != nil {
 		return nil, ErrDownloadFailed{name, err}
 	}
-	return buf.Bytes(), nil
+	return b, nil
+}
+
+func (c *Client) downloadMetaFromTimestamp(name string, m data.TimestampFileMeta) ([]byte, error) {
+	b, err := c.downloadMeta(name, m.Version, m.FileMeta)
+	if err != nil {
+		return nil, err
+	}
+
+	meta, err := util.GenerateTimestampFileMeta(bytes.NewReader(b), m.HashAlgorithms()...)
+	if err != nil {
+		return nil, err
+	}
+	if err := util.TimestampFileMetaEqual(meta, m); err != nil {
+		return nil, ErrDownloadFailed{name, err}
+	}
+	return b, nil
 }
 
 // decodeRoot decodes and verifies root metadata.
 func (c *Client) decodeRoot(b json.RawMessage) error {
 	root := &data.Root{}
-	if err := verify.Unmarshal(b, root, "root", c.rootVer, c.db); err != nil {
+	if err := c.db.Unmarshal(b, root, "root", c.rootVer); err != nil {
 		return ErrDecodeFailed{"root.json", err}
 	}
 	c.rootVer = root.Version
@@ -463,10 +530,10 @@ func (c *Client) decodeRoot(b json.RawMessage) error {
 
 // decodeSnapshot decodes and verifies snapshot metadata, and returns the new
 // root and targets file meta.
-func (c *Client) decodeSnapshot(b json.RawMessage) (data.FileMeta, data.FileMeta, error) {
+func (c *Client) decodeSnapshot(b json.RawMessage) (data.SnapshotFileMeta, data.SnapshotFileMeta, error) {
 	snapshot := &data.Snapshot{}
-	if err := verify.Unmarshal(b, snapshot, "snapshot", c.snapshotVer, c.db); err != nil {
-		return data.FileMeta{}, data.FileMeta{}, ErrDecodeFailed{"snapshot.json", err}
+	if err := c.db.Unmarshal(b, snapshot, "snapshot", c.snapshotVer); err != nil {
+		return data.SnapshotFileMeta{}, data.SnapshotFileMeta{}, ErrDecodeFailed{"snapshot.json", err}
 	}
 	c.snapshotVer = snapshot.Version
 	return snapshot.Meta["root.json"], snapshot.Meta["targets.json"], nil
@@ -474,47 +541,77 @@ func (c *Client) decodeSnapshot(b json.RawMessage) (data.FileMeta, data.FileMeta
 
 // decodeTargets decodes and verifies targets metadata, sets c.targets and
 // returns updated targets.
-func (c *Client) decodeTargets(b json.RawMessage) (data.Files, error) {
+func (c *Client) decodeTargets(b json.RawMessage) (data.TargetFiles, error) {
 	targets := &data.Targets{}
-	if err := verify.Unmarshal(b, targets, "targets", c.targetsVer, c.db); err != nil {
+	if err := c.db.Unmarshal(b, targets, "targets", c.targetsVer); err != nil {
 		return nil, ErrDecodeFailed{"targets.json", err}
 	}
-	updatedTargets := make(data.Files)
+	updatedTargets := make(data.TargetFiles)
 	for path, meta := range targets.Targets {
 		if local, ok := c.targets[path]; ok {
-			if err := util.FileMetaEqual(local, meta); err == nil {
+			if err := util.TargetFileMetaEqual(local, meta); err == nil {
 				continue
 			}
 		}
 		updatedTargets[path] = meta
 	}
 	c.targetsVer = targets.Version
-	c.targets = targets.Targets
+	// FIXME(TUF-0.9) temporarily support files with leading path separators.
+	// c.targets = targets.Targets
+	c.loadTargets(targets.Targets)
 	return updatedTargets, nil
 }
 
 // decodeTimestamp decodes and verifies timestamp metadata, and returns the
 // new snapshot file meta.
-func (c *Client) decodeTimestamp(b json.RawMessage) (data.FileMeta, error) {
+func (c *Client) decodeTimestamp(b json.RawMessage) (data.TimestampFileMeta, error) {
 	timestamp := &data.Timestamp{}
-	if err := verify.Unmarshal(b, timestamp, "timestamp", c.timestampVer, c.db); err != nil {
-		return data.FileMeta{}, ErrDecodeFailed{"timestamp.json", err}
+	if err := c.db.Unmarshal(b, timestamp, "timestamp", c.timestampVer); err != nil {
+		return data.TimestampFileMeta{}, ErrDecodeFailed{"timestamp.json", err}
 	}
 	c.timestampVer = timestamp.Version
 	return timestamp.Meta["snapshot.json"], nil
 }
 
-// hasMeta checks whether local metadata has the given file meta
-func (c *Client) hasMeta(name string, m data.FileMeta) bool {
+// hasSnapshotMeta checks whether local metadata has the given meta
+func (c *Client) hasMetaFromSnapshot(name string, m data.SnapshotFileMeta) bool {
 	b, ok := c.localMeta[name]
 	if !ok {
 		return false
 	}
-	meta, err := util.GenerateFileMeta(bytes.NewReader(b), m.HashAlgorithms()...)
+	meta, err := util.GenerateSnapshotFileMeta(bytes.NewReader(b), m.HashAlgorithms()...)
 	if err != nil {
 		return false
 	}
-	err = util.FileMetaEqual(meta, m)
+	err = util.SnapshotFileMetaEqual(meta, m)
+	return err == nil
+}
+
+// hasTargetsMeta checks whether local metadata has the given snapshot meta
+func (c *Client) hasTargetsMeta(m data.SnapshotFileMeta) bool {
+	b, ok := c.localMeta["targets.json"]
+	if !ok {
+		return false
+	}
+	meta, err := util.GenerateSnapshotFileMeta(bytes.NewReader(b), m.HashAlgorithms()...)
+	if err != nil {
+		return false
+	}
+	err = util.SnapshotFileMetaEqual(meta, m)
+	return err == nil
+}
+
+// hasSnapshotMeta checks whether local metadata has the given meta
+func (c *Client) hasMetaFromTimestamp(name string, m data.TimestampFileMeta) bool {
+	b, ok := c.localMeta[name]
+	if !ok {
+		return false
+	}
+	meta, err := util.GenerateTimestampFileMeta(bytes.NewReader(b), m.HashAlgorithms()...)
+	if err != nil {
+		return false
+	}
+	err = util.TimestampFileMetaEqual(meta, m)
 	return err == nil
 }
 
@@ -554,7 +651,7 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 	}
 
 	// get the data from remote storage
-	r, size, err := c.download(normalizedName, c.remote.GetTarget, localMeta.Hashes)
+	r, size, err := c.downloadTarget(normalizedName, c.remote.GetTarget, localMeta.Hashes)
 	if err != nil {
 		return err
 	}
@@ -569,15 +666,15 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 	stream := io.LimitReader(r, localMeta.Length)
 
 	// read the data, simultaneously writing it to dest and generating metadata
-	actual, err := util.GenerateFileMeta(io.TeeReader(stream, dest), localMeta.HashAlgorithms()...)
+	actual, err := util.GenerateTargetFileMeta(io.TeeReader(stream, dest), localMeta.HashAlgorithms()...)
 	if err != nil {
 		return ErrDownloadFailed{name, err}
 	}
 
 	// check the data has the correct length and hashes
-	if err := util.FileMetaEqual(actual, localMeta); err != nil {
-		if err == util.ErrWrongLength {
-			return ErrWrongSize{name, actual.Length, localMeta.Length}
+	if err := util.TargetFileMetaEqual(actual, localMeta); err != nil {
+		if e, ok := err.(util.ErrWrongLength); ok {
+			return ErrWrongSize{name, e.Actual, e.Expected}
 		}
 		return ErrDownloadFailed{name, err}
 	}
@@ -585,8 +682,24 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 	return nil
 }
 
+// Target returns the target metadata for a specific target if it
+// exists. If it does not, ErrNotFound will be returned.
+func (c *Client) Target(name string) (data.TargetFileMeta, error) {
+	m, err := c.Targets()
+	if err != nil {
+		return data.TargetFileMeta{}, err
+	}
+
+	target, ok := m[util.NormalizeTarget(name)]
+	if ok {
+		return target, nil
+	}
+
+	return data.TargetFileMeta{}, ErrNotFound{name}
+}
+
 // Targets returns the complete list of available targets.
-func (c *Client) Targets() (data.Files, error) {
+func (c *Client) Targets() (data.TargetFiles, error) {
 	// populate c.targets from local storage if not set
 	if c.targets == nil {
 		if err := c.getLocalMeta(); err != nil {

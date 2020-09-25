@@ -1,0 +1,37 @@
+{
+ "signatures": [
+  {
+   "keyid": "79cc8a40a8e6658daae229b1524402956637ccced210981e5ea719a0de0f8752",
+   "sig": "533e05a59155bed6ba8f69644b206b5ac461d720a5ef088a840f3ff5569f646eb165b035edfdb2b8a4d9a0c16409a74f3c66a2f2ddbff62b014be1ddc8736603"
+  }
+ ],
+ "signed": {
+  "_type": "targets",
+  "delegations": {
+   "keys": {},
+   "roles": []
+  },
+  "expires": "2030-01-01T00:00:00Z",
+  "spec_version": "1.0",
+  "targets": {
+   "dir/file2.txt": {
+    "hashes": {
+     "sha256": "04e2f59431a9d219321baf7d21b8cc797d7615dc3e9515c782c49d2075658701",
+     "sha512": "2b85daf030ebc94d302822da4fd50216dc56f90c9bb60a95b272aa5b11fe81cd9b192b1a860896d6a8241d1a42cc97b6015d42100c9b46432a32db4b13a11c58"
+    },
+    "length": 9
+   },
+   "file1.txt": {
+    "custom": {
+     "file_permissions": "0644"
+    },
+    "hashes": {
+     "sha256": "55ae75d991c770d8f3ef07cbfde124ffce9c420da5db6203afab700b27e10cf9",
+     "sha512": "055dc805570eecebad4270774054ee4375ef9a7248d981cfa8155dc884817df31e8497684dd26addd018a30565c3ccf87eeb70445f2e76587af84ed6ce1e0302"
+    },
+    "length": 9
+   }
+  },
+  "version": 1
+ }
+}

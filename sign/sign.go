@@ -4,16 +4,22 @@ import (
 	"crypto"
 	"crypto/rand"
 
-	"github.com/flynn/go-tuf/data"
-	"github.com/tent/canonical-json-go"
+	cjson "github.com/tent/canonical-json-go"
+	"github.com/theupdateframework/go-tuf/data"
 )
 
 type Signer interface {
-	// ID returns the TUF key id
-	ID() string
+	// IDs returns the TUF key ids
+	IDs() []string
+
+	// ContainsID returns if the signer contains the key id
+	ContainsID(id string) bool
 
 	// Type returns the TUF key type
 	Type() string
+
+	// Scheme returns the TUF key scheme
+	Scheme() string
 
 	// Signer is used to sign messages and provides access to the public key.
 	// The signer is expected to do its own hashing, so the full message will be
@@ -22,13 +28,19 @@ type Signer interface {
 }
 
 func Sign(s *data.Signed, k Signer) error {
-	id := k.ID()
+	ids := k.IDs()
 	signatures := make([]data.Signature, 0, len(s.Signatures)+1)
 	for _, sig := range s.Signatures {
-		if sig.KeyID == id {
-			continue
+		found := false
+		for _, id := range ids {
+			if sig.KeyID == id {
+				found = true
+				break
+			}
 		}
-		signatures = append(signatures, sig)
+		if !found {
+			signatures = append(signatures, sig)
+		}
 	}
 
 	sig, err := k.Sign(rand.Reader, s.Signed, crypto.Hash(0))
@@ -36,11 +48,14 @@ func Sign(s *data.Signed, k Signer) error {
 		return err
 	}
 
-	s.Signatures = append(signatures, data.Signature{
-		KeyID:     id,
-		Method:    k.Type(),
-		Signature: sig,
-	})
+	s.Signatures = signatures
+	for _, id := range ids {
+		s.Signatures = append(s.Signatures, data.Signature{
+			KeyID:     id,
+			Method:    k.Type(),
+			Signature: sig,
+		})
+	}
 
 	return nil
 }
