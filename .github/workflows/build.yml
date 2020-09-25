@@ -12,8 +12,15 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: ${{ matrix.go-version }}
+    - name: Setup Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.6
     - name: Checkout code
       uses: actions/checkout@v2
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade iso8601 requests securesystemslib six tuf
     - name: Format Unix
       if: runner.os == 'Linux'
       run: test -z $(go fmt ./...)
