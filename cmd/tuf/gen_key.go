@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/flynn/go-docopt"
 	"github.com/theupdateframework/go-tuf"
@@ -27,7 +28,8 @@ func cmdGenKey(args *docopt.Args, repo *tuf.Repo) error {
 	var keyids []string
 	var err error
 	if arg := args.String["--expires"]; arg != "" {
-		expires, err := parseExpires(arg)
+		var expires time.Time
+		expires, err = parseExpires(arg)
 		if err != nil {
 			return err
 		}
