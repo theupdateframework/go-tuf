@@ -144,10 +144,14 @@ func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 		//so that it can be initiated in the system
 		for _, fileInfo := range dir {
 			nameJSON := fileInfo.Name()
-			if nameJSON != "root.json" && nameJSON != "targets.json" && nameJSON != "snapshot.json" && nameJSON != "timestamp.json" && strings.HasSuffix(nameJSON, ".json") {
-				topLevelManifests = append(topLevelManifests, nameJSON)
+			switch nameJSON {
+			case "root.json", "targets.json", "snapshot.json", "timestamp.json":
+				fallthrough
+			default:
+				if strings.HasSuffix(nameJSON, ".json") {
+					topLevelManifests = append(topLevelManifests, nameJSON)
+				}
 			}
-
 		}
 	}
 

@@ -24,7 +24,8 @@ func (db *DB) Verify(s *data.Signed, role string, minVersion int) error {
 	if err := json.Unmarshal(s.Signed, sm); err != nil {
 		return err
 	}
-	if role == "root" || role == "targets" || role == "snapshot" || role == "timestamp" {
+	switch role {
+	case "root", "targets", "snapshot", "timestamp":
 		if strings.ToLower(sm.Type) != strings.ToLower(role) {
 			return ErrWrongMetaType
 		}

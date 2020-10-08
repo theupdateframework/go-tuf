@@ -169,8 +169,8 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 	c.Assert(err, IsNil)
 
 	// generate a key for an unknown role
-	//_, err = r.GenKey("foo")
-	//c.Assert(err, Equals, ErrInvalidRole{"foo"})
+	_, err = r.GenKey("foo")
+	c.Assert(err, Equals, ErrInvalidRole{"foo"})
 
 	// generate a root key
 	ids := genKey(c, r, "root")
