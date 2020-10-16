@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stretchr/stew/slice"
 	cjson "github.com/tent/canonical-json-go"
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/sign"

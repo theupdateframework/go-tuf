@@ -573,7 +573,7 @@ func (rs *RepoSuite) TestRevokeKey(c *C) {
 	if !ok {
 		c.Fatal("missing delegated targets role")
 	}
-	c.Assert(tempRole.KeyIDs, HasLen, 2)
+	c.Assert(tempRole.KeyIDs, HasLen, 1)
 	c.Assert(tempRole.KeyIDs, DeepEquals, delek2)
 }
 
@@ -654,7 +654,7 @@ func (rs *RepoSuite) TestDelegation(c *C) {
 	if !ok {
 		c.Fatal("missing target role")
 	}
-	c.Assert(targetRole.KeyIDs, HasLen, 2)
+	c.Assert(targetRole.KeyIDs, HasLen, 1)
 	c.Assert(targetRole.KeyIDs, DeepEquals, ids1)
 	for _, keyID := range ids1 {
 		k, ok := root.Keys[keyID]
@@ -671,7 +671,7 @@ func (rs *RepoSuite) TestDelegation(c *C) {
 	if !ok {
 		c.Fatal("missing target role")
 	}
-	c.Assert(tempRole.KeyIDs, HasLen, 2)
+	c.Assert(tempRole.KeyIDs, HasLen, 1)
 	c.Assert(tempRole.KeyIDs, DeepEquals, keyids)
 	for _, keyID := range keyids {
 		k, ok := target.Keys[keyID]
@@ -829,12 +829,12 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	keyids2, err := r.DelegateGenKey("role01")
 	c.Assert(err, IsNil)
 	c.Assert(len(keyids2) > 0, Equals, true)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid root.json in snapshot.json: wrong length, expected 3216 got 3828"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid root.json in snapshot.json: wrong length, expected 1740 got 2046"))
 
 	// commit with an invalid targets hash in snapshot.json
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.AddTarget("bar.txt", nil), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 3500 got 3674"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 1906 got 2080"))
 
 	// commit with an invalid timestamp
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
@@ -858,8 +858,6 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), DeepEquals, ErrNotEnoughKeys{"timestamp", 0, 1})
-
-	r.RestoreAll()
 }
 
 func (rs *RepoSuite) TestCommitVersions(c *C) {
