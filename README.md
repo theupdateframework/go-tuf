@@ -149,6 +149,8 @@ Generate a root key on the root box:
 ##### Note that passphrase cannot be none
 
 ```
+$tuf init
+
 $ tuf gen-key root
 Enter root keys passphrase:
 Repeat root keys passphrase:
