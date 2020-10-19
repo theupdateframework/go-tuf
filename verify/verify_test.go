@@ -5,7 +5,9 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
 	"io"
 	"testing"
 	"time"
@@ -57,6 +59,41 @@ func (ecdsaSigner) Type() string {
 
 func (ecdsaSigner) Scheme() string {
 	return data.KeySchemeECDSA_SHA2_P256
+}
+
+type rsaSigner struct {
+	*rsa.PrivateKey
+}
+
+func (s rsaSigner) PublicData() *data.Key {
+	pub, _ := x509.MarshalPKIXPublicKey(s.Public().(*rsa.PublicKey))
+	return &data.Key{
+		Type:       data.KeyTypeRSASSA_PSS_SHA256,
+		Scheme:     data.KeySchemeRSASSA_PSS_SHA256,
+		Algorithms: data.KeyAlgorithms,
+		Value:      data.KeyValue{Public: pub},
+	}
+}
+
+func (s rsaSigner) Sign(rand io.Reader, msg []byte, opts crypto.SignerOpts) ([]byte, error) {
+	hash := sha256.Sum256(msg)
+	return s.PrivateKey.Sign(rand, hash[:], crypto.SHA256)
+}
+
+func (s rsaSigner) IDs() []string {
+	return s.PublicData().IDs()
+}
+
+func (s rsaSigner) ContainsID(id string) bool {
+	return s.PublicData().ContainsID(id)
+}
+
+func (rsaSigner) Type() string {
+	return data.KeyTypeRSASSA_PSS_SHA256
+}
+
+func (rsaSigner) Scheme() string {
+	return data.KeySchemeRSASSA_PSS_SHA256
 }
 
 func (VerifySuite) Test(c *C) {
@@ -191,6 +228,29 @@ func (VerifySuite) Test(c *C) {
 			mut: func(t *test) {
 				k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 				s := ecdsaSigner{k}
+				sign.Sign(t.s, s)
+				t.s.Signatures[1].Signature[0]++
+				t.keys = append(t.keys, s.PublicData())
+				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, s.PublicData().IDs()...)
+			},
+			err: ErrInvalid,
+		},
+		{
+			name: "valid rsa signature",
+			mut: func(t *test) {
+				k, _ := rsa.GenerateKey(rand.Reader, 2048)
+				s := rsaSigner{k}
+				sign.Sign(t.s, s)
+				t.s.Signatures = t.s.Signatures[1:]
+				t.keys = []*data.Key{s.PublicData()}
+				t.roles["root"].KeyIDs = s.PublicData().IDs()
+			},
+		},
+		{
+			name: "invalid rsa signature",
+			mut: func(t *test) {
+				k, _ := rsa.GenerateKey(rand.Reader, 2048)
+				s := rsaSigner{k}
 				sign.Sign(t.s, s)
 				t.s.Signatures[1].Signature[0]++
 				t.keys = append(t.keys, s.PublicData())
