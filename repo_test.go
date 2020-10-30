@@ -831,6 +831,7 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	c.Assert(len(keyids2) > 0, Equals, true)
 	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid root.json in snapshot.json: wrong length, expected 1740 got 2046"))
 
+
 	// commit with an invalid targets hash in snapshot.json
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.AddTarget("bar.txt", nil), IsNil)
