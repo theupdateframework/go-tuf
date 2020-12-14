@@ -15,6 +15,8 @@ import (
 	"github.com/theupdateframework/go-tuf/util"
 )
 
+//MemoryStore constructs a memoryStore object with given meta and files,
+//connected to repo.go as LocalStore declared as interface
 func MemoryStore(meta map[string]json.RawMessage, files map[string][]byte) LocalStore {
 	if meta == nil {
 		meta = make(map[string]json.RawMessage)
@@ -34,6 +36,7 @@ type memoryStore struct {
 	signers    map[string][]sign.Signer
 }
 
+//GetMeta reads all meta data from a memoryStore
 func (m *memoryStore) GetMeta() (map[string]json.RawMessage, error) {
 	meta := make(map[string]json.RawMessage, len(m.meta)+len(m.stagedMeta))
 	for key, value := range m.meta {
@@ -124,6 +127,7 @@ func (f *fileSystemStore) stagedDir() string {
 	return filepath.Join(f.dir, "staged")
 }
 
+//GetMeta reads all .json data from local
 func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 	meta := make(map[string]json.RawMessage)
 	var err error
@@ -131,6 +135,27 @@ func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 		_, err := os.Stat(path)
 		return os.IsNotExist(err)
 	}
+
+	if !notExists(f.stagedDir()) {
+		dir, err := ioutil.ReadDir(f.keysDir())
+		if err != nil {
+			return meta, err
+		}
+		//adding all delegated role names into top level manifests
+		//so that it can be initiated in the system
+		for _, fileInfo := range dir {
+			nameJSON := fileInfo.Name()
+			switch nameJSON {
+			case "root.json", "targets.json", "snapshot.json", "timestamp.json":
+				fallthrough
+			default:
+				if strings.HasSuffix(nameJSON, ".json") {
+					topLevelManifests = append(topLevelManifests, nameJSON)
+				}
+			}
+		}
+	}
+
 	for _, name := range topLevelManifests {
 		path := filepath.Join(f.stagedDir(), name)
 		if notExists(path) {
