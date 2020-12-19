@@ -139,7 +139,6 @@ func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 		_, err := os.Stat(path)
 		return os.IsNotExist(err)
 	}
-
 	if !notExists(f.stagedDir()) {
 		dir, err := ioutil.ReadDir(f.keysDir())
 		if err != nil {

@@ -630,15 +630,6 @@ func (r *Repo) signedMeta(name string) (*data.Signed, error) {
 	return s, nil
 }
 
-func validManifest(name string) bool {
-	for _, m := range topLevelManifests {
-		if m == name {
-			return true
-		}
-	}
-	return false
-}
-
 func validSnapManifest(name string) bool {
 	for _, m := range snapshotManifests {
 		if m == name {
