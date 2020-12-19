@@ -832,7 +832,7 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	// commit with an invalid targets hash in snapshot.json
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.AddTarget("bar.txt", nil), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 725 got 899"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 1906 got 2080"))
 
 	// commit with an invalid timestamp
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
@@ -859,7 +859,7 @@ func (rs *RepoSuite) TestCommit(c *C) {
 }
 
 func (rs *RepoSuite) TestCommitVersions(c *C) {
-	files := map[string][]byte{"foo.txt": []byte("foo")}
+	files := map[string][]byte{"foo.txt": []byte("foo"), "bar.txt": []byte("bar")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -1291,7 +1291,7 @@ func (rs *RepoSuite) TestConsistentSnapshot(c *C) {
 }
 
 func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
-	files := map[string][]byte{"foo.txt": []byte("foo")}
+	files := map[string][]byte{"foo.txt": []byte("foo"), "bar.txt": []byte("bar")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
@@ -1315,8 +1315,8 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 	genKey(c, r, "timestamp")
 
 	c.Assert(r.AddTargets([]string{}, nil), IsNil)
-	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.DelegateAddTargets("role01.json", []string{}, nil), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
 
@@ -1370,15 +1370,15 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(targets.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
 	c.Assert(targets.Version, Equals, 3)
 
-	expires = time.Now().Add(time.Hour)
+	expires = time.Now().Add(6 * time.Hour)
 	c.Assert(r.DelegateAddTargetWithExpires("role01.json", "bar.txt", nil, expires), IsNil)
-	c.Assert(r.SnapshotWithExpires(CompressionTypeNone, expires), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
-	snapshot, err := r.snapshot()
+	temp, err := r.delegationTargets("role01.json")
 	c.Assert(err, IsNil)
-	c.Assert(snapshot.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
-	c.Assert(snapshot.Version, Equals, 6)
+	c.Assert(temp.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
+	c.Assert(temp.Version, Equals, 2)
 
 	expires = time.Now().Add(2 * time.Hour)
 	c.Assert(r.DelegateRemoveTargetWithExpires("role01.json", "bar.txt", expires), IsNil)
@@ -1409,7 +1409,7 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(r.Commit(), IsNil)
 	snapshot, err = r.snapshot()
 	c.Assert(err, IsNil)
-	c.Assert(snapshot.Version, Equals, 7)
+	c.Assert(snapshot.Version, Equals, 9)
 
 	expires = time.Now().Add(10 * time.Minute)
 	c.Assert(r.TimestampWithExpires(expires), IsNil)
@@ -1417,18 +1417,18 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 	timestamp, err := r.timestamp()
 	c.Assert(err, IsNil)
 	c.Assert(timestamp.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
-	c.Assert(timestamp.Version, Equals, 8)
+	c.Assert(timestamp.Version, Equals, 10)
 
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
 	timestamp, err = r.timestamp()
 	c.Assert(err, IsNil)
-	c.Assert(timestamp.Version, Equals, 9)
+	c.Assert(timestamp.Version, Equals, 11)
 	c.Assert(timestamp.Meta["snapshot.json"].Version, Equals, snapshot.Version)
 }
 
 func (rs *RepoSuite) TestHashAlgorithm(c *C) {
-	files := map[string][]byte{"foo.txt": []byte("foo")}
+	files := map[string][]byte{"foo.txt": []byte("foo"), "bar.txt": []byte("bar")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	type hashTest struct {
 		args     []string

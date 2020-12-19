@@ -127,6 +127,10 @@ func (f *fileSystemStore) stagedDir() string {
 	return filepath.Join(f.dir, "staged")
 }
 
+func (f *fileSystemStore) keysDir() string {
+	return filepath.Join(f.dir, "keys")
+}
+
 //GetMeta reads all .json data from local
 func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 	meta := make(map[string]json.RawMessage)

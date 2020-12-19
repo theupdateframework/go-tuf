@@ -87,12 +87,17 @@ func NewRepoIndent(local LocalStore, prefix string, indent string, hashAlgorithm
 	return r, nil
 }
 
+//Init generates a new repository,
+//check if some targets already existes
 func (r *Repo) Init(consistentSnapshot bool) error {
 	t, err := r.targets()
 	if err != nil {
 		return err
 	}
 	if len(t.Targets) > 0 {
+		return ErrInitNotAllowed
+	}
+	if len(t.Delegations) > 0 {
 		return ErrInitNotAllowed
 	}
 	root := data.NewRoot()
@@ -113,7 +118,6 @@ func (r *Repo) db() (*verify.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	for id, k := range root.Keys {
 		if err := db.AddKey(id, k); err != nil {
 			// TUF is considering in TAP-12 removing the
@@ -132,7 +136,6 @@ func (r *Repo) db() (*verify.DB, error) {
 			return nil, err
 		}
 	}
-
 	for id, k := range target.Keys {
 		if err := db.AddKey(id, k); err != nil {
 			return nil, err
@@ -636,6 +639,15 @@ func validManifest(name string) bool {
 	return false
 }
 
+func validSnapManifest(name string) bool {
+	for _, m := range snapshotManifests {
+		if m == name {
+			return true
+		}
+	}
+	return false
+}
+
 //The following four is a set of functions adding targets,
 //first two add default expiration parameters
 func (r *Repo) AddTarget(path string, custom json.RawMessage) error {
@@ -925,6 +937,8 @@ func (r *Repo) Commit() error {
 	if err != nil {
 		return err
 	}
+
+	// check roles in root are valid
 	for name, role := range root.Roles {
 		if len(role.KeyIDs) < role.Threshold {
 			return ErrNotEnoughKeys{name, len(role.KeyIDs), role.Threshold}
@@ -940,13 +954,6 @@ func (r *Repo) Commit() error {
 		if len(role.KeyIDs) < role.Threshold {
 			return ErrNotEnoughKeys{name, len(role.KeyIDs), role.Threshold}
 		}
-	}
-
-	//Expand topLevelMenifest to include delegated roles
-	//Otherwise delegations won't be committed
-	for name := range target.Roles {
-		topLevelManifests = append(topLevelManifests, name+".json")
-		snapshotManifests = append(snapshotManifests, name+".json")
 	}
 
 	// check we have all the metadata

@@ -50,15 +50,17 @@ var validRoles = map[string]struct{}{
 	"timestamp": {},
 }
 
+//ValidRole checks if the role can be operated
+//Parameter: name of a Role
 func ValidRole(name string) bool {
 	_, ok := validRoles[name]
 	return ok
 }
 
 func (db *DB) AddRole(name string, r *data.Role) error {
-	if !ValidRole(name) {
-		return ErrInvalidRole
-	}
+	//if !ValidRole(name) {
+	//	return ErrInvalidRole
+	//}
 	if r.Threshold < 1 {
 		return ErrInvalidThreshold
 	}
