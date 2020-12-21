@@ -65,6 +65,25 @@ Stages the removal of files with the given path(s) from the `targets` manifest
 (they get removed from the filesystem when the change is committed). Specifying
 no paths removes all files from the `targets` manifest.
 
+#### `dele-gen-key [--expires=<days>] <role>`
+
+Creates a new delegation role's key. Prompts the user for an encryption passphrase
+(unless the `--insecure-plaintext` flag is set), then generates a new signing key and
+writes it to the relevant key file in the `keys` directory. It also stages
+the addition of the new key to the `target` manifest.
+
+#### `dele-add <names>  [<path>...]`
+
+Hashes files in the `staged/targets` directory at the given path(s), then
+updates and stages the delegated target manifest. Specifying no paths hashes all
+files in the `staged/targets` directory.
+
+#### `dele-remove <name> [<path>...]`
+
+Stages the removal of files with the given path(s) from the certain non-top target manifest
+(they get removed from the filesystem when the change is committed). Specifying
+no paths removes all files from the certain non-top target manifest.
+
 #### `tuf snapshot [--compression=<format>]`
 
 Expects a staged, fully signed `targets` manifest and stages an appropriate
@@ -98,6 +117,11 @@ Removes all staged manifests and targets.
 #### `tuf root-keys`
 
 Outputs a JSON serialized array of root keys to STDOUT. The resulting JSON
+should be distributed to clients for performing initial updates.
+
+#### `tuf target-keys`
+
+Outputs a JSON serialized array of target keys to STDOUT. The resulting JSON
 should be distributed to clients for performing initial updates.
 
 For a list of supported commands, run `tuf help` from the command line.
@@ -152,6 +176,12 @@ Enter targets keys passphrase:
 Repeat targets keys passphrase:
 Generated targets key with ID 8cf4810c
 
+$ tuf dele-gen-key r01
+Enter r01 keys passphrase: 
+Repeat r01 keys passphrase: 
+Enter targets keys passphrase: 
+Generated r01 key with ID 4d6ddd68
+
 $ tuf gen-key snapshot
 Enter snapshot keys passphrase:
 Repeat snapshot keys passphrase:
@@ -165,12 +195,14 @@ Generated timestamp key with ID a3768063
 $ tree .
 .
 ├── keys
+│   ├── r01.json
 │   ├── snapshot.json
 │   ├── targets.json
 │   └── timestamp.json
 ├── repository
 └── staged
     ├── root.json
+    ├── targets.json
     └── targets
 ```
 
@@ -193,15 +225,17 @@ Enter root keys passphrase:
 The staged `root.json` can now be copied back to the repo box ready to be
 committed alongside other manifests.
 
-#### Add a target file
+#### Add target files
 
 Assuming a staged, signed `root` manifest and the file to add exists at
-`staged/targets/foo/bar/baz.txt`:
+`staged/targets/foo/bar/baz.txt` and `staged/targets/sin.txt`:
 
 ```
 $ tree .
 .
 ├── keys
+│   ├── r01.json
+│   ├── root.json
 │   ├── snapshot.json
 │   ├── targets.json
 │   └── timestamp.json
@@ -209,6 +243,7 @@ $ tree .
 └── staged
     ├── root.json
     └── targets
+        ├── sin.txt
         └── foo
             └── bar
                 └── baz.txt
@@ -216,16 +251,23 @@ $ tree .
 $ tuf add foo/bar/baz.txt
 Enter targets keys passphrase:
 
+$tuf dele-add r01 sin.txt
+Enter r01 keys passphrase:
+
 $ tree .
 .
 ├── keys
+│   ├── r01.json
+│   ├── root.json
 │   ├── snapshot.json
 │   ├── targets.json
 │   └── timestamp.json
 ├── repository
 └── staged
+    ├── r01.json
     ├── root.json
     ├── targets
+    │   ├── sin.txt
     │   └── foo
     │       └── bar
     │           └── baz.txt
@@ -240,14 +282,17 @@ Enter timestamp keys passphrase:
 $ tree .
 .
 ├── keys
+│   ├── r01.json
 │   ├── snapshot.json
 │   ├── targets.json
 │   └── timestamp.json
 ├── repository
 └── staged
+    ├── r01.json
     ├── root.json
     ├── snapshot.json
     ├── targets
+    │   ├── sin.txt
     │   └── foo
     │       └── bar
     │           └── baz.txt
@@ -259,13 +304,17 @@ $ tuf commit
 $ tree .
 .
 ├── keys
+│   ├── r01.json
+│   ├── root.json
 │   ├── snapshot.json
 │   ├── targets.json
 │   └── timestamp.json
 ├── repository
+│   ├── r01.json
 │   ├── root.json
 │   ├── snapshot.json
 │   ├── targets
+│   │   ├── sin.txt
 │   │   └── foo
 │   │       └── bar
 │   │           └── baz.txt
@@ -274,21 +323,26 @@ $ tree .
 └── staged
 ```
 
-#### Remove a target file
+#### Remove target files
 
-Assuming the file to remove is at `repository/targets/foo/bar/baz.txt`:
+Assuming the file to remove is at `repository/targets/foo/bar/baz.txt`
+and `repository/targets/sin.txt`:
 
 ```
 $ tree .
 .
 ├── keys
+│   ├── r01.json
+│   ├── root.json
 │   ├── snapshot.json
 │   ├── targets.json
 │   └── timestamp.json
 ├── repository
+│   ├── r01.json
 │   ├── root.json
 │   ├── snapshot.json
 │   ├── targets
+│   │   ├── sin.txt
 │   │   └── foo
 │   │       └── bar
 │   │           └── baz.txt
@@ -299,22 +353,31 @@ $ tree .
 $ tuf remove foo/bar/baz.txt
 Enter targets keys passphrase:
 
+$tuf dele-remove r01 sin.txt
+Enter r01 keys passphrase:
+
 $ tree .
 .
 ├── keys
+│   ├── r01.json
+│   ├── root.json
 │   ├── snapshot.json
 │   ├── targets.json
 │   └── timestamp.json
 ├── repository
+│   ├── r01.json
 │   ├── root.json
 │   ├── snapshot.json
 │   ├── targets
+│   │   ├── sin.txt
 │   │   └── foo
 │   │       └── bar
 │   │           └── baz.txt
 │   ├── targets.json
 │   └── timestamp.json
 └── staged
+    ├── r01.json
+    ├── targets
     └── targets.json
 
 $ tuf snapshot
@@ -326,10 +389,13 @@ Enter timestamp keys passphrase:
 $ tree .
 .
 ├── keys
+│   ├── r01.json
+│   ├── root.json
 │   ├── snapshot.json
 │   ├── targets.json
 │   └── timestamp.json
 ├── repository
+│   ├── r01.json
 │   ├── root.json
 │   ├── snapshot.json
 │   ├── targets
@@ -339,6 +405,8 @@ $ tree .
 │   ├── targets.json
 │   └── timestamp.json
 └── staged
+    ├── r01.json
+    ├── targets
     ├── snapshot.json
     ├── targets.json
     └── timestamp.json
@@ -348,10 +416,13 @@ $ tuf commit
 $ tree .
 .
 ├── keys
+│   ├── r01.json
+│   ├── root.json
 │   ├── snapshot.json
 │   ├── targets.json
 │   └── timestamp.json
 ├── repository
+│   ├── r01.json
 │   ├── root.json
 │   ├── snapshot.json
 │   ├── targets.json
@@ -359,7 +430,8 @@ $ tree .
 └── staged
 ```
 
-#### Regenerate manifests based on targets tree
+#### Regenerate manifests based on targets tree 
+(Haven't finished yet)
 
 ```
 $ tree .
@@ -454,6 +526,7 @@ $ tree .
 ├── keys
 │   └── timestamp.json
 ├── repository
+│   ├── r01.json
 │   ├── root.json
 │   ├── snapshot.json
 │   ├── targets
@@ -472,6 +545,7 @@ $ tree .
 ├── keys
 │   └── timestamp.json
 ├── repository
+│   ├── r01.json
 │   ├── root.json
 │   ├── snapshot.json
 │   ├── targets
@@ -490,6 +564,7 @@ $ tree .
 ├── keys
 │   └── timestamp.json
 ├── repository
+│   ├── r01.json
 │   ├── root.json
 │   ├── snapshot.json
 │   ├── targets

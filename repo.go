@@ -639,7 +639,7 @@ func validSnapManifest(name string) bool {
 	return false
 }
 
-//The following four is a set of functions adding targets,
+//AddTarget and followed three is a set of functions adding targets,
 //first two add default expiration parameters
 func (r *Repo) AddTarget(path string, custom json.RawMessage) error {
 	return r.AddTargets([]string{path}, custom)
