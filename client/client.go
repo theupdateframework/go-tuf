@@ -104,6 +104,7 @@ func (c *Client) Init(rootKeys []*data.Key, threshold int) error {
 		return err
 	}
 
+	// create a new key database, and add all the public `rootKeys` to it.
 	c.db = verify.NewDB()
 	rootKeyIDs := make([]string, 0, len(rootKeys))
 	for _, key := range rootKeys {
@@ -114,11 +115,15 @@ func (c *Client) Init(rootKeys []*data.Key, threshold int) error {
 			}
 		}
 	}
+
+	// add a mock "root" role that trusts the passed in key ids. These keys
+	// will be used to verify the `root.json` we just fetched.
 	role := &data.Role{Threshold: threshold, KeyIDs: rootKeyIDs}
 	if err := c.db.AddRole("root", role); err != nil {
 		return err
 	}
 
+	// verify that the new root is valid.
 	if err := c.decodeRoot(rootJSON); err != nil {
 		return err
 	}
@@ -278,8 +283,12 @@ func (c *Client) getLocalMeta() error {
 		c.db = verify.NewDB()
 		for id, k := range root.Keys {
 			if err := c.db.AddKey(id, k); err != nil {
-				// FIXME(TUF-0.9) Ignore unknown keyids, which
-				// can happen during the transition to TUF-1.0.
+				// TUF is considering in TAP-12 removing the
+				// requirement that the keyid hash algorithm be derived
+				// from the public key. So to be forwards compatible,
+				// we ignore `ErrWrongID` errors.
+				//
+				// TAP-12: https://github.com/theupdateframework/taps/blob/master/tap12.md
 				if _, ok := err.(verify.ErrWrongID); !ok {
 					return err
 				}

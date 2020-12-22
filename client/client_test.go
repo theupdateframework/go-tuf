@@ -11,8 +11,10 @@ import (
 	"testing"
 	"time"
 
+	cjson "github.com/tent/canonical-json-go"
 	tuf "github.com/theupdateframework/go-tuf"
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/sign"
 	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
 	. "gopkg.in/check.v1"
@@ -895,6 +897,55 @@ func (s *ClientSuite) TestAvailableTarget(c *C) {
 
 	_, err = client.Target("/bar.txt")
 	c.Assert(err, Equals, ErrNotFound{"/bar.txt"})
+}
+
+func (s *ClientSuite) TestUnknownKeyIDs(c *C) {
+	// get local root.json
+	meta, err := s.store.GetMeta()
+	c.Assert(err, IsNil)
+
+	rootJSON, ok := meta["root.json"]
+	c.Assert(ok, Equals, true)
+
+	var root struct {
+		Signed     data.Root        `json:"signed"`
+		Signatures []data.Signature `json:signatures"`
+	}
+	c.Assert(json.Unmarshal(rootJSON, &root), IsNil)
+
+	// update remote root.json to add a new key with an unknown id
+	key, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+
+	root.Signed.Keys["unknown-key-id"] = key.PublicData()
+
+	// re-sign the root metadata, then commit it back into the store.
+	signingKeys, err := s.store.GetSigningKeys("root")
+	c.Assert(err, IsNil)
+
+	signedRoot, err := sign.Marshal(root.Signed, signingKeys...)
+	c.Assert(err, IsNil)
+
+	rootJSON, err = cjson.Marshal(signedRoot)
+	c.Assert(err, IsNil)
+
+	s.store.SetMeta("root.json", rootJSON)
+	s.store.Commit(false, nil, nil)
+	s.syncRemote(c)
+
+	// FIXME(TUF-0.9) We need this for now because the client still uses
+	// the TUF-0.9 update workflow, where we decide to update the root
+	// metadata when we observe a new root through the snapshot.
+	repo, err := tuf.NewRepo(s.store)
+	c.Assert(repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+	c.Assert(repo.Timestamp(), IsNil)
+	c.Assert(repo.Commit(), IsNil)
+	s.syncRemote(c)
+
+	// Make sure the client can update with the unknown keyid.
+	client := s.newClient(c)
+	_, err = client.Update()
+	c.Assert(err, IsNil)
 }
 
 func generateRepoFS(c *C, dir string, files map[string][]byte, consistentSnapshot bool) *tuf.Repo {

@@ -1309,3 +1309,73 @@ func (rs *RepoSuite) TestCustomTargetMetadata(c *C) {
 	assertCustomMeta("bar.txt", nil)
 	assertCustomMeta("foo.txt", &custom)
 }
+
+func (rs *RepoSuite) TestUnknownKeyIDs(c *C) {
+	// generate a repo
+	local := MemoryStore(make(map[string]json.RawMessage), nil)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	// add a new key to the root metadata with an unknown key id.
+	key, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+
+	root, err := r.root()
+	c.Assert(err, IsNil)
+	c.Assert(root.Version, Equals, 1)
+
+	root.Keys["unknown-key-id"] = key.PublicData()
+	r.setMeta("root.json", root)
+
+	// commit the metadata to the store.
+	c.Assert(r.AddTargets([]string{}, nil), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	// validate that the unknown key id wasn't stripped when written to the
+	// store.
+	meta, err := local.GetMeta()
+	c.Assert(err, IsNil)
+
+	rootJSON, ok := meta["root.json"]
+	c.Assert(ok, Equals, true)
+
+	var signedRoot struct {
+		Signed     data.Root        `json:"signed"`
+		Signatures []data.Signature `json:signatures"`
+	}
+	c.Assert(json.Unmarshal(rootJSON, &signedRoot), IsNil)
+	c.Assert(signedRoot.Signed.Version, Equals, 1)
+
+	unknownKey, ok := signedRoot.Signed.Keys["unknown-key-id"]
+	c.Assert(ok, Equals, true)
+	c.Assert(unknownKey, DeepEquals, key.PublicData())
+
+	// make sure if we generate a new root that we preserve the unknown key
+	// id.
+	root, err = r.root()
+
+	genKey(c, r, "timestamp")
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	meta, err = local.GetMeta()
+	c.Assert(err, IsNil)
+
+	rootJSON, ok = meta["root.json"]
+	c.Assert(ok, Equals, true)
+
+	c.Assert(json.Unmarshal(rootJSON, &signedRoot), IsNil)
+	c.Assert(signedRoot.Signed.Version, Equals, 2)
+
+	unknownKey, ok = signedRoot.Signed.Keys["unknown-key-id"]
+	c.Assert(ok, Equals, true)
+	c.Assert(unknownKey, DeepEquals, key.PublicData())
+}
