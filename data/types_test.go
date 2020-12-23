@@ -11,10 +11,6 @@ const (
 	//
 	// https://github.com/theupdateframework/specification
 	//
-	// Unfortunately there was a bug in the 1.0 spec, which reused the 0.9
-	// key ids. This patch fixes it:
-	//
-	// https://github.com/theupdateframework/specification/pull/43
 	public       = `"72378e5bc588793e58f81c8533da64a2e8f1565c1fcc7f253496394ffc52542c"`
 	keyid10      = "1bf1c6e3cdd3d3a8420b19199e27511999850f4b376c4547b2f32fba7e80fca3"
 	keyid10algos = "506a349b85945d0d99c7289c3f0f1f6c550218089d1d38a3f64824db31e827ac"
