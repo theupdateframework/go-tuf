@@ -1357,8 +1357,7 @@ func (rs *RepoSuite) TestUnknownKeyIDs(c *C) {
 	c.Assert(ok, Equals, true)
 	c.Assert(unknownKey, DeepEquals, key.PublicData())
 
-	// make sure if we generate a new root that we preserve the unknown key
-	// id.
+	// a new root should preserve the unknown key id.
 	root, err = r.root()
 
 	genKey(c, r, "timestamp")
