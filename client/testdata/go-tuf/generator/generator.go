@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -25,11 +24,6 @@ func assertNotNil(err error) {
 	if err != nil {
 		panic(fmt.Sprintf("assertion failed: %s", err))
 	}
-}
-
-func copyRepo(src string, dst string) {
-	cmd := exec.Command("cp", "-r", src, dst)
-	assertNotNil(cmd.Run())
 }
 
 func newRepo(dir string) *tuf.Repo {
@@ -92,13 +86,11 @@ func generateRepos(dir string, roleKeys map[string][][]*sign.PrivateKey, consist
 	commit(dir0, repo0)
 
 	// Rotate all the keys to make sure that works.
-	oldDir := dir0
 	i := 1
 	for _, role := range []string{"root", "targets", "snapshot", "timestamp"} {
 		// Setup the repo.
 		stepName := fmt.Sprintf("%d", i)
 		d := filepath.Join(dir, stepName)
-		copyRepo(oldDir, d)
 		repo := newRepo(d)
 		addKeys(repo, keys)
 
@@ -113,14 +105,12 @@ func generateRepos(dir string, roleKeys map[string][][]*sign.PrivateKey, consist
 		addTargets(repo, d, map[string][]byte{stepName: []byte(stepName)})
 		commit(d, repo)
 
-		i += 1
-		oldDir = d
+		i++
 	}
 
 	// Add another target file to make sure the workflow worked.
 	stepName := fmt.Sprintf("%d", i)
 	d := filepath.Join(dir, stepName)
-	copyRepo(oldDir, d)
 	repo := newRepo(d)
 	addKeys(repo, keys)
 	addTargets(repo, d, map[string][]byte{stepName: []byte(stepName)})

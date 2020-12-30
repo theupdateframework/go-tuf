@@ -172,14 +172,13 @@ func (t *testCase) runStep(c *C, stepName string, init bool) {
 	c.Assert(err, IsNil)
 	c.Assert(util.TargetFileMetaEqual(file, meta), IsNil)
 
+	c.Log(t.targets)
 	// download the files and check they have the correct content
-	for name, data := range t.targets {
-		for _, prefix := range []string{"", "/"} {
-			var dest testDestination
-			c.Assert(client.Download(prefix+name, &dest), IsNil)
-			c.Assert(dest.deleted, Equals, false)
-			c.Assert(dest.String(), Equals, string(data))
-		}
+	for _, prefix := range []string{"", "/"} {
+		var dest testDestination
+		c.Assert(client.Download(prefix+targetName, &dest), IsNil)
+		c.Assert(dest.deleted, Equals, false)
+		c.Assert(dest.String(), Equals, string(data))
 	}
 }
 

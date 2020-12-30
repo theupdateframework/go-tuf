@@ -2,16 +2,16 @@
 	"signatures": [
 		{
 			"keyid": "ce72db3f938914205461a415c9b7b91267a2079df991fd6283aa8461988c1add",
-			"sig": "65f63745aa8bd39132f827c427ea6d87f620ec805d9f376b6a8400dc3db7eb964e5423d31ed08867916d039661a70d6bf255bca552248021a4e78b5d357c2b0f"
+			"sig": "6658129fea318671119384ba07d53121ad14981730f1e6761c18358140fc1aa2ff8cfec9a50ce46642aa55d55369ce0ccec0aa7d3dea224ead3971747e58670a"
 		},
 		{
 			"keyid": "b2403f96ae9b1089d8cbc15bbc35e9acbacd7984571f951b43aab56aedcfa84f",
-			"sig": "20e91b55c995989b270091b714347b15169285cb636ef05d68d49ed7b7a96ebfda13898e0d9ef928c382873b9dba90dca492dbf705d56a4b293adaaed574340f"
+			"sig": "4e19bc38c94625d5a1c8a396f07e1d37fadbffdd95b705ec3a7b141558dbf059c139d0355bb519314e7396d36f798d65bebe176d0144f0949f2a20eefd9f840c"
 		}
 	],
 	"signed": {
 		"_type": "root",
-		"consistent_snapshot": false,
+		"consistent_snapshot": true,
 		"expires": "2100-01-01T00:00:00Z",
 		"keys": {
 			"289e5a9e71afd7909326aa4caea92f7557ee0e2283d8c31f0c3401ce67248a45": {
@@ -86,6 +86,6 @@
 			}
 		},
 		"spec_version": "1.0",
-		"version": 2
+		"version": 1
 	}
 }
