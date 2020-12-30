@@ -108,7 +108,15 @@ func (r *Repo) db() (*verify.DB, error) {
 	}
 	for id, k := range root.Keys {
 		if err := db.AddKey(id, k); err != nil {
-			return nil, err
+			// TUF is considering in TAP-12 removing the
+			// requirement that the keyid hash algorithm be derived
+			// from the public key. So to be forwards compatible,
+			// we ignore `ErrWrongID` errors.
+			//
+			// TAP-12: https://github.com/theupdateframework/taps/blob/master/tap12.md
+			if _, ok := err.(verify.ErrWrongID); !ok {
+				return nil, err
+			}
 		}
 	}
 	for name, role := range root.Roles {
