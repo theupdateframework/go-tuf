@@ -1,1 +1,25 @@
-../../4/repository/1.targets.json
+{
+	"signatures": [
+		{
+			"keyid": "bc8f087663855564b358ddf314d5932ab920af17bd1df2f58b397afd82d76dc1",
+			"sig": "1a56a09872ee2749e9bcab9b8eb7c6a8032bf51717621c8b3315eea41164baf49b7c65b96d0a4ab4cfc0f4fb401d138a90302f093233d50ba7c87790f373730f"
+		}
+	],
+	"signed": {
+		"_type": "targets",
+		"delegations": {},
+		"expires": "2100-01-01T00:00:00Z",
+		"keys": {},
+		"roles": {},
+		"spec_version": "1.0",
+		"targets": {
+			"5": {
+				"hashes": {
+					"sha512": "06df05371981a237d0ed11472fae7c94c9ac0eff1d05413516710d17b10a4fb6f4517bda4a695f02d0a73dd4db543b4653df28f5d09dab86f92ffb9b86d01e25"
+				},
+				"length": 1
+			}
+		},
+		"version": 1
+	}
+}
