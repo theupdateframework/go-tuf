@@ -2,12 +2,11 @@
 	"signatures": [
 		{
 			"keyid": "bc8f087663855564b358ddf314d5932ab920af17bd1df2f58b397afd82d76dc1",
-			"sig": "1a56a09872ee2749e9bcab9b8eb7c6a8032bf51717621c8b3315eea41164baf49b7c65b96d0a4ab4cfc0f4fb401d138a90302f093233d50ba7c87790f373730f"
+			"sig": "7572ba79949d790e8e52a01d44b8380bef53de5c8fbf8c5fd2de23cf2cb8d369d9b8ba6e77362b080df306497efa5b29dc5f5fdea36fd8b25bd37a6328f2e906"
 		}
 	],
 	"signed": {
 		"_type": "targets",
-		"delegations": {},
 		"expires": "2100-01-01T00:00:00Z",
 		"keys": {},
 		"roles": {},

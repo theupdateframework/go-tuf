@@ -97,7 +97,7 @@ func (r *Repo) Init(consistentSnapshot bool) error {
 	if len(t.Targets) > 0 {
 		return ErrInitNotAllowed
 	}
-	if len(t.Delegations) > 0 {
+	if len(t.Roles) > 0 {
 		return ErrInitNotAllowed
 	}
 	root := data.NewRoot()
@@ -1151,22 +1151,12 @@ func (r *Repo) DelegateAddPrivateKeyWithExpires(nameJSON string, key *sign.Priva
 		target.Roles[name] = role
 	}
 
-	delegation, ok := target.Delegations[name]
-	if !ok {
-		delegation = data.NewDelegations()
-		target.Delegations[name] = delegation
-	}
-
 	changed := false
 	if role.AddKeyIDs(pk.IDs()) {
 		changed = true
 	}
 
 	if target.TargetAddKey(pk) {
-		changed = true
-	}
-
-	if delegation.DelegationAddKey(pk) {
 		changed = true
 	}
 

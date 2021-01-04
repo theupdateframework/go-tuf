@@ -832,7 +832,7 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	// commit with an invalid targets hash in snapshot.json
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.AddTarget("bar.txt", nil), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 1906 got 2080"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 1392 got 1566"))
 
 	// commit with an invalid timestamp
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)

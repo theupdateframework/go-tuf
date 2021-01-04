@@ -127,6 +127,7 @@ func (t *Targets) TargetAddKey(key *Key) bool {
 
 //DelegationAddKey check existence of a key,
 //Add it to Delegation's key filed if not exist
+/*
 func (d *Delegation) DelegationAddKey(key *Key) bool {
 	changed := false
 	for _, id := range key.IDs() {
@@ -137,6 +138,7 @@ func (d *Delegation) DelegationAddKey(key *Key) bool {
 	}
 	return changed
 }
+*/
 
 // UniqueKeys returns the unique keys for each associated role.
 // We might have multiple key IDs that correspond to the same key.
@@ -257,15 +259,16 @@ func (f TargetFileMeta) HashAlgorithms() []string {
 }
 
 type Targets struct {
-	Type        string                 `json:"_type"`
-	SpecVersion string                 `json:"spec_version"`
-	Version     int                    `json:"version"`
-	Expires     time.Time              `json:"expires"`
-	Targets     TargetFiles            `json:"targets"`
-	Keys        map[string]*Key        `json:"keys"`
-	Roles       map[string]*Role       `json:"roles"`
-	Delegations map[string]*Delegation `json:"delegations"`
+	Type        string           `json:"_type"`
+	SpecVersion string           `json:"spec_version"`
+	Version     int              `json:"version"`
+	Expires     time.Time        `json:"expires"`
+	Targets     TargetFiles      `json:"targets"`
+	Keys        map[string]*Key  `json:"keys"`
+	Roles       map[string]*Role `json:"roles"`
+	//Delegations map[string]*Delegation `json:"delegations"`
 }
+
 
 func NewTargets() *Targets {
 	return &Targets{
@@ -275,19 +278,7 @@ func NewTargets() *Targets {
 		Targets:     make(TargetFiles),
 		Keys:        make(map[string]*Key),
 		Roles:       make(map[string]*Role),
-		Delegations: make(map[string]*Delegation),
-	}
-}
-
-//Delegation item in Targets.json
-type Delegation struct {
-	Keys map[string]*Key `json:"keys"`
-}
-
-//NewDelegations returns a ptr to a Delegation instance
-func NewDelegations() *Delegation {
-	return &Delegation{
-		Keys: make(map[string]*Key),
+		//Delegations: make(map[string]*Delegation),
 	}
 }
 
