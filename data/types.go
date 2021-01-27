@@ -125,21 +125,6 @@ func (t *Targets) TargetAddKey(key *Key) bool {
 	return changed
 }
 
-//DelegationAddKey check existence of a key,
-//Add it to Delegation's key filed if not exist
-/*
-func (d *Delegation) DelegationAddKey(key *Key) bool {
-	changed := false
-	for _, id := range key.IDs() {
-		if _, ok := d.Keys[id]; !ok {
-			changed = true
-			d.Keys[id] = key
-		}
-	}
-	return changed
-}
-*/
-
 // UniqueKeys returns the unique keys for each associated role.
 // We might have multiple key IDs that correspond to the same key.
 func (r Root) UniqueKeys() map[string][]*Key {
@@ -266,9 +251,7 @@ type Targets struct {
 	Targets     TargetFiles      `json:"targets"`
 	Keys        map[string]*Key  `json:"keys"`
 	Roles       map[string]*Role `json:"roles"`
-	//Delegations map[string]*Delegation `json:"delegations"`
 }
-
 
 func NewTargets() *Targets {
 	return &Targets{
@@ -278,7 +261,6 @@ func NewTargets() *Targets {
 		Targets:     make(TargetFiles),
 		Keys:        make(map[string]*Key),
 		Roles:       make(map[string]*Role),
-		//Delegations: make(map[string]*Delegation),
 	}
 }
 
