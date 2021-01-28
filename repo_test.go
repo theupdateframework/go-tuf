@@ -1714,7 +1714,7 @@ func (rs *RepoSuite) TestUnknownKeyIDs(c *C) {
 
 	// commit the metadata to the store.
 	c.Assert(r.AddTargets([]string{}, nil), IsNil)
-	c.Assert(r.DelegateAddTargets("role01.json",[]string{},nil),IsNil)
+	c.Assert(r.DelegateAddTargets("role01.json", []string{}, nil), IsNil)
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
