@@ -82,7 +82,7 @@ type rsaVerifier struct{}
 
 func (v rsaVerifier) Verify(key, msg, sig []byte) error {
 	digest := sha256.Sum256(msg)
-	pub, err := x509.ParsePKIXPublicKey(key)
+	pub, err := parseKey(key)
 	if err != nil {
 		return ErrInvalid
 	}
@@ -98,8 +98,8 @@ func (v rsaVerifier) Verify(key, msg, sig []byte) error {
 	return nil
 }
 
-func (rsaVerifier) ValidKey(k []byte) bool {
-	pub, err := x509.ParsePKIXPublicKey(k)
+func (v rsaVerifier) ValidKey(k []byte) bool {
+	pub, err := parseKey(k)
 	if err != nil {
 		return false
 	}
@@ -108,4 +108,21 @@ func (rsaVerifier) ValidKey(k []byte) bool {
 		return false
 	}
 	return true
+}
+
+// parseKey tries to parse a PEM []byte slice by attempting PKCS8, PKCS1, and PKIX in order.
+func parseKey(data []byte) (interface{}, error) {
+	key, err := x509.ParsePKCS8PrivateKey(data)
+	if err == nil {
+		return key, nil
+	}
+	key, err = x509.ParsePKCS1PrivateKey(data)
+	if err == nil {
+		return key, nil
+	}
+	key, err = x509.ParsePKIXPublicKey(data)
+	if err == nil {
+		return key, nil
+	}
+	return nil, ErrInvalid
 }
