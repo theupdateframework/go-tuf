@@ -132,14 +132,21 @@ func (r *Repo) root() (*data.Root, error) {
 	if !ok {
 		return data.NewRoot(), nil
 	}
+
+	return parseRoot(rootJSON)
+}
+
+func parseRoot(jsonData []byte) (*data.Root, error) {
 	s := &data.Signed{}
-	if err := json.Unmarshal(rootJSON, s); err != nil {
+	if err := json.Unmarshal(jsonData, s); err != nil {
 		return nil, err
 	}
+
 	root := &data.Root{}
 	if err := json.Unmarshal(s.Signed, root); err != nil {
 		return nil, err
 	}
+
 	return root, nil
 }
 
@@ -332,11 +339,25 @@ func validExpires(expires time.Time) bool {
 	return expires.Sub(time.Now()) > 0
 }
 
+func ParseRootKeys(jsonData []byte) ([]*data.Key, error) {
+	root, err := parseRoot(jsonData)
+	if err != nil {
+		return nil, err
+	}
+
+	return rootKeys(root)
+}
+
 func (r *Repo) RootKeys() ([]*data.Key, error) {
 	root, err := r.root()
 	if err != nil {
 		return nil, err
 	}
+
+	return rootKeys(root)
+}
+
+func rootKeys(root *data.Root) ([]*data.Key, error) {
 	role, ok := root.Roles["root"]
 	if !ok {
 		return nil, nil
