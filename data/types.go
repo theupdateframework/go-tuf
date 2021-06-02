@@ -61,7 +61,8 @@ func (k *Key) ContainsID(id string) bool {
 }
 
 type KeyValue struct {
-	Public HexBytes `json:"public"`
+	Public HexBytes         `json:"public"`
+	Custom *json.RawMessage `json:"custom,omitempty"`
 }
 
 func DefaultExpires(role string) time.Time {
