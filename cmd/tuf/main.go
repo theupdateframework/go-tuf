@@ -40,6 +40,7 @@ Commands:
   regenerate   Recreate the targets manifest
   clean        Remove all staged manifests
   root-keys    Output a JSON serialized array of root keys to STDOUT
+  set-threshold Sets the threshold for a role
 
 See "tuf help <command>" for more information on a specific command
 `
