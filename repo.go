@@ -181,7 +181,7 @@ func (r *Repo) GetThreshold(keyRole string) (int, error) {
 }
 
 func (r *Repo) SetThreshold(keyRole string, t int) error {
-	if !validManifest(keyRole) {
+	if !validManifest(keyRole + ".json") {
 		// Delegations are not currently supported, so return an error if this is not a
 		// top-level manifest.
 		return ErrInvalidRole{keyRole}
