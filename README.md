@@ -53,6 +53,11 @@ Prompts the user for an encryption passphrase (unless the
 writes it to the relevant key file in the `keys` directory. It also stages
 the addition of the new key to the `root` manifest.
 
+#### `tuf set-threshold <role> <threshold>`
+
+Sets the `role` threshold, the required number of keys for signing, to
+`threshold`.
+
 #### `tuf add [<path>...]`
 
 Hashes files in the `staged/targets` directory at the given path(s), then
@@ -500,10 +505,6 @@ $ tree .
 │   └── timestamp.json
 └── staged
 ```
-
-#### Modify key thresholds
-
-TODO
 
 ## Client
 

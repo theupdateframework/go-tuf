@@ -705,7 +705,7 @@ func (rs *RepoSuite) TestCommitVersions(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(snapshotVersion, Equals, 3)
 
-	timestampVersion, err = r.SnapshotVersion()
+	timestampVersion, err = r.TimestampVersion()
 	c.Assert(err, IsNil)
 	c.Assert(timestampVersion, Equals, 3)
 }
@@ -1377,4 +1377,56 @@ func (rs *RepoSuite) TestUnknownKeyIDs(c *C) {
 	unknownKey, ok = signedRoot.Signed.Keys["unknown-key-id"]
 	c.Assert(ok, Equals, true)
 	c.Assert(unknownKey, DeepEquals, key.PublicData())
+}
+
+func (rs *RepoSuite) TestThreshold(c *C) {
+	local := MemoryStore(make(map[string]json.RawMessage), nil)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// Add one key to each role
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+	t, err := r.GetThreshold("root")
+	c.Assert(err, IsNil)
+	c.Assert(t, Equals, 1)
+
+	// commit the metadata to the store.
+	c.Assert(r.AddTargets([]string{}, nil), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	// Set a new threshold. Commit without threshold keys
+	c.Assert(r.SetThreshold("root", 2), IsNil)
+	t, err = r.GetThreshold("root")
+	c.Assert(err, IsNil)
+	c.Assert(t, Equals, 2)
+	c.Assert(r.Commit(), DeepEquals, ErrNotEnoughKeys{"root", 1, 2})
+
+	// Add a second root key and try again
+	genKey(c, r, "root")
+	c.Assert(r.Sign("root.json"), IsNil)
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	// Check versions updated
+	rootVersion, err := r.RootVersion()
+	c.Assert(err, IsNil)
+	c.Assert(rootVersion, Equals, 2)
+
+	targetsVersion, err := r.TargetsVersion()
+	c.Assert(err, IsNil)
+	c.Assert(targetsVersion, Equals, 1)
+
+	snapshotVersion, err := r.SnapshotVersion()
+	c.Assert(err, IsNil)
+	c.Assert(snapshotVersion, Equals, 2)
+
+	timestampVersion, err := r.TimestampVersion()
+	c.Assert(err, IsNil)
+	c.Assert(timestampVersion, Equals, 2)
 }

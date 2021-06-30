@@ -167,6 +167,45 @@ func (r *Repo) RootVersion() (int, error) {
 	return root.Version, nil
 }
 
+func (r *Repo) GetThreshold(keyRole string) (int, error) {
+	root, err := r.root()
+	if err != nil {
+		return -1, err
+	}
+	role, ok := root.Roles[keyRole]
+	if !ok {
+		return -1, ErrInvalidRole{keyRole}
+	}
+
+	return role.Threshold, nil
+}
+
+func (r *Repo) SetThreshold(keyRole string, t int) error {
+	if !validManifest(keyRole + ".json") {
+		// Delegations are not currently supported, so return an error if this is not a
+		// top-level manifest.
+		return ErrInvalidRole{keyRole}
+	}
+	root, err := r.root()
+	if err != nil {
+		return err
+	}
+	role, ok := root.Roles[keyRole]
+	if !ok {
+		return ErrInvalidRole{keyRole}
+	}
+	if role.Threshold == t {
+		// Change was a no-op.
+		return nil
+	}
+	role.Threshold = t
+	if _, ok := r.versionUpdated["root.json"]; !ok {
+		root.Version++
+		r.versionUpdated["root.json"] = struct{}{}
+	}
+	return r.setMeta("root.json", root)
+}
+
 func (r *Repo) Targets() (data.TargetFiles, error) {
 	targets, err := r.targets()
 	if err != nil {
