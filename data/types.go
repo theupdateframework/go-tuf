@@ -4,6 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,7 +22,8 @@ const (
 )
 
 var (
-	KeyAlgorithms = []string{"sha256", "sha512"}
+	KeyAlgorithms            = []string{"sha256", "sha512"}
+	ErrPathsAndPathHashesSet = errors.New("tuf: failed validation of delegated target: paths and path_hash_prefixes are both set")
 )
 
 type Signed struct {
@@ -208,11 +212,93 @@ func (f TargetFileMeta) HashAlgorithms() []string {
 }
 
 type Targets struct {
-	Type        string      `json:"_type"`
-	SpecVersion string      `json:"spec_version"`
-	Version     int         `json:"version"`
-	Expires     time.Time   `json:"expires"`
-	Targets     TargetFiles `json:"targets"`
+	Type        string       `json:"_type"`
+	SpecVersion string       `json:"spec_version"`
+	Version     int          `json:"version"`
+	Expires     time.Time    `json:"expires"`
+	Targets     TargetFiles  `json:"targets"`
+	Delegations *Delegations `json:"delegations,omitempty"`
+}
+
+// Delegations represents the edges from a parent Targets role to one or more
+// delegated target roles. See spec v1.0.19 section 4.5.
+type Delegations struct {
+	Keys  map[string]*Key `json:"keys"`
+	Roles []DelegatedRole `json:"roles"`
+}
+
+// DelegatedRole describes a delegated role, including what paths it is
+// reponsible for. See spec v1.0.19 section 4.5.
+type DelegatedRole struct {
+	Name             string   `json:"name"`
+	KeyIDs           []string `json:"keyids"`
+	Threshold        int      `json:"threshold"`
+	Terminating      bool     `json:"terminating"`
+	PathHashPrefixes []string `json:"path_hash_prefixes,omitempty"`
+	Paths            []string `json:"paths"`
+}
+
+// MatchesPath evaluates whether the path patterns or path hash prefixes match
+// a given file. This determines whether a delegated role is responsible for
+// signing and verifying the file.
+func (d *DelegatedRole) MatchesPath(file string) (bool, error) {
+	if err := d.validatePaths(); err != nil {
+		return false, err
+	}
+
+	for _, pattern := range d.Paths {
+		if matched, _ := filepath.Match(pattern, file); matched {
+			return true, nil
+		}
+	}
+
+	pathHash := PathHexDigest(file)
+	for _, hashPrefix := range d.PathHashPrefixes {
+		if strings.HasPrefix(pathHash, hashPrefix) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// validatePaths enforces the spec
+// https://theupdateframework.github.io/specification/v1.0.19/index.html#file-formats-targets
+// 'role MUST specify only one of the "path_hash_prefixes" or "paths"'
+// Marshalling and unmarshalling JSON will fail and return
+// ErrPathsAndPathHashesSet if both fields are set and not empty.
+func (d *DelegatedRole) validatePaths() error {
+	if len(d.PathHashPrefixes) > 0 && len(d.Paths) > 0 {
+		return ErrPathsAndPathHashesSet
+	}
+
+	return nil
+}
+
+// MarshalJSON is called when writing the struct to JSON. We validate prior to
+// marshalling to ensure that an invalid delegated role can not be serialized
+// to JSON.
+func (d *DelegatedRole) MarshalJSON() ([]byte, error) {
+	type delegatedRoleAlias DelegatedRole
+
+	if err := d.validatePaths(); err != nil {
+		return nil, err
+	}
+
+	return json.Marshal((*delegatedRoleAlias)(d))
+}
+
+// UnmarshalJSON is called when reading the struct from JSON. We validate once
+// unmarshalled to ensure that an error is thrown if an invalid delegated role
+// is read.
+func (d *DelegatedRole) UnmarshalJSON(b []byte) error {
+	type delegatedRoleAlias DelegatedRole
+
+	if err := json.Unmarshal(b, (*delegatedRoleAlias)(d)); err != nil {
+		return err
+	}
+
+	return d.validatePaths()
 }
 
 func NewTargets() *Targets {
