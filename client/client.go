@@ -18,6 +18,7 @@ const (
 	// big it is.
 	defaultRootDownloadLimit      = 512000
 	defaultTimestampDownloadLimit = 16384
+	defaultMaxDelegations         = 32
 )
 
 // LocalStore is local storage for downloaded top-level metadata.
@@ -81,12 +82,17 @@ type Client struct {
 	// consistentSnapshot indicates whether the remote storage is using
 	// consistent snapshots (as specified in root.json)
 	consistentSnapshot bool
+
+	// MaxDelegations limits by default the number of delegations visited for any
+	// target
+	MaxDelegations int
 }
 
 func NewClient(local LocalStore, remote RemoteStore) *Client {
 	return &Client{
-		local:  local,
-		remote: remote,
+		local:          local,
+		remote:         remote,
+		MaxDelegations: defaultMaxDelegations,
 	}
 }
 
@@ -198,7 +204,7 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 	if err != nil {
 		return nil, err
 	}
-	rootMeta, targetsMeta, err := c.decodeSnapshot(snapshotJSON)
+	rootMeta, rootInSnapshot, targetsMeta, err := c.decodeSnapshot(snapshotJSON)
 	if err != nil {
 		// ErrRoleThreshold could indicate snapshot keys have been
 		// revoked, so retry with the latest root.json
@@ -210,7 +216,8 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 
 	// If we don't have the root.json, download it, save it in local
 	// storage and restart the update
-	if !c.hasMetaFromSnapshot("root.json", rootMeta) {
+	// Root should no longer be pinned in snapshot meta https://github.com/theupdateframework/tuf/pull/988
+	if rootInSnapshot && !c.hasMetaFromSnapshot("root.json", rootMeta) {
 		return c.updateWithLatestRoot(&rootMeta)
 	}
 
@@ -539,13 +546,14 @@ func (c *Client) decodeRoot(b json.RawMessage) error {
 
 // decodeSnapshot decodes and verifies snapshot metadata, and returns the new
 // root and targets file meta.
-func (c *Client) decodeSnapshot(b json.RawMessage) (data.SnapshotFileMeta, data.SnapshotFileMeta, error) {
+func (c *Client) decodeSnapshot(b json.RawMessage) (data.SnapshotFileMeta, bool, data.SnapshotFileMeta, error) {
 	snapshot := &data.Snapshot{}
 	if err := c.db.Unmarshal(b, snapshot, "snapshot", c.snapshotVer); err != nil {
-		return data.SnapshotFileMeta{}, data.SnapshotFileMeta{}, ErrDecodeFailed{"snapshot.json", err}
+		return data.SnapshotFileMeta{}, false, data.SnapshotFileMeta{}, ErrDecodeFailed{"snapshot.json", err}
 	}
 	c.snapshotVer = snapshot.Version
-	return snapshot.Meta["root.json"], snapshot.Meta["targets.json"], nil
+	rootMeta, rootInSnapshot := snapshot.Meta["root.json"]
+	return rootMeta, rootInSnapshot, snapshot.Meta["targets.json"], nil
 }
 
 // decodeTargets decodes and verifies targets metadata, sets c.targets and
@@ -582,18 +590,24 @@ func (c *Client) decodeTimestamp(b json.RawMessage) (data.TimestampFileMeta, err
 	return timestamp.Meta["snapshot.json"], nil
 }
 
-// hasSnapshotMeta checks whether local metadata has the given meta
+// hasMetaFromSnapshot checks whether local metadata has the given meta
 func (c *Client) hasMetaFromSnapshot(name string, m data.SnapshotFileMeta) bool {
+	_, ok := c.localMetaFromSnapshot(name, m)
+	return ok
+}
+
+// localMetaFromSnapshot returns localmetadata if it matches the snapshot
+func (c *Client) localMetaFromSnapshot(name string, m data.SnapshotFileMeta) (json.RawMessage, bool) {
 	b, ok := c.localMeta[name]
 	if !ok {
-		return false
+		return nil, false
 	}
 	meta, err := util.GenerateSnapshotFileMeta(bytes.NewReader(b), m.HashAlgorithms()...)
 	if err != nil {
-		return false
+		return nil, false
 	}
 	err = util.SnapshotFileMetaEqual(meta, m)
-	return err == nil
+	return b, err == nil
 }
 
 // hasTargetsMeta checks whether local metadata has the given snapshot meta
@@ -634,7 +648,8 @@ type Destination interface {
 // dest will be deleted and an error returned in the following situations:
 //
 //   * The target does not exist in the local targets.json
-//   * The target does not exist in remote storage
+//   * Failed to fetch the chain of delegations accessible from local snapshot.json
+//   * The target does not exist in any targets
 //   * Metadata cannot be generated for the downloaded data
 //   * Generated metadata does not match local metadata for the given file
 func (c *Client) Download(name string, dest Destination) (err error) {
@@ -652,11 +667,14 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 		}
 	}
 
-	// return ErrUnknownTarget if the file is not in the local targets.json
 	normalizedName := util.NormalizeTarget(name)
 	localMeta, ok := c.targets[normalizedName]
 	if !ok {
-		return ErrUnknownTarget{name}
+		// search in delegations
+		localMeta, err = c.getTargetFileMeta(normalizedName)
+		if err != nil {
+			return err
+		}
 	}
 
 	// get the data from remote storage

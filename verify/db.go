@@ -26,6 +26,32 @@ func NewDB() *DB {
 	}
 }
 
+type DelegationsVerifier interface {
+	Unmarshal([]byte, interface{}, string, int) error
+}
+
+// NewDelegationsVerifier returns a DelegationsVerifier that verifies delegations
+// of a given Targets. It reuses the DB struct to leverage verified keys, roles
+// unmarshals.
+func NewDelegationsVerifier(d *data.Delegations) (DelegationsVerifier, error) {
+	db := &DB{
+		roles: make(map[string]*Role, len(d.Roles)),
+		keys:  make(map[string]*data.Key),
+	}
+	for _, r := range d.Roles {
+		role := &data.Role{Threshold: r.Threshold, KeyIDs: r.KeyIDs}
+		if err := db.addRole(r.Name, role); err != nil {
+			return nil, err
+		}
+	}
+	for id, k := range d.Keys {
+		if err := db.AddKey(id, k); err != nil {
+			return nil, err
+		}
+	}
+	return db, nil
+}
+
 func (db *DB) AddKey(id string, k *data.Key) error {
 	v, ok := Verifiers[k.Type]
 	if !ok {
@@ -59,6 +85,10 @@ func (db *DB) AddRole(name string, r *data.Role) error {
 	if !ValidRole(name) {
 		return ErrInvalidRole
 	}
+	return db.addRole(name, r)
+}
+
+func (db *DB) addRole(name string, r *data.Role) error {
 	if r.Threshold < 1 {
 		return ErrInvalidThreshold
 	}
