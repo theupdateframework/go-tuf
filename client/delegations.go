@@ -46,9 +46,9 @@ func (c *Client) getTargetFileMeta(file string) (data.TargetFileMeta, error) {
 		}
 	}
 	return data.TargetFileMeta{}, ErrMaxDelegations{
-		File: file,
-		MaxDelegations: c.MaxDelegations,
-		SnapshotVersion: snapshot.Version
+		File:            file,
+		MaxDelegations:  c.MaxDelegations,
+		SnapshotVersion: snapshot.Version,
 	}
 }
 
@@ -93,10 +93,10 @@ func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, role string, veri
 	// 5.6.4 check against snapshot version
 	if target.Version != fileMeta.Version {
 		return nil, ErrTargetsSnapshotVersionMismatch{
-			Role: fileName,
+			Role:                     fileName,
 			DownloadedTargetsVersion: fileMeta.Version,
-			TargetsSnapshotVersion: target.Version,
-			SnapshotVersion: snapshot.Version,
+			TargetsSnapshotVersion:   target.Version,
+			SnapshotVersion:          snapshot.Version,
 		}
 	}
 	// 5.6.6 persist
