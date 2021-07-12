@@ -15,8 +15,9 @@ func (r *Role) ValidKey(id string) bool {
 }
 
 type DB struct {
-	roles map[string]*Role
-	keys  map[string]*data.Key
+	roles               map[string]*Role
+	keys                map[string]*data.Key
+	delegationsVerifier bool
 }
 
 func NewDB() *DB {
@@ -24,6 +25,26 @@ func NewDB() *DB {
 		roles: make(map[string]*Role),
 		keys:  make(map[string]*data.Key),
 	}
+}
+
+func NewDelegationsVerifier(d *data.Delegations) (*DB, error) {
+	db := &DB{
+		roles:               make(map[string]*Role, len(d.Roles)),
+		keys:                make(map[string]*data.Key),
+		delegationsVerifier: true,
+	}
+	for _, r := range d.Roles {
+		role := &data.Role{Threshold: r.Threshold, KeyIDs: r.KeyIDs}
+		if err := db.AddRole(r.Name, role); err != nil {
+			return nil, err
+		}
+	}
+	for id, k := range d.Keys {
+		if err := db.AddKey(id, k); err != nil {
+			return nil, err
+		}
+	}
+	return db, nil
 }
 
 func (db *DB) AddKey(id string, k *data.Key) error {
@@ -56,7 +77,7 @@ func ValidRole(name string) bool {
 }
 
 func (db *DB) AddRole(name string, r *data.Role) error {
-	if !ValidRole(name) {
+	if !db.delegationsVerifier && !ValidRole(name) {
 		return ErrInvalidRole
 	}
 	if r.Threshold < 1 {

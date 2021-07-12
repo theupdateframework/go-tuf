@@ -804,7 +804,7 @@ func (t *testDestination) Delete() error {
 func (s *ClientSuite) TestDownloadUnknownTarget(c *C) {
 	client := s.updatedClient(c)
 	var dest testDestination
-	c.Assert(client.Download("nonexistent", &dest), Equals, ErrUnknownTarget{"nonexistent"})
+	c.Assert(client.Download("nonexistent", &dest), Equals, ErrUnknownTarget{Name: "nonexistent", SnapshotVersion: 1})
 	c.Assert(dest.deleted, Equals, true)
 }
 

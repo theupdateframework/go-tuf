@@ -1,0 +1,28 @@
+{
+ "signatures": [
+  {
+   "keyid": "e9829d3f2fdff6d6f31002c17cf7f20cf0398e215ca0c0c44d075ccd76a26f62",
+   "sig": "04d8264dd6d75fad106d599603801842057de038803935cf9b043fff4d5ee2618675c85291822f18efff770fa89056ed960de35309356a24baef45d9f64c8c0f"
+  }
+ ],
+ "signed": {
+  "_type": "targets",
+  "delegations": {
+   "keys": {},
+   "roles": []
+  },
+  "expires": "2020-04-01T07:27:10Z",
+  "spec_version": "1.0.0",
+  "targets": {
+   "d.txt": {
+    "custom": {},
+    "hashes": {
+     "sha256": "b2ce56612fa7e840d56d263f75804f60baaad5d6e0a7d544e65e1791f2df5e55",
+     "sha512": "79b44a183eaa0025f3997b856537502ac1759de74263985ad1dd9ab0bb5cc8ce46b6c45c1bf37adb87c2839cca54ae784c3d3488e994d29f003decc81638d589"
+    },
+    "length": 15
+   }
+  },
+  "version": 1
+ }
+}

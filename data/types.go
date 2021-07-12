@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -208,11 +210,44 @@ func (f TargetFileMeta) HashAlgorithms() []string {
 }
 
 type Targets struct {
-	Type        string      `json:"_type"`
-	SpecVersion string      `json:"spec_version"`
-	Version     int         `json:"version"`
-	Expires     time.Time   `json:"expires"`
-	Targets     TargetFiles `json:"targets"`
+	Type        string       `json:"_type"`
+	SpecVersion string       `json:"spec_version"`
+	Version     int          `json:"version"`
+	Expires     time.Time    `json:"expires"`
+	Targets     TargetFiles  `json:"targets"`
+	Delegations *Delegations `json:"delegations,omitempty"`
+}
+
+type Delegations struct {
+	Keys  map[string]*Key `json:"keys"`
+	Roles []DelegatedRole `json:"roles"`
+}
+
+type DelegatedRole struct {
+	Name             string   `json:"name"`
+	KeyIDs           []string `json:"keyids"`
+	Threshold        int      `json:"threshold"`
+	PathHashPrefixes []string `json:"path_hash_prefixes,omitempty"`
+	Paths            []string `json:"paths"`
+	Terminating      bool     `json:"terminating"`
+}
+
+func (d DelegatedRole) MatchesPath(file string) bool {
+	for _, path := range d.Paths {
+		if matched, _ := filepath.Match(path, file); matched {
+			return true
+		}
+	}
+	if len(d.PathHashPrefixes) == 0 {
+		return false
+	}
+	pathHash := PathHexDigest(file)
+	for _, prefix := range d.PathHashPrefixes {
+		if strings.HasPrefix(pathHash, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func NewTargets() *Targets {

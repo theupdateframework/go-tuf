@@ -25,7 +25,10 @@ func (db *DB) Verify(s *data.Signed, role string, minVersion int) error {
 		return err
 	}
 	if strings.ToLower(sm.Type) != strings.ToLower(role) {
-		return ErrWrongMetaType
+		// delegated roles produce a targets meta
+		if !db.delegationsVerifier || sm.Type != "targets" {
+			return ErrWrongMetaType
+		}
 	}
 	if IsExpired(sm.Expires) {
 		return ErrExpired{sm.Expires}

@@ -2,7 +2,9 @@ package data
 
 import (
 	"encoding/json"
+	"testing"
 
+	"github.com/stretchr/testify/assert"
 	. "gopkg.in/check.v1"
 )
 
@@ -90,4 +92,63 @@ func (TypesSuite) TestRoleAddKeyIDs(c *C) {
 	// Adding the key again doesn't modify the array.
 	c.Assert(role.AddKeyIDs(key.IDs()), Equals, true)
 	c.Assert(role.KeyIDs, DeepEquals, []string{keyid10, keyid10algos})
+}
+
+func TestDelegatedRolePathMatch(t *testing.T) {
+	var tts = []struct {
+		testName         string
+		file             string
+		pathHashPrefixes []string
+		paths            []string
+		matches          bool
+	}{
+		{
+			testName: "no path",
+			file:     "licence.txt",
+		},
+		{
+			testName: "match path *",
+			paths:    []string{"null", "targets/*.tgz"},
+			file:     "targets/foo.tgz",
+			matches:  true,
+		},
+		{
+			testName: "does not match path *",
+			paths:    []string{"null", "targets/*.tgz"},
+			file:     "targets/foo.txt",
+		},
+		{
+			testName: "match path ?",
+			paths:    []string{"foo-version-?.tgz"},
+			file:     "foo-version-a.tgz",
+			matches:  true,
+		},
+		{
+			testName: "does not match ?",
+			paths:    []string{"foo-version-?.tgz"},
+			file:     "foo-version-alpha.tgz",
+		},
+		// picked from https://github.com/theupdateframework/tuf/blob/30ba6e9f9ab25e0370e29ce574dada2d8809afa0/tests/test_updater.py#L1726-L1734
+		{
+			testName:         "match hash prefix",
+			pathHashPrefixes: []string{"badd", "8baf"},
+			file:             "/file3.txt",
+			matches:          true,
+		},
+		{
+			testName:         "does not match hash prefix",
+			pathHashPrefixes: []string{"badd"},
+			file:             "/file3.txt",
+		},
+	}
+	for _, tt := range tts {
+		t.Run(tt.testName, func(t *testing.T) {
+			d := DelegatedRole{
+				PathHashPrefixes: tt.pathHashPrefixes,
+				Paths:            tt.paths,
+			}
+			assert.Equal(t, tt.matches, d.MatchesPath(tt.file))
+		})
+
+	}
 }
