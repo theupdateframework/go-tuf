@@ -3,9 +3,9 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -270,7 +270,7 @@ func initTestDelegationClient(t *testing.T, dirPrefix string) (*Client, func() e
 	remote, err := HTTPRemoteStore(fmt.Sprintf("http://%s/", addr), opts, nil)
 
 	c := NewClient(MemoryLocalStore(), remote)
-	rawFile, err := os.ReadFile(initialStateDir + "/" + "root.json")
+	rawFile, err := ioutil.ReadFile(initialStateDir + "/" + "root.json")
 	assert.Nil(t, err)
 	s := &data.Signed{}
 	root := &data.Root{}
@@ -285,7 +285,7 @@ func initTestDelegationClient(t *testing.T, dirPrefix string) (*Client, func() e
 	}
 
 	assert.Nil(t, c.Init(keys, 1))
-	files, err := os.ReadDir(initialStateDir)
+	files, err := ioutil.ReadDir(initialStateDir)
 	assert.Nil(t, err)
 
 	// load local files
@@ -296,7 +296,7 @@ func initTestDelegationClient(t *testing.T, dirPrefix string) (*Client, func() e
 		name := f.Name()
 		// ignoring consistent snapshot when loading initial state
 		if len(strings.Split(name, ".")) == 1 && strings.HasSuffix(name, ".json") {
-			rawFile, err := os.ReadFile(initialStateDir + "/" + name)
+			rawFile, err := ioutil.ReadFile(initialStateDir + "/" + name)
 			assert.Nil(t, err)
 			assert.Nil(t, c.local.SetMeta(name, rawFile))
 		}
