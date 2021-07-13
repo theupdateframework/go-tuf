@@ -30,44 +30,44 @@ func TestDelegationsIterator(t *testing.T) {
 		resultOrder    []string
 	}{
 		{
-			"no termination",
-			map[string][]data.DelegatedRole{
+			testName: "no termination",
+			roles: map[string][]data.DelegatedRole{
 				"a": []data.DelegatedRole{{Name: "b", PathMatchers: defaultPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
 				"b": []data.DelegatedRole{{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
 			},
-			data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
-			"",
-			[]string{"a", "b", "c", "d", "e"},
+			rootDelegation: data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
+			file:           "",
+			resultOrder:    []string{"a", "b", "c", "d", "e"},
 		},
 		{
-			"terminated in b",
-			map[string][]data.DelegatedRole{
+			testName: "terminated in b",
+			roles: map[string][]data.DelegatedRole{
 				"a": []data.DelegatedRole{{Name: "b", PathMatchers: defaultPathMatchers, Terminating: true}, {Name: "e", PathMatchers: defaultPathMatchers}},
 				"b": []data.DelegatedRole{{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
 			},
-			data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
-			"",
-			[]string{"a", "b", "c", "d"},
+			rootDelegation: data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
+			file:           "",
+			resultOrder:    []string{"a", "b", "c", "d"},
 		},
 		{
-			"path does not match b",
-			map[string][]data.DelegatedRole{
+			testName: "path does not match b",
+			roles: map[string][]data.DelegatedRole{
 				"a": []data.DelegatedRole{{Name: "b", PathMatchers: notMatchingPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
 				"b": []data.DelegatedRole{{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
 			},
-			data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
-			"",
-			[]string{"a", "e"},
+			rootDelegation: data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
+			file:           "",
+			resultOrder:    []string{"a", "e"},
 		},
 		{
-			"cycle avoided",
-			map[string][]data.DelegatedRole{
+			testName: "cycle avoided",
+			roles: map[string][]data.DelegatedRole{
 				"a": []data.DelegatedRole{{Name: "b", PathMatchers: defaultPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
 				"b": []data.DelegatedRole{{Name: "a", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
 			},
-			data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
-			"",
-			[]string{"a", "b", "a", "e", "d"},
+			rootDelegation: data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
+			file:           "",
+			resultOrder:    []string{"a", "b", "a", "e", "d"},
 		},
 	}
 
@@ -209,19 +209,19 @@ func TestPersistedMeta(t *testing.T) {
 		fileContent   string
 	}{
 		{
-			"unknown",
-			[]expectedTargets{
+			file: "unknown",
+			targets: []expectedTargets{
 				{
 					"targets.json",
 					2,
 				},
 			},
-			ErrUnknownTarget{Name: "unknown", SnapshotVersion: 2},
-			"",
+			downloadError: ErrUnknownTarget{Name: "unknown", SnapshotVersion: 2},
+			fileContent:   "",
 		},
 		{
-			"b.txt",
-			[]expectedTargets{
+			file: "b.txt",
+			targets: []expectedTargets{
 				{
 					"targets.json",
 					2,
@@ -235,12 +235,12 @@ func TestPersistedMeta(t *testing.T) {
 					1,
 				},
 			},
-			nil,
-			"Contents: b.txt",
+			downloadError: nil,
+			fileContent:   "Contents: b.txt",
 		},
 		{
-			"f.txt",
-			[]expectedTargets{
+			file: "f.txt",
+			targets: []expectedTargets{
 				{
 					"targets.json",
 					2,
@@ -270,8 +270,8 @@ func TestPersistedMeta(t *testing.T) {
 					1,
 				},
 			},
-			nil,
-			"Contents: f.txt",
+			downloadError: nil,
+			fileContent:   "Contents: f.txt",
 		},
 	}
 
