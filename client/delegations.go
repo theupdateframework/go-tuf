@@ -132,10 +132,10 @@ func (c *Client) rootTargetDelegation() data.DelegatedRole {
 	}
 
 	return data.DelegatedRole{
-		Name:         role,
-		KeyIDs:       keyIDs,
-		Threshold:    r.Threshold,
-		PathMatchers: []string{"*"},
+		Name:      role,
+		KeyIDs:    keyIDs,
+		Threshold: r.Threshold,
+		Paths:     []string{"*"},
 	}
 }
 
