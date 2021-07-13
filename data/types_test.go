@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	cjson "github.com/tent/canonical-json-go"
 	. "gopkg.in/check.v1"
 )
 
@@ -96,59 +97,135 @@ func (TypesSuite) TestRoleAddKeyIDs(c *C) {
 
 func TestDelegatedRolePathMatch(t *testing.T) {
 	var tts = []struct {
-		testName         string
-		file             string
-		pathHashPrefixes []string
-		paths            []string
-		matches          bool
+		testName              string
+		file                  string
+		matchWithHashPrefixes bool
+		pathMatchers          []string
+		matches               bool
 	}{
 		{
 			testName: "no path",
 			file:     "licence.txt",
 		},
 		{
-			testName: "match path *",
-			paths:    []string{"null", "targets/*.tgz"},
-			file:     "targets/foo.tgz",
-			matches:  true,
+			testName:     "match path *",
+			pathMatchers: []string{"null", "targets/*.tgz"},
+			file:         "targets/foo.tgz",
+			matches:      true,
 		},
 		{
-			testName: "does not match path *",
-			paths:    []string{"null", "targets/*.tgz"},
-			file:     "targets/foo.txt",
+			testName:     "does not match path *",
+			pathMatchers: []string{"null", "targets/*.tgz"},
+			file:         "targets/foo.txt",
 		},
 		{
-			testName: "match path ?",
-			paths:    []string{"foo-version-?.tgz"},
-			file:     "foo-version-a.tgz",
-			matches:  true,
+			testName:     "match path ?",
+			pathMatchers: []string{"foo-version-?.tgz"},
+			file:         "foo-version-a.tgz",
+			matches:      true,
 		},
 		{
-			testName: "does not match ?",
-			paths:    []string{"foo-version-?.tgz"},
-			file:     "foo-version-alpha.tgz",
+			testName:     "does not match ?",
+			pathMatchers: []string{"foo-version-?.tgz"},
+			file:         "foo-version-alpha.tgz",
 		},
 		// picked from https://github.com/theupdateframework/tuf/blob/30ba6e9f9ab25e0370e29ce574dada2d8809afa0/tests/test_updater.py#L1726-L1734
 		{
-			testName:         "match hash prefix",
-			pathHashPrefixes: []string{"badd", "8baf"},
-			file:             "/file3.txt",
-			matches:          true,
+			testName:              "match hash prefix",
+			pathMatchers:          []string{"badd", "8baf"},
+			file:                  "/file3.txt",
+			matchWithHashPrefixes: true,
+			matches:               true,
 		},
 		{
-			testName:         "does not match hash prefix",
-			pathHashPrefixes: []string{"badd"},
-			file:             "/file3.txt",
+			testName:              "does not match hash prefix",
+			pathMatchers:          []string{"badd"},
+			matchWithHashPrefixes: true,
+			file:                  "/file3.txt",
+		},
+		{
+			testName:              "hash prefix first char",
+			pathMatchers:          []string{"2"},
+			matchWithHashPrefixes: true,
+			file:                  "/a/b/c/file_d.txt",
+			matches:               true,
+		},
+		{
+			testName:              "full hash prefix",
+			pathMatchers:          []string{"34c85d1ee84f61f10d7dc633472a49096ed87f8f764bd597831eac371f40ac39"},
+			matchWithHashPrefixes: true,
+			file:                  "/e/f/g.txt",
+			matches:               true,
 		},
 	}
 	for _, tt := range tts {
 		t.Run(tt.testName, func(t *testing.T) {
 			d := DelegatedRole{
-				PathHashPrefixes: tt.pathHashPrefixes,
-				Paths:            tt.paths,
+				PathMatchers:          tt.pathMatchers,
+				MatchWithHashPrefixes: tt.matchWithHashPrefixes,
 			}
 			assert.Equal(t, tt.matches, d.MatchesPath(tt.file))
 		})
 
 	}
+}
+
+func TestDelegatedRoleJSON(t *testing.T) {
+	var tts = []struct {
+		testName string
+		d        DelegatedRole
+		rawCJSON string
+	}{{
+		"all fields with hashes",
+		DelegatedRole{
+			Name:                  "n1",
+			KeyIDs:                []string{"k1"},
+			Threshold:             5,
+			Terminating:           true,
+			MatchWithHashPrefixes: true,
+			PathMatchers:          []string{"8f"},
+		},
+		`{"keyids":["k1"],"name":"n1","path_hash_prefixes":["8f"],"paths":null,"terminating":true,"threshold":5}`,
+	},
+		{
+			"paths only",
+			DelegatedRole{
+				Name:         "n2",
+				KeyIDs:       []string{"k1", "k3"},
+				Threshold:    12,
+				PathMatchers: []string{"*.txt"},
+			},
+			`{"keyids":["k1","k3"],"name":"n2","paths":["*.txt"],"terminating":false,"threshold":12}`,
+		},
+		{
+			"default",
+			DelegatedRole{},
+			`{"keyids":null,"name":"","paths":null,"terminating":false,"threshold":0}`,
+		},
+	}
+
+	for _, tt := range tts {
+		t.Run(tt.testName, func(t *testing.T) {
+			d := &DelegatedRole{}
+			*d = tt.d
+
+			raw, err := cjson.Marshal(d)
+			assert.Nil(t, err)
+			assert.Equal(t, tt.rawCJSON, string(raw))
+
+			var newD DelegatedRole
+			assert.Nil(t, json.Unmarshal(raw, &newD))
+			assert.Equal(t, d, &newD)
+		})
+	}
+}
+
+func TestDelegatedRoleUnmarshalErr(t *testing.T) {
+	targetsWithBothMatchers := []byte(`{"keyids":null,"name":"","paths":["*.txt"],"path_hash_prefixes":["8f"],"terminating":false,"threshold":0}`)
+	var d DelegatedRole
+	assert.Equal(t, json.Unmarshal(targetsWithBothMatchers, &d), ErrPathsAndPathHashesSet)
+
+	// test for type errors
+	err := json.Unmarshal([]byte(`{"keyids":"a"}`), &d)
+	assert.Equal(t, err.Error(), "json: cannot unmarshal string into Go struct field delegatedRoleJSON.keyids of type []string")
 }

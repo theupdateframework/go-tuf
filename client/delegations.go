@@ -119,10 +119,10 @@ func (c *Client) rootTargetDelegation() data.DelegatedRole {
 		keyIDs = append(keyIDs, id)
 	}
 	return data.DelegatedRole{
-		Name:      role,
-		KeyIDs:    keyIDs,
-		Threshold: r.Threshold,
-		Paths:     []string{"*"},
+		Name:         role,
+		KeyIDs:       keyIDs,
+		Threshold:    r.Threshold,
+		PathMatchers: []string{"*"},
 	}
 }
 

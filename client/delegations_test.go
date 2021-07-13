@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	defaultPaths     = []string{"tmp", "*"}
-	notMatchingPaths = []string{"vars", "null"}
+	defaultPathMatchers     = []string{"tmp", "*"}
+	notMatchingPathMatchers = []string{"vars", "null"}
 )
 
 func TestDelegationsIterator(t *testing.T) {
@@ -32,40 +32,40 @@ func TestDelegationsIterator(t *testing.T) {
 		{
 			"no termination",
 			map[string][]data.DelegatedRole{
-				"a": []data.DelegatedRole{{Name: "b", Paths: defaultPaths}, {Name: "e", Paths: defaultPaths}},
-				"b": []data.DelegatedRole{{Name: "c", Paths: defaultPaths}, {Name: "d", Paths: defaultPaths}},
+				"a": []data.DelegatedRole{{Name: "b", PathMatchers: defaultPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
+				"b": []data.DelegatedRole{{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
 			},
-			data.DelegatedRole{Name: "a", Paths: defaultPaths},
+			data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
 			"",
 			[]string{"a", "b", "c", "d", "e"},
 		},
 		{
 			"terminated in b",
 			map[string][]data.DelegatedRole{
-				"a": []data.DelegatedRole{{Name: "b", Paths: defaultPaths, Terminating: true}, {Name: "e", Paths: defaultPaths}},
-				"b": []data.DelegatedRole{{Name: "c", Paths: defaultPaths}, {Name: "d", Paths: defaultPaths}},
+				"a": []data.DelegatedRole{{Name: "b", PathMatchers: defaultPathMatchers, Terminating: true}, {Name: "e", PathMatchers: defaultPathMatchers}},
+				"b": []data.DelegatedRole{{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
 			},
-			data.DelegatedRole{Name: "a", Paths: defaultPaths},
+			data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
 			"",
 			[]string{"a", "b", "c", "d"},
 		},
 		{
 			"path does not match b",
 			map[string][]data.DelegatedRole{
-				"a": []data.DelegatedRole{{Name: "b", Paths: notMatchingPaths}, {Name: "e", Paths: defaultPaths}},
-				"b": []data.DelegatedRole{{Name: "c", Paths: defaultPaths}, {Name: "d", Paths: defaultPaths}},
+				"a": []data.DelegatedRole{{Name: "b", PathMatchers: notMatchingPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
+				"b": []data.DelegatedRole{{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
 			},
-			data.DelegatedRole{Name: "a", Paths: defaultPaths},
+			data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
 			"",
 			[]string{"a", "e"},
 		},
 		{
 			"cycle avoided",
 			map[string][]data.DelegatedRole{
-				"a": []data.DelegatedRole{{Name: "b", Paths: defaultPaths}, {Name: "e", Paths: defaultPaths}},
-				"b": []data.DelegatedRole{{Name: "a", Paths: defaultPaths}, {Name: "d", Paths: defaultPaths}},
+				"a": []data.DelegatedRole{{Name: "b", PathMatchers: defaultPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
+				"b": []data.DelegatedRole{{Name: "a", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
 			},
-			data.DelegatedRole{Name: "a", Paths: defaultPaths},
+			data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
 			"",
 			[]string{"a", "b", "a", "e", "d"},
 		},
