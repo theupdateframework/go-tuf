@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -97,7 +98,7 @@ func TestDelegationsIterator(t *testing.T) {
 func TestGetTargetMeta(t *testing.T) {
 	verify.IsExpired = func(t time.Time) bool { return false }
 	c, closer := initTestDelegationClient(t, "testdata/php-tuf-fixtures/TUFTestFixture3LevelDelegation")
-	defer closer()
+	defer func() { assert.Nil(t, closer()) }()
 	_, err := c.Update()
 	assert.Nil(t, err)
 
@@ -109,7 +110,7 @@ func TestGetTargetMeta(t *testing.T) {
 func TestMaxDelegations(t *testing.T) {
 	verify.IsExpired = func(t time.Time) bool { return false }
 	c, closer := initTestDelegationClient(t, "testdata/php-tuf-fixtures/TUFTestFixture3LevelDelegation")
-	defer closer()
+	defer func() { assert.Nil(t, closer()) }()
 	_, err := c.Update()
 	assert.Nil(t, err)
 	c.MaxDelegations = 2
@@ -120,11 +121,71 @@ func TestMaxDelegations(t *testing.T) {
 func TestMetaNotFound(t *testing.T) {
 	verify.IsExpired = func(t time.Time) bool { return false }
 	c, closer := initTestDelegationClient(t, "testdata/php-tuf-fixtures/TUFTestFixture3LevelDelegation")
-	defer closer()
+	defer func() { assert.Nil(t, closer()) }()
 	_, err := c.Update()
 	assert.Nil(t, err)
 	_, err = c.getTargetFileMeta("unknown.txt")
 	assert.Equal(t, err, ErrUnknownTarget{Name: "unknown.txt", SnapshotVersion: 2})
+}
+
+type fakeRemote struct {
+	getMeta   func(name string) (stream io.ReadCloser, size int64, err error)
+	getTarget func(path string) (stream io.ReadCloser, size int64, err error)
+}
+
+func (f fakeRemote) GetMeta(name string) (stream io.ReadCloser, size int64, err error) {
+	return f.getMeta(name)
+}
+
+func (f fakeRemote) GetTarget(name string) (stream io.ReadCloser, size int64, err error) {
+	return f.getTarget(name)
+}
+
+func TestTargetsNotFound(t *testing.T) {
+	verify.IsExpired = func(t time.Time) bool { return false }
+	c, closer := initTestDelegationClient(t, "testdata/php-tuf-fixtures/TUFTestFixture3LevelDelegation")
+	defer func() { assert.Nil(t, closer()) }()
+	_, err := c.Update()
+	assert.Nil(t, err)
+
+	previousRemote := c.remote
+	newRemote := fakeRemote{
+		getMeta: func(path string) (stream io.ReadCloser, size int64, err error) {
+			if path == "1.c.json" {
+				return nil, 0, ErrNotFound{}
+			}
+			return previousRemote.GetMeta(path)
+		},
+		getTarget: previousRemote.GetTarget,
+	}
+	c.remote = newRemote
+
+	_, err = c.getTargetFileMeta("c.txt")
+	assert.Equal(t, ErrMissingRemoteMetadata{Name: "c.json"}, err)
+}
+
+func TestUnverifiedTargets(t *testing.T) {
+	verify.IsExpired = func(t time.Time) bool { return false }
+	c, closer := initTestDelegationClient(t, "testdata/php-tuf-fixtures/TUFTestFixture3LevelDelegation")
+	defer closer()
+	_, err := c.Update()
+	assert.Nil(t, err)
+
+	previousRemote := c.remote
+	newRemote := fakeRemote{
+		getMeta: func(path string) (stream io.ReadCloser, size int64, err error) {
+			if path == "1.c.json" {
+				// returns a snapshot that does not match
+				return previousRemote.GetMeta("1.d.json")
+			}
+			return previousRemote.GetMeta(path)
+		},
+		getTarget: previousRemote.GetTarget,
+	}
+	c.remote = newRemote
+
+	_, err = c.getTargetFileMeta("c.txt")
+	assert.Equal(t, ErrDecodeFailed{File: "c.json", Err: verify.ErrRoleThreshold{Expected: 1, Actual: 0}}, err)
 }
 
 func TestPersistedMeta(t *testing.T) {
