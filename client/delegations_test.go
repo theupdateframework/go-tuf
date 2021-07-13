@@ -32,8 +32,14 @@ func TestDelegationsIterator(t *testing.T) {
 		{
 			testName: "no termination",
 			roles: map[string][]data.DelegatedRole{
-				"a": {{Name: "b", PathMatchers: defaultPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
-				"b": {{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
+				"a": {
+					{Name: "b", PathMatchers: defaultPathMatchers},
+					{Name: "e", PathMatchers: defaultPathMatchers},
+				},
+				"b": {
+					{Name: "c", PathMatchers: defaultPathMatchers},
+					{Name: "d", PathMatchers: defaultPathMatchers},
+				},
 			},
 			rootDelegation: data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
 			file:           "",
@@ -42,8 +48,14 @@ func TestDelegationsIterator(t *testing.T) {
 		{
 			testName: "terminated in b",
 			roles: map[string][]data.DelegatedRole{
-				"a": {{Name: "b", PathMatchers: defaultPathMatchers, Terminating: true}, {Name: "e", PathMatchers: defaultPathMatchers}},
-				"b": {{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
+				"a": {
+					{Name: "b", PathMatchers: defaultPathMatchers, Terminating: true},
+					{Name: "e", PathMatchers: defaultPathMatchers},
+				},
+				"b": {
+					{Name: "c", PathMatchers: defaultPathMatchers},
+					{Name: "d", PathMatchers: defaultPathMatchers},
+				},
 			},
 			rootDelegation: data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
 			file:           "",
@@ -52,8 +64,14 @@ func TestDelegationsIterator(t *testing.T) {
 		{
 			testName: "path does not match b",
 			roles: map[string][]data.DelegatedRole{
-				"a": {{Name: "b", PathMatchers: notMatchingPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
-				"b": {{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
+				"a": {
+					{Name: "b", PathMatchers: notMatchingPathMatchers},
+					{Name: "e", PathMatchers: defaultPathMatchers},
+				},
+				"b": {
+					{Name: "c", PathMatchers: defaultPathMatchers},
+					{Name: "d", PathMatchers: defaultPathMatchers},
+				},
 			},
 			rootDelegation: data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
 			file:           "",
@@ -62,8 +80,14 @@ func TestDelegationsIterator(t *testing.T) {
 		{
 			testName: "cycle avoided",
 			roles: map[string][]data.DelegatedRole{
-				"a": {{Name: "b", PathMatchers: defaultPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
-				"b": {{Name: "a", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
+				"a": {
+					{Name: "b", PathMatchers: defaultPathMatchers},
+					{Name: "e", PathMatchers: defaultPathMatchers},
+				},
+				"b": {
+					{Name: "a", PathMatchers: defaultPathMatchers},
+					{Name: "d", PathMatchers: defaultPathMatchers},
+				},
 			},
 			rootDelegation: data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
 			file:           "",

@@ -13,7 +13,10 @@ func (c *Client) getTargetFileMeta(file string) (data.TargetFileMeta, error) {
 	if err != nil {
 		return data.TargetFileMeta{}, err
 	}
-	verifiers := map[string]verify.DelegationsVerifier{"root": verify.DelegationsVerifier{c.db}}
+
+	verifiers := map[string]verify.DelegationsVerifier{
+		"root": {DB: c.db},
+	}
 
 	// delegationsIterator covers 5.6.7
 	// - pre-order depth-first search starting with the top targets
@@ -26,16 +29,19 @@ func (c *Client) getTargetFileMeta(file string) (data.TargetFileMeta, error) {
 		if !ok {
 			return data.TargetFileMeta{}, ErrUnknownTarget{file, snapshot.Version}
 		}
-		verifier := verifiers[d.parent]
+
 		// covers 5.6.{1,2,3,4,5,6}
+		verifier := verifiers[d.parent]
 		target, err := c.loadDelegatedTargets(snapshot, d.child.Name, verifier)
 		if err != nil {
 			return data.TargetFileMeta{}, err
 		}
+
 		// stop when the searched TargetFileMeta is found
 		if m, ok := target.Targets[file]; ok {
 			return m, nil
 		}
+
 		if target.Delegations != nil {
 			delegations.add(target.Delegations.Roles, d.child.Name)
 			targetVerifier, err := verify.NewDelegationsVerifier(target.Delegations)
@@ -45,6 +51,7 @@ func (c *Client) getTargetFileMeta(file string) (data.TargetFileMeta, error) {
 			verifiers[d.child.Name] = targetVerifier
 		}
 	}
+
 	return data.TargetFileMeta{}, ErrMaxDelegations{
 		File:            file,
 		MaxDelegations:  c.MaxDelegations,
@@ -56,10 +63,12 @@ func (c *Client) loadLocalSnapshot() (*data.Snapshot, error) {
 	if err := c.getLocalMeta(); err != nil {
 		return nil, err
 	}
+
 	rawS, ok := c.localMeta["snapshot.json"]
 	if !ok {
 		return nil, ErrNoLocalSnapshot
 	}
+
 	snapshot := &data.Snapshot{}
 	if err := c.db.Unmarshal(rawS, snapshot, "snapshot", c.snapshotVer); err != nil {
 		return nil, ErrDecodeFailed{"snapshot.json", err}
@@ -75,6 +84,7 @@ func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, role string, veri
 	if !ok {
 		return nil, ErrRoleNotInSnapshot{role, snapshot.Version}
 	}
+
 	// 5.6.1 download target if not in the local store
 	// 5.6.2 check against snapshot hash
 	raw, alreadyStored := c.localMetaFromSnapshot(fileName, fileMeta)
@@ -84,6 +94,7 @@ func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, role string, veri
 			return nil, err
 		}
 	}
+
 	target := &data.Targets{}
 	// 5.6.3 verify signature with parent public keys
 	// 5.6.5 verify that the targets is not expired
@@ -114,10 +125,12 @@ func (c *Client) rootTargetDelegation() data.DelegatedRole {
 	if r == nil {
 		return data.DelegatedRole{}
 	}
+
 	keyIDs := make([]string, 0, len(r.KeyIDs))
 	for id, _ := range r.KeyIDs {
 		keyIDs = append(keyIDs, id)
 	}
+
 	return data.DelegatedRole{
 		Name:         role,
 		KeyIDs:       keyIDs,
@@ -148,7 +161,9 @@ func newDelegationsIterator(role data.DelegatedRole, parent string, file string)
 		stack:   make([]delegation, 0, 1),
 		visited: make(map[delegationID]struct{}),
 	}
+
 	i.add([]data.DelegatedRole{role}, parent)
+
 	return i
 }
 
