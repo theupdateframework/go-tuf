@@ -13,7 +13,7 @@ func (c *Client) getTargetFileMeta(file string) (data.TargetFileMeta, error) {
 	if err != nil {
 		return data.TargetFileMeta{}, err
 	}
-	verifiers := map[string]verify.DelegationsVerifier{"root": c.db}
+	verifiers := map[string]verify.DelegationsVerifier{"root": verify.DelegationsVerifier{c.db}}
 
 	// delegationsIterator covers 5.6.7
 	// - pre-order depth-first search starting with the top targets

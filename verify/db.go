@@ -26,8 +26,12 @@ func NewDB() *DB {
 	}
 }
 
-type DelegationsVerifier interface {
-	Unmarshal([]byte, interface{}, string, int) error
+type DelegationsVerifier struct {
+	DB *DB
+}
+
+func (d *DelegationsVerifier) Unmarshal(b []byte, v interface{}, role string, minVersion int) error {
+	return d.DB.Unmarshal(b, v, role, minVersion)
 }
 
 // NewDelegationsVerifier returns a DelegationsVerifier that verifies delegations
@@ -41,15 +45,15 @@ func NewDelegationsVerifier(d *data.Delegations) (DelegationsVerifier, error) {
 	for _, r := range d.Roles {
 		role := &data.Role{Threshold: r.Threshold, KeyIDs: r.KeyIDs}
 		if err := db.addRole(r.Name, role); err != nil {
-			return nil, err
+			return DelegationsVerifier{}, err
 		}
 	}
 	for id, k := range d.Keys {
 		if err := db.AddKey(id, k); err != nil {
-			return nil, err
+			return DelegationsVerifier{}, err
 		}
 	}
-	return db, nil
+	return DelegationsVerifier{db}, nil
 }
 
 func (db *DB) AddKey(id string, k *data.Key) error {
