@@ -204,7 +204,7 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 	if err != nil {
 		return nil, err
 	}
-	rootMeta, rootInSnapshot, targetsMeta, err := c.decodeSnapshot(snapshotJSON)
+	snapshotMetas, err := c.decodeSnapshot(snapshotJSON)
 	if err != nil {
 		// ErrRoleThreshold could indicate snapshot keys have been
 		// revoked, so retry with the latest root.json
@@ -217,13 +217,16 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 	// If we don't have the root.json, download it, save it in local
 	// storage and restart the update
 	// Root should no longer be pinned in snapshot meta https://github.com/theupdateframework/tuf/pull/988
-	if rootInSnapshot && !c.hasMetaFromSnapshot("root.json", rootMeta) {
-		return c.updateWithLatestRoot(&rootMeta)
+	if rootMeta, ok := snapshotMetas["root.json"]; ok {
+		if !c.hasMetaFromSnapshot("root.json", rootMeta) {
+			return c.updateWithLatestRoot(&rootMeta)
+		}
 	}
 
 	// If we don't have the targets.json, download it, determine updated
 	// targets and save targets.json in local storage
 	var updatedTargets data.TargetFiles
+	targetsMeta := snapshotMetas["targets.json"]
 	if !c.hasMetaFromSnapshot("targets.json", targetsMeta) {
 		targetsJSON, err := c.downloadMetaFromSnapshot("targets.json", targetsMeta)
 		if err != nil {
@@ -546,14 +549,13 @@ func (c *Client) decodeRoot(b json.RawMessage) error {
 
 // decodeSnapshot decodes and verifies snapshot metadata, and returns the new
 // root and targets file meta.
-func (c *Client) decodeSnapshot(b json.RawMessage) (data.SnapshotFileMeta, bool, data.SnapshotFileMeta, error) {
+func (c *Client) decodeSnapshot(b json.RawMessage) (data.SnapshotFiles, error) {
 	snapshot := &data.Snapshot{}
 	if err := c.db.Unmarshal(b, snapshot, "snapshot", c.snapshotVer); err != nil {
-		return data.SnapshotFileMeta{}, false, data.SnapshotFileMeta{}, ErrDecodeFailed{"snapshot.json", err}
+		return data.SnapshotFiles{}, ErrDecodeFailed{"snapshot.json", err}
 	}
 	c.snapshotVer = snapshot.Version
-	rootMeta, rootInSnapshot := snapshot.Meta["root.json"]
-	return rootMeta, rootInSnapshot, snapshot.Meta["targets.json"], nil
+	return snapshot.Meta, nil
 }
 
 // decodeTargets decodes and verifies targets metadata, sets c.targets and
