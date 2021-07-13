@@ -32,8 +32,8 @@ func TestDelegationsIterator(t *testing.T) {
 		{
 			testName: "no termination",
 			roles: map[string][]data.DelegatedRole{
-				"a": []data.DelegatedRole{{Name: "b", PathMatchers: defaultPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
-				"b": []data.DelegatedRole{{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
+				"a": {{Name: "b", PathMatchers: defaultPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
+				"b": {{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
 			},
 			rootDelegation: data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
 			file:           "",
@@ -42,8 +42,8 @@ func TestDelegationsIterator(t *testing.T) {
 		{
 			testName: "terminated in b",
 			roles: map[string][]data.DelegatedRole{
-				"a": []data.DelegatedRole{{Name: "b", PathMatchers: defaultPathMatchers, Terminating: true}, {Name: "e", PathMatchers: defaultPathMatchers}},
-				"b": []data.DelegatedRole{{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
+				"a": {{Name: "b", PathMatchers: defaultPathMatchers, Terminating: true}, {Name: "e", PathMatchers: defaultPathMatchers}},
+				"b": {{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
 			},
 			rootDelegation: data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
 			file:           "",
@@ -52,8 +52,8 @@ func TestDelegationsIterator(t *testing.T) {
 		{
 			testName: "path does not match b",
 			roles: map[string][]data.DelegatedRole{
-				"a": []data.DelegatedRole{{Name: "b", PathMatchers: notMatchingPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
-				"b": []data.DelegatedRole{{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
+				"a": {{Name: "b", PathMatchers: notMatchingPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
+				"b": {{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
 			},
 			rootDelegation: data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
 			file:           "",
@@ -62,8 +62,8 @@ func TestDelegationsIterator(t *testing.T) {
 		{
 			testName: "cycle avoided",
 			roles: map[string][]data.DelegatedRole{
-				"a": []data.DelegatedRole{{Name: "b", PathMatchers: defaultPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
-				"b": []data.DelegatedRole{{Name: "a", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
+				"a": {{Name: "b", PathMatchers: defaultPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
+				"b": {{Name: "a", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
 			},
 			rootDelegation: data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
 			file:           "",
@@ -212,8 +212,8 @@ func TestPersistedMeta(t *testing.T) {
 			file: "unknown",
 			targets: []expectedTargets{
 				{
-					"targets.json",
-					2,
+					name:    "targets.json",
+					version: 2,
 				},
 			},
 			downloadError: ErrUnknownTarget{Name: "unknown", SnapshotVersion: 2},
@@ -223,16 +223,16 @@ func TestPersistedMeta(t *testing.T) {
 			file: "b.txt",
 			targets: []expectedTargets{
 				{
-					"targets.json",
-					2,
+					name:    "targets.json",
+					version: 2,
 				},
 				{
-					"a.json",
-					1,
+					name:    "a.json",
+					version: 1,
 				},
 				{
-					"b.json",
-					1,
+					name:    "b.json",
+					version: 1,
 				},
 			},
 			downloadError: nil,
@@ -242,32 +242,32 @@ func TestPersistedMeta(t *testing.T) {
 			file: "f.txt",
 			targets: []expectedTargets{
 				{
-					"targets.json",
-					2,
+					name:    "targets.json",
+					version: 2,
 				},
 				{
-					"a.json",
-					1,
+					name:    "a.json",
+					version: 1,
 				},
 				{
-					"b.json",
-					1,
+					name:    "b.json",
+					version: 1,
 				},
 				{
-					"c.json",
-					1,
+					name:    "c.json",
+					version: 1,
 				},
 				{
-					"d.json",
-					1,
+					name:    "d.json",
+					version: 1,
 				},
 				{
-					"e.json",
-					1,
+					name:    "e.json",
+					version: 1,
 				},
 				{
-					"f.json",
-					1,
+					name:    "f.json",
+					version: 1,
 				},
 			},
 			downloadError: nil,
