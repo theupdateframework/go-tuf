@@ -111,9 +111,9 @@ func TestDelegationsIterator(t *testing.T) {
 				}
 				d.add(delegations, r.child.Name)
 			}
-			assert.Equal(t, len(iterationOrder), len(tt.resultOrder))
+			assert.Equal(t, len(tt.resultOrder), len(iterationOrder))
 			for i, role := range iterationOrder {
-				assert.Equal(t, role, tt.resultOrder[i])
+				assert.Equal(t, tt.resultOrder[i], role)
 			}
 		})
 	}
@@ -128,7 +128,7 @@ func TestGetTargetMeta(t *testing.T) {
 
 	f, err := c.getTargetFileMeta("f.txt")
 	assert.Nil(t, err)
-	assert.Equal(t, f.Length, int64(15))
+	assert.Equal(t, int64(15), f.Length)
 }
 
 func TestMaxDelegations(t *testing.T) {
@@ -139,7 +139,7 @@ func TestMaxDelegations(t *testing.T) {
 	assert.Nil(t, err)
 	c.MaxDelegations = 2
 	_, err = c.getTargetFileMeta("c.txt")
-	assert.Equal(t, err, ErrMaxDelegations{File: "c.txt", MaxDelegations: 2, SnapshotVersion: 2})
+	assert.Equal(t, ErrMaxDelegations{File: "c.txt", MaxDelegations: 2, SnapshotVersion: 2}, err)
 }
 
 func TestMetaNotFound(t *testing.T) {
@@ -149,7 +149,7 @@ func TestMetaNotFound(t *testing.T) {
 	_, err := c.Update()
 	assert.Nil(t, err)
 	_, err = c.getTargetFileMeta("unknown.txt")
-	assert.Equal(t, err, ErrUnknownTarget{Name: "unknown.txt", SnapshotVersion: 2})
+	assert.Equal(t, ErrUnknownTarget{Name: "unknown.txt", SnapshotVersion: 2}, err)
 }
 
 type fakeRemote struct {
@@ -315,7 +315,7 @@ func TestPersistedMeta(t *testing.T) {
 			}
 			for _, targets := range tt.targets {
 				storedVersion, err := versionOfStoredTargets(targets.name, persisted)
-				assert.Equal(t, storedVersion, targets.version)
+				assert.Equal(t, targets.version, storedVersion)
 				assert.Nil(t, err)
 				delete(persisted, targets.name)
 			}
