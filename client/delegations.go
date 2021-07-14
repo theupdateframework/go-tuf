@@ -131,11 +131,12 @@ func (c *Client) rootTargetDelegation() data.DelegatedRole {
 		keyIDs = append(keyIDs, id)
 	}
 
+	// root delegates the signing of all files to the top level targets
 	return data.DelegatedRole{
-		Name:      role,
-		KeyIDs:    keyIDs,
-		Threshold: r.Threshold,
-		Paths:     []string{"*"},
+		Name:             role,
+		KeyIDs:           keyIDs,
+		Threshold:        r.Threshold,
+		PathHashPrefixes: []string{""},
 	}
 }
 

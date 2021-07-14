@@ -188,6 +188,14 @@ func TestTargetsNotFound(t *testing.T) {
 	assert.Equal(t, ErrMissingRemoteMetadata{Name: "c.json"}, err)
 }
 
+func TestRootDelegationMatchesAll(t *testing.T) {
+	c := &Client{db: verify.NewDB()}
+	c.db.AddRole("targets", &data.Role{Threshold: 1})
+	d := c.rootTargetDelegation()
+	assert.True(t, d.MatchesPath("a.txt"))
+	assert.True(t, d.MatchesPath("var/b//g"))
+}
+
 func TestUnverifiedTargets(t *testing.T) {
 	verify.IsExpired = func(t time.Time) bool { return false }
 	c, closer := initTestDelegationClient(t, "testdata/php-tuf-fixtures/TUFTestFixture3LevelDelegation")
