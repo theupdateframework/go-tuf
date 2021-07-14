@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	defaultPathMatchers     = []string{"tmp", "*"}
-	notMatchingPathMatchers = []string{"vars", "null"}
+	defaultPathPatterns = []string{"tmp", "*"}
+	noMatchPathPatterns = []string{"vars", "null"}
 )
 
 func TestDelegationsIterator(t *testing.T) {
@@ -30,44 +30,68 @@ func TestDelegationsIterator(t *testing.T) {
 		resultOrder    []string
 	}{
 		{
-			"no termination",
-			map[string][]data.DelegatedRole{
-				"a": []data.DelegatedRole{{Name: "b", PathMatchers: defaultPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
-				"b": []data.DelegatedRole{{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
+			testName: "no termination",
+			roles: map[string][]data.DelegatedRole{
+				"a": {
+					{Name: "b", Paths: defaultPathPatterns},
+					{Name: "e", Paths: defaultPathPatterns},
+				},
+				"b": {
+					{Name: "c", Paths: defaultPathPatterns},
+					{Name: "d", Paths: defaultPathPatterns},
+				},
 			},
-			data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
-			"",
-			[]string{"a", "b", "c", "d", "e"},
+			rootDelegation: data.DelegatedRole{Name: "a", Paths: defaultPathPatterns},
+			file:           "",
+			resultOrder:    []string{"a", "b", "c", "d", "e"},
 		},
 		{
-			"terminated in b",
-			map[string][]data.DelegatedRole{
-				"a": []data.DelegatedRole{{Name: "b", PathMatchers: defaultPathMatchers, Terminating: true}, {Name: "e", PathMatchers: defaultPathMatchers}},
-				"b": []data.DelegatedRole{{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
+			testName: "terminated in b",
+			roles: map[string][]data.DelegatedRole{
+				"a": {
+					{Name: "b", Paths: defaultPathPatterns, Terminating: true},
+					{Name: "e", Paths: defaultPathPatterns},
+				},
+				"b": {
+					{Name: "c", Paths: defaultPathPatterns},
+					{Name: "d", Paths: defaultPathPatterns},
+				},
 			},
-			data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
-			"",
-			[]string{"a", "b", "c", "d"},
+			rootDelegation: data.DelegatedRole{Name: "a", Paths: defaultPathPatterns},
+			file:           "",
+			resultOrder:    []string{"a", "b", "c", "d"},
 		},
 		{
-			"path does not match b",
-			map[string][]data.DelegatedRole{
-				"a": []data.DelegatedRole{{Name: "b", PathMatchers: notMatchingPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
-				"b": []data.DelegatedRole{{Name: "c", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
+			testName: "path does not match b",
+			roles: map[string][]data.DelegatedRole{
+				"a": {
+					{Name: "b", Paths: noMatchPathPatterns},
+					{Name: "e", Paths: defaultPathPatterns},
+				},
+				"b": {
+					{Name: "c", Paths: defaultPathPatterns},
+					{Name: "d", Paths: defaultPathPatterns},
+				},
 			},
-			data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
-			"",
-			[]string{"a", "e"},
+			rootDelegation: data.DelegatedRole{Name: "a", Paths: defaultPathPatterns},
+			file:           "",
+			resultOrder:    []string{"a", "e"},
 		},
 		{
-			"cycle avoided",
-			map[string][]data.DelegatedRole{
-				"a": []data.DelegatedRole{{Name: "b", PathMatchers: defaultPathMatchers}, {Name: "e", PathMatchers: defaultPathMatchers}},
-				"b": []data.DelegatedRole{{Name: "a", PathMatchers: defaultPathMatchers}, {Name: "d", PathMatchers: defaultPathMatchers}},
+			testName: "cycle avoided",
+			roles: map[string][]data.DelegatedRole{
+				"a": {
+					{Name: "b", Paths: defaultPathPatterns},
+					{Name: "e", Paths: defaultPathPatterns},
+				},
+				"b": {
+					{Name: "a", Paths: defaultPathPatterns},
+					{Name: "d", Paths: defaultPathPatterns},
+				},
 			},
-			data.DelegatedRole{Name: "a", PathMatchers: defaultPathMatchers},
-			"",
-			[]string{"a", "b", "a", "e", "d"},
+			rootDelegation: data.DelegatedRole{Name: "a", Paths: defaultPathPatterns},
+			file:           "",
+			resultOrder:    []string{"a", "b", "a", "e", "d"},
 		},
 	}
 
@@ -87,9 +111,9 @@ func TestDelegationsIterator(t *testing.T) {
 				}
 				d.add(delegations, r.child.Name)
 			}
-			assert.Equal(t, len(iterationOrder), len(tt.resultOrder))
+			assert.Equal(t, len(tt.resultOrder), len(iterationOrder))
 			for i, role := range iterationOrder {
-				assert.Equal(t, role, tt.resultOrder[i])
+				assert.Equal(t, tt.resultOrder[i], role)
 			}
 		})
 	}
@@ -104,7 +128,7 @@ func TestGetTargetMeta(t *testing.T) {
 
 	f, err := c.getTargetFileMeta("f.txt")
 	assert.Nil(t, err)
-	assert.Equal(t, f.Length, int64(15))
+	assert.Equal(t, int64(15), f.Length)
 }
 
 func TestMaxDelegations(t *testing.T) {
@@ -115,7 +139,7 @@ func TestMaxDelegations(t *testing.T) {
 	assert.Nil(t, err)
 	c.MaxDelegations = 2
 	_, err = c.getTargetFileMeta("c.txt")
-	assert.Equal(t, err, ErrMaxDelegations{File: "c.txt", MaxDelegations: 2, SnapshotVersion: 2})
+	assert.Equal(t, ErrMaxDelegations{File: "c.txt", MaxDelegations: 2, SnapshotVersion: 2}, err)
 }
 
 func TestMetaNotFound(t *testing.T) {
@@ -125,7 +149,7 @@ func TestMetaNotFound(t *testing.T) {
 	_, err := c.Update()
 	assert.Nil(t, err)
 	_, err = c.getTargetFileMeta("unknown.txt")
-	assert.Equal(t, err, ErrUnknownTarget{Name: "unknown.txt", SnapshotVersion: 2})
+	assert.Equal(t, ErrUnknownTarget{Name: "unknown.txt", SnapshotVersion: 2}, err)
 }
 
 type fakeRemote struct {
@@ -209,69 +233,69 @@ func TestPersistedMeta(t *testing.T) {
 		fileContent   string
 	}{
 		{
-			"unknown",
-			[]expectedTargets{
+			file: "unknown",
+			targets: []expectedTargets{
 				{
-					"targets.json",
-					2,
+					name:    "targets.json",
+					version: 2,
 				},
 			},
-			ErrUnknownTarget{Name: "unknown", SnapshotVersion: 2},
-			"",
+			downloadError: ErrUnknownTarget{Name: "unknown", SnapshotVersion: 2},
+			fileContent:   "",
 		},
 		{
-			"b.txt",
-			[]expectedTargets{
+			file: "b.txt",
+			targets: []expectedTargets{
 				{
-					"targets.json",
-					2,
+					name:    "targets.json",
+					version: 2,
 				},
 				{
-					"a.json",
-					1,
+					name:    "a.json",
+					version: 1,
 				},
 				{
-					"b.json",
-					1,
+					name:    "b.json",
+					version: 1,
 				},
 			},
-			nil,
-			"Contents: b.txt",
+			downloadError: nil,
+			fileContent:   "Contents: b.txt",
 		},
 		{
-			"f.txt",
-			[]expectedTargets{
+			file: "f.txt",
+			targets: []expectedTargets{
 				{
-					"targets.json",
-					2,
+					name:    "targets.json",
+					version: 2,
 				},
 				{
-					"a.json",
-					1,
+					name:    "a.json",
+					version: 1,
 				},
 				{
-					"b.json",
-					1,
+					name:    "b.json",
+					version: 1,
 				},
 				{
-					"c.json",
-					1,
+					name:    "c.json",
+					version: 1,
 				},
 				{
-					"d.json",
-					1,
+					name:    "d.json",
+					version: 1,
 				},
 				{
-					"e.json",
-					1,
+					name:    "e.json",
+					version: 1,
 				},
 				{
-					"f.json",
-					1,
+					name:    "f.json",
+					version: 1,
 				},
 			},
-			nil,
-			"Contents: f.txt",
+			downloadError: nil,
+			fileContent:   "Contents: f.txt",
 		},
 	}
 
@@ -291,7 +315,7 @@ func TestPersistedMeta(t *testing.T) {
 			}
 			for _, targets := range tt.targets {
 				storedVersion, err := versionOfStoredTargets(targets.name, persisted)
-				assert.Equal(t, storedVersion, targets.version)
+				assert.Equal(t, targets.version, storedVersion)
 				assert.Nil(t, err)
 				delete(persisted, targets.name)
 			}

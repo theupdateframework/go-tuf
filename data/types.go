@@ -230,70 +230,61 @@ type Delegations struct {
 // delegatedRoleJSON and delegatedRoleCopy help decoding and encoding jsons.
 // DelegatedRole UnmarshalJSON will fail and return ErrPathsAndPathHashesSet if both fields are set and not empty
 type DelegatedRole struct {
-	Name                  string   `json:"name"`
-	KeyIDs                []string `json:"keyids"`
-	Threshold             int      `json:"threshold"`
-	Terminating           bool     `json:"terminating"`
-	MatchWithHashPrefixes bool     `json:"-"`
-	PathMatchers          []string `json:"-"`
-}
-
-func (d *DelegatedRole) MatchesPath(file string) bool {
-	for _, pattern := range d.PathMatchers {
-		if d.MatchWithHashPrefixes {
-			pathHash := PathHexDigest(file)
-			if strings.HasPrefix(pathHash, pattern) {
-				return true
-			}
-		}
-		if matched, _ := filepath.Match(pattern, file); matched {
-			return true
-		}
-	}
-	return false
-}
-
-type delegatedRoleJSON struct {
-	delegatedRoleCopy
+	Name             string   `json:"name"`
+	KeyIDs           []string `json:"keyids"`
+	Threshold        int      `json:"threshold"`
+	Terminating      bool     `json:"terminating"`
 	PathHashPrefixes []string `json:"path_hash_prefixes,omitempty"`
 	Paths            []string `json:"paths"`
 }
 
-// delegatedRoleCopy is used for MarshalJSON and UnmarshalJSON to extract DelegatedRole
-// fields from delegatedRoleJSON
-type delegatedRoleCopy DelegatedRole
+func (d *DelegatedRole) MatchesPath(file string) bool {
+	for _, pattern := range d.Paths {
+		if matched, _ := filepath.Match(pattern, file); matched {
+			return true
+		}
+	}
+
+	pathHash := PathHexDigest(file)
+	for _, hashPrefix := range d.PathHashPrefixes {
+		if strings.HasPrefix(pathHash, hashPrefix) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// validateFields enforces the spec 1.0.19 section 4.5:
+// 'role MUST specify only one of the "path_hash_prefixes" or "paths"'
+// Marshalling and unmarshalling JSON will fail and return
+// ErrPathsAndPathHashesSet if both fields are set and not empty.
+func (d *DelegatedRole) validateFields() error {
+	if len(d.PathHashPrefixes) > 0 && len(d.Paths) > 0 {
+		return ErrPathsAndPathHashesSet
+	}
+
+	return nil
+}
 
 func (d *DelegatedRole) MarshalJSON() ([]byte, error) {
-	delegatedJSON := delegatedRoleJSON{delegatedRoleCopy: delegatedRoleCopy(*d)}
-	if d.MatchWithHashPrefixes {
-		delegatedJSON.PathHashPrefixes = d.PathMatchers
-	} else {
-		delegatedJSON.Paths = d.PathMatchers
+	type delegatedRoleAlias DelegatedRole
+
+	if err := d.validateFields(); err != nil {
+		return nil, err
 	}
-	return json.Marshal(&delegatedJSON)
+
+	return json.Marshal((*delegatedRoleAlias)(d))
 }
 
 func (d *DelegatedRole) UnmarshalJSON(b []byte) error {
-	var djson delegatedRoleJSON
-	err := json.Unmarshal(b, &djson)
-	if err != nil {
+	type delegatedRoleAlias DelegatedRole
+
+	if err := json.Unmarshal(b, (*delegatedRoleAlias)(d)); err != nil {
 		return err
 	}
-	new := DelegatedRole(djson.delegatedRoleCopy)
-	*d = new
-	if len(djson.PathHashPrefixes) != 0 && len(djson.Paths) != 0 {
-		return ErrPathsAndPathHashesSet
-	}
-	if len(djson.PathHashPrefixes) > 0 {
-		d.MatchWithHashPrefixes = true
-		d.PathMatchers = djson.PathHashPrefixes
-		return nil
-	}
-	if len(djson.Paths) > 0 {
-		d.PathMatchers = djson.Paths
-		return nil
-	}
-	return nil
+
+	return d.validateFields()
 }
 
 func NewTargets() *Targets {
