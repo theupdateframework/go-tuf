@@ -43,7 +43,11 @@ func (c *Client) getTargetFileMeta(file string) (data.TargetFileMeta, error) {
 		}
 
 		if target.Delegations != nil {
-			delegations.add(target.Delegations.Roles, d.child.Name)
+			err := delegations.add(target.Delegations.Roles, d.child.Name)
+			if err != nil {
+				return data.TargetFileMeta{}, err
+			}
+
 			targetVerifier, err := verify.NewDelegationsVerifier(target.Delegations)
 			if err != nil {
 				return data.TargetFileMeta{}, err
@@ -191,11 +195,19 @@ func (d *delegationsIterator) next() (delegation, bool) {
 	return delegation, true
 }
 
-func (d *delegationsIterator) add(roles []data.DelegatedRole, parent string) {
+func (d *delegationsIterator) add(roles []data.DelegatedRole, parent string) error {
 	for i := len(roles) - 1; i >= 0; i-- {
+		// Push the roles onto the stack in reverse so we get an in-order traversal
+		// of the delegations graph.
 		r := roles[i]
-		if r.MatchesPath(d.file) {
+		matchesPath, err := r.MatchesPath(d.file)
+		if err != nil {
+			return err
+		}
+		if matchesPath {
 			d.stack = append(d.stack, delegation{parent, r})
 		}
 	}
+
+	return nil
 }

@@ -38,12 +38,23 @@ func TestDelegationsIterator(t *testing.T) {
 				},
 				"b": {
 					{Name: "c", Paths: defaultPathPatterns},
+				},
+				"c": {
 					{Name: "d", Paths: defaultPathPatterns},
+				},
+				"e": {
+					{Name: "f", Paths: defaultPathPatterns},
+					{Name: "g", Paths: defaultPathPatterns},
+				},
+				"g": {
+					{Name: "h", Paths: defaultPathPatterns},
+					{Name: "i", Paths: defaultPathPatterns},
+					{Name: "j", Paths: defaultPathPatterns},
 				},
 			},
 			rootDelegation: data.DelegatedRole{Name: "a", Paths: defaultPathPatterns},
 			file:           "",
-			resultOrder:    []string{"a", "b", "c", "d", "e"},
+			resultOrder:    []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"},
 		},
 		{
 			testName: "terminated in b",
@@ -78,7 +89,7 @@ func TestDelegationsIterator(t *testing.T) {
 			resultOrder:    []string{"a", "e"},
 		},
 		{
-			testName: "cycle avoided",
+			testName: "cycle avoided 1",
 			roles: map[string][]data.DelegatedRole{
 				"a": {
 					{Name: "b", Paths: defaultPathPatterns},
@@ -92,6 +103,44 @@ func TestDelegationsIterator(t *testing.T) {
 			rootDelegation: data.DelegatedRole{Name: "a", Paths: defaultPathPatterns},
 			file:           "",
 			resultOrder:    []string{"a", "b", "a", "e", "d"},
+		},
+		{
+			testName: "cycle avoided 2",
+			roles: map[string][]data.DelegatedRole{
+				"a": {
+					{Name: "a", Paths: defaultPathPatterns},
+					{Name: "b", Paths: defaultPathPatterns},
+				},
+				"b": {
+					{Name: "a", Paths: defaultPathPatterns},
+					{Name: "b", Paths: defaultPathPatterns},
+					{Name: "c", Paths: defaultPathPatterns},
+				},
+				"c": {
+					{Name: "c", Paths: defaultPathPatterns},
+				},
+			},
+			rootDelegation: data.DelegatedRole{Name: "a", Paths: defaultPathPatterns},
+			file:           "",
+			resultOrder:    []string{"a", "a", "b", "a", "b", "c", "c"},
+		},
+		{
+			testName: "diamond delegation",
+			roles: map[string][]data.DelegatedRole{
+				"a": {
+					{Name: "b", Paths: defaultPathPatterns},
+					{Name: "c", Paths: defaultPathPatterns},
+				},
+				"b": {
+					{Name: "d", Paths: defaultPathPatterns},
+				},
+				"c": {
+					{Name: "d", Paths: defaultPathPatterns},
+				},
+			},
+			rootDelegation: data.DelegatedRole{Name: "a", Paths: defaultPathPatterns},
+			file:           "",
+			resultOrder:    []string{"a", "b", "d", "c", "d"},
 		},
 	}
 
@@ -111,10 +160,7 @@ func TestDelegationsIterator(t *testing.T) {
 				}
 				d.add(delegations, r.child.Name)
 			}
-			assert.Equal(t, len(tt.resultOrder), len(iterationOrder))
-			for i, role := range iterationOrder {
-				assert.Equal(t, tt.resultOrder[i], role)
-			}
+			assert.Equal(t, tt.resultOrder, iterationOrder)
 		})
 	}
 }
@@ -192,8 +238,14 @@ func TestRootDelegationMatchesAll(t *testing.T) {
 	c := &Client{db: verify.NewDB()}
 	c.db.AddRole("targets", &data.Role{Threshold: 1})
 	d := c.rootTargetDelegation()
-	assert.True(t, d.MatchesPath("a.txt"))
-	assert.True(t, d.MatchesPath("var/b//g"))
+
+	matchesPath, err := d.MatchesPath("a.txt")
+	assert.NoError(t, err)
+	assert.True(t, matchesPath)
+
+	matchesPath, err = d.MatchesPath("var/b//g")
+	assert.NoError(t, err)
+	assert.True(t, matchesPath)
 }
 
 func TestUnverifiedTargets(t *testing.T) {

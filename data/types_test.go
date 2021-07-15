@@ -164,7 +164,10 @@ func TestDelegatedRolePathMatch(t *testing.T) {
 				PathHashPrefixes: tt.pathHashPrefixes,
 			}
 			assert.NoError(t, d.validateFields())
-			assert.Equal(t, tt.shouldMatch, d.MatchesPath(tt.file))
+
+			matchesPath, err := d.MatchesPath(tt.file)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.shouldMatch, matchesPath)
 		})
 
 	}
