@@ -146,12 +146,12 @@ func TestDelegationsIterator(t *testing.T) {
 				if !ok {
 					break
 				}
-				iterationOrder = append(iterationOrder, r.child.Name)
-				delegations, ok := tt.roles[r.child.Name]
+				iterationOrder = append(iterationOrder, r.delegatee.Name)
+				delegations, ok := tt.roles[r.delegatee.Name]
 				if !ok {
 					continue
 				}
-				d.add(delegations, r.child.Name)
+				d.add(delegations, r.delegatee.Name, verify.DelegationsVerifier{})
 			}
 			assert.Equal(t, tt.resultOrder, iterationOrder)
 		})
@@ -178,7 +178,7 @@ func TestMaxDelegations(t *testing.T) {
 	assert.Nil(t, err)
 	c.MaxDelegations = 2
 	_, err = c.getTargetFileMeta("c.txt")
-	assert.Equal(t, ErrMaxDelegations{File: "c.txt", MaxDelegations: 2, SnapshotVersion: 2}, err)
+	assert.Equal(t, ErrMaxDelegations{Target: "c.txt", MaxDelegations: 2, SnapshotVersion: 2}, err)
 }
 
 func TestMetaNotFound(t *testing.T) {

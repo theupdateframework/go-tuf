@@ -40,13 +40,13 @@ func (e ErrDecodeFailed) Error() string {
 }
 
 type ErrMaxDelegations struct {
-	File            string
+	Target          string
 	MaxDelegations  int
 	SnapshotVersion int
 }
 
 func (e ErrMaxDelegations) Error() string {
-	return fmt.Sprintf("tuf: max delegation of %d reached searching for %s with snapshot version %d", e.MaxDelegations, e.File, e.SnapshotVersion)
+	return fmt.Sprintf("tuf: max delegation of %d reached searching for %s with snapshot version %d", e.MaxDelegations, e.Target, e.SnapshotVersion)
 }
 
 func isDecodeFailedWithErrRoleThreshold(err error) bool {

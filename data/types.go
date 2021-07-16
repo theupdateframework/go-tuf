@@ -242,7 +242,7 @@ type DelegatedRole struct {
 // a given file. This determines whether a delegated role is responsible for
 // signing and verifying the file.
 func (d *DelegatedRole) MatchesPath(file string) (bool, error) {
-	if err := d.validateFields(); err != nil {
+	if err := d.validatePaths(); err != nil {
 		return false, err
 	}
 
@@ -262,12 +262,12 @@ func (d *DelegatedRole) MatchesPath(file string) (bool, error) {
 	return false, nil
 }
 
-// validateFields enforces the spec
+// validatePaths enforces the spec
 // https://theupdateframework.github.io/specification/v1.0.19/index.html#file-formats-targets
 // 'role MUST specify only one of the "path_hash_prefixes" or "paths"'
 // Marshalling and unmarshalling JSON will fail and return
 // ErrPathsAndPathHashesSet if both fields are set and not empty.
-func (d *DelegatedRole) validateFields() error {
+func (d *DelegatedRole) validatePaths() error {
 	if len(d.PathHashPrefixes) > 0 && len(d.Paths) > 0 {
 		return ErrPathsAndPathHashesSet
 	}
@@ -281,7 +281,7 @@ func (d *DelegatedRole) validateFields() error {
 func (d *DelegatedRole) MarshalJSON() ([]byte, error) {
 	type delegatedRoleAlias DelegatedRole
 
-	if err := d.validateFields(); err != nil {
+	if err := d.validatePaths(); err != nil {
 		return nil, err
 	}
 
@@ -298,7 +298,7 @@ func (d *DelegatedRole) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	return d.validateFields()
+	return d.validatePaths()
 }
 
 func NewTargets() *Targets {
