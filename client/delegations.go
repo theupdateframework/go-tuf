@@ -43,6 +43,9 @@ func (c *Client) getTargetFileMeta(target string) (data.TargetFileMeta, error) {
 				return data.TargetFileMeta{}, err
 			}
 			err = delegations.add(targets.Delegations.Roles, d.delegatee.Name, delegationsVerifier)
+			if err != nil {
+				return data.TargetFileMeta{}, err
+			}
 		}
 	}
 
@@ -89,25 +92,25 @@ func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, role string, veri
 		}
 	}
 
-	target := &data.Targets{}
+	targets := &data.Targets{}
 	// 5.6.3 verify signature with parent public keys
 	// 5.6.5 verify that the targets is not expired
-	// role "targets" is the topTargets verified by root roles loaded in the client db
+	// role "targets" is a top role verified by root keys loaded in the client db
 	if role == "targets" {
-		err = c.db.Unmarshal(raw, target, role, fileMeta.Version)
+		err = c.db.Unmarshal(raw, targets, role, fileMeta.Version)
 	} else {
-		err = verifier.Unmarshal(raw, target, role, fileMeta.Version)
+		err = verifier.Unmarshal(raw, targets, role, fileMeta.Version)
 	}
 	if err != nil {
 		return nil, ErrDecodeFailed{fileName, err}
 	}
 
 	// 5.6.4 check against snapshot version
-	if target.Version != fileMeta.Version {
+	if targets.Version != fileMeta.Version {
 		return nil, ErrTargetsSnapshotVersionMismatch{
 			Role:                     fileName,
 			DownloadedTargetsVersion: fileMeta.Version,
-			TargetsSnapshotVersion:   target.Version,
+			TargetsSnapshotVersion:   targets.Version,
 			SnapshotVersion:          snapshot.Version,
 		}
 	}
@@ -117,7 +120,7 @@ func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, role string, veri
 			return nil, err
 		}
 	}
-	return target, nil
+	return targets, nil
 }
 
 type delegation struct {
