@@ -97,7 +97,7 @@ func TestDelegationsIterator(t *testing.T) {
 				},
 			},
 			file:        "",
-			resultOrder: []string{"targets", "b", "targets", "e", "d"},
+			resultOrder: []string{"targets", "b", "d", "e"},
 		},
 		{
 			testName: "cycle avoided 2",
@@ -116,7 +116,7 @@ func TestDelegationsIterator(t *testing.T) {
 				},
 			},
 			file:        "",
-			resultOrder: []string{"targets", "targets", "b", "targets", "b", "c", "c"},
+			resultOrder: []string{"targets", "b", "c"},
 		},
 		{
 			testName: "diamond delegation",
@@ -133,7 +133,7 @@ func TestDelegationsIterator(t *testing.T) {
 				},
 			},
 			file:        "",
-			resultOrder: []string{"targets", "b", "d", "c", "d"},
+			resultOrder: []string{"targets", "b", "d", "c"},
 		},
 	}
 
