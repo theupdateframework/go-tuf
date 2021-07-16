@@ -175,6 +175,7 @@ func (d *delegationsIterator) next() (delegation, bool) {
 	// will be considered
 	// https://github.com/theupdateframework/specification/issues/168
 	if delegation.child.Terminating {
+		// Empty the stack.
 		d.stack = d.stack[0:0]
 	}
 	return delegation, true
