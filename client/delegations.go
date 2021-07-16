@@ -14,16 +14,16 @@ func (c *Client) getTargetFileMeta(file string) (data.TargetFileMeta, error) {
 		return data.TargetFileMeta{}, err
 	}
 
-	verifiers := map[string]verify.DelegationsVerifier{
-		"root": {DB: c.db},
-	}
+	// verifiers is map of parent targets name to an associated DelegationsVerifier
+	// that can verify all child targets pointed by delegatedRoles in the parent targets
+	verifiers := make(map[string]verify.DelegationsVerifier)
 
 	// delegationsIterator covers 5.6.7
 	// - pre-order depth-first search starting with the top targets
 	// - filter delegations with paths or path_hash_prefixes matching searched file
 	// - 5.6.7.1 cycles protection
 	// - 5.6.7.2 terminations
-	delegations := newDelegationsIterator(c.rootTargetDelegation(), "root", file)
+	delegations := newDelegationsIterator(file)
 	for i := 0; i < c.MaxDelegations; i++ {
 		d, ok := delegations.next()
 		if !ok {
@@ -80,7 +80,7 @@ func (c *Client) loadLocalSnapshot() (*data.Snapshot, error) {
 	return snapshot, nil
 }
 
-// loadDelegatedTargets downloads, decodes, verifies and stores delegated targets
+// loadDelegatedTargets downloads, decodes, verifies and stores targets
 func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, role string, verifier verify.DelegationsVerifier) (*data.Targets, error) {
 	var err error
 	fileName := role + ".json"
@@ -102,9 +102,16 @@ func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, role string, veri
 	target := &data.Targets{}
 	// 5.6.3 verify signature with parent public keys
 	// 5.6.5 verify that the targets is not expired
-	if err := verifier.Unmarshal(raw, target, role, fileMeta.Version); err != nil {
+	// role "targets" is the topTargets verified by root roles loaded in the client db
+	if role == "targets" {
+		err = c.db.Unmarshal(raw, target, role, fileMeta.Version)
+	} else {
+		err = verifier.Unmarshal(raw, target, role, fileMeta.Version)
+	}
+	if err != nil {
 		return nil, ErrDecodeFailed{fileName, err}
 	}
+
 	// 5.6.4 check against snapshot version
 	if target.Version != fileMeta.Version {
 		return nil, ErrTargetsSnapshotVersionMismatch{
@@ -123,27 +130,6 @@ func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, role string, veri
 	return target, nil
 }
 
-func (c *Client) rootTargetDelegation() data.DelegatedRole {
-	role := "targets"
-	r := c.db.GetRole(role)
-	if r == nil {
-		return data.DelegatedRole{}
-	}
-
-	keyIDs := make([]string, 0, len(r.KeyIDs))
-	for id, _ := range r.KeyIDs {
-		keyIDs = append(keyIDs, id)
-	}
-
-	// root delegates the signing of all files to the top level targets
-	return data.DelegatedRole{
-		Name:             role,
-		KeyIDs:           keyIDs,
-		Threshold:        r.Threshold,
-		PathHashPrefixes: []string{""},
-	}
-}
-
 type delegation struct {
 	parent string
 	child  data.DelegatedRole
@@ -160,15 +146,18 @@ type delegationsIterator struct {
 	visited map[delegationID]struct{}
 }
 
-func newDelegationsIterator(role data.DelegatedRole, parent string, file string) *delegationsIterator {
+// newDelegationsIterator initialises an iterator with a first step
+// on top level targets
+func newDelegationsIterator(file string) *delegationsIterator {
 	i := &delegationsIterator{
-		file:    file,
-		stack:   make([]delegation, 0, 1),
+		file: file,
+		stack: []delegation{
+			{
+				child: data.DelegatedRole{Name: "targets"},
+			},
+		},
 		visited: make(map[delegationID]struct{}),
 	}
-
-	i.add([]data.DelegatedRole{role}, parent)
-
 	return i
 }
 

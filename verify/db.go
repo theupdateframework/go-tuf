@@ -40,7 +40,7 @@ func (d *DelegationsVerifier) Unmarshal(b []byte, v interface{}, role string, mi
 func NewDelegationsVerifier(d *data.Delegations) (DelegationsVerifier, error) {
 	db := &DB{
 		roles: make(map[string]*Role, len(d.Roles)),
-		keys:  make(map[string]*data.Key),
+		keys:  make(map[string]*data.Key, len(d.Keys)),
 	}
 	for _, r := range d.Roles {
 		role := &data.Role{Threshold: r.Threshold, KeyIDs: r.KeyIDs}

@@ -2,6 +2,7 @@ package verify
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	cjson "github.com/tent/canonical-json-go"
@@ -27,12 +28,12 @@ func (db *DB) Verify(s *data.Signed, role string, minVersion int) error {
 	if isTopLevelRole(role) {
 		// Top-level roles can only sign metadata of the same type (e.g. snapshot
 		// metadata must be signed by the snapshot role).
-		if sm.Type != role {
+		if strings.ToLower(sm.Type) != strings.ToLower(role) {
 			return ErrWrongMetaType
 		}
 	} else {
 		// Delegated (non-top-level) roles may only sign targets metadata.
-		if sm.Type != "targets" {
+		if strings.ToLower(sm.Type) != "targets" {
 			return ErrWrongMetaType
 		}
 	}

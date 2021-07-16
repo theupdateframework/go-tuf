@@ -262,7 +262,8 @@ func (d *DelegatedRole) MatchesPath(file string) (bool, error) {
 	return false, nil
 }
 
-// validateFields enforces the spec 1.0.19 section 4.5:
+// validateFields enforces the spec
+// https://theupdateframework.github.io/specification/v1.0.19/index.html#file-formats-targets
 // 'role MUST specify only one of the "path_hash_prefixes" or "paths"'
 // Marshalling and unmarshalling JSON will fail and return
 // ErrPathsAndPathHashesSet if both fields are set and not empty.
