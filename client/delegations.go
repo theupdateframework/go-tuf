@@ -94,6 +94,7 @@ func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, role string, veri
 
 	targets := &data.Targets{}
 	// 5.6.3 verify signature with parent public keys
+	// 5.6.4 check against snapshot version
 	// 5.6.5 verify that the targets is not expired
 	// role "targets" is a top role verified by root keys loaded in the client db
 	if role == "targets" {
@@ -105,15 +106,6 @@ func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, role string, veri
 		return nil, ErrDecodeFailed{fileName, err}
 	}
 
-	// 5.6.4 check against snapshot version
-	if targets.Version != fileMeta.Version {
-		return nil, ErrTargetsSnapshotVersionMismatch{
-			Role:                     fileName,
-			DownloadedTargetsVersion: fileMeta.Version,
-			TargetsSnapshotVersion:   targets.Version,
-			SnapshotVersion:          snapshot.Version,
-		}
-	}
 	// 5.6.6 persist
 	if !alreadyStored {
 		if err := c.local.SetMeta(fileName, raw); err != nil {

@@ -43,6 +43,9 @@ func NewDelegationsVerifier(d *data.Delegations) (DelegationsVerifier, error) {
 		keys:  make(map[string]*data.Key, len(d.Keys)),
 	}
 	for _, r := range d.Roles {
+		if _, ok := topLevelRoles[r.Name]; ok {
+			return DelegationsVerifier{}, ErrInvalidDelegatedRole
+		}
 		role := &data.Role{Threshold: r.Threshold, KeyIDs: r.KeyIDs}
 		if err := db.addRole(r.Name, role); err != nil {
 			return DelegationsVerifier{}, err

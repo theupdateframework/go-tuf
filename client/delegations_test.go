@@ -163,6 +163,19 @@ func TestDelegationsIterator(t *testing.T) {
 			file:        "",
 			resultOrder: []string{"targets", "b", "d", "c"},
 		},
+		{
+			testName: "simple cycle",
+			roles: map[string][]data.DelegatedRole{
+				"targets": {
+					{Name: "a", Paths: defaultPathPatterns},
+				},
+				"a": {
+					{Name: "a", Paths: defaultPathPatterns},
+				},
+			},
+			file:        "",
+			resultOrder: []string{"targets", "a"},
+		},
 	}
 
 	for _, tt := range iteratorTests {
