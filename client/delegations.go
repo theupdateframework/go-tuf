@@ -84,6 +84,7 @@ func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, role string, veri
 
 	// 5.6.1 download target if not in the local store
 	// 5.6.2 check against snapshot hash
+	// 5.6.4 check against snapshot version
 	raw, alreadyStored := c.localMetaFromSnapshot(fileName, fileMeta)
 	if !alreadyStored {
 		raw, err = c.downloadMetaFromSnapshot(fileName, fileMeta)
@@ -94,7 +95,6 @@ func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, role string, veri
 
 	targets := &data.Targets{}
 	// 5.6.3 verify signature with parent public keys
-	// 5.6.4 check against snapshot version
 	// 5.6.5 verify that the targets is not expired
 	// role "targets" is a top role verified by root keys loaded in the client db
 	if role == "targets" {
