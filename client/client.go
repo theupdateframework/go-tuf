@@ -195,11 +195,13 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 		return nil, ErrLatestSnapshot{c.snapshotVer}
 	}
 
-	// Get snapshot.json, then extract root.json and targets.json file meta.
+	// Get snapshot.json, then extract file metas.
 	//
-	// The snapshot.json is only saved locally after checking root.json and
+	// The snapshot.json is only saved locally after checking
 	// targets.json so that it will be re-downloaded on subsequent updates
 	// if this update fails.
+	// root.json meta should not be stored in the snapshot, if it is,
+	// the root will be checked, re-downloaded
 	snapshotJSON, err := c.downloadMetaFromTimestamp("snapshot.json", snapshotMeta)
 	if err != nil {
 		return nil, err
