@@ -737,3 +737,11 @@ func (c *Client) Targets() (data.TargetFiles, error) {
 	}
 	return c.targets, nil
 }
+
+func (c *Client) RootVersion() int {
+	return c.rootVer
+}
+
+func (c *Client) TargetsVersion() int {
+	return c.targetsVer
+}

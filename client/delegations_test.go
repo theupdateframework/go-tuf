@@ -197,6 +197,9 @@ func TestGetTargetMeta(t *testing.T) {
 	f, err := c.getTargetFileMeta("f.txt")
 	assert.Nil(t, err)
 	assert.Equal(t, int64(15), f.Length)
+
+	assert.Equal(t, c.RootVersion(), 2)
+	assert.Equal(t, c.TargetsVersion(), 2)
 }
 
 func TestMaxDelegations(t *testing.T) {
