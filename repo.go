@@ -551,7 +551,7 @@ func (r *Repo) AppendSignature(name string, signature data.Signature) error {
 		return ErrInvalidRole{role}
 	}
 	if !roleData.ValidKey(signature.KeyID) {
-		return verify.ErrInvalidKeyID
+		return verify.ErrInvalidKey
 	}
 
 	s, err := r.SignedMeta(name)

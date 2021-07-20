@@ -1505,3 +1505,69 @@ func (rs *RepoSuite) TestAppendSignatures(c *C) {
 	// commit successfully!
 	c.Assert(r.Commit(), IsNil)
 }
+
+func (rs *RepoSuite) TestBadAppendSignatures(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// don't use consistent snapshots to make the checks simpler
+	c.Assert(r.Init(false), IsNil)
+
+	// generate root key offline and add as a verification key
+	rootKey, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	c.Assert(r.AddVerificationKey("root", rootKey.PublicData()), IsNil)
+	targetsKey, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	c.Assert(r.AddVerificationKey("targets", targetsKey.PublicData()), IsNil)
+	snapshotKey, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	c.Assert(r.AddVerificationKey("snapshot", snapshotKey.PublicData()), IsNil)
+	timestampKey, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	c.Assert(r.AddVerificationKey("timestamp", timestampKey.PublicData()), IsNil)
+
+	// add a signature with a bad role
+	rootMeta, err := r.SignedMeta("root.json")
+	c.Assert(err, IsNil)
+	rootSig, err := rootKey.Signer().Sign(rand.Reader, rootMeta.Signed, crypto.Hash(0))
+	c.Assert(err, IsNil)
+	for _, id := range rootKey.Signer().IDs() {
+		c.Assert(r.AppendSignature("invalid_root.json", data.Signature{
+			KeyID:     id,
+			Signature: rootSig}), Equals, ErrInvalidRole{"invalid_root"})
+	}
+
+	// add a root signature with an invalid key ID
+	for _, id := range targetsKey.Signer().IDs() {
+		c.Assert(r.AppendSignature("root.json", data.Signature{
+			KeyID:     id,
+			Signature: rootSig}), Equals, verify.ErrInvalidKey)
+	}
+
+	// add the correct root signature
+	for _, id := range rootKey.Signer().IDs() {
+		c.Assert(r.AppendSignature("root.json", data.Signature{
+			KeyID:     id,
+			Signature: rootSig}), IsNil)
+	}
+	checkSigIDs := func(role string, keyIDs ...string) {
+		s, err := r.SignedMeta(role)
+		c.Assert(err, IsNil)
+		c.Assert(s.Signatures, HasLen, len(keyIDs))
+		for i, id := range keyIDs {
+			c.Assert(s.Signatures[i].KeyID, Equals, id)
+		}
+	}
+	checkSigIDs("root.json", rootKey.PublicData().IDs()...)
+
+	// re-adding should not duplicate
+	for _, id := range rootKey.Signer().IDs() {
+		c.Assert(r.AppendSignature("root.json", data.Signature{
+			KeyID:     id,
+			Signature: rootSig}), IsNil)
+	}
+	checkSigIDs("root.json", rootKey.PublicData().IDs()...)
+}
