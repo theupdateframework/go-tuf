@@ -1540,11 +1540,20 @@ func (rs *RepoSuite) TestBadAppendSignatures(c *C) {
 			Signature: rootSig}), Equals, ErrInvalidRole{"invalid_root"})
 	}
 
-	// add a root signature with an invalid key ID
+	// add a root signature with an key ID that is for the targets role
 	for _, id := range targetsKey.Signer().IDs() {
 		c.Assert(r.AppendSignature("root.json", data.Signature{
 			KeyID:     id,
 			Signature: rootSig}), Equals, verify.ErrInvalidKey)
+	}
+
+	// attempt to add a bad signature to root
+	badSig, err := rootKey.Signer().Sign(rand.Reader, []byte(""), crypto.Hash(0))
+	c.Assert(err, IsNil)
+	for _, id := range rootKey.Signer().IDs() {
+		c.Assert(r.AppendSignature("root.json", data.Signature{
+			KeyID:     id,
+			Signature: badSig}), Equals, verify.ErrInvalid)
 	}
 
 	// add the correct root signature

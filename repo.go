@@ -535,13 +535,14 @@ func (r *Repo) Sign(name string) error {
 }
 
 // AppendSignature allows users to append a signature generated with an external tool.
+// The name must be a valid manifest name, like root.json.
 func (r *Repo) AppendSignature(name string, signature data.Signature) error {
 	role := strings.TrimSuffix(name, ".json")
 	if !verify.ValidRole(role) {
 		return ErrInvalidRole{role}
 	}
 
-	// Check Key ID is in valid for the role.
+	// Check key ID is in valid for the role.
 	db, err := r.db()
 	if err != nil {
 		return err
@@ -559,16 +560,25 @@ func (r *Repo) AppendSignature(name string, signature data.Signature) error {
 		return err
 	}
 
-	// Iterate through signatures and remove a signature with a matching ID
-	signatures := make([]data.Signature, 0, len(s.Signatures)+1)
+	// Add signature if one doesn't already exist with the same key ID.
+	found := false
 	for _, sig := range s.Signatures {
-		if sig.KeyID != signature.KeyID {
-			signatures = append(signatures, sig)
+		if sig.KeyID == signature.KeyID {
+			found = true
 		}
 	}
-	signatures = append(signatures, signature)
+	if !found {
+		s.Signatures = append(s.Signatures, signature)
+	}
 
-	s.Signatures = signatures
+	// Check signature on signed meta. Ignore threshold errors as this may not be fully
+	// signed.
+	if err := db.VerifySignatures(s, role); err != nil {
+		if _, ok := err.(verify.ErrRoleThreshold); !ok {
+			return err
+		}
+	}
+
 	b, err := r.jsonMarshal(s)
 	if err != nil {
 		return err
