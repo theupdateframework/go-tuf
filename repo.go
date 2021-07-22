@@ -36,7 +36,7 @@ var snapshotManifests = []string{
 	"targets.json",
 }
 
-type targetsWalkFunc func(path string, target io.Reader) error
+type TargetsWalkFunc func(path string, target io.Reader) error
 
 type LocalStore interface {
 	GetMeta() (map[string]json.RawMessage, error)
@@ -45,7 +45,7 @@ type LocalStore interface {
 	// WalkStagedTargets calls targetsFn for each staged target file in paths.
 	//
 	// If paths is empty, all staged target files will be walked.
-	WalkStagedTargets(paths []string, targetsFn targetsWalkFunc) error
+	WalkStagedTargets(paths []string, targetsFn TargetsWalkFunc) error
 
 	Commit(bool, map[string]int, map[string]data.Hashes) error
 	GetSigningKeys(string) ([]sign.Signer, error)
