@@ -36,6 +36,9 @@ var snapshotManifests = []string{
 	"targets.json",
 }
 
+// TargetsWalkFunc is a function of a target path name and a target payload used to
+// execute some function on each staged target file. For example, it may normalize path
+// names and generate target file metadata with additional custom metadata.
 type TargetsWalkFunc func(path string, target io.Reader) error
 
 type LocalStore interface {
