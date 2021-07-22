@@ -39,7 +39,10 @@ var snapshotManifests = []string{
 type TargetsWalkFunc func(path string, target io.Reader) error
 
 type LocalStore interface {
+	// GetMeta returns a map from manifest file names (e.g. root.json) to their raw JSON payload or an error.
 	GetMeta() (map[string]json.RawMessage, error)
+
+	// SetMeta is used to update a manifest file name with a JSON payload.
 	SetMeta(string, json.RawMessage) error
 
 	// WalkStagedTargets calls targetsFn for each staged target file in paths.
@@ -47,9 +50,16 @@ type LocalStore interface {
 	// If paths is empty, all staged target files will be walked.
 	WalkStagedTargets(paths []string, targetsFn TargetsWalkFunc) error
 
+	// Commit is used to publish staged files to the repository
 	Commit(bool, map[string]int, map[string]data.Hashes) error
+
+	// GetSigningKeys return a list of signing keys for a role.
 	GetSigningKeys(string) ([]sign.Signer, error)
+
+	// SavePrivateKey adds a signing key to a role.
 	SavePrivateKey(string, *sign.PrivateKey) error
+
+	// Clean is used to remove all staged manifests.
 	Clean() error
 }
 
