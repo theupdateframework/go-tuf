@@ -50,7 +50,7 @@ func (m *memoryStore) SetMeta(name string, meta json.RawMessage) error {
 	return nil
 }
 
-func (m *memoryStore) WalkStagedTargets(paths []string, targetsFn targetsWalkFunc) error {
+func (m *memoryStore) WalkStagedTargets(paths []string, targetsFn TargetsWalkFunc) error {
 	if len(paths) == 0 {
 		for path, data := range m.files {
 			if err := targetsFn(path, bytes.NewReader(data)); err != nil {
@@ -166,7 +166,7 @@ func (f *fileSystemStore) createDirs() error {
 	return nil
 }
 
-func (f *fileSystemStore) WalkStagedTargets(paths []string, targetsFn targetsWalkFunc) error {
+func (f *fileSystemStore) WalkStagedTargets(paths []string, targetsFn TargetsWalkFunc) error {
 	if len(paths) == 0 {
 		walkFunc := func(path string, info os.FileInfo, err error) error {
 			if err != nil {
