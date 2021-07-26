@@ -57,7 +57,7 @@ func NewDelegationsVerifier(d *data.Delegations) (DelegationsVerifier, error) {
 }
 
 func (db *DB) AddKey(id string, k *data.Key) error {
-	v, ok := Verifiers[k.Type]
+	v, ok := Verifiers[k.Scheme]
 	if !ok {
 		return nil
 	}
