@@ -1433,7 +1433,7 @@ func (rs *RepoSuite) TestThreshold(c *C) {
 	c.Assert(timestampVersion, Equals, 2)
 }
 
-func (rs *RepoSuite) TestAppendSignatures(c *C) {
+func (rs *RepoSuite) TestAddOrUpdateSignatures(c *C) {
 	files := map[string][]byte{"foo.txt": []byte("foo")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
@@ -1462,7 +1462,7 @@ func (rs *RepoSuite) TestAppendSignatures(c *C) {
 	rootSig, err := rootKey.Signer().Sign(rand.Reader, rootMeta.Signed, crypto.Hash(0))
 	c.Assert(err, IsNil)
 	for _, id := range rootKey.Signer().IDs() {
-		c.Assert(r.AppendSignature("root.json", data.Signature{
+		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
 			KeyID:     id,
 			Signature: rootSig}), IsNil)
 	}
@@ -1474,7 +1474,7 @@ func (rs *RepoSuite) TestAppendSignatures(c *C) {
 	targetsSig, err := targetsKey.Signer().Sign(rand.Reader, targetsMeta.Signed, crypto.Hash(0))
 	c.Assert(err, IsNil)
 	for _, id := range targetsKey.Signer().IDs() {
-		r.AppendSignature("targets.json", data.Signature{
+		r.AddOrUpdateSignature("targets.json", data.Signature{
 			KeyID:     id,
 			Signature: targetsSig})
 	}
@@ -1486,7 +1486,7 @@ func (rs *RepoSuite) TestAppendSignatures(c *C) {
 	snapshotSig, err := snapshotKey.Signer().Sign(rand.Reader, snapshotMeta.Signed, crypto.Hash(0))
 	c.Assert(err, IsNil)
 	for _, id := range snapshotKey.Signer().IDs() {
-		r.AppendSignature("snapshot.json", data.Signature{
+		r.AddOrUpdateSignature("snapshot.json", data.Signature{
 			KeyID:     id,
 			Signature: snapshotSig})
 	}
@@ -1497,7 +1497,7 @@ func (rs *RepoSuite) TestAppendSignatures(c *C) {
 	timestampSig, err := timestampKey.Signer().Sign(rand.Reader, timestampMeta.Signed, crypto.Hash(0))
 	c.Assert(err, IsNil)
 	for _, id := range timestampKey.Signer().IDs() {
-		r.AppendSignature("timestamp.json", data.Signature{
+		r.AddOrUpdateSignature("timestamp.json", data.Signature{
 			KeyID:     id,
 			Signature: timestampSig})
 	}
@@ -1506,7 +1506,7 @@ func (rs *RepoSuite) TestAppendSignatures(c *C) {
 	c.Assert(r.Commit(), IsNil)
 }
 
-func (rs *RepoSuite) TestBadAppendSignatures(c *C) {
+func (rs *RepoSuite) TestBadAddOrUpdateSignatures(c *C) {
 	files := map[string][]byte{"foo.txt": []byte("foo")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
@@ -1535,14 +1535,14 @@ func (rs *RepoSuite) TestBadAppendSignatures(c *C) {
 	rootSig, err := rootKey.Signer().Sign(rand.Reader, rootMeta.Signed, crypto.Hash(0))
 	c.Assert(err, IsNil)
 	for _, id := range rootKey.Signer().IDs() {
-		c.Assert(r.AppendSignature("invalid_root.json", data.Signature{
+		c.Assert(r.AddOrUpdateSignature("invalid_root.json", data.Signature{
 			KeyID:     id,
 			Signature: rootSig}), Equals, ErrInvalidRole{"invalid_root"})
 	}
 
 	// add a root signature with an key ID that is for the targets role
 	for _, id := range targetsKey.Signer().IDs() {
-		c.Assert(r.AppendSignature("root.json", data.Signature{
+		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
 			KeyID:     id,
 			Signature: rootSig}), Equals, verify.ErrInvalidKey)
 	}
@@ -1551,14 +1551,14 @@ func (rs *RepoSuite) TestBadAppendSignatures(c *C) {
 	badSig, err := rootKey.Signer().Sign(rand.Reader, []byte(""), crypto.Hash(0))
 	c.Assert(err, IsNil)
 	for _, id := range rootKey.Signer().IDs() {
-		c.Assert(r.AppendSignature("root.json", data.Signature{
+		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
 			KeyID:     id,
 			Signature: badSig}), Equals, verify.ErrInvalid)
 	}
 
 	// add the correct root signature
 	for _, id := range rootKey.Signer().IDs() {
-		c.Assert(r.AppendSignature("root.json", data.Signature{
+		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
 			KeyID:     id,
 			Signature: rootSig}), IsNil)
 	}
@@ -1574,7 +1574,7 @@ func (rs *RepoSuite) TestBadAppendSignatures(c *C) {
 
 	// re-adding should not duplicate
 	for _, id := range rootKey.Signer().IDs() {
-		c.Assert(r.AppendSignature("root.json", data.Signature{
+		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
 			KeyID:     id,
 			Signature: rootSig}), IsNil)
 	}

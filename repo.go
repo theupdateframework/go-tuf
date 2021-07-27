@@ -487,8 +487,8 @@ func (r *Repo) jsonMarshal(v interface{}) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-func (r *Repo) setMeta(name string, meta interface{}) error {
-	keys, err := r.getSigningKeys(strings.TrimSuffix(name, ".json"))
+func (r *Repo) setMeta(roleFilename string, meta interface{}) error {
+	keys, err := r.getSigningKeys(strings.TrimSuffix(roleFilename, ".json"))
 	if err != nil {
 		return err
 	}
@@ -500,17 +500,17 @@ func (r *Repo) setMeta(name string, meta interface{}) error {
 	if err != nil {
 		return err
 	}
-	r.meta[name] = b
-	return r.local.SetMeta(name, b)
+	r.meta[roleFilename] = b
+	return r.local.SetMeta(roleFilename, b)
 }
 
-func (r *Repo) Sign(name string) error {
-	role := strings.TrimSuffix(name, ".json")
+func (r *Repo) Sign(roleFilename string) error {
+	role := strings.TrimSuffix(roleFilename, ".json")
 	if !verify.ValidRole(role) {
 		return ErrInvalidRole{role}
 	}
 
-	s, err := r.SignedMeta(name)
+	s, err := r.SignedMeta(roleFilename)
 	if err != nil {
 		return err
 	}
@@ -520,7 +520,7 @@ func (r *Repo) Sign(name string) error {
 		return err
 	}
 	if len(keys) == 0 {
-		return ErrInsufficientKeys{name}
+		return ErrInsufficientKeys{roleFilename}
 	}
 	for _, k := range keys {
 		sign.Sign(s, k)
@@ -530,14 +530,14 @@ func (r *Repo) Sign(name string) error {
 	if err != nil {
 		return err
 	}
-	r.meta[name] = b
-	return r.local.SetMeta(name, b)
+	r.meta[roleFilename] = b
+	return r.local.SetMeta(roleFilename, b)
 }
 
-// AppendSignature allows users to append a signature generated with an external tool.
+// AddOrUpdateSignature allows users to add or update a signature generated with an external tool.
 // The name must be a valid manifest name, like root.json.
-func (r *Repo) AppendSignature(name string, signature data.Signature) error {
-	role := strings.TrimSuffix(name, ".json")
+func (r *Repo) AddOrUpdateSignature(roleFilename string, signature data.Signature) error {
+	role := strings.TrimSuffix(roleFilename, ".json")
 	if !verify.ValidRole(role) {
 		return ErrInvalidRole{role}
 	}
@@ -555,21 +555,20 @@ func (r *Repo) AppendSignature(name string, signature data.Signature) error {
 		return verify.ErrInvalidKey
 	}
 
-	s, err := r.SignedMeta(name)
+	s, err := r.SignedMeta(roleFilename)
 	if err != nil {
 		return err
 	}
 
-	// Add signature if one doesn't already exist with the same key ID.
-	found := false
+	// Add or update signature.
+	signatures := make([]data.Signature, 0, len(s.Signatures)+1)
 	for _, sig := range s.Signatures {
-		if sig.KeyID == signature.KeyID {
-			found = true
+		if sig.KeyID != signature.KeyID {
+			signatures = append(signatures, sig)
 		}
 	}
-	if !found {
-		s.Signatures = append(s.Signatures, signature)
-	}
+	signatures = append(signatures, signature)
+	s.Signatures = signatures
 
 	// Check signature on signed meta. Ignore threshold errors as this may not be fully
 	// signed.
@@ -583,9 +582,9 @@ func (r *Repo) AppendSignature(name string, signature data.Signature) error {
 	if err != nil {
 		return err
 	}
-	r.meta[name] = b
+	r.meta[roleFilename] = b
 
-	return r.local.SetMeta(name, b)
+	return r.local.SetMeta(roleFilename, b)
 }
 
 // getSigningKeys returns available signing keys.
@@ -625,10 +624,10 @@ func (r *Repo) getSigningKeys(name string) ([]sign.Signer, error) {
 }
 
 // Used to retrieve the signable portion of the metadata when using an external signing tool.
-func (r *Repo) SignedMeta(name string) (*data.Signed, error) {
-	b, ok := r.meta[name]
+func (r *Repo) SignedMeta(roleFilename string) (*data.Signed, error) {
+	b, ok := r.meta[roleFilename]
 	if !ok {
-		return nil, ErrMissingMetadata{name}
+		return nil, ErrMissingMetadata{roleFilename}
 	}
 	s := &data.Signed{}
 	if err := json.Unmarshal(b, s); err != nil {
@@ -637,9 +636,9 @@ func (r *Repo) SignedMeta(name string) (*data.Signed, error) {
 	return s, nil
 }
 
-func validManifest(name string) bool {
+func validManifest(roleFilename string) bool {
 	for _, m := range topLevelManifests {
-		if m == name {
+		if m == roleFilename {
 			return true
 		}
 	}
@@ -952,30 +951,30 @@ func (r *Repo) Clean() error {
 	return r.local.Clean()
 }
 
-func (r *Repo) verifySignature(name string, db *verify.DB) error {
-	s, err := r.SignedMeta(name)
+func (r *Repo) verifySignature(roleFilename string, db *verify.DB) error {
+	s, err := r.SignedMeta(roleFilename)
 	if err != nil {
 		return err
 	}
-	role := strings.TrimSuffix(name, ".json")
+	role := strings.TrimSuffix(roleFilename, ".json")
 	if err := db.Verify(s, role, 0); err != nil {
-		return ErrInsufficientSignatures{name, err}
+		return ErrInsufficientSignatures{roleFilename, err}
 	}
 	return nil
 }
 
-func (r *Repo) snapshotFileMeta(name string) (data.SnapshotFileMeta, error) {
-	b, ok := r.meta[name]
+func (r *Repo) snapshotFileMeta(roleFilename string) (data.SnapshotFileMeta, error) {
+	b, ok := r.meta[roleFilename]
 	if !ok {
-		return data.SnapshotFileMeta{}, ErrMissingMetadata{name}
+		return data.SnapshotFileMeta{}, ErrMissingMetadata{roleFilename}
 	}
 	return util.GenerateSnapshotFileMeta(bytes.NewReader(b), r.hashAlgorithms...)
 }
 
-func (r *Repo) timestampFileMeta(name string) (data.TimestampFileMeta, error) {
-	b, ok := r.meta[name]
+func (r *Repo) timestampFileMeta(roleFilename string) (data.TimestampFileMeta, error) {
+	b, ok := r.meta[roleFilename]
 	if !ok {
-		return data.TimestampFileMeta{}, ErrMissingMetadata{name}
+		return data.TimestampFileMeta{}, ErrMissingMetadata{roleFilename}
 	}
 	return util.GenerateTimestampFileMeta(bytes.NewReader(b), r.hashAlgorithms...)
 }
