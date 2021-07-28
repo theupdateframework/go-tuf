@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -1562,21 +1563,30 @@ func (rs *RepoSuite) TestBadAddOrUpdateSignatures(c *C) {
 			KeyID:     id,
 			Signature: rootSig}), IsNil)
 	}
-	checkSigIDs := func(role string, keyIDs ...string) {
+	checkSigIDs := func(role string) {
 		s, err := r.SignedMeta(role)
 		c.Assert(err, IsNil)
-		c.Assert(s.Signatures, HasLen, len(keyIDs))
-		for i, id := range keyIDs {
-			c.Assert(s.Signatures[i].KeyID, Equals, id)
+		db, err := r.db()
+		c.Assert(err, IsNil)
+		// keys is a map of key IDs.
+		keys := db.GetRole(strings.TrimSuffix(role, ".json")).KeyIDs
+		c.Assert(s.Signatures, HasLen, len(keys))
+		// If the lengths are equal, and each signature key ID appears
+		// in the role keys, they Sig IDs are equal to keyIDs.
+		for _, sig := range s.Signatures {
+			if _, ok := keys[sig.KeyID]; !ok {
+				c.Fatal("missing key ID in signatures")
+			}
 		}
 	}
-	checkSigIDs("root.json", rootKey.PublicData().IDs()...)
+	checkSigIDs("root.json")
 
-	// re-adding should not duplicate
+	// re-adding should not duplicate. this is checked by verifying
+	// signature key IDs match with the map of role key IDs.
 	for _, id := range rootKey.Signer().IDs() {
 		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
 			KeyID:     id,
 			Signature: rootSig}), IsNil)
 	}
-	checkSigIDs("root.json", rootKey.PublicData().IDs()...)
+	checkSigIDs("root.json")
 }
