@@ -6,6 +6,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/json"
 	"io"
 	"testing"
 	"time"
@@ -30,11 +31,12 @@ type ecdsaSigner struct {
 
 func (s ecdsaSigner) PublicData() *data.Key {
 	pub := s.Public().(*ecdsa.PublicKey)
+	keyValBytes, _ := json.Marshal(data.KeyValue{Public: elliptic.Marshal(pub.Curve, pub.X, pub.Y)})
 	return &data.Key{
 		Type:       data.KeyTypeECDSA_SHA2_P256,
 		Scheme:     data.KeySchemeECDSA_SHA2_P256,
 		Algorithms: data.KeyAlgorithms,
-		Value:      data.KeyValue{Public: elliptic.Marshal(pub.Curve, pub.X, pub.Y)},
+		Value:      keyValBytes,
 	}
 }
 

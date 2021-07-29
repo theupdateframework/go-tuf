@@ -34,7 +34,11 @@ func (db *DB) AddKey(id string, k *data.Key) error {
 	if !k.ContainsID(id) {
 		return ErrWrongID{}
 	}
-	if !v.ValidKey(k.Value.Public) {
+	public, err := v.Public(k.Value)
+	if err != nil {
+		return err
+	}
+	if !v.ValidKey(public) {
 		return ErrInvalidKey
 	}
 

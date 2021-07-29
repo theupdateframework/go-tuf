@@ -25,10 +25,12 @@ func (TypesSuite) TestKeyIDs(c *C) {
 	err := json.Unmarshal([]byte(public), &hexbytes)
 	c.Assert(err, IsNil)
 
+	pubBytes, err := json.Marshal(KeyValue{Public: hexbytes})
+	c.Assert(err, IsNil)
 	key := Key{
 		Type:   KeyTypeEd25519,
 		Scheme: KeySchemeEd25519,
-		Value:  KeyValue{Public: hexbytes},
+		Value:  pubBytes,
 	}
 	c.Assert(key.IDs(), DeepEquals, []string{keyid10})
 
@@ -36,7 +38,7 @@ func (TypesSuite) TestKeyIDs(c *C) {
 		Type:       KeyTypeEd25519,
 		Scheme:     KeySchemeEd25519,
 		Algorithms: KeyAlgorithms,
-		Value:      KeyValue{Public: hexbytes},
+		Value:      pubBytes,
 	}
 	c.Assert(key.IDs(), DeepEquals, []string{keyid10algos})
 }
@@ -46,10 +48,12 @@ func (TypesSuite) TestRootAddKey(c *C) {
 	err := json.Unmarshal([]byte(public), &hexbytes)
 	c.Assert(err, IsNil)
 
+	pubBytes, err := json.Marshal(KeyValue{Public: hexbytes})
+	c.Assert(err, IsNil)
 	key := &Key{
 		Type:   KeyTypeEd25519,
 		Scheme: KeySchemeEd25519,
-		Value:  KeyValue{Public: hexbytes},
+		Value:  pubBytes,
 	}
 
 	root := NewRoot()
@@ -63,10 +67,12 @@ func (TypesSuite) TestRoleAddKeyIDs(c *C) {
 	err := json.Unmarshal([]byte(public), &hexbytes)
 	c.Assert(err, IsNil)
 
+	pubBytes, err := json.Marshal(KeyValue{Public: hexbytes})
+	c.Assert(err, IsNil)
 	key := &Key{
 		Type:   KeyTypeEd25519,
 		Scheme: KeySchemeEd25519,
-		Value:  KeyValue{Public: hexbytes},
+		Value:  pubBytes,
 	}
 
 	role := &Role{}
@@ -84,7 +90,7 @@ func (TypesSuite) TestRoleAddKeyIDs(c *C) {
 		Type:       KeyTypeEd25519,
 		Scheme:     KeySchemeEd25519,
 		Algorithms: KeyAlgorithms,
-		Value:      KeyValue{Public: hexbytes},
+		Value:      pubBytes,
 	}
 
 	// Adding the key again doesn't modify the array.

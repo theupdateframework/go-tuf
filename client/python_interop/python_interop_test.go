@@ -16,6 +16,7 @@ import (
 	client "github.com/theupdateframework/go-tuf/client"
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/util"
+	"github.com/theupdateframework/go-tuf/verify"
 	"golang.org/x/crypto/ed25519"
 	. "gopkg.in/check.v1"
 )
@@ -64,7 +65,10 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 		key := &data.Key{}
 		c.Assert(json.NewDecoder(f).Decode(key), IsNil)
 		c.Assert(key.Type, Equals, "ed25519")
-		c.Assert(key.Value.Public, HasLen, ed25519.PublicKeySize)
+		v := verify.Verifiers[key.Type]
+		pubBytes, err := v.Public(key.Value)
+		c.Assert(err, IsNil)
+		c.Assert(pubBytes, HasLen, ed25519.PublicKeySize)
 		client := client.NewClient(client.MemoryLocalStore(), remote)
 		c.Assert(client.Init([]*data.Key{key}, 1), IsNil)
 

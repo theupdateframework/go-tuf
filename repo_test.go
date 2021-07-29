@@ -172,7 +172,10 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 			c.Fatal("missing key")
 		}
 		c.Assert(k.IDs(), DeepEquals, ids)
-		c.Assert(k.Value.Public, HasLen, ed25519.PublicKeySize)
+		v := verify.Verifiers[k.Type]
+		pub, err := v.Public(k.Value)
+		c.Assert(err, IsNil)
+		c.Assert(pub, HasLen, ed25519.PublicKeySize)
 	}
 
 	// check root key + role are in db
@@ -196,7 +199,13 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 		c.Assert(err, IsNil)
 		c.Assert(rootKeys, HasLen, 1)
 		c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
-		c.Assert(rootKeys[0].Value.Public, DeepEquals, rootKey.Value.Public)
+		v0 := verify.Verifiers[rootKeys[0].Type]
+		pub0, err := v0.Public(rootKeys[0].Value)
+		c.Assert(err, IsNil)
+		v := verify.Verifiers[rootKey.Type]
+		pub, err := v.Public(rootKey.Value)
+		c.Assert(err, IsNil)
+		c.Assert(pub0, DeepEquals, pub)
 	}
 
 	rootKey := db.GetKey(ids[0])
@@ -331,7 +340,10 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 			c.Fatalf("missing key %s", keyID)
 		}
 		c.Assert(k.IDs(), DeepEquals, ids)
-		c.Assert(k.Value.Public, HasLen, ed25519.PublicKeySize)
+		v := verify.Verifiers[k.Type]
+		pub, err := v.Public(k.Value)
+		c.Assert(err, IsNil)
+		c.Assert(pub, HasLen, ed25519.PublicKeySize)
 	}
 
 	// check root key + role are in db
@@ -355,7 +367,13 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 		c.Assert(err, IsNil)
 		c.Assert(rootKeys, HasLen, 1)
 		c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
-		c.Assert(rootKeys[0].Value.Public, DeepEquals, rootKey.Value.Public)
+		v0 := verify.Verifiers[rootKeys[0].Type]
+		pub0, err := v0.Public(rootKeys[0].Value)
+		c.Assert(err, IsNil)
+		v := verify.Verifiers[rootKey.Type]
+		pub, err := v.Public(rootKey.Value)
+		c.Assert(err, IsNil)
+		c.Assert(pub0, DeepEquals, pub)
 	}
 
 	rootKey := db.GetKey(ids[0])

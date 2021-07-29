@@ -2,6 +2,7 @@ package sign
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"sync"
 
 	"github.com/theupdateframework/go-tuf/data"
@@ -21,11 +22,12 @@ type PrivateKeyValue struct {
 }
 
 func (k *PrivateKey) PublicData() *data.Key {
+	keyValBytes, _ := json.Marshal(data.KeyValue{Public: k.Value.Public})
 	return &data.Key{
 		Type:       k.Type,
 		Scheme:     k.Scheme,
 		Algorithms: k.Algorithms,
-		Value:      data.KeyValue{Public: k.Value.Public},
+		Value:      keyValBytes,
 	}
 }
 
@@ -81,11 +83,12 @@ func (s *ed25519Signer) ContainsID(id string) bool {
 }
 
 func (s *ed25519Signer) publicData() *data.Key {
+	keyValBytes, _ := json.Marshal(data.KeyValue{Public: []byte(s.PrivateKey.Public().(ed25519.PublicKey))})
 	return &data.Key{
 		Type:       s.keyType,
 		Scheme:     s.keyScheme,
 		Algorithms: s.keyAlgorithms,
-		Value:      data.KeyValue{Public: []byte(s.PrivateKey.Public().(ed25519.PublicKey))},
+		Value:      keyValBytes,
 	}
 }
 

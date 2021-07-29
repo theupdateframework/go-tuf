@@ -5,6 +5,7 @@ import (
 	"crypto/elliptic"
 	"crypto/sha256"
 	"encoding/asn1"
+	"encoding/json"
 	"math/big"
 
 	"github.com/theupdateframework/go-tuf/data"
@@ -21,6 +22,8 @@ type Verifier interface {
 	// ValidKey returns true if the provided public key is valid and usable to
 	// verify signatures with this verifier.
 	ValidKey([]byte) bool
+
+	Public(valueBytes json.RawMessage) ([]byte, error)
 }
 
 // Verifiers is used to map key types to Verifier instances.
@@ -40,6 +43,14 @@ func (ed25519Verifier) Verify(key, msg, sig []byte) error {
 
 func (ed25519Verifier) ValidKey(k []byte) bool {
 	return len(k) == ed25519.PublicKeySize
+}
+
+func (ed25519Verifier) Public(valueBytes json.RawMessage) ([]byte, error) {
+	s := data.KeyValue{}
+	if err := json.Unmarshal(valueBytes, &s); err != nil {
+		return nil, ErrInvalidKey
+	}
+	return s.Public, nil
 }
 
 type ecdsaSignature struct {
@@ -72,4 +83,12 @@ func (p256Verifier) Verify(key, msg, sigBytes []byte) error {
 func (p256Verifier) ValidKey(k []byte) bool {
 	x, _ := elliptic.Unmarshal(elliptic.P256(), k)
 	return x != nil
+}
+
+func (p256Verifier) Public(valueBytes json.RawMessage) ([]byte, error) {
+	s := data.KeyValue{}
+	if err := json.Unmarshal(valueBytes, &s); err != nil {
+		return nil, ErrInvalidKey
+	}
+	return s.Public, nil
 }

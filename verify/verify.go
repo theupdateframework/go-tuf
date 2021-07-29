@@ -74,7 +74,12 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 			continue
 		}
 
-		if err := Verifiers[key.Type].Verify(key.Value.Public, msg, sig.Signature); err != nil {
+		verifier := Verifiers[key.Type]
+		pubBytes, err := verifier.Public(key.Value)
+		if err != nil {
+			return err
+		}
+		if err := verifier.Verify(pubBytes, msg, sig.Signature); err != nil {
 			return err
 		}
 

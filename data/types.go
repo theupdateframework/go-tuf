@@ -33,13 +33,40 @@ type Signature struct {
 }
 
 type Key struct {
-	Type       string   `json:"keytype"`
-	Scheme     string   `json:"scheme"`
-	Algorithms []string `json:"keyid_hash_algorithms,omitempty"`
-	Value      KeyValue `json:"keyval"`
+	Type       string          `json:"keytype"`
+	Scheme     string          `json:"scheme"`
+	Algorithms []string        `json:"keyid_hash_algorithms,omitempty"`
+	Value      json.RawMessage `json:"keyval"`
 
 	ids    []string
 	idOnce sync.Once
+}
+
+// A KeyType instance is an implementation of a KeyType
+type KeyType interface {
+	// UniquePublic returns the unique information identifying the public key from the KeyValue.
+	UniquePublic(valueBytes json.RawMessage) string
+}
+
+// PublicKeyInfo is used to map key types to types that can extract public information from KeyValue
+var PublicKeyTypes = map[string]KeyType{
+	KeySchemeEd25519:         ed25519KeyType{},
+	KeySchemeECDSA_SHA2_P256: p256KeyType{},
+}
+
+type ed25519KeyType struct{}
+type p256KeyType struct{}
+
+func (v ed25519KeyType) UniquePublic(valueBytes json.RawMessage) string {
+	s := KeyValue{}
+	json.Unmarshal(valueBytes, &s)
+	return s.Public.String()
+}
+
+func (v p256KeyType) UniquePublic(valueBytes json.RawMessage) string {
+	s := KeyValue{}
+	json.Unmarshal(valueBytes, &s)
+	return s.Public.String()
 }
 
 func (k *Key) IDs() []string {
@@ -58,6 +85,10 @@ func (k *Key) ContainsID(id string) bool {
 		}
 	}
 	return false
+}
+
+func (k *Key) UniquePublic() string {
+	return PublicKeyTypes[k.Type].UniquePublic(k.Value)
 }
 
 type KeyValue struct {
@@ -122,7 +153,7 @@ func (r Root) UniqueKeys() map[string][]*Key {
 		for _, id := range role.KeyIDs {
 			// Double-check that there is actually a key with that ID.
 			if key, ok := r.Keys[id]; ok {
-				val := key.Value.Public.String()
+				val := key.UniquePublic()
 				if _, ok := seen[val]; ok {
 					continue
 				}
