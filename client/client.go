@@ -724,6 +724,10 @@ func (c *Client) Target(name string) (data.TargetFileMeta, error) {
 		return target, nil
 	}
 
+	if target, err = c.getTargetFileMeta(name); err == nil {
+		return target, nil
+	}
+
 	return data.TargetFileMeta{}, ErrNotFound{name}
 }
 
