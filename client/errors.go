@@ -10,6 +10,7 @@ import (
 var (
 	ErrNoRootKeys       = errors.New("tuf: no root keys found in local meta store")
 	ErrInsufficientKeys = errors.New("tuf: insufficient keys to meet threshold")
+	ErrNoLocalSnapshot  = errors.New("tuf: no snapshot stored locally")
 )
 
 type ErrMissingRemoteMetadata struct {
@@ -36,6 +37,16 @@ type ErrDecodeFailed struct {
 
 func (e ErrDecodeFailed) Error() string {
 	return fmt.Sprintf("tuf: failed to decode %s: %s", e.File, e.Err)
+}
+
+type ErrMaxDelegations struct {
+	Target          string
+	MaxDelegations  int
+	SnapshotVersion int
+}
+
+func (e ErrMaxDelegations) Error() string {
+	return fmt.Sprintf("tuf: max delegation of %d reached searching for %s with snapshot version %d", e.MaxDelegations, e.Target, e.SnapshotVersion)
 }
 
 func isDecodeFailedWithErrRoleThreshold(err error) bool {
@@ -88,11 +99,12 @@ func IsLatestSnapshot(err error) bool {
 }
 
 type ErrUnknownTarget struct {
-	Name string
+	Name            string
+	SnapshotVersion int
 }
 
 func (e ErrUnknownTarget) Error() string {
-	return fmt.Sprintf("tuf: unknown target file: %s", e.Name)
+	return fmt.Sprintf("tuf: unknown target file: %s with snapshot version %d", e.Name, e.SnapshotVersion)
 }
 
 type ErrMetaTooLarge struct {
@@ -111,4 +123,13 @@ type ErrInvalidURL struct {
 
 func (e ErrInvalidURL) Error() string {
 	return fmt.Sprintf("tuf: invalid repository URL %s", e.URL)
+}
+
+type ErrRoleNotInSnapshot struct {
+	Role            string
+	SnapshotVersion int
+}
+
+func (e ErrRoleNotInSnapshot) Error() string {
+	return fmt.Sprintf("tuf: role %s not in snapshot version %d", e.Role, e.SnapshotVersion)
 }

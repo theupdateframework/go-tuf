@@ -26,6 +26,39 @@ func NewDB() *DB {
 	}
 }
 
+type DelegationsVerifier struct {
+	DB *DB
+}
+
+func (d *DelegationsVerifier) Unmarshal(b []byte, v interface{}, role string, minVersion int) error {
+	return d.DB.Unmarshal(b, v, role, minVersion)
+}
+
+// NewDelegationsVerifier returns a DelegationsVerifier that verifies delegations
+// of a given Targets. It reuses the DB struct to leverage verified keys, roles
+// unmarshals.
+func NewDelegationsVerifier(d *data.Delegations) (DelegationsVerifier, error) {
+	db := &DB{
+		roles: make(map[string]*Role, len(d.Roles)),
+		keys:  make(map[string]*data.Key, len(d.Keys)),
+	}
+	for _, r := range d.Roles {
+		if _, ok := topLevelRoles[r.Name]; ok {
+			return DelegationsVerifier{}, ErrInvalidDelegatedRole
+		}
+		role := &data.Role{Threshold: r.Threshold, KeyIDs: r.KeyIDs}
+		if err := db.addRole(r.Name, role); err != nil {
+			return DelegationsVerifier{}, err
+		}
+	}
+	for id, k := range d.Keys {
+		if err := db.AddKey(id, k); err != nil {
+			return DelegationsVerifier{}, err
+		}
+	}
+	return DelegationsVerifier{db}, nil
+}
+
 func (db *DB) AddKey(id string, k *data.Key) error {
 	v, ok := Verifiers[k.Type]
 	if !ok {
@@ -43,22 +76,31 @@ func (db *DB) AddKey(id string, k *data.Key) error {
 	return nil
 }
 
-var validRoles = map[string]struct{}{
+var topLevelRoles = map[string]struct{}{
 	"root":      {},
 	"targets":   {},
 	"snapshot":  {},
 	"timestamp": {},
 }
 
+// ValidRole checks if a role is a top level role.
 func ValidRole(name string) bool {
-	_, ok := validRoles[name]
+	return isTopLevelRole(name)
+}
+
+func isTopLevelRole(name string) bool {
+	_, ok := topLevelRoles[name]
 	return ok
 }
 
 func (db *DB) AddRole(name string, r *data.Role) error {
-	if !ValidRole(name) {
+	if !isTopLevelRole(name) {
 		return ErrInvalidRole
 	}
+	return db.addRole(name, r)
+}
+
+func (db *DB) addRole(name string, r *data.Role) error {
 	if r.Threshold < 1 {
 		return ErrInvalidThreshold
 	}

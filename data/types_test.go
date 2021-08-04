@@ -2,7 +2,10 @@ package data
 
 import (
 	"encoding/json"
+	"testing"
 
+	"github.com/stretchr/testify/assert"
+	cjson "github.com/tent/canonical-json-go"
 	. "gopkg.in/check.v1"
 )
 
@@ -90,4 +93,139 @@ func (TypesSuite) TestRoleAddKeyIDs(c *C) {
 	// Adding the key again doesn't modify the array.
 	c.Assert(role.AddKeyIDs(key.IDs()), Equals, true)
 	c.Assert(role.KeyIDs, DeepEquals, []string{keyid10, keyid10algos})
+}
+
+func TestDelegatedRolePathMatch(t *testing.T) {
+	var tts = []struct {
+		testName         string
+		pathPatterns     []string
+		pathHashPrefixes []string
+		file             string
+		shouldMatch      bool
+	}{
+		{
+			testName: "no path",
+			file:     "licence.txt",
+		},
+		{
+			testName:     "match path *",
+			pathPatterns: []string{"null", "targets/*.tgz"},
+			file:         "targets/foo.tgz",
+			shouldMatch:  true,
+		},
+		{
+			testName:     "does not match path *",
+			pathPatterns: []string{"null", "targets/*.tgz"},
+			file:         "targets/foo.txt",
+			shouldMatch:  false,
+		},
+		{
+			testName:     "match path ?",
+			pathPatterns: []string{"foo-version-?.tgz"},
+			file:         "foo-version-a.tgz",
+			shouldMatch:  true,
+		},
+		{
+			testName:     "does not match ?",
+			pathPatterns: []string{"foo-version-?.tgz"},
+			file:         "foo-version-alpha.tgz",
+			shouldMatch:  false,
+		},
+		// picked from https://github.com/theupdateframework/tuf/blob/30ba6e9f9ab25e0370e29ce574dada2d8809afa0/tests/test_updater.py#L1726-L1734
+		{
+			testName:         "match hash prefix",
+			pathHashPrefixes: []string{"badd", "8baf"},
+			file:             "/file3.txt",
+			shouldMatch:      true,
+		},
+		{
+			testName:         "does not match hash prefix",
+			pathHashPrefixes: []string{"badd"},
+			file:             "/file3.txt",
+			shouldMatch:      false,
+		},
+		{
+			testName:         "hash prefix first char",
+			pathHashPrefixes: []string{"2"},
+			file:             "/a/b/c/file_d.txt",
+			shouldMatch:      true,
+		},
+		{
+			testName:         "full hash prefix",
+			pathHashPrefixes: []string{"34c85d1ee84f61f10d7dc633472a49096ed87f8f764bd597831eac371f40ac39"},
+			file:             "/e/f/g.txt",
+			shouldMatch:      true,
+		},
+	}
+	for _, tt := range tts {
+		t.Run(tt.testName, func(t *testing.T) {
+			d := DelegatedRole{
+				Paths:            tt.pathPatterns,
+				PathHashPrefixes: tt.pathHashPrefixes,
+			}
+			assert.NoError(t, d.validatePaths())
+
+			matchesPath, err := d.MatchesPath(tt.file)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.shouldMatch, matchesPath)
+		})
+
+	}
+}
+
+func TestDelegatedRoleJSON(t *testing.T) {
+	var tts = []struct {
+		testName string
+		d        *DelegatedRole
+		rawCJSON string
+	}{{
+		testName: "all fields with hashes",
+		d: &DelegatedRole{
+			Name:             "n1",
+			KeyIDs:           []string{"k1"},
+			Threshold:        5,
+			Terminating:      true,
+			PathHashPrefixes: []string{"8f"},
+		},
+		rawCJSON: `{"keyids":["k1"],"name":"n1","path_hash_prefixes":["8f"],"paths":null,"terminating":true,"threshold":5}`,
+	},
+		{
+			testName: "paths only",
+			d: &DelegatedRole{
+				Name:      "n2",
+				KeyIDs:    []string{"k1", "k3"},
+				Threshold: 12,
+				Paths:     []string{"*.txt"},
+			},
+			rawCJSON: `{"keyids":["k1","k3"],"name":"n2","paths":["*.txt"],"terminating":false,"threshold":12}`,
+		},
+		{
+			testName: "default",
+			d:        &DelegatedRole{},
+			rawCJSON: `{"keyids":null,"name":"","paths":null,"terminating":false,"threshold":0}`,
+		},
+	}
+
+	for _, tt := range tts {
+		t.Run(tt.testName, func(t *testing.T) {
+			b, err := cjson.Marshal(tt.d)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.rawCJSON, string(b))
+
+			newD := &DelegatedRole{}
+			err = json.Unmarshal(b, newD)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.d, newD)
+		})
+	}
+}
+
+func TestDelegatedRoleUnmarshalErr(t *testing.T) {
+	targetsWithBothMatchers := []byte(`{"keyids":null,"name":"","paths":["*.txt"],"path_hash_prefixes":["8f"],"terminating":false,"threshold":0}`)
+	var d DelegatedRole
+	assert.Equal(t, ErrPathsAndPathHashesSet, json.Unmarshal(targetsWithBothMatchers, &d))
+
+	// test for type errors
+	err := json.Unmarshal([]byte(`{"keyids":"a"}`), &d)
+	assert.Equal(t, "keyids", err.(*json.UnmarshalTypeError).Field)
 }

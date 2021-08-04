@@ -7,16 +7,17 @@ import (
 )
 
 var (
-	ErrMissingKey       = errors.New("tuf: missing key")
-	ErrNoSignatures     = errors.New("tuf: data has no signatures")
-	ErrInvalid          = errors.New("tuf: signature verification failed")
-	ErrWrongMethod      = errors.New("tuf: invalid signature type")
-	ErrWrongMetaType    = errors.New("tuf: meta file has wrong type")
-	ErrExists           = errors.New("tuf: key already in db")
-	ErrInvalidKey       = errors.New("tuf: invalid key")
-	ErrInvalidRole      = errors.New("tuf: invalid role")
-	ErrInvalidKeyID     = errors.New("tuf: invalid key id")
-	ErrInvalidThreshold = errors.New("tuf: invalid role threshold")
+	ErrMissingKey           = errors.New("tuf: missing key")
+	ErrNoSignatures         = errors.New("tuf: data has no signatures")
+	ErrInvalid              = errors.New("tuf: signature verification failed")
+	ErrWrongMethod          = errors.New("tuf: invalid signature type")
+	ErrWrongMetaType        = errors.New("tuf: meta file has wrong type")
+	ErrExists               = errors.New("tuf: key already in db")
+	ErrInvalidKey           = errors.New("tuf: invalid key")
+	ErrInvalidRole          = errors.New("tuf: invalid role")
+	ErrInvalidDelegatedRole = errors.New("tuf: invalid delegated role")
+	ErrInvalidKeyID         = errors.New("tuf: invalid key id")
+	ErrInvalidThreshold     = errors.New("tuf: invalid role threshold")
 )
 
 type ErrWrongID struct{}
