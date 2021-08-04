@@ -1,12 +1,15 @@
 package tuf
 
 import (
+	"crypto"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -1429,4 +1432,161 @@ func (rs *RepoSuite) TestThreshold(c *C) {
 	timestampVersion, err := r.TimestampVersion()
 	c.Assert(err, IsNil)
 	c.Assert(timestampVersion, Equals, 2)
+}
+
+func (rs *RepoSuite) TestAddOrUpdateSignatures(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// don't use consistent snapshots to make the checks simpler
+	c.Assert(r.Init(false), IsNil)
+
+	// generate root key offline and add as a verification key
+	rootKey, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	c.Assert(r.AddVerificationKey("root", rootKey.PublicData()), IsNil)
+	targetsKey, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	c.Assert(r.AddVerificationKey("targets", targetsKey.PublicData()), IsNil)
+	snapshotKey, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	c.Assert(r.AddVerificationKey("snapshot", snapshotKey.PublicData()), IsNil)
+	timestampKey, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	c.Assert(r.AddVerificationKey("timestamp", timestampKey.PublicData()), IsNil)
+
+	// generate signatures externally and append
+	rootMeta, err := r.SignedMeta("root.json")
+	c.Assert(err, IsNil)
+	rootSig, err := rootKey.Signer().Sign(rand.Reader, rootMeta.Signed, crypto.Hash(0))
+	c.Assert(err, IsNil)
+	for _, id := range rootKey.Signer().IDs() {
+		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
+			KeyID:     id,
+			Signature: rootSig}), IsNil)
+	}
+
+	// add targets and sign
+	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+	targetsMeta, err := r.SignedMeta("targets.json")
+	c.Assert(err, IsNil)
+	targetsSig, err := targetsKey.Signer().Sign(rand.Reader, targetsMeta.Signed, crypto.Hash(0))
+	c.Assert(err, IsNil)
+	for _, id := range targetsKey.Signer().IDs() {
+		r.AddOrUpdateSignature("targets.json", data.Signature{
+			KeyID:     id,
+			Signature: targetsSig})
+	}
+
+	// snapshot and timestamp
+	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
+	snapshotMeta, err := r.SignedMeta("snapshot.json")
+	c.Assert(err, IsNil)
+	snapshotSig, err := snapshotKey.Signer().Sign(rand.Reader, snapshotMeta.Signed, crypto.Hash(0))
+	c.Assert(err, IsNil)
+	for _, id := range snapshotKey.Signer().IDs() {
+		r.AddOrUpdateSignature("snapshot.json", data.Signature{
+			KeyID:     id,
+			Signature: snapshotSig})
+	}
+
+	c.Assert(r.Timestamp(), IsNil)
+	timestampMeta, err := r.SignedMeta("timestamp.json")
+	c.Assert(err, IsNil)
+	timestampSig, err := timestampKey.Signer().Sign(rand.Reader, timestampMeta.Signed, crypto.Hash(0))
+	c.Assert(err, IsNil)
+	for _, id := range timestampKey.Signer().IDs() {
+		r.AddOrUpdateSignature("timestamp.json", data.Signature{
+			KeyID:     id,
+			Signature: timestampSig})
+	}
+
+	// commit successfully!
+	c.Assert(r.Commit(), IsNil)
+}
+
+func (rs *RepoSuite) TestBadAddOrUpdateSignatures(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// don't use consistent snapshots to make the checks simpler
+	c.Assert(r.Init(false), IsNil)
+
+	// generate root key offline and add as a verification key
+	rootKey, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	c.Assert(r.AddVerificationKey("root", rootKey.PublicData()), IsNil)
+	targetsKey, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	c.Assert(r.AddVerificationKey("targets", targetsKey.PublicData()), IsNil)
+	snapshotKey, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	c.Assert(r.AddVerificationKey("snapshot", snapshotKey.PublicData()), IsNil)
+	timestampKey, err := sign.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	c.Assert(r.AddVerificationKey("timestamp", timestampKey.PublicData()), IsNil)
+
+	// add a signature with a bad role
+	rootMeta, err := r.SignedMeta("root.json")
+	c.Assert(err, IsNil)
+	rootSig, err := rootKey.Signer().Sign(rand.Reader, rootMeta.Signed, crypto.Hash(0))
+	c.Assert(err, IsNil)
+	for _, id := range rootKey.Signer().IDs() {
+		c.Assert(r.AddOrUpdateSignature("invalid_root.json", data.Signature{
+			KeyID:     id,
+			Signature: rootSig}), Equals, ErrInvalidRole{"invalid_root"})
+	}
+
+	// add a root signature with an key ID that is for the targets role
+	for _, id := range targetsKey.Signer().IDs() {
+		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
+			KeyID:     id,
+			Signature: rootSig}), Equals, verify.ErrInvalidKey)
+	}
+
+	// attempt to add a bad signature to root
+	badSig, err := rootKey.Signer().Sign(rand.Reader, []byte(""), crypto.Hash(0))
+	c.Assert(err, IsNil)
+	for _, id := range rootKey.Signer().IDs() {
+		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
+			KeyID:     id,
+			Signature: badSig}), Equals, verify.ErrInvalid)
+	}
+
+	// add the correct root signature
+	for _, id := range rootKey.Signer().IDs() {
+		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
+			KeyID:     id,
+			Signature: rootSig}), IsNil)
+	}
+	checkSigIDs := func(role string) {
+		s, err := r.SignedMeta(role)
+		c.Assert(err, IsNil)
+		db, err := r.db()
+		c.Assert(err, IsNil)
+		// keys is a map of key IDs.
+		keys := db.GetRole(strings.TrimSuffix(role, ".json")).KeyIDs
+		c.Assert(s.Signatures, HasLen, len(keys))
+		// If the lengths are equal, and each signature key ID appears
+		// in the role keys, they Sig IDs are equal to keyIDs.
+		for _, sig := range s.Signatures {
+			if _, ok := keys[sig.KeyID]; !ok {
+				c.Fatal("missing key ID in signatures")
+			}
+		}
+	}
+	checkSigIDs("root.json")
+
+	// re-adding should not duplicate. this is checked by verifying
+	// signature key IDs match with the map of role key IDs.
+	for _, id := range rootKey.Signer().IDs() {
+		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
+			KeyID:     id,
+			Signature: rootSig}), IsNil)
+	}
+	checkSigIDs("root.json")
 }
