@@ -812,8 +812,10 @@ func (s *ClientSuite) TestUpdateLocalRootExpiredKeyChange(c *C) {
 	// replace all keys
 	newKeyIDs := make(map[string][]string)
 	for role, ids := range s.keyIDs {
-		c.Assert(s.repo.RevokeKey(role, ids[0]), IsNil)
-		newKeyIDs[role] = s.genKey(c, role)
+		if role != "snapshot" && role != "timestamp" && role != "targets" {
+			c.Assert(s.repo.RevokeKey(role, ids[0]), IsNil)
+			newKeyIDs[role] = s.genKey(c, role)
+		}
 	}
 
 	// update metadata

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -209,6 +210,7 @@ func (c *Client) Update() (data.TargetFiles, error) {
 			return nil, err
 		}
 		if err := c.local.SetMeta("targets.json", targetsJSON); err != nil {
+			fmt.Println("problem here 220")
 			return nil, err
 		}
 	}
