@@ -387,47 +387,13 @@ func (c *Client) updateWithLatestRoot(m *data.SnapshotFileMeta) (data.TargetFile
 // The verification of local files is purely for consistency, if an attacker
 // has compromised the local storage, there is no guarantee it can be trusted.
 func (c *Client) getLocalMeta() error {
-	meta, err := c.local.GetMeta()
-	if err != nil {
+	if err := c.getLocalRootMeta(); err != nil {
 		return err
 	}
 
-	if rootJSON, ok := meta["root.json"]; ok {
-		// unmarshal root.json without verifying as we need the root
-		// keys first
-		s := &data.Signed{}
-		if err := json.Unmarshal(rootJSON, s); err != nil {
-			return err
-		}
-		root := &data.Root{}
-		if err := json.Unmarshal(s.Signed, root); err != nil {
-			return err
-		}
-		c.db = verify.NewDB()
-		for id, k := range root.Keys {
-			if err := c.db.AddKey(id, k); err != nil {
-				// TUF is considering in TAP-12 removing the
-				// requirement that the keyid hash algorithm be derived
-				// from the public key. So to be forwards compatible,
-				// we ignore `ErrWrongID` errors.
-				//
-				// TAP-12: https://github.com/theupdateframework/taps/blob/master/tap12.md
-				if _, ok := err.(verify.ErrWrongID); !ok {
-					return err
-				}
-			}
-		}
-		for name, role := range root.Roles {
-			if err := c.db.AddRole(name, role); err != nil {
-				return err
-			}
-		}
-		if err := c.db.Verify(s, "root", 0); err != nil {
-			return err
-		}
-		c.consistentSnapshot = root.ConsistentSnapshot
-	} else {
-		return ErrNoRootKeys
+	meta, err := c.local.GetMeta()
+	if err != nil {
+		return nil
 	}
 
 	if snapshotJSON, ok := meta["snapshot.json"]; ok {
