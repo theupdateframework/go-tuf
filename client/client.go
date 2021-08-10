@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -176,6 +175,13 @@ func (c *Client) Update() (data.TargetFiles, error) {
 	}
 
 	// Get snapshot.json, then extract file metas.
+<<<<<<< HEAD
+=======
+	//
+	// The snapshot.json is only saved locally after checking
+	// targets.json so that it will be re-downloaded on subsequent updates
+	// if this update fails.
+>>>>>>> 7e70871 (removing some debugging comments)
 	// root.json meta should not be stored in the snapshot, if it is,
 	// the root will be checked, re-downloaded
 	snapshotJSON, err := c.downloadMetaFromTimestamp("snapshot.json", snapshotMeta)
@@ -210,7 +216,6 @@ func (c *Client) Update() (data.TargetFiles, error) {
 			return nil, err
 		}
 		if err := c.local.SetMeta("targets.json", targetsJSON); err != nil {
-			fmt.Println("problem here 220")
 			return nil, err
 		}
 	}

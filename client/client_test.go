@@ -372,23 +372,43 @@ func startTUFRepoServer(baseDir string, relPath string) (net.Listener, error) {
 	return l, err
 }
 
+<<<<<<< HEAD
 // newClientWithMeta creates new client and sets the root metadata for it.
 func newClientWithMeta(baseDir string, relPath string, serverAddr string) (*Client, error) {
 	initialStateDir := filepath.Join(baseDir, relPath)
 	opts := &HTTPRemoteOptions{
 		MetadataPath: "metadata",
 		TargetsPath:  "targets",
+=======
+func (s *ClientSuite) initClientWithMetaFiles(c *C, metaDirPath string) error {
+	var MetaFiles = [1]string{"root"}
+	for _, m := range MetaFiles {
+		if data, err := ioutil.ReadFile(filepath.Join(metaDirPath, m+".json")); err == nil {
+			s.local.SetMeta(m, data)
+		} else {
+			return err
+		}
+>>>>>>> 7e70871 (removing some debugging comments)
 	}
 
 	remote, err := HTTPRemoteStore(fmt.Sprintf("http://%s/", serverAddr), opts, nil)
 	if err != nil {
 		return nil, err
 	}
+<<<<<<< HEAD
 	c := NewClient(MemoryLocalStore(), remote)
 	for _, m := range []string{"root.json", "snapshot.json", "timestamp.json", "targets.json"} {
 		metadataJSON, err := ioutil.ReadFile(initialStateDir + "/" + m)
 		if err != nil {
 			return nil, err
+=======
+	for _, f := range files {
+		if data, err := ioutil.ReadFile(filepath.Join(metaDirPath, f.Name())); err == nil {
+			//s.remote.meta[f.Name()] = newFakeFile(data)
+			s.store.SetMeta(f.Name(), data)
+		} else {
+			return err
+>>>>>>> 7e70871 (removing some debugging comments)
 		}
 		c.local.SetMeta(m, metadataJSON)
 	}
