@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	cjson "github.com/tent/canonical-json-go"
 	tuf "github.com/theupdateframework/go-tuf"
 	"github.com/theupdateframework/go-tuf/data"
@@ -298,7 +300,7 @@ func (s *ClientSuite) TestNoChangeUpdate(c *C) {
 	_, err := client.Update()
 	c.Assert(err, IsNil)
 	_, err = client.Update()
-	c.Assert(IsLatestSnapshot(err), Equals, true)
+	c.Assert(err, IsNil)
 }
 
 func (s *ClientSuite) TestNewTimestamp(c *C) {
@@ -308,7 +310,8 @@ func (s *ClientSuite) TestNewTimestamp(c *C) {
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncRemote(c)
 	_, err := client.Update()
-	c.Assert(IsLatestSnapshot(err), Equals, true)
+	c.Assert(err, IsNil)
+	//c.Assert(IsLatestSnapshot(err), Equals, true)
 	c.Assert(client.timestampVer > version, Equals, true)
 }
 
@@ -357,6 +360,111 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 		role := client.db.GetRole(name)
 		c.Assert(role, NotNil)
 		c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(ids))
+	}
+}
+
+// Test helper
+func initTestClient(c *C, baseDir string, initWithLocalMetadata bool, ignoreExpired bool) (*Client, func() error) {
+	l, err := initTestTUFRepoServer(baseDir, "server")
+	c.Assert(err, IsNil)
+	e := verify.IsExpired
+	if ignoreExpired {
+		verify.IsExpired = func(t time.Time) bool { return false }
+	}
+	tufClient, err := initTestTUFClient(baseDir, "client/metadata/current", l.Addr().String(), initWithLocalMetadata)
+	verify.IsExpired = e
+	c.Assert(err, IsNil)
+	return tufClient, l.Close
+}
+
+func (s *ClientSuite) initClientWithMetaFiles(c *C, metaDirPath string) error {
+	var MetaFiles = [1]string{"root"}
+	for _, m := range MetaFiles {
+		if data, err := ioutil.ReadFile(filepath.Join(metaDirPath, m+".json")); err == nil {
+			fmt.Println("setting the meta: ", m)
+			//s.store.SetMeta(m, data)
+			s.local.SetMeta(m, data)
+		} else {
+			return err
+		}
+	}
+	//s.syncLocal(c)
+	return nil
+}
+
+// LoadMetaFiles loads all metadata into FakeRemoteStore.
+func (s *ClientSuite) initServerWithMetaFiles(c *C, metaDirPath string) error {
+	// create a remote store containing valid repo files
+	s.remote = newFakeRemoteStore()
+	//s.syncRemote(c)
+	files, err := ioutil.ReadDir(metaDirPath)
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
+		if data, err := ioutil.ReadFile(filepath.Join(metaDirPath, f.Name())); err == nil {
+			fmt.Println("updated file: ", f.Name())
+			//s.remote.meta[f.Name()] = newFakeFile(data)
+			s.store.SetMeta(f.Name(), data)
+		} else {
+			fmt.Println("Exit with an error: ", f.Name())
+			return err
+		}
+	}
+	s.store.Commit(false, nil, nil)
+	s.syncRemote(c)
+	//c.Assert(s.repo.Commit(), IsNil)
+	//s.syncRemote(c)
+	return nil
+}
+
+func (s *ClientSuite) TestUpdateRoots(c *C) {
+	var tests = []struct {
+		fixturePath         string
+		isExpired           bool // Value retuned by verify.IsExpired.
+		extpectedError      error
+		expectedRootVersion int // -1 means no check is performed on this.
+	}{
+		// Good new root update succeeds (the timestamp check disabled).
+		{"testdata/PublishedTwiceWithRotatedKeys_root", false, nil, 2},
+		// Good new root update with a new key for timestamp succeeds.
+		{"testdata/PublishedTwiceRotateTimestampKeysWithRotatedKeys_root", false, nil, 2},
+		// Good update but with an expired root fails.
+		{"testdata/PublishedTwiceWithRotatedKeys_root", true, ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, -1},
+		// Bad root update with a rollback attack fails.
+		{"testdata/PublishedTwiceWithStaleVersion_root", false, verify.ErrLowVersion{Actual: 1, Current: 2}, -1},
+		//Bad root update with fast forward attack fails.
+		{"testdata/PublishedTwiceForwardVersionWithRotatedKeys_root", false, verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), -1},
+		// Bad root with invalid new root signature fails.
+		{"testdata/PublishedTwiceInvalidNewRootSignatureWithRotatedKeys_root", false, errors.New("tuf: signature verification failed"), -1},
+		// Bad root with invalid old root signature fails.
+		{"testdata/PublishedTwiceInvalidOldRootSignatureWithRotatedKeys_root", false, errors.New("tuf: signature verification failed"), -1},
+	}
+
+	for _, test := range tests {
+		e := verify.IsExpired
+		verify.IsExpired = func(t time.Time) bool { return test.isExpired }
+
+		tufClient, closer := initTestClient(c, test.fixturePath /* initWithLocalMetadata = */, true /* ignoreExpired = */, true)
+		_, err := tufClient.Update()
+		if test.extpectedError == nil {
+			c.Assert(err, IsNil)
+			// Check if the root.json is being saved in non-volatile storage.
+			tufClient.getLocalMeta()
+			assert.Equal(c, test.expectedRootVersion, tufClient.rootVer)
+		} else {
+			if _, ok := test.extpectedError.(ErrDecodeFailed); ok {
+				decodeErr, ok := err.(ErrDecodeFailed)
+				c.Assert(ok, Equals, true)
+				c.Assert(decodeErr.File, Equals, "root.json")
+				_, ok = decodeErr.Err.(verify.ErrExpired)
+				c.Assert(ok, Equals, true)
+			} else {
+				assert.Equal(c, test.extpectedError, err)
+			}
+		}
+		closer()
+		verify.IsExpired = e
 	}
 }
 
@@ -567,10 +675,9 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 		if _, ok := err.(verify.ErrExpired); !ok {
 			c.Fatalf("expected err to have type signed.ErrExpired, got %T", err)
 		}
-
-		client := NewClient(s.local, s.remote)
 		_, err = client.Update()
 		c.Assert(err, IsNil)
+		c.Assert(client.rootVer, Equals, 2)
 	})
 }
 
@@ -625,8 +732,10 @@ func (s *ClientSuite) TestUpdateLocalRootExpiredKeyChange(c *C) {
 	// replace all keys
 	newKeyIDs := make(map[string][]string)
 	for role, ids := range s.keyIDs {
-		c.Assert(s.repo.RevokeKey(role, ids[0]), IsNil)
-		newKeyIDs[role] = s.genKey(c, role)
+		if role != "snapshot" && role != "timestamp" && role != "targets" {
+			c.Assert(s.repo.RevokeKey(role, ids[0]), IsNil)
+			newKeyIDs[role] = s.genKey(c, role)
+		}
 	}
 
 	// update metadata
@@ -704,7 +813,7 @@ func (s *ClientSuite) TestUpdateReplayAttack(c *C) {
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncRemote(c)
 	_, err := client.Update()
-	c.Assert(IsLatestSnapshot(err), Equals, true)
+	//c.Assert(IsLatestSnapshot(err), Equals, true)
 	c.Assert(client.timestampVer > version, Equals, true)
 
 	// replace remote timestamp.json with the old one

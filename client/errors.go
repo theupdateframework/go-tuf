@@ -133,3 +133,23 @@ type ErrRoleNotInSnapshot struct {
 func (e ErrRoleNotInSnapshot) Error() string {
 	return fmt.Sprintf("tuf: role %s not in snapshot version %d", e.Role, e.SnapshotVersion)
 }
+
+//func (e ErrTargetsSnapshotVersionMismatch) Error() string {
+//	return fmt.Sprintf("tuf: downloaded %s version %d expected %d in snapshot v%d ", e.Role, e.DownloadedTargetsVersion, e.TargetsSnapshotVersion, e.SnapshotVersion)
+//}
+
+type ErrEmptyTimestampOrSnapshot struct {
+}
+
+func (e ErrEmptyTimestampOrSnapshot) Error() string {
+	return fmt.Sprint("tuf: Timestamp or snapshot is empty")
+}
+
+type ErrWrongRootVersion struct {
+	DownloadedVersion int
+	ExpectedVersion   int
+}
+
+func (e ErrWrongRootVersion) Error() string {
+	return fmt.Sprintf("tuf: wrong root version downloaded expected %d got %d", e.ExpectedVersion, e.DownloadedVersion)
+}

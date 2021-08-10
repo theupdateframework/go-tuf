@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"reflect"
+	"sort"
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/util"
@@ -19,6 +22,7 @@ const (
 	defaultRootDownloadLimit      = 512000
 	defaultTimestampDownloadLimit = 16384
 	defaultMaxDelegations         = 32
+	defaultMaxRoots               = 10000
 )
 
 // LocalStore is local storage for downloaded top-level metadata.
@@ -86,13 +90,17 @@ type Client struct {
 	// MaxDelegations limits by default the number of delegations visited for any
 	// target
 	MaxDelegations int
+
+	// UpdaterMaxRoots limits the number of downloaded roots in 1.0.19 root updater
+	UpdaterMaxRoots int
 }
 
 func NewClient(local LocalStore, remote RemoteStore) *Client {
 	return &Client{
-		local:          local,
-		remote:         remote,
-		MaxDelegations: defaultMaxDelegations,
+		local:           local,
+		remote:          remote,
+		MaxDelegations:  defaultMaxDelegations,
+		UpdaterMaxRoots: defaultMaxRoots,
 	}
 }
 
@@ -148,27 +156,11 @@ func (c *Client) Update() (data.TargetFiles, error) {
 }
 
 func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
-	// Always start the update using local metadata
-	if err := c.getLocalMeta(); err != nil {
+	if err := c.updateRoots(); err != nil {
 		if _, ok := err.(verify.ErrExpired); ok {
-			if !latestRoot {
-				return c.updateWithLatestRoot(nil)
-			}
-			// this should not be reached as if the latest root has
-			// been downloaded and it is expired, updateWithLatestRoot
-			// should not have continued the update
-			return nil, err
+			return nil, ErrDecodeFailed{"root.json", err}
 		}
-		if latestRoot && isErrRoleThreshold(err) {
-			// Root was updated with new keys, so our local metadata is no
-			// longer validating. Read only the versions from the local metadata
-			// and re-download everything.
-			if err := c.getRootAndLocalVersionsUnsafe(); err != nil {
-				return nil, err
-			}
-		} else {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	// Get timestamp.json, extract snapshot.json file meta and save the
@@ -179,11 +171,6 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 	}
 	snapshotMeta, err := c.decodeTimestamp(timestampJSON)
 	if err != nil {
-		// ErrRoleThreshold could indicate timestamp keys have been
-		// revoked, so retry with the latest root.json
-		if isDecodeFailedWithErrRoleThreshold(err) && !latestRoot {
-			return c.updateWithLatestRoot(nil)
-		}
 		return nil, err
 	}
 	if err := c.local.SetMeta("timestamp.json", timestampJSON); err != nil {
@@ -191,16 +178,18 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 	}
 
 	// Return ErrLatestSnapshot if we already have the latest snapshot.json
-	if c.hasMetaFromTimestamp("snapshot.json", snapshotMeta) {
-		return nil, ErrLatestSnapshot{c.snapshotVer}
-	}
+	//if c.hasMetaFromTimestamp("snapshot.json", snapshotMeta) {
+	// FIXME: Should we return with an error?
+	//	fmt.Println("Hey you!")
+	//	return nil, ErrLatestSnapshot{c.snapshotVer}
+	//}
 
 	// Get snapshot.json, then extract file metas.
 	//
 	// The snapshot.json is only saved locally after checking
 	// targets.json so that it will be re-downloaded on subsequent updates
 	// if this update fails.
-	// root.json meta should not be stored in the snapshot, if it is,
+	// root.json meta should not be stored in the snapshot(???), if it is,
 	// the root will be checked, re-downloaded
 	snapshotJSON, err := c.downloadMetaFromTimestamp("snapshot.json", snapshotMeta)
 	if err != nil {
@@ -208,21 +197,7 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 	}
 	snapshotMetas, err := c.decodeSnapshot(snapshotJSON)
 	if err != nil {
-		// ErrRoleThreshold could indicate snapshot keys have been
-		// revoked, so retry with the latest root.json
-		if isDecodeFailedWithErrRoleThreshold(err) && !latestRoot {
-			return c.updateWithLatestRoot(nil)
-		}
 		return nil, err
-	}
-
-	// If we don't have the root.json, download it, save it in local
-	// storage and restart the update
-	// Root should no longer be pinned in snapshot meta https://github.com/theupdateframework/tuf/pull/988
-	if rootMeta, ok := snapshotMetas["root.json"]; ok {
-		if !c.hasMetaFromSnapshot("root.json", rootMeta) {
-			return c.updateWithLatestRoot(&rootMeta)
-		}
 	}
 
 	// If we don't have the targets.json, download it, determine updated
@@ -239,6 +214,7 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 			return nil, err
 		}
 		if err := c.local.SetMeta("targets.json", targetsJSON); err != nil {
+			fmt.Println("problem here 220")
 			return nil, err
 		}
 	}
@@ -247,26 +223,170 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 	if err := c.local.SetMeta("snapshot.json", snapshotJSON); err != nil {
 		return nil, err
 	}
-
 	return updatedTargets, nil
+}
+
+func (c *Client) updateRoots() error {
+	// https://theupdateframework.github.io/specification/v1.0.19/index.html#load-trusted-root
+
+	// 5.2 Load the trusted root metadata file. We assume that a good,
+	// trusted copy of this file was shipped with the package manager
+	// or software updater using an out-of-band process. Note that
+	// the expiration of the trusted root metadata file does not
+	// matter, because we will attempt to update it in the next step.
+	if err := c.getLocalRootMeta(); err != nil {
+		if _, ok := err.(verify.ErrExpired); !ok {
+			return err
+		}
+	}
+
+	// Prepare for 5.3.11: If the timestamp and / or snapshot keys have been rotated,
+	// then delete the trusted timestamp and snapshot metadata files.
+	getKeyIDs := func(role string) []string {
+		keyIDs := make([]string, 0, len(c.db.GetRole(role).KeyIDs))
+		for k := range c.db.GetRole(role).KeyIDs {
+			keyIDs = append(keyIDs, k)
+		}
+		sort.Strings(keyIDs)
+		return keyIDs
+	}
+	startKeyIDs := map[string][]string{"timestamp": {}, "snapshot": {}, "targets": {}}
+	for k := range startKeyIDs {
+		startKeyIDs[k] = getKeyIDs(k)
+	}
+
+	// 5.3.1 Temorarily turn on the consistent snapshots in order to download
+	// versioned root metadata files as described next.
+	consistentSnapshot := c.consistentSnapshot
+	c.consistentSnapshot = true
+
+	// https://theupdateframework.github.io/specification/v1.0.19/index.html#update-root
+
+	// 5.3.1 Since it may now be signed using entirely different keys,
+	// the client MUST somehow be able to establish a trusted line of
+	// continuity to the latest set of keys (see § 6.1 Key
+	// management and migration). To do so, the client MUST
+	// download intermediate root metadata files, until the
+	// latest available one is reached. Therefore, it MUST
+	// temporarily turn on consistent snapshots in order to
+	// download versioned root metadata files as described next.
+
+	// This loop returns on error or breaks after downloading the lastest root metadata.
+	// 5.3.2 Let N denote the version number of the trusted root metadata file.
+	for i := 0; i < c.UpdaterMaxRoots; i++ {
+		// 5.3.3 Try downloading version nPlusOne of the root metadata file.
+		// NOTE: as a side effect, we do update c.rootVer to nPlusOne between iterations.
+		nPlusOne := c.rootVer + 1
+		nPlusOneRootPath := util.VersionedPath("root.json", nPlusOne)
+		nPlusOneRootMetadata, err := c.downloadMetaUnsafe(nPlusOneRootPath, defaultRootDownloadLimit)
+
+		if err != nil {
+			if _, ok := err.(ErrMissingRemoteMetadata); ok {
+				// stop when the next root can't be downloaded
+				break
+			} else {
+				return err
+			}
+		}
+
+		// 5.3.4 Check for an arbitrary software attack.
+		nPlusOneRootMetadataSigned := &data.Root{}
+		if nPlusOne == 1 {
+			return ErrNoRootKeys
+		} else {
+			// 5.3.4.1 Check that N signed N+1
+			// 5.3.5 Check for a rollback attack. Here, we check that nPlusOneRootMetadataSigned.version >= nPlusOne.
+			if err := c.db.UnmarshalExpired(nPlusOneRootMetadata, nPlusOneRootMetadataSigned, "root", nPlusOne); err != nil {
+				// 5.3.6 Note that the expiration of the new (intermediate) root
+				// metadata file does not matter yet, because we will check for
+				// it in step 5.3.10.
+				if _, ok := err.(verify.ErrExpired); !ok {
+					return err
+				}
+			}
+		}
+
+		// 5.3.5 Following up, we check for a fast-forward attack: here, we check for that nPlusOneRootMetadataSigned.version >= nPlusOne.
+		if nPlusOneRootMetadataSigned.Version != nPlusOne {
+			return verify.ErrWrongVersion{
+				Given:    nPlusOneRootMetadataSigned.Version,
+				Expected: nPlusOne,
+			}
+		}
+
+		// 5.3.7 Set the trusted root metadata file to the new root metadata file.
+		c.rootVer = nPlusOneRootMetadataSigned.Version
+		// NOTE: following up on 5.3.1, we want to always have consistent snapshots on for the duration
+		// of root rotation. AFTER the rotation is over, we will set it to the value of the last root.
+		consistentSnapshot = nPlusOneRootMetadataSigned.ConsistentSnapshot
+		// 5.3.8 Persist root metadata. The client MUST write the file to non-volatile storage as FILENAME.EXT (e.g. root.json).
+		// NOTE: Internally, setMeta stores metadata in LevelDB in a persistent manner.
+		if err := c.local.SetMeta("root.json", nPlusOneRootMetadata); err != nil {
+			return err
+		}
+
+		for k := range startKeyIDs {
+			if !reflect.DeepEqual(startKeyIDs[k], getKeyIDs(k)) {
+				c.local.SetMeta(k, json.RawMessage{})
+			}
+		}
+
+		// 5.3.4.2 check that N+1 signed itself.
+		//This is different from the previous call because now the threashold and the keys are updated.
+		if err := c.getLocalRootMeta(); err != nil {
+			// 5.3.6 Note that the expiration of the new (intermediate) root
+			// metadata file does not matter yet, because we will check for
+			// it in step 5.3.10.
+			if _, ok := err.(verify.ErrExpired); !ok {
+				return err
+			}
+		}
+
+		// 5.3.9 Repeat steps 5.3.2 to 5.3.9
+	}
+	// 5.3.10 Check for a freeze attack.
+	// NOTE: this will check for any, including freeze, attack.
+	if err := c.getLocalRootMeta(); err != nil {
+		return err
+	}
+
+	// 5.3.11 If the timestamp and / or snapshot keys have been rotated,
+	// then delete the trusted timestamp and snapshot metadata files.
+	for k := range startKeyIDs {
+		if !reflect.DeepEqual(startKeyIDs[k], getKeyIDs(k)) {
+			c.local.SetMeta(k, json.RawMessage{})
+		}
+	}
+
+	// 5.3.12 Set whether consistent snapshots are used as per the trusted root metadata file.
+	c.consistentSnapshot = consistentSnapshot
+	return nil
 }
 
 func (c *Client) updateWithLatestRoot(m *data.SnapshotFileMeta) (data.TargetFiles, error) {
 	var rootJSON json.RawMessage
 	var err error
-	if m == nil {
-		rootJSON, err = c.downloadMetaUnsafe("root.json", defaultRootDownloadLimit)
+	if m == nil && c.rootVer != 0 {
+		if err = c.updateRoots(); err != nil {
+			if _, ok := err.(ErrEmptyTimestampOrSnapshot); !ok {
+				return nil, err
+			}
+		}
 	} else {
-		rootJSON, err = c.downloadMetaFromSnapshot("root.json", *m)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if err := c.decodeRoot(rootJSON); err != nil {
-		return nil, err
-	}
-	if err := c.local.SetMeta("root.json", rootJSON); err != nil {
-		return nil, err
+		if m == nil {
+			rootJSON, err = c.downloadMetaUnsafe("root.json", defaultRootDownloadLimit)
+		} else {
+			rootJSON, err = c.downloadMetaFromSnapshot("root.json", *m)
+		}
+		if err != nil {
+			return nil, err
+		}
+		if err := c.decodeRoot(rootJSON); err != nil {
+			return nil, err
+		}
+		if err := c.local.SetMeta("root.json", rootJSON); err != nil {
+			return nil, err
+		}
 	}
 	return c.update(true)
 }
@@ -347,6 +467,52 @@ func (c *Client) getLocalMeta() error {
 	}
 
 	c.localMeta = meta
+	return nil
+}
+
+// getLocalRootMeta only decodes and verifies root metadata from local storage.
+func (c *Client) getLocalRootMeta() error {
+	meta, err := c.local.GetMeta()
+	if err != nil {
+		return err
+	}
+	rootJSON, ok := meta["root.json"]
+	if !ok {
+		return ErrNoRootKeys
+	}
+	// unmarshal root.json without verifying as we need the root
+	// keys first
+	s := &data.Signed{}
+	if err := json.Unmarshal(rootJSON, s); err != nil {
+		return err
+	}
+	root := &data.Root{}
+	if err := json.Unmarshal(s.Signed, root); err != nil {
+		return err
+	}
+	c.db = verify.NewDB()
+	for id, k := range root.Keys {
+		if err := c.db.AddKey(id, k); err != nil {
+			// TUF is considering in TAP-12 removing the
+			// requirement that the keyid hash algorithm be derived
+			// from the public key. So to be forwards compatible,
+			// we ignore `ErrWrongID` errors.
+			//
+			// TAP-12: https://github.com/theupdateframework/taps/blob/master/tap12.md
+			if _, ok := err.(verify.ErrWrongID); !ok {
+				return err
+			}
+		}
+	}
+	for name, role := range root.Roles {
+		if err := c.db.AddRole(name, role); err != nil {
+			return err
+		}
+	}
+	if err := c.db.Verify(s, "root", 0); err != nil {
+		return err
+	}
+	c.consistentSnapshot = root.ConsistentSnapshot
 	return nil
 }
 
