@@ -311,7 +311,6 @@ func (s *ClientSuite) TestNewTimestamp(c *C) {
 	s.syncRemote(c)
 	_, err := client.Update()
 	c.Assert(err, IsNil)
-	//c.Assert(IsLatestSnapshot(err), Equals, true)
 	c.Assert(client.timestampVer > version, Equals, true)
 }
 
@@ -381,8 +380,6 @@ func (s *ClientSuite) initClientWithMetaFiles(c *C, metaDirPath string) error {
 	var MetaFiles = [1]string{"root"}
 	for _, m := range MetaFiles {
 		if data, err := ioutil.ReadFile(filepath.Join(metaDirPath, m+".json")); err == nil {
-			fmt.Println("setting the meta: ", m)
-			//s.store.SetMeta(m, data)
 			s.local.SetMeta(m, data)
 		} else {
 			return err
@@ -403,11 +400,9 @@ func (s *ClientSuite) initServerWithMetaFiles(c *C, metaDirPath string) error {
 	}
 	for _, f := range files {
 		if data, err := ioutil.ReadFile(filepath.Join(metaDirPath, f.Name())); err == nil {
-			fmt.Println("updated file: ", f.Name())
 			//s.remote.meta[f.Name()] = newFakeFile(data)
 			s.store.SetMeta(f.Name(), data)
 		} else {
-			fmt.Println("Exit with an error: ", f.Name())
 			return err
 		}
 	}

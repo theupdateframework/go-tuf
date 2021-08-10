@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"reflect"
@@ -177,19 +176,12 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 		return nil, err
 	}
 
-	// Return ErrLatestSnapshot if we already have the latest snapshot.json
-	//if c.hasMetaFromTimestamp("snapshot.json", snapshotMeta) {
-	// FIXME: Should we return with an error?
-	//	fmt.Println("Hey you!")
-	//	return nil, ErrLatestSnapshot{c.snapshotVer}
-	//}
-
 	// Get snapshot.json, then extract file metas.
 	//
 	// The snapshot.json is only saved locally after checking
 	// targets.json so that it will be re-downloaded on subsequent updates
 	// if this update fails.
-	// root.json meta should not be stored in the snapshot(???), if it is,
+	// root.json meta should not be stored in the snapshot, if it is,
 	// the root will be checked, re-downloaded
 	snapshotJSON, err := c.downloadMetaFromTimestamp("snapshot.json", snapshotMeta)
 	if err != nil {
@@ -214,7 +206,6 @@ func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 			return nil, err
 		}
 		if err := c.local.SetMeta("targets.json", targetsJSON); err != nil {
-			fmt.Println("problem here 220")
 			return nil, err
 		}
 	}
