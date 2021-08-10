@@ -388,6 +388,7 @@ func (c *Client) updateRoots() error {
 // The verification of local files is purely for consistency, if an attacker
 // has compromised the local storage, there is no guarantee it can be trusted.
 func (c *Client) getLocalMeta() error {
+<<<<<<< HEAD
 	if err := c.loadAndVerifyLocalRootMeta( /*ignoreExpiredCheck=*/ false); err != nil {
 		return err
 	}
@@ -403,6 +404,15 @@ func (c *Client) getLocalMeta() error {
 			return err
 		}
 		c.timestampVer = timestamp.Version
+=======
+	if err := c.getLocalRootMeta(); err != nil {
+		return err
+	}
+
+	meta, err := c.local.GetMeta()
+	if err != nil {
+		return nil
+>>>>>>> 3184132 (removing duplicate code for getLocalRootMeta by calling it from getLocalMeta)
 	}
 
 	if snapshotJSON, ok := meta["snapshot.json"]; ok {
