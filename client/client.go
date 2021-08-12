@@ -21,7 +21,7 @@ const (
 	defaultRootDownloadLimit      = 512000
 	defaultTimestampDownloadLimit = 16384
 	defaultMaxDelegations         = 32
-	defaultMaxRoots               = 10000
+	defaultMaxRootRotations       = 1e3
 )
 
 // LocalStore is local storage for downloaded top-level metadata.
@@ -90,16 +90,16 @@ type Client struct {
 	// target
 	MaxDelegations int
 
-	// UpdaterMaxRoots limits the number of downloaded roots in 1.0.19 root updater
-	UpdaterMaxRoots int
+	// MaxRootRotations limits the number of downloaded roots in 1.0.19 root updater
+	MaxRootRotations int
 }
 
 func NewClient(local LocalStore, remote RemoteStore) *Client {
 	return &Client{
-		local:           local,
-		remote:          remote,
-		MaxDelegations:  defaultMaxDelegations,
-		UpdaterMaxRoots: defaultMaxRoots,
+		local:            local,
+		remote:           remote,
+		MaxDelegations:   defaultMaxDelegations,
+		MaxRootRotations: defaultMaxRootRotations,
 	}
 }
 
@@ -156,6 +156,8 @@ func (c *Client) Update() (data.TargetFiles, error) {
 
 func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 	if err := c.updateRoots(); err != nil {
+		// For backward compatibility, we wrap the ErrExpired inside
+		// ErrDecodeFailed.
 		if _, ok := err.(verify.ErrExpired); ok {
 			return nil, ErrDecodeFailed{"root.json", err}
 		}
@@ -264,7 +266,7 @@ func (c *Client) updateRoots() error {
 
 	// This loop returns on error or breaks after downloading the lastest root metadata.
 	// 5.3.2 Let N denote the version number of the trusted root metadata file.
-	for i := 0; i < c.UpdaterMaxRoots; i++ {
+	for i := 0; i < c.MaxRootRotations; i++ {
 		// 5.3.3 Try downloading version nPlusOne of the root metadata file.
 		// NOTE: as a side effect, we do update c.rootVer to nPlusOne between iterations.
 		nPlusOne := c.rootVer + 1
@@ -287,7 +289,7 @@ func (c *Client) updateRoots() error {
 		} else {
 			// 5.3.4.1 Check that N signed N+1
 			// 5.3.5 Check for a rollback attack. Here, we check that nPlusOneRootMetadataSigned.version >= nPlusOne.
-			if err := c.db.UnmarshalExpired(nPlusOneRootMetadata, nPlusOneRootMetadataSigned, "root", nPlusOne); err != nil {
+			if err := c.db.UnmarshalIgnoreExpired(nPlusOneRootMetadata, nPlusOneRootMetadataSigned, "root", nPlusOne); err != nil {
 				// 5.3.6 Note that the expiration of the new (intermediate) root
 				// metadata file does not matter yet, because we will check for
 				// it in step 5.3.10.
@@ -323,7 +325,7 @@ func (c *Client) updateRoots() error {
 		}
 
 		// 5.3.4.2 check that N+1 signed itself.
-		//This is different from the previous call because now the threashold and the keys are updated.
+		//This is different from the previous call because now the threshold and the keys are updated.
 		if err := c.getLocalRootMeta(); err != nil {
 			// 5.3.6 Note that the expiration of the new (intermediate) root
 			// metadata file does not matter yet, because we will check for
@@ -352,34 +354,6 @@ func (c *Client) updateRoots() error {
 	// 5.3.12 Set whether consistent snapshots are used as per the trusted root metadata file.
 	c.consistentSnapshot = consistentSnapshot
 	return nil
-}
-
-func (c *Client) updateWithLatestRoot(m *data.SnapshotFileMeta) (data.TargetFiles, error) {
-	var rootJSON json.RawMessage
-	var err error
-	if m == nil && c.rootVer != 0 {
-		if err = c.updateRoots(); err != nil {
-			if _, ok := err.(ErrEmptyTimestampOrSnapshot); !ok {
-				return nil, err
-			}
-		}
-	} else {
-		if m == nil {
-			rootJSON, err = c.downloadMetaUnsafe("root.json", defaultRootDownloadLimit)
-		} else {
-			rootJSON, err = c.downloadMetaFromSnapshot("root.json", *m)
-		}
-		if err != nil {
-			return nil, err
-		}
-		if err := c.decodeRoot(rootJSON); err != nil {
-			return nil, err
-		}
-		if err := c.local.SetMeta("root.json", rootJSON); err != nil {
-			return nil, err
-		}
-	}
-	return c.update(true)
 }
 
 // getLocalMeta decodes and verifies metadata from local storage.

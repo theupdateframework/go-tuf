@@ -448,6 +448,8 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 			tufClient.getLocalMeta()
 			assert.Equal(c, test.expectedRootVersion, tufClient.rootVer)
 		} else {
+			// For backward compatibility, the update root returns
+			// ErrDecodeFailed that wraps the verify.ErrExpired.
 			if _, ok := test.extpectedError.(ErrDecodeFailed); ok {
 				decodeErr, ok := err.(ErrDecodeFailed)
 				c.Assert(ok, Equals, true)
@@ -663,6 +665,8 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 	s.addRemoteTarget(c, "bar.txt")
 	s.syncRemote(c)
 
+	const expectedRootVersion = 2
+
 	// check the update downloads the non expired remote root.json and
 	// restarts itself, thus successfully updating
 	s.withMetaExpired(func() {
@@ -672,7 +676,7 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 		}
 		_, err = client.Update()
 		c.Assert(err, IsNil)
-		c.Assert(client.rootVer, Equals, 2)
+		c.Assert(client.rootVer, Equals, expectedRootVersion)
 	})
 }
 
@@ -727,10 +731,8 @@ func (s *ClientSuite) TestUpdateLocalRootExpiredKeyChange(c *C) {
 	// replace all keys
 	newKeyIDs := make(map[string][]string)
 	for role, ids := range s.keyIDs {
-		if role != "snapshot" && role != "timestamp" && role != "targets" {
-			c.Assert(s.repo.RevokeKey(role, ids[0]), IsNil)
-			newKeyIDs[role] = s.genKey(c, role)
-		}
+		c.Assert(s.repo.RevokeKey(role, ids[0]), IsNil)
+		newKeyIDs[role] = s.genKey(c, role)
 	}
 
 	// update metadata
@@ -808,7 +810,6 @@ func (s *ClientSuite) TestUpdateReplayAttack(c *C) {
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncRemote(c)
 	_, err := client.Update()
-	//c.Assert(IsLatestSnapshot(err), Equals, true)
 	c.Assert(client.timestampVer > version, Equals, true)
 
 	// replace remote timestamp.json with the old one
