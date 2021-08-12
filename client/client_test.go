@@ -475,7 +475,11 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 		} else {
 			// For backward compatibility, the update root returns
 			// ErrDecodeFailed that wraps the verify.ErrExpired.
+<<<<<<< HEAD
 			if _, ok := test.expectedError.(ErrDecodeFailed); ok {
+=======
+			if _, ok := test.extpectedError.(ErrDecodeFailed); ok {
+>>>>>>> 220eb66 (fix based on the reviews.)
 				decodeErr, ok := err.(ErrDecodeFailed)
 				c.Assert(ok, Equals, true)
 				c.Assert(decodeErr.File, Equals, "root.json")
@@ -764,7 +768,11 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 
+<<<<<<< HEAD
 	const expectedRootVersion = 3
+=======
+	const expectedRootVersion = 2
+>>>>>>> 220eb66 (fix based on the reviews.)
 
 	// check the update downloads the non expired remote root.json and
 	// restarts itself, thus successfully updating
@@ -832,10 +840,8 @@ func (s *ClientSuite) TestUpdateLocalRootExpiredKeyChange(c *C) {
 	// replace all keys
 	newKeyIDs := make(map[string][]string)
 	for role, ids := range s.keyIDs {
-		if role != "snapshot" && role != "timestamp" && role != "targets" {
-			c.Assert(s.repo.RevokeKey(role, ids[0]), IsNil)
-			newKeyIDs[role] = s.genKey(c, role)
-		}
+		c.Assert(s.repo.RevokeKey(role, ids[0]), IsNil)
+		newKeyIDs[role] = s.genKey(c, role)
 	}
 
 	// update metadata

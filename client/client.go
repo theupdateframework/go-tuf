@@ -152,6 +152,8 @@ func (c *Client) Init(rootKeys []*data.Key, threshold int) error {
 // https://theupdateframework.github.io/specification/v1.0.19/index.html#load-trusted-root
 func (c *Client) Update() (data.TargetFiles, error) {
 	if err := c.updateRoots(); err != nil {
+		// For backward compatibility, we wrap the ErrExpired inside
+		// ErrDecodeFailed.
 		if _, ok := err.(verify.ErrExpired); ok {
 			// For backward compatibility, we wrap the ErrExpired inside
 			// ErrDecodeFailed.
@@ -299,6 +301,7 @@ func (c *Client) updateRoots() error {
 		}
 
 		// 5.3.4 Check for an arbitrary software attack.
+<<<<<<< HEAD
 		// 5.3.4.1 Check that N signed N+1
 		nPlusOneRootMetadataSigned, err := c.verifyRoot(nRootMetadata, nPlusOneRootMetadata)
 		if err != nil {
@@ -311,6 +314,22 @@ func (c *Client) updateRoots() error {
 			// metadata file does not matter yet, because we will check for
 			// it in step 5.3.10.
 			return err
+=======
+		nPlusOneRootMetadataSigned := &data.Root{}
+		if nPlusOne == 1 {
+			return ErrNoRootKeys
+		} else {
+			// 5.3.4.1 Check that N signed N+1
+			// 5.3.5 Check for a rollback attack. Here, we check that nPlusOneRootMetadataSigned.version >= nPlusOne.
+			if err := c.db.UnmarshalIgnoreExpired(nPlusOneRootMetadata, nPlusOneRootMetadataSigned, "root", nPlusOne); err != nil {
+				// 5.3.6 Note that the expiration of the new (intermediate) root
+				// metadata file does not matter yet, because we will check for
+				// it in step 5.3.10.
+				if _, ok := err.(verify.ErrExpired); !ok {
+					return err
+				}
+			}
+>>>>>>> 220eb66 (fix based on the reviews.)
 		}
 
 		// 5.3.5 Check for a rollback attack. Here, we check that nPlusOneRootMetadataSigned.version == nPlusOne.
@@ -336,6 +355,22 @@ func (c *Client) updateRoots() error {
 
 	} // End of the for loop.
 
+<<<<<<< HEAD
+=======
+		// 5.3.4.2 check that N+1 signed itself.
+		//This is different from the previous call because now the threshold and the keys are updated.
+		if err := c.getLocalRootMeta(); err != nil {
+			// 5.3.6 Note that the expiration of the new (intermediate) root
+			// metadata file does not matter yet, because we will check for
+			// it in step 5.3.10.
+			if _, ok := err.(verify.ErrExpired); !ok {
+				return err
+			}
+		}
+
+		// 5.3.9 Repeat steps 5.3.2 to 5.3.9
+	}
+>>>>>>> 220eb66 (fix based on the reviews.)
 	// 5.3.10 Check for a freeze attack.
 	// NOTE: This will check for any, including freeze, attack.
 	if err := c.loadAndVerifyLocalRootMeta( /*ignoreExpiredCheck=*/ false); err != nil {
@@ -373,6 +408,7 @@ func (c *Client) updateRoots() error {
 				"targets":   {"snapshot.json", "targets.json"},
 			}
 
+<<<<<<< HEAD
 			for _, r := range deleteMeta[topLevelRolename] {
 				c.local.DeleteMeta(r)
 			}
@@ -384,6 +420,8 @@ func (c *Client) updateRoots() error {
 	return nil
 }
 
+=======
+>>>>>>> 220eb66 (fix based on the reviews.)
 // getLocalMeta decodes and verifies metadata from local storage.
 // The verification of local files is purely for consistency, if an attacker
 // has compromised the local storage, there is no guarantee it can be trusted.

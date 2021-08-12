@@ -135,7 +135,7 @@ func (db *DB) Unmarshal(b []byte, v interface{}, role string, minVersion int) er
 }
 
 // UnmarshalExpired is exactly like Unmarshal except ignores expired timestamp error.
-func (db *DB) UnmarshalExpired(b []byte, v interface{}, role string, minVersion int) error {
+func (db *DB) UnmarshalIgnoreExpired(b []byte, v interface{}, role string, minVersion int) error {
 	s := &data.Signed{}
 	if err := json.Unmarshal(b, s); err != nil {
 		return err
@@ -148,10 +148,7 @@ func (db *DB) UnmarshalExpired(b []byte, v interface{}, role string, minVersion 
 			return verifyErr
 		}
 	}
-	if err := json.Unmarshal(s.Signed, v); err != nil {
-		return err
-	}
-	return nil
+	return json.Unmarshal(s.Signed, v)
 }
 
 func (db *DB) UnmarshalTrusted(b []byte, v interface{}, role string) error {
