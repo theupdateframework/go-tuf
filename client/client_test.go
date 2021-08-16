@@ -429,6 +429,7 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 		expectedError    error
 		expectedVersions map[string]int
 	}{
+<<<<<<< HEAD
 		// Succeeds when there is no root update.
 		{"testdata/Published1Time", nil, map[string]int{"root": 1, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// Succeeds updating root from version 1 to version 2.
@@ -456,6 +457,22 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 		{"testdata/Published2Times_targets_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 2}},
 		// timestamp role key rotation increase the timestamp.
 		{"testdata/Published2Times_timestamp_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 1, "targets": 1}},
+=======
+		// Good new root update succeeds (the timestamp check disabled).
+		{"testdata/PublishedTwiceWithRotatedKeys_root", false, nil, 2},
+		// Good new root update with a new key for timestamp succeeds.
+		{"testdata/PublishedTwiceRotateTimestampKeysWithRotatedKeys_root", false, nil, 2},
+		// Good update but with an expired root fails.
+		{"testdata/PublishedTwiceWithRotatedKeys_root", true, ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, -1},
+		// Bad root update with a rollback attack fails.
+		{"testdata/PublishedTwiceWithStaleVersion_root", false, verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), -1},
+		//Bad root update with fast forward attack fails.
+		{"testdata/PublishedTwiceForwardVersionWithRotatedKeys_root", false, verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), -1},
+		// Bad root with invalid new root signature fails.
+		{"testdata/PublishedTwiceInvalidNewRootSignatureWithRotatedKeys_root", false, errors.New("tuf: signature verification failed"), -1},
+		// Bad root with invalid old root signature fails.
+		{"testdata/PublishedTwiceInvalidOldRootSignatureWithRotatedKeys_root", false, errors.New("tuf: signature verification failed"), -1},
+>>>>>>> 2e1d266 (enable an arbitrary root verify another root (use case: n verify n+1) without the need for store them permanently.)
 	}
 
 	for _, test := range tests {

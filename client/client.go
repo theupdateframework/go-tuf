@@ -242,6 +242,11 @@ func (c *Client) updateRoots() error {
 		KeyIDs    map[string]bool
 		Threshold int
 	}
+	m, err := c.local.GetMeta()
+	if err != nil {
+		return err
+	}
+	nRootMetadata := m["root.json"]
 
 	// Prepare for 5.3.11: If the timestamp and / or snapshot keys have been rotated,
 	// then delete the trusted timestamp and snapshot metadata files.
@@ -302,6 +307,7 @@ func (c *Client) updateRoots() error {
 
 		// 5.3.4 Check for an arbitrary software attack.
 <<<<<<< HEAD
+<<<<<<< HEAD
 		// 5.3.4.1 Check that N signed N+1
 		nPlusOneRootMetadataSigned, err := c.verifyRoot(nRootMetadata, nPlusOneRootMetadata)
 		if err != nil {
@@ -310,10 +316,21 @@ func (c *Client) updateRoots() error {
 
 		// 5.3.4.2 check that N+1 signed itself.
 		if _, err := c.verifyRoot(nPlusOneRootMetadata, nPlusOneRootMetadata); err != nil {
+=======
+		// 5.3.4.1 Check that N signed N+1
+		nPlusOneRootMetadataSigned, err := c.VerifyRoot(nRootMetadata, nPlusOneRootMetadata)
+		if err != nil {
+			return err
+		}
+		// 5.3.4.2 check that N+1 signed itself.
+		//This is different from the previous call because now the threshold and the keys are updated.
+		if _, err := c.VerifyRoot(nPlusOneRootMetadata, nPlusOneRootMetadata); err != nil {
+>>>>>>> 2e1d266 (enable an arbitrary root verify another root (use case: n verify n+1) without the need for store them permanently.)
 			// 5.3.6 Note that the expiration of the new (intermediate) root
 			// metadata file does not matter yet, because we will check for
 			// it in step 5.3.10.
 			return err
+<<<<<<< HEAD
 =======
 		nPlusOneRootMetadataSigned := &data.Root{}
 		if nPlusOne == 1 {
@@ -333,6 +350,12 @@ func (c *Client) updateRoots() error {
 		}
 
 		// 5.3.5 Check for a rollback attack. Here, we check that nPlusOneRootMetadataSigned.version == nPlusOne.
+=======
+		}
+
+		// 5.3.5 Check for a rollback attack. Here, we check that nPlusOneRootMetadataSigned.version >= nPlusOne.
+		// 5.3.5 Following up, we check for a fast-forward attack: here, we check for that nPlusOneRootMetadataSigned.version >= nPlusOne.
+>>>>>>> 2e1d266 (enable an arbitrary root verify another root (use case: n verify n+1) without the need for store them permanently.)
 		if nPlusOneRootMetadataSigned.Version != nPlusOne {
 			return verify.ErrWrongVersion{
 				Given:    nPlusOneRootMetadataSigned.Version,
@@ -351,6 +374,7 @@ func (c *Client) updateRoots() error {
 			return err
 		}
 		nRootMetadata = nPlusOneRootMetadata
+<<<<<<< HEAD
 		// 5.3.9 Repeat steps 5.3.2 to 5.3.9
 
 	} // End of the for loop.
@@ -368,6 +392,8 @@ func (c *Client) updateRoots() error {
 			}
 		}
 
+=======
+>>>>>>> 2e1d266 (enable an arbitrary root verify another root (use case: n verify n+1) without the need for store them permanently.)
 		// 5.3.9 Repeat steps 5.3.2 to 5.3.9
 	}
 >>>>>>> 220eb66 (fix based on the reviews.)
@@ -533,6 +559,7 @@ func (c *Client) loadAndVerifyLocalRootMeta(ignoreExpiredCheck bool) error {
 	return nil
 }
 
+<<<<<<< HEAD
 // verifyRoot verifies Signed section of the bJSON
 // using verification keys in aJSON.
 func (c *Client) verifyRoot(aJSON []byte, bJSON []byte) (*data.Root, error) {
@@ -551,11 +578,34 @@ func (c *Client) verifyRoot(aJSON []byte, bJSON []byte) (*data.Root, error) {
 	}
 	bRoot := &data.Root{}
 	if err := json.Unmarshal(bSigned.Signed, bRoot); err != nil {
+=======
+// getLocalRootMeta only decodes and verifies root metadata from local storage.
+func (c *Client) VerifyRoot(verifierJSON []byte, subjectJSON []byte) (*data.Root, error) {
+	verifierSigned := &data.Signed{}
+	if err := json.Unmarshal(verifierJSON, verifierSigned); err != nil {
+		return nil, err
+	}
+	verifierRoot := &data.Root{}
+	if err := json.Unmarshal(verifierSigned.Signed, verifierRoot); err != nil {
+		return nil, err
+	}
+
+	subjectSigned := &data.Signed{}
+	if err := json.Unmarshal(subjectJSON, subjectSigned); err != nil {
+		return nil, err
+	}
+	subjectRoot := &data.Root{}
+	if err := json.Unmarshal(subjectSigned.Signed, subjectRoot); err != nil {
+>>>>>>> 2e1d266 (enable an arbitrary root verify another root (use case: n verify n+1) without the need for store them permanently.)
 		return nil, err
 	}
 
 	ndb := verify.NewDB()
+<<<<<<< HEAD
 	for id, k := range aRoot.Keys {
+=======
+	for id, k := range verifierRoot.Keys {
+>>>>>>> 2e1d266 (enable an arbitrary root verify another root (use case: n verify n+1) without the need for store them permanently.)
 		if err := ndb.AddKey(id, k); err != nil {
 			// TUF is considering in TAP-12 removing the
 			// requirement that the keyid hash algorithm be derived
@@ -568,16 +618,27 @@ func (c *Client) verifyRoot(aJSON []byte, bJSON []byte) (*data.Root, error) {
 			}
 		}
 	}
+<<<<<<< HEAD
 	for name, role := range aRoot.Roles {
+=======
+	for name, role := range verifierRoot.Roles {
+>>>>>>> 2e1d266 (enable an arbitrary root verify another root (use case: n verify n+1) without the need for store them permanently.)
 		if err := ndb.AddRole(name, role); err != nil {
 			return nil, err
 		}
 	}
 
+<<<<<<< HEAD
 	if err := ndb.VerifySignatures(bSigned, "root"); err != nil {
 		return nil, err
 	}
 	return bRoot, nil
+=======
+	if err := ndb.VerifySignatures(subjectSigned, "root"); err != nil {
+		return nil, err
+	}
+	return subjectRoot, nil
+>>>>>>> 2e1d266 (enable an arbitrary root verify another root (use case: n verify n+1) without the need for store them permanently.)
 }
 
 // FIXME(TUF-0.9) TUF is considering removing support for target files starting
