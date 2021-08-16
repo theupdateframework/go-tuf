@@ -427,7 +427,7 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 		// Good update but with an expired root fails.
 		{"testdata/PublishedTwiceWithRotatedKeys_root", true, ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, -1},
 		// Bad root update with a rollback attack fails.
-		{"testdata/PublishedTwiceWithStaleVersion_root", false, verify.ErrLowVersion{Actual: 1, Current: 2}, -1},
+		{"testdata/PublishedTwiceWithStaleVersion_root", false, verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), -1},
 		//Bad root update with fast forward attack fails.
 		{"testdata/PublishedTwiceForwardVersionWithRotatedKeys_root", false, verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), -1},
 		// Bad root with invalid new root signature fails.
