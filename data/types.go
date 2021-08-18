@@ -42,9 +42,9 @@ type Key struct {
 	idOnce sync.Once
 }
 
-// A KeyType instance is an implementation of a KeyType
+// A KeyType implements type-specific methods for the Key data type.
 type KeyType interface {
-	// UniquePublic returns the unique information identifying the public key from the KeyValue.
+	// UniquePublic returns the unique information identifying the public key from the KeyValue dictionary.
 	UniquePublic(valueBytes json.RawMessage) string
 }
 
