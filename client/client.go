@@ -156,9 +156,9 @@ func (c *Client) Update() (data.TargetFiles, error) {
 
 func (c *Client) update(latestRoot bool) (data.TargetFiles, error) {
 	if err := c.updateRoots(); err != nil {
-		// For backward compatibility, we wrap the ErrExpired inside
-		// ErrDecodeFailed.
 		if _, ok := err.(verify.ErrExpired); ok {
+			// For backward compatibility, we wrap the ErrExpired inside
+			// ErrDecodeFailed.
 			return nil, ErrDecodeFailed{"root.json", err}
 		}
 		return nil, err
@@ -227,7 +227,7 @@ func (c *Client) updateRoots() error {
 	// or software updater using an out-of-band process. Note that
 	// the expiration of the trusted root metadata file does not
 	// matter, because we will attempt to update it in the next step.
-	if err := c.getLocalRootMeta(); err != nil {
+	if err := c.loadAndVerifyLocalRootMeta(); err != nil {
 		if _, ok := err.(verify.ErrExpired); !ok {
 			return err
 		}
@@ -248,9 +248,16 @@ func (c *Client) updateRoots() error {
 		sort.Strings(keyIDs)
 		return keyIDs
 	}
-	startKeyIDs := map[string][]string{"timestamp": {}, "snapshot": {}, "targets": {}}
-	for k := range startKeyIDs {
-		startKeyIDs[k] = getKeyIDs(k)
+
+	// The manifest looks like this:
+	// {
+	//	"timestamp": ["KEYID1", "KEYID2"],
+	//	"snapshot": ["KEYID3"],
+	//	"targets": ["KEYID4", "KEYID5", "KEYID6"]
+	// }
+	nonRootManifests := map[string][]string{"timestamp": {}, "snapshot": {}, "targets": {}}
+	for k := range nonRootManifests {
+		nonRootManifests[k] = getKeyIDs(k)
 	}
 
 	// 5.3.1 Temorarily turn on the consistent snapshots in order to download
@@ -289,21 +296,20 @@ func (c *Client) updateRoots() error {
 
 		// 5.3.4 Check for an arbitrary software attack.
 		// 5.3.4.1 Check that N signed N+1
-		nPlusOneRootMetadataSigned, err := c.VerifyRoot(nRootMetadata, nPlusOneRootMetadata)
+		nPlusOneRootMetadataSigned, err := c.verifyRoot(nRootMetadata, nPlusOneRootMetadata)
 		if err != nil {
 			return err
 		}
+
 		// 5.3.4.2 check that N+1 signed itself.
-		//This is different from the previous call because now the threshold and the keys are updated.
-		if _, err := c.VerifyRoot(nPlusOneRootMetadata, nPlusOneRootMetadata); err != nil {
+		if _, err := c.verifyRoot(nPlusOneRootMetadata, nPlusOneRootMetadata); err != nil {
 			// 5.3.6 Note that the expiration of the new (intermediate) root
 			// metadata file does not matter yet, because we will check for
 			// it in step 5.3.10.
 			return err
 		}
 
-		// 5.3.5 Check for a rollback attack. Here, we check that nPlusOneRootMetadataSigned.version >= nPlusOne.
-		// 5.3.5 Following up, we check for a fast-forward attack: here, we check for that nPlusOneRootMetadataSigned.version >= nPlusOne.
+		// 5.3.5 Check for a rollback attack. Here, we check that nPlusOneRootMetadataSigned.version == nPlusOne.
 		if nPlusOneRootMetadataSigned.Version != nPlusOne {
 			return verify.ErrWrongVersion{
 				Given:    nPlusOneRootMetadataSigned.Version,
@@ -323,18 +329,22 @@ func (c *Client) updateRoots() error {
 		}
 		nRootMetadata = nPlusOneRootMetadata
 		// 5.3.9 Repeat steps 5.3.2 to 5.3.9
-	}
+
+	} // End of the for loop.
+
 	// 5.3.10 Check for a freeze attack.
 	// NOTE: this will check for any, including freeze, attack.
-	if err := c.getLocalRootMeta(); err != nil {
+	if err := c.loadAndVerifyLocalRootMeta(); err != nil {
 		return err
 	}
 
 	// 5.3.11 If the timestamp and / or snapshot keys have been rotated,
 	// then delete the trusted timestamp and snapshot metadata files.
-	for k := range startKeyIDs {
-		if !reflect.DeepEqual(startKeyIDs[k], getKeyIDs(k)) {
-			c.local.SetMeta(k, json.RawMessage{})
+	for topLevelRolename := range nonRootManifests {
+		if !reflect.DeepEqual(
+			nonRootManifests[topLevelRolename],
+			getKeyIDs(topLevelRolename)) {
+			c.local.SetMeta(topLevelRolename, json.RawMessage{})
 		}
 	}
 
@@ -344,11 +354,10 @@ func (c *Client) updateRoots() error {
 }
 
 // getLocalMeta decodes and verifies metadata from local storage.
-//
 // The verification of local files is purely for consistency, if an attacker
 // has compromised the local storage, there is no guarantee it can be trusted.
 func (c *Client) getLocalMeta() error {
-	if err := c.getLocalRootMeta(); err != nil {
+	if err := c.loadAndVerifyLocalRootMeta(); err != nil {
 		return err
 	}
 
@@ -388,8 +397,10 @@ func (c *Client) getLocalMeta() error {
 	return nil
 }
 
-// getLocalRootMeta only decodes and verifies root metadata from local storage.
-func (c *Client) getLocalRootMeta() error {
+// loadAndVerifyLocalRootMeta decodes and verifies root metadata from
+// local storage and loads the top-level keys. This method first clears
+// the DB for top-level keys and then loads the new keys.
+func (c *Client) loadAndVerifyLocalRootMeta() error {
 	meta, err := c.local.GetMeta()
 	if err != nil {
 		return err
@@ -427,6 +438,7 @@ func (c *Client) getLocalRootMeta() error {
 			return err
 		}
 	}
+	// Any trusted local root metadata version must be greater than 0.
 	if err := c.db.Verify(s, "root", 0); err != nil {
 		return err
 	}
@@ -434,28 +446,29 @@ func (c *Client) getLocalRootMeta() error {
 	return nil
 }
 
-// getLocalRootMeta only decodes and verifies root metadata from local storage.
-func (c *Client) VerifyRoot(verifierJSON []byte, subjectJSON []byte) (*data.Root, error) {
-	verifierSigned := &data.Signed{}
-	if err := json.Unmarshal(verifierJSON, verifierSigned); err != nil {
+// verifyRoot verifies Signed section of the bJSON
+// using verification keys in aJSON.
+func (c *Client) verifyRoot(aJSON []byte, bJSON []byte) (*data.Root, error) {
+	aSigned := &data.Signed{}
+	if err := json.Unmarshal(aJSON, aSigned); err != nil {
 		return nil, err
 	}
-	verifierRoot := &data.Root{}
-	if err := json.Unmarshal(verifierSigned.Signed, verifierRoot); err != nil {
+	aRoot := &data.Root{}
+	if err := json.Unmarshal(aSigned.Signed, aRoot); err != nil {
 		return nil, err
 	}
 
-	subjectSigned := &data.Signed{}
-	if err := json.Unmarshal(subjectJSON, subjectSigned); err != nil {
+	bSigned := &data.Signed{}
+	if err := json.Unmarshal(bJSON, bSigned); err != nil {
 		return nil, err
 	}
-	subjectRoot := &data.Root{}
-	if err := json.Unmarshal(subjectSigned.Signed, subjectRoot); err != nil {
+	bRoot := &data.Root{}
+	if err := json.Unmarshal(bSigned.Signed, bRoot); err != nil {
 		return nil, err
 	}
 
 	ndb := verify.NewDB()
-	for id, k := range verifierRoot.Keys {
+	for id, k := range aRoot.Keys {
 		if err := ndb.AddKey(id, k); err != nil {
 			// TUF is considering in TAP-12 removing the
 			// requirement that the keyid hash algorithm be derived
@@ -468,16 +481,16 @@ func (c *Client) VerifyRoot(verifierJSON []byte, subjectJSON []byte) (*data.Root
 			}
 		}
 	}
-	for name, role := range verifierRoot.Roles {
+	for name, role := range aRoot.Roles {
 		if err := ndb.AddRole(name, role); err != nil {
 			return nil, err
 		}
 	}
 
-	if err := ndb.VerifySignatures(subjectSigned, "root"); err != nil {
+	if err := ndb.VerifySignatures(bSigned, "root"); err != nil {
 		return nil, err
 	}
-	return subjectRoot, nil
+	return bRoot, nil
 }
 
 // FIXME(TUF-0.9) TUF is considering removing support for target files starting

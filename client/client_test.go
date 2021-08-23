@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -362,102 +364,106 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	}
 }
 
-// Test helper
-func initTestClient(c *C, baseDir string, initWithLocalMetadata bool, ignoreExpired bool) (*Client, func() error) {
-	l, err := initTestTUFRepoServer(baseDir, "server")
+// startTUFRepoServer starts a HTTP server to serve a TUF Repo.
+func startTUFRepoServer(baseDir string, relPath string) (net.Listener, error) {
+	serverDir := filepath.Join(baseDir, relPath)
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	go http.Serve(l, http.FileServer(http.Dir(serverDir)))
+	return l, err
+}
+
+// newClientWithMeta creates new client and sets the root metadata for it.
+func newClientWithMeta(baseDir string, relPath string, serverAddr string, initWithLocalMetadata bool) (*Client, error) {
+	initialStateDir := filepath.Join(baseDir, relPath)
+	opts := &HTTPRemoteOptions{
+		MetadataPath: "metadata",
+		TargetsPath:  "targets",
+	}
+
+	remote, err := HTTPRemoteStore(fmt.Sprintf("http://%s/", serverAddr), opts, nil)
+	if err != nil {
+		return nil, err
+	}
+	c := NewClient(MemoryLocalStore(), remote)
+	for _, m := range []string{"root.json", "snapshot.json", "timestamp.json", "targets.json"} {
+		metadataJSON, err := ioutil.ReadFile(initialStateDir + "/" + m)
+		if err != nil {
+			return nil, err
+		}
+		c.local.SetMeta(m, metadataJSON)
+	}
+	return c, nil
+}
+
+func initRootTest(c *C, baseDir string, initWithLocalMetadata bool, ignoreExpired bool) (*Client, func() error) {
+	l, err := startTUFRepoServer(baseDir, "server")
 	c.Assert(err, IsNil)
 	e := verify.IsExpired
 	if ignoreExpired {
 		verify.IsExpired = func(t time.Time) bool { return false }
 	}
-	tufClient, err := initTestTUFClient(baseDir, "client/metadata/current", l.Addr().String(), initWithLocalMetadata)
+	tufClient, err := newClientWithMeta(baseDir, "client/metadata/current", l.Addr().String(), initWithLocalMetadata)
 	verify.IsExpired = e
 	c.Assert(err, IsNil)
 	return tufClient, l.Close
 }
 
-func (s *ClientSuite) initClientWithMetaFiles(c *C, metaDirPath string) error {
-	var MetaFiles = [1]string{"root"}
-	for _, m := range MetaFiles {
-		if data, err := ioutil.ReadFile(filepath.Join(metaDirPath, m+".json")); err == nil {
-			s.local.SetMeta(m, data)
-		} else {
-			return err
-		}
-	}
-	//s.syncLocal(c)
-	return nil
-}
-
-// LoadMetaFiles loads all metadata into FakeRemoteStore.
-func (s *ClientSuite) initServerWithMetaFiles(c *C, metaDirPath string) error {
-	// create a remote store containing valid repo files
-	s.remote = newFakeRemoteStore()
-	//s.syncRemote(c)
-	files, err := ioutil.ReadDir(metaDirPath)
-	if err != nil {
-		return err
-	}
-	for _, f := range files {
-		if data, err := ioutil.ReadFile(filepath.Join(metaDirPath, f.Name())); err == nil {
-			//s.remote.meta[f.Name()] = newFakeFile(data)
-			s.store.SetMeta(f.Name(), data)
-		} else {
-			return err
-		}
-	}
-	s.store.Commit(false, nil, nil)
-	s.syncRemote(c)
-	//c.Assert(s.repo.Commit(), IsNil)
-	//s.syncRemote(c)
-	return nil
-}
-
 func (s *ClientSuite) TestUpdateRoots(c *C) {
 	var tests = []struct {
-		fixturePath         string
-		isExpired           bool // Value retuned by verify.IsExpired.
-		extpectedError      error
-		expectedRootVersion int // -1 means no check is performed on this.
+		fixturePath      string
+		isExpired        bool // Value retuned by verify.IsExpired.
+		expectedError    error
+		expectedVersions map[string]int
 	}{
-		// Good new root update succeeds (the timestamp check disabled).
-		{"testdata/PublishedTwiceWithRotatedKeys_root", false, nil, 2},
-		// Good new root update with a new key for timestamp succeeds.
-		{"testdata/PublishedTwiceRotateTimestampKeysWithRotatedKeys_root", false, nil, 2},
-		// Good update but with an expired root fails.
-		{"testdata/PublishedTwiceWithRotatedKeys_root", true, ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, -1},
-		// Bad root update with a rollback attack fails.
-		{"testdata/PublishedTwiceWithStaleVersion_root", false, verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), -1},
-		//Bad root update with fast forward attack fails.
-		{"testdata/PublishedTwiceForwardVersionWithRotatedKeys_root", false, verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), -1},
-		// Bad root with invalid new root signature fails.
-		{"testdata/PublishedTwiceInvalidNewRootSignatureWithRotatedKeys_root", false, errors.New("tuf: signature verification failed"), -1},
-		// Bad root with invalid old root signature fails.
-		{"testdata/PublishedTwiceInvalidOldRootSignatureWithRotatedKeys_root", false, errors.New("tuf: signature verification failed"), -1},
+		// New root version update (no key update) succeeds.
+		{"testdata/PublishedTwice", false, nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// New root update (root role key rotation) succeeds.
+		{"testdata/PublishedTwiceWithRotatedKeys_root", false, nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// New root update (snapshot role key rotation) succeeds.
+		{"testdata/PublishedTwiceWithRotatedKeys_snapshot", false, nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 1}},
+		// New root update (targets role key rotation) succeeds.
+		{"testdata/PublishedTwiceWithRotatedKeys_targets", false, nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 2}},
+		// New root update (timestamp role key rotation) succeeds.
+		{"testdata/PublishedTwiceWithRotatedKeys_timestamp", false, nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 1, "targets": 1}},
+		// New expired root update fails.
+		{"testdata/PublishedTwiceWithRotatedKeys_root", true, ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int{}},
+		// New root update with a rollback attack fails.
+		{"testdata/PublishedTwiceWithStaleVersion_root", false, verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), map[string]int{}},
+		// New root update with fast forward attack fails.
+		{"testdata/PublishedTwiceForwardVersionWithRotatedKeys_root", false, verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), map[string]int{}},
+		// New root with invalid new root signature fails (n+1th root didn't sign off n+1).
+		{"testdata/PublishedTwiceInvalidNewRootSignatureWithRotatedKeys_root", false, errors.New("tuf: signature verification failed"), map[string]int{}},
+		// New root with invalid old root signature fails (nth root didn't sign off n+1).
+		{"testdata/PublishedTwiceInvalidOldRootSignatureWithRotatedKeys_root", false, errors.New("tuf: signature verification failed"), map[string]int{}},
 	}
 
 	for _, test := range tests {
 		e := verify.IsExpired
 		verify.IsExpired = func(t time.Time) bool { return test.isExpired }
-
-		tufClient, closer := initTestClient(c, test.fixturePath /* initWithLocalMetadata = */, true /* ignoreExpired = */, true)
+		tufClient, closer := initRootTest(c, test.fixturePath /* initWithLocalMetadata = */, true /* ignoreExpired = */, true)
 		_, err := tufClient.Update()
-		if test.extpectedError == nil {
+		if test.expectedError == nil {
 			c.Assert(err, IsNil)
 			// Check if the root.json is being saved in non-volatile storage.
 			tufClient.getLocalMeta()
-			assert.Equal(c, test.expectedRootVersion, tufClient.rootVer)
+			versionMethods := map[string]int{"root": tufClient.rootVer,
+				"timestamp": tufClient.timestampVer,
+				"snapshot":  tufClient.snapshotVer,
+				"targets":   tufClient.targetsVer}
+			for m, v := range test.expectedVersions {
+				assert.Equal(c, v, versionMethods[m])
+			}
 		} else {
 			// For backward compatibility, the update root returns
 			// ErrDecodeFailed that wraps the verify.ErrExpired.
-			if _, ok := test.extpectedError.(ErrDecodeFailed); ok {
+			if _, ok := test.expectedError.(ErrDecodeFailed); ok {
 				decodeErr, ok := err.(ErrDecodeFailed)
 				c.Assert(ok, Equals, true)
 				c.Assert(decodeErr.File, Equals, "root.json")
 				_, ok = decodeErr.Err.(verify.ErrExpired)
 				c.Assert(ok, Equals, true)
 			} else {
-				assert.Equal(c, test.extpectedError, err)
+				assert.Equal(c, test.expectedError, err)
 			}
 		}
 		closer()
