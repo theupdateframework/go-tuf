@@ -373,12 +373,18 @@ func startTUFRepoServer(baseDir string, relPath string) (net.Listener, error) {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 // newClientWithMeta creates new client and sets the root metadata for it.
 func newClientWithMeta(baseDir string, relPath string, serverAddr string) (*Client, error) {
+=======
+// newClientWithMeta creates new client and sets the root metadata for it.
+func newClientWithMeta(baseDir string, relPath string, serverAddr string, initWithLocalMetadata bool) (*Client, error) {
+>>>>>>> 960c52e (check non root metadata, refactor test, address comments)
 	initialStateDir := filepath.Join(baseDir, relPath)
 	opts := &HTTPRemoteOptions{
 		MetadataPath: "metadata",
 		TargetsPath:  "targets",
+<<<<<<< HEAD
 =======
 func (s *ClientSuite) initClientWithMetaFiles(c *C, metaDirPath string) error {
 	var MetaFiles = [1]string{"root"}
@@ -389,6 +395,8 @@ func (s *ClientSuite) initClientWithMetaFiles(c *C, metaDirPath string) error {
 			return err
 		}
 >>>>>>> 7e70871 (removing some debugging comments)
+=======
+>>>>>>> 960c52e (check non root metadata, refactor test, address comments)
 	}
 
 	remote, err := HTTPRemoteStore(fmt.Sprintf("http://%s/", serverAddr), opts, nil)
@@ -396,11 +404,15 @@ func (s *ClientSuite) initClientWithMetaFiles(c *C, metaDirPath string) error {
 		return nil, err
 	}
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 960c52e (check non root metadata, refactor test, address comments)
 	c := NewClient(MemoryLocalStore(), remote)
 	for _, m := range []string{"root.json", "snapshot.json", "timestamp.json", "targets.json"} {
 		metadataJSON, err := ioutil.ReadFile(initialStateDir + "/" + m)
 		if err != nil {
 			return nil, err
+<<<<<<< HEAD
 =======
 	for _, f := range files {
 		if data, err := ioutil.ReadFile(filepath.Join(metaDirPath, f.Name())); err == nil {
@@ -409,16 +421,30 @@ func (s *ClientSuite) initClientWithMetaFiles(c *C, metaDirPath string) error {
 		} else {
 			return err
 >>>>>>> 7e70871 (removing some debugging comments)
+=======
+>>>>>>> 960c52e (check non root metadata, refactor test, address comments)
 		}
 		c.local.SetMeta(m, metadataJSON)
 	}
 	return c, nil
 }
 
+<<<<<<< HEAD
 func initRootTest(c *C, baseDir string) (*Client, func() error) {
 	l, err := startTUFRepoServer(baseDir, "server")
 	c.Assert(err, IsNil)
 	tufClient, err := newClientWithMeta(baseDir, "client/metadata/current", l.Addr().String())
+=======
+func initRootTest(c *C, baseDir string, initWithLocalMetadata bool, ignoreExpired bool) (*Client, func() error) {
+	l, err := startTUFRepoServer(baseDir, "server")
+	c.Assert(err, IsNil)
+	e := verify.IsExpired
+	if ignoreExpired {
+		verify.IsExpired = func(t time.Time) bool { return false }
+	}
+	tufClient, err := newClientWithMeta(baseDir, "client/metadata/current", l.Addr().String(), initWithLocalMetadata)
+	verify.IsExpired = e
+>>>>>>> 960c52e (check non root metadata, refactor test, address comments)
 	c.Assert(err, IsNil)
 	return tufClient, l.Close
 }
@@ -426,6 +452,7 @@ func initRootTest(c *C, baseDir string) (*Client, func() error) {
 func (s *ClientSuite) TestUpdateRoots(c *C) {
 	var tests = []struct {
 		fixturePath      string
+<<<<<<< HEAD
 		expectedError    error
 		expectedVersions map[string]int
 	}{
@@ -477,6 +504,38 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 
 	for _, test := range tests {
 		tufClient, closer := initRootTest(c, test.fixturePath)
+=======
+		isExpired        bool // Value retuned by verify.IsExpired.
+		expectedError    error
+		expectedVersions map[string]int
+	}{
+		// New root version update (no key update) succeeds.
+		{"testdata/PublishedTwice", false, nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// New root update (root role key rotation) succeeds.
+		{"testdata/PublishedTwiceWithRotatedKeys_root", false, nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// New root update (snapshot role key rotation) succeeds.
+		{"testdata/PublishedTwiceWithRotatedKeys_snapshot", false, nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 1}},
+		// New root update (targets role key rotation) succeeds.
+		{"testdata/PublishedTwiceWithRotatedKeys_targets", false, nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 2}},
+		// New root update (timestamp role key rotation) succeeds.
+		{"testdata/PublishedTwiceWithRotatedKeys_timestamp", false, nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 1, "targets": 1}},
+		// New expired root update fails.
+		{"testdata/PublishedTwiceWithRotatedKeys_root", true, ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int{}},
+		// New root update with a rollback attack fails.
+		{"testdata/PublishedTwiceWithStaleVersion_root", false, verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), map[string]int{}},
+		// New root update with fast forward attack fails.
+		{"testdata/PublishedTwiceForwardVersionWithRotatedKeys_root", false, verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), map[string]int{}},
+		// New root with invalid new root signature fails (n+1th root didn't sign off n+1).
+		{"testdata/PublishedTwiceInvalidNewRootSignatureWithRotatedKeys_root", false, errors.New("tuf: signature verification failed"), map[string]int{}},
+		// New root with invalid old root signature fails (nth root didn't sign off n+1).
+		{"testdata/PublishedTwiceInvalidOldRootSignatureWithRotatedKeys_root", false, errors.New("tuf: signature verification failed"), map[string]int{}},
+	}
+
+	for _, test := range tests {
+		e := verify.IsExpired
+		verify.IsExpired = func(t time.Time) bool { return test.isExpired }
+		tufClient, closer := initRootTest(c, test.fixturePath /* initWithLocalMetadata = */, true /* ignoreExpired = */, true)
+>>>>>>> 960c52e (check non root metadata, refactor test, address comments)
 		_, err := tufClient.Update()
 		if test.expectedError == nil {
 			c.Assert(err, IsNil)
@@ -493,10 +552,14 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 			// For backward compatibility, the update root returns
 			// ErrDecodeFailed that wraps the verify.ErrExpired.
 <<<<<<< HEAD
+<<<<<<< HEAD
 			if _, ok := test.expectedError.(ErrDecodeFailed); ok {
 =======
 			if _, ok := test.extpectedError.(ErrDecodeFailed); ok {
 >>>>>>> 220eb66 (fix based on the reviews.)
+=======
+			if _, ok := test.expectedError.(ErrDecodeFailed); ok {
+>>>>>>> 960c52e (check non root metadata, refactor test, address comments)
 				decodeErr, ok := err.(ErrDecodeFailed)
 				c.Assert(ok, Equals, true)
 				c.Assert(decodeErr.File, Equals, "root.json")
