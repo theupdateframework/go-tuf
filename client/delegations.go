@@ -2,6 +2,7 @@ package client
 
 import (
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/internal/targets"
 	"github.com/theupdateframework/go-tuf/verify"
 )
 
@@ -19,15 +20,15 @@ func (c *Client) getTargetFileMeta(target string) (data.TargetFileMeta, error) {
 	// - filter delegations with paths or path_hash_prefixes matching searched target
 	// - 5.6.7.1 cycles protection
 	// - 5.6.7.2 terminations
-	delegations := newDelegationsIterator(target)
+	delegations := targets.NewDelegationsIterator(target)
 	for i := 0; i < c.MaxDelegations; i++ {
-		d, ok := delegations.next()
+		d, ok := delegations.Next()
 		if !ok {
 			return data.TargetFileMeta{}, ErrUnknownTarget{target, snapshot.Version}
 		}
 
 		// covers 5.6.{1,2,3,4,5,6}
-		targets, err := c.loadDelegatedTargets(snapshot, d.delegatee.Name, d.verifier)
+		targets, err := c.loadDelegatedTargets(snapshot, d.Delegatee.Name, d.Verifier)
 		if err != nil {
 			return data.TargetFileMeta{}, err
 		}
@@ -42,7 +43,7 @@ func (c *Client) getTargetFileMeta(target string) (data.TargetFileMeta, error) {
 			if err != nil {
 				return data.TargetFileMeta{}, err
 			}
-			err = delegations.add(targets.Delegations.Roles, d.delegatee.Name, delegationsVerifier)
+			err = delegations.Add(targets.Delegations.Roles, d.Delegatee.Name, delegationsVerifier)
 			if err != nil {
 				return data.TargetFileMeta{}, err
 			}
@@ -113,78 +114,4 @@ func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, role string, veri
 		}
 	}
 	return targets, nil
-}
-
-type delegation struct {
-	delegator string
-	verifier  verify.DelegationsVerifier
-	delegatee data.DelegatedRole
-}
-
-type delegationsIterator struct {
-	stack        []delegation
-	target       string
-	visitedRoles map[string]struct{}
-}
-
-// newDelegationsIterator initialises an iterator with a first step
-// on top level targets
-func newDelegationsIterator(target string) *delegationsIterator {
-	i := &delegationsIterator{
-		target: target,
-		stack: []delegation{
-			{
-				delegatee: data.DelegatedRole{Name: "targets"},
-			},
-		},
-		visitedRoles: make(map[string]struct{}),
-	}
-	return i
-}
-
-func (d *delegationsIterator) next() (value delegation, ok bool) {
-	if len(d.stack) == 0 {
-		return delegation{}, false
-	}
-	delegation := d.stack[len(d.stack)-1]
-	d.stack = d.stack[:len(d.stack)-1]
-
-	// 5.6.7.1: If this role has been visited before, then skip this role (so
-	// that cycles in the delegation graph are avoided).
-	roleName := delegation.delegatee.Name
-	if _, ok := d.visitedRoles[roleName]; ok {
-		return d.next()
-	}
-	d.visitedRoles[roleName] = struct{}{}
-
-	// 5.6.7.2 trim delegations to visit, only the current role and its delegations
-	// will be considered
-	// https://github.com/theupdateframework/specification/issues/168
-	if delegation.delegatee.Terminating {
-		// Empty the stack.
-		d.stack = d.stack[0:0]
-	}
-	return delegation, true
-}
-
-func (d *delegationsIterator) add(roles []data.DelegatedRole, delegator string, verifier verify.DelegationsVerifier) error {
-	for i := len(roles) - 1; i >= 0; i-- {
-		// Push the roles onto the stack in reverse so we get an preorder traversal
-		// of the delegations graph.
-		r := roles[i]
-		matchesPath, err := r.MatchesPath(d.target)
-		if err != nil {
-			return err
-		}
-		if matchesPath {
-			delegation := delegation{
-				delegator: delegator,
-				delegatee: r,
-				verifier:  verifier,
-			}
-			d.stack = append(d.stack, delegation)
-		}
-	}
-
-	return nil
 }
