@@ -258,14 +258,6 @@ func HashedPaths(p string, hashes data.Hashes) []string {
 	return paths
 }
 
-func StringSliceToSet(items []string) map[string]struct{} {
-	s := make(map[string]struct{})
-	for _, item := range items {
-		s[item] = struct{}{}
-	}
-	return s
-}
-
 func AtomicallyWriteFile(filename string, data []byte, perm os.FileMode) error {
 	dir, name := filepath.Split(filename)
 	f, err := ioutil.TempFile(dir, name)

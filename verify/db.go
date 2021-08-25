@@ -2,6 +2,7 @@ package verify
 
 import (
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/internal/roles"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
 )
 
@@ -27,37 +28,28 @@ func NewDB() *DB {
 	}
 }
 
-type DelegationsVerifier struct {
-	DB *DB
-}
-
-func (d *DelegationsVerifier) Unmarshal(b []byte, v interface{}, role string, minVersion int) error {
-	return d.DB.Unmarshal(b, v, role, minVersion)
-}
-
-// NewDelegationsVerifier returns a DelegationsVerifier that verifies delegations
-// of a given Targets. It reuses the DB struct to leverage verified keys, roles
-// unmarshals.
-func NewDelegationsVerifier(d *data.Delegations) (DelegationsVerifier, error) {
+// NewDBFromDelegations returns a DB that verifies delegations
+// of a given Targets.
+func NewDBFromDelegations(d *data.Delegations) (*DB, error) {
 	db := &DB{
 		roles:     make(map[string]*Role, len(d.Roles)),
 		verifiers: make(map[string]keys.Verifier, len(d.Keys)),
 	}
 	for _, r := range d.Roles {
-		if _, ok := topLevelRoles[r.Name]; ok {
-			return DelegationsVerifier{}, ErrInvalidDelegatedRole
+		if _, ok := roles.TopLevelRoles[r.Name]; ok {
+			return nil, ErrInvalidDelegatedRole
 		}
 		role := &data.Role{Threshold: r.Threshold, KeyIDs: r.KeyIDs}
-		if err := db.addRole(r.Name, role); err != nil {
-			return DelegationsVerifier{}, err
+		if err := db.AddRole(r.Name, role); err != nil {
+			return nil, err
 		}
 	}
 	for id, k := range d.Keys {
 		if err := db.AddKey(id, k); err != nil {
-			return DelegationsVerifier{}, err
+			return nil, err
 		}
 	}
-	return DelegationsVerifier{db}, nil
+	return db, nil
 }
 
 func (db *DB) AddKey(id string, k *data.PublicKey) error {
@@ -72,31 +64,7 @@ func (db *DB) AddKey(id string, k *data.PublicKey) error {
 	return nil
 }
 
-var topLevelRoles = map[string]struct{}{
-	"root":      {},
-	"targets":   {},
-	"snapshot":  {},
-	"timestamp": {},
-}
-
-// ValidRole checks if a role is a top level role.
-func ValidRole(name string) bool {
-	return isTopLevelRole(name)
-}
-
-func isTopLevelRole(name string) bool {
-	_, ok := topLevelRoles[name]
-	return ok
-}
-
 func (db *DB) AddRole(name string, r *data.Role) error {
-	if !isTopLevelRole(name) {
-		return ErrInvalidRole
-	}
-	return db.addRole(name, r)
-}
-
-func (db *DB) addRole(name string, r *data.Role) error {
 	if r.Threshold < 1 {
 		return ErrInvalidThreshold
 	}

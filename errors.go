@@ -86,3 +86,11 @@ type ErrPassphraseRequired struct {
 func (e ErrPassphraseRequired) Error() string {
 	return fmt.Sprintf("tuf: a passphrase is required to access the encrypted %s keys file", e.Role)
 }
+
+type ErrNoDelegatedTarget struct {
+	Path string
+}
+
+func (e ErrNoDelegatedTarget) Error() string {
+	return fmt.Sprintf("tuf: no delegated target for path %s", e.Path)
+}

@@ -7,6 +7,7 @@ import (
 
 	cjson "github.com/tent/canonical-json-go"
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/internal/roles"
 )
 
 type signedMeta struct {
@@ -25,7 +26,7 @@ func (db *DB) VerifyIgnoreExpiredCheck(s *data.Signed, role string, minVersion i
 		return err
 	}
 
-	if isTopLevelRole(role) {
+	if roles.IsTopLevelRole(role) {
 		// Top-level roles can only sign metadata of the same type (e.g. snapshot
 		// metadata must be signed by the snapshot role).
 		if strings.ToLower(sm.Type) != strings.ToLower(role) {

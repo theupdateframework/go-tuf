@@ -14,6 +14,7 @@ var (
 )
 
 func TestDelegationsIterator(t *testing.T) {
+	defaultKeyIDs := []string{"26b878ad73362774b8b69dd4fdeb2cc6a2688e4133ed5ace9e18a06e9d998a6d"}
 	var iteratorTests = []struct {
 		testName    string
 		roles       map[string][]data.DelegatedRole
@@ -25,23 +26,23 @@ func TestDelegationsIterator(t *testing.T) {
 			testName: "no termination",
 			roles: map[string][]data.DelegatedRole{
 				"targets": {
-					{Name: "b", Paths: defaultPathPatterns},
-					{Name: "e", Paths: defaultPathPatterns},
+					{Name: "b", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
+					{Name: "e", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 				"b": {
-					{Name: "c", Paths: defaultPathPatterns},
+					{Name: "c", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 				"c": {
-					{Name: "d", Paths: defaultPathPatterns},
+					{Name: "d", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 				"e": {
-					{Name: "f", Paths: defaultPathPatterns},
-					{Name: "g", Paths: defaultPathPatterns},
+					{Name: "f", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
+					{Name: "g", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 				"g": {
-					{Name: "h", Paths: defaultPathPatterns},
-					{Name: "i", Paths: defaultPathPatterns},
-					{Name: "j", Paths: defaultPathPatterns},
+					{Name: "h", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
+					{Name: "i", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
+					{Name: "j", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 			},
 			file:        "",
@@ -51,12 +52,12 @@ func TestDelegationsIterator(t *testing.T) {
 			testName: "terminated in b",
 			roles: map[string][]data.DelegatedRole{
 				"targets": {
-					{Name: "b", Paths: defaultPathPatterns, Terminating: true},
-					{Name: "e", Paths: defaultPathPatterns},
+					{Name: "b", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs, Terminating: true},
+					{Name: "e", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 				"b": {
-					{Name: "c", Paths: defaultPathPatterns},
-					{Name: "d", Paths: defaultPathPatterns},
+					{Name: "c", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
+					{Name: "d", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 			},
 			file:        "",
@@ -66,12 +67,12 @@ func TestDelegationsIterator(t *testing.T) {
 			testName: "path does not match b",
 			roles: map[string][]data.DelegatedRole{
 				"targets": {
-					{Name: "b", Paths: noMatchPathPatterns},
-					{Name: "e", Paths: defaultPathPatterns},
+					{Name: "b", Paths: noMatchPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
+					{Name: "e", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 				"b": {
-					{Name: "c", Paths: defaultPathPatterns},
-					{Name: "d", Paths: defaultPathPatterns},
+					{Name: "c", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
+					{Name: "d", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 			},
 			file:        "",
@@ -81,12 +82,13 @@ func TestDelegationsIterator(t *testing.T) {
 			testName: "path does not match b - path prefixes",
 			roles: map[string][]data.DelegatedRole{
 				"targets": {
-					{Name: "b", PathHashPrefixes: []string{"33472a4909"}},
-					{Name: "c", PathHashPrefixes: []string{"34c85d1ee84f61f10d7dc633"}},
+					{Name: "b", PathHashPrefixes: []string{"33472a4909"}, Threshold: 1, KeyIDs: defaultKeyIDs},
+					{Name: "c", PathHashPrefixes: []string{"34c85d1ee84f61f10d7dc633"}, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 				"c": {
-					{Name: "d", PathHashPrefixes: []string{"8baf"}},
-					{Name: "e", PathHashPrefixes: []string{"34c85d1ee84f61f10d7dc633472a49096ed87f8f764bd597831eac371f40ac39"}},
+
+					{Name: "d", PathHashPrefixes: []string{"8baf"}, Threshold: 1, KeyIDs: defaultKeyIDs},
+					{Name: "e", PathHashPrefixes: []string{"34c85d1ee84f61f10d7dc633472a49096ed87f8f764bd597831eac371f40ac39"}, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 			},
 			file:        "/e/f/g.txt",
@@ -96,7 +98,7 @@ func TestDelegationsIterator(t *testing.T) {
 			testName: "err paths and pathHashPrefixes are set",
 			roles: map[string][]data.DelegatedRole{
 				"targets": {
-					{Name: "b", Paths: defaultPathPatterns, PathHashPrefixes: defaultPathPatterns},
+					{Name: "b", Paths: defaultPathPatterns, PathHashPrefixes: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 				"b": {},
 			},
@@ -108,48 +110,54 @@ func TestDelegationsIterator(t *testing.T) {
 			testName: "cycle avoided 1",
 			roles: map[string][]data.DelegatedRole{
 				"targets": {
-					{Name: "b", Paths: defaultPathPatterns},
-					{Name: "e", Paths: defaultPathPatterns},
+					{Name: "a", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
+				},
+				"a": {
+					{Name: "b", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
+					{Name: "e", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 				"b": {
-					{Name: "targets", Paths: defaultPathPatterns},
-					{Name: "d", Paths: defaultPathPatterns},
+					{Name: "a", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
+					{Name: "d", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 			},
 			file:        "",
-			resultOrder: []string{"targets", "b", "d", "e"},
+			resultOrder: []string{"targets", "a", "b", "d", "e"},
 		},
 		{
 			testName: "cycle avoided 2",
 			roles: map[string][]data.DelegatedRole{
 				"targets": {
-					{Name: "targets", Paths: defaultPathPatterns},
-					{Name: "b", Paths: defaultPathPatterns},
+					{Name: "a", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
+				},
+				"a": {
+					{Name: "a", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
+					{Name: "b", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 				"b": {
-					{Name: "targets", Paths: defaultPathPatterns},
-					{Name: "b", Paths: defaultPathPatterns},
-					{Name: "c", Paths: defaultPathPatterns},
+					{Name: "a", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
+					{Name: "b", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
+					{Name: "c", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 				"c": {
-					{Name: "c", Paths: defaultPathPatterns},
+					{Name: "c", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 			},
 			file:        "",
-			resultOrder: []string{"targets", "b", "c"},
+			resultOrder: []string{"targets", "a", "b", "c"},
 		},
 		{
 			testName: "diamond delegation",
 			roles: map[string][]data.DelegatedRole{
 				"targets": {
-					{Name: "b", Paths: defaultPathPatterns},
-					{Name: "c", Paths: defaultPathPatterns},
+					{Name: "b", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
+					{Name: "c", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 				"b": {
-					{Name: "d", Paths: defaultPathPatterns},
+					{Name: "d", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 				"c": {
-					{Name: "d", Paths: defaultPathPatterns},
+					{Name: "d", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 			},
 			file:        "",
@@ -159,10 +167,10 @@ func TestDelegationsIterator(t *testing.T) {
 			testName: "simple cycle",
 			roles: map[string][]data.DelegatedRole{
 				"targets": {
-					{Name: "a", Paths: defaultPathPatterns},
+					{Name: "a", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 				"a": {
-					{Name: "a", Paths: defaultPathPatterns},
+					{Name: "a", Paths: defaultPathPatterns, Threshold: 1, KeyIDs: defaultKeyIDs},
 				},
 			},
 			file:        "",
@@ -172,7 +180,17 @@ func TestDelegationsIterator(t *testing.T) {
 
 	for _, tt := range iteratorTests {
 		t.Run(tt.testName, func(t *testing.T) {
-			d := NewDelegationsIterator(tt.file)
+			flattened := []data.DelegatedRole{}
+			for _, roles := range tt.roles {
+				flattened = append(flattened, roles...)
+			}
+			db, err := verify.NewDBFromDelegations(&data.Delegations{
+				Roles: flattened,
+			})
+
+			assert.NoError(t, err)
+			d := NewDelegationsIterator(tt.file, db)
+
 			var iterationOrder []string
 			for {
 				r, ok := d.Next()
@@ -184,7 +202,13 @@ func TestDelegationsIterator(t *testing.T) {
 				if !ok {
 					continue
 				}
-				err := d.Add(delegations, r.Delegatee.Name, verify.DelegationsVerifier{})
+
+				db, err := verify.NewDBFromDelegations(&data.Delegations{
+					Roles: delegations,
+				})
+				assert.NoError(t, err)
+
+				err = d.Add(delegations, r.Delegatee.Name, db)
 				assert.Equal(t, tt.err, err)
 			}
 			assert.Equal(t, tt.resultOrder, iterationOrder)

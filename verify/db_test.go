@@ -7,8 +7,8 @@ import (
 	"github.com/theupdateframework/go-tuf/data"
 )
 
-func TestDelegationsVerifier(t *testing.T) {
-	var verifierTests = []struct {
+func TestDelegationsDB(t *testing.T) {
+	var dbTests = []struct {
 		testName     string
 		delegations  *data.Delegations
 		initErr      error
@@ -42,14 +42,14 @@ func TestDelegationsVerifier(t *testing.T) {
 		},
 	}
 
-	for _, tt := range verifierTests {
+	for _, tt := range dbTests {
 		t.Run(tt.testName, func(t *testing.T) {
-			verifier, err := NewDelegationsVerifier(tt.delegations)
-			assert.NotNil(t, verifier)
+			db, err := NewDBFromDelegations(tt.delegations)
 			assert.Equal(t, tt.initErr, err)
 			if err == nil {
+				assert.NotNil(t, db)
 				var targets data.Targets
-				err = verifier.Unmarshal([]byte(`{"a":"b"}`), targets, "tree", 0)
+				err = db.Unmarshal([]byte(`{"a":"b"}`), targets, "tree", 0)
 				assert.Equal(t, tt.unmarshalErr, err)
 			}
 		})
