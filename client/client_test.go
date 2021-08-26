@@ -373,7 +373,7 @@ func startTUFRepoServer(baseDir string, relPath string) (net.Listener, error) {
 }
 
 // newClientWithMeta creates new client and sets the root metadata for it.
-func newClientWithMeta(baseDir string, relPath string, serverAddr string, initWithLocalMetadata bool) (*Client, error) {
+func newClientWithMeta(baseDir string, relPath string, serverAddr string) (*Client, error) {
 	initialStateDir := filepath.Join(baseDir, relPath)
 	opts := &HTTPRemoteOptions{
 		MetadataPath: "metadata",
@@ -395,14 +395,14 @@ func newClientWithMeta(baseDir string, relPath string, serverAddr string, initWi
 	return c, nil
 }
 
-func initRootTest(c *C, baseDir string, initWithLocalMetadata bool, ignoreExpired bool) (*Client, func() error) {
+func initRootTest(c *C, baseDir string, ignoreExpired bool) (*Client, func() error) {
 	l, err := startTUFRepoServer(baseDir, "server")
 	c.Assert(err, IsNil)
 	e := verify.IsExpired
 	if ignoreExpired {
 		verify.IsExpired = func(t time.Time) bool { return false }
 	}
-	tufClient, err := newClientWithMeta(baseDir, "client/metadata/current", l.Addr().String(), initWithLocalMetadata)
+	tufClient, err := newClientWithMeta(baseDir, "client/metadata/current", l.Addr().String())
 	verify.IsExpired = e
 	c.Assert(err, IsNil)
 	return tufClient, l.Close
@@ -440,7 +440,7 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 	for _, test := range tests {
 		e := verify.IsExpired
 		verify.IsExpired = func(t time.Time) bool { return test.isExpired }
-		tufClient, closer := initRootTest(c, test.fixturePath /* initWithLocalMetadata = */, true /* ignoreExpired = */, true)
+		tufClient, closer := initRootTest(c, test.fixturePath, true)
 		_, err := tufClient.Update()
 		if test.expectedError == nil {
 			c.Assert(err, IsNil)

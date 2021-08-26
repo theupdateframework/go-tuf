@@ -124,7 +124,7 @@ func (db *DB) UnmarshalIgnoreExpired(b []byte, v interface{}, role string, minVe
 	if err := json.Unmarshal(b, s); err != nil {
 		return err
 	}
-	// Note: If verification fails, then we wont attemp to unmarshal
+	// Note: If verification fails, then we wont attempt to unmarshal
 	// unless when verification error is errExpired.
 	verifyErr := db.Verify(s, role, minVersion)
 	if verifyErr != nil {

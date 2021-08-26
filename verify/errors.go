@@ -57,7 +57,7 @@ type ErrWrongVersion struct {
 }
 
 func (e ErrWrongVersion) Error() string {
-	return fmt.Sprintf("version %d does not match the extepcted version %d", e.Given, e.Expected)
+	return fmt.Sprintf("version %d does not match the expected version %d", e.Given, e.Expected)
 }
 
 type ErrRoleThreshold struct {
