@@ -125,6 +125,15 @@ func (e ErrInvalidURL) Error() string {
 	return fmt.Sprintf("tuf: invalid repository URL %s", e.URL)
 }
 
+type ErrRoleNotInSnapshot struct {
+	Role            string
+	SnapshotVersion int
+}
+
+func (e ErrRoleNotInSnapshot) Error() string {
+	return fmt.Sprintf("tuf: role %s not in snapshot version %d", e.Role, e.SnapshotVersion)
+}
+
 type ErrWrongRootVersion struct {
 	DownloadedVersion int
 	ExpectedVersion   int
