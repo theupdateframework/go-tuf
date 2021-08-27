@@ -7,6 +7,8 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"reflect"
+	"sort"
 	"time"
 
 	"github.com/theupdateframework/go-tuf/data"
@@ -238,6 +240,28 @@ func (c *Client) updateRoots() error {
 		return err
 	}
 
+	// Prepare for 5.3.11: If the timestamp and / or snapshot keys have been rotated,
+	// then delete the trusted timestamp and snapshot metadata files.
+	getKeyIDs := func(role string) []string {
+		keyIDs := make([]string, 0, len(c.db.GetRole(role).KeyIDs))
+		for k := range c.db.GetRole(role).KeyIDs {
+			keyIDs = append(keyIDs, k)
+		}
+		sort.Strings(keyIDs)
+		return keyIDs
+	}
+
+	// The manifest looks like this:
+	// {
+	//	"timestamp": ["KEYID1", "KEYID2"],
+	//	"snapshot": ["KEYID3"],
+	//	"targets": ["KEYID4", "KEYID5", "KEYID6"]
+	// }
+	nonRootManifests := map[string][]string{"timestamp": {}, "snapshot": {}, "targets": {}}
+	for k := range nonRootManifests {
+		nonRootManifests[k] = getKeyIDs(k)
+	}
+
 	// 5.3.1 Temorarily turn on the consistent snapshots in order to download
 	// versioned root metadata files as described next.
 	consistentSnapshot := c.consistentSnapshot
@@ -321,7 +345,15 @@ func (c *Client) updateRoots() error {
 		return err
 	}
 
-	// Note: We are stricter than 5.3.11 by always clearing all non-root top-level keys.
+	// 5.3.11 If the timestamp and / or snapshot keys have been rotated,
+	// then delete the trusted timestamp and snapshot metadata files.
+	for topLevelRolename := range nonRootManifests {
+		if !reflect.DeepEqual(
+			nonRootManifests[topLevelRolename],
+			getKeyIDs(topLevelRolename)) {
+			c.local.SetMeta(topLevelRolename, json.RawMessage{})
+		}
+	}
 
 	// 5.3.12 Set whether consistent snapshots are used as per the trusted root metadata file.
 	c.consistentSnapshot = consistentSnapshot
