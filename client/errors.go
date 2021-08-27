@@ -133,12 +133,3 @@ type ErrRoleNotInSnapshot struct {
 func (e ErrRoleNotInSnapshot) Error() string {
 	return fmt.Sprintf("tuf: role %s not in snapshot version %d", e.Role, e.SnapshotVersion)
 }
-
-type ErrWrongRootVersion struct {
-	DownloadedVersion int
-	ExpectedVersion   int
-}
-
-func (e ErrWrongRootVersion) Error() string {
-	return fmt.Sprintf("tuf: wrong root version downloaded expected %d got %d", e.ExpectedVersion, e.DownloadedVersion)
-}
