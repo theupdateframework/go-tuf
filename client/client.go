@@ -354,7 +354,7 @@ func (c *Client) updateRoots() error {
 		if !reflect.DeepEqual(
 			nonRootManifests[topLevelRolename],
 			getKeyIDs(topLevelRolename)) {
-			c.local.SetMeta(topLevelRolename, json.RawMessage{})
+			c.local.DeleteMeta(topLevelRolename)
 		}
 	}
 
