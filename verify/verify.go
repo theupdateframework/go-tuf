@@ -86,8 +86,8 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 			continue
 		}
 
-		if err := Verifiers[key.Type].Verify(key.Value.Public, msg, sig.Signature); err != nil {
-			return err
+		if err := key.Verify(msg, sig.Signature); err != nil {
+			return ErrInvalid
 		}
 
 		// Only consider this key valid if we haven't seen any of it's

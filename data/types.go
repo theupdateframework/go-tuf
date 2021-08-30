@@ -37,10 +37,10 @@ type Signature struct {
 }
 
 type Key struct {
-	Type       string   `json:"keytype"`
-	Scheme     string   `json:"scheme"`
-	Algorithms []string `json:"keyid_hash_algorithms,omitempty"`
-	Value      KeyValue `json:"keyval"`
+	Type       string          `json:"keytype"`
+	Scheme     string          `json:"scheme"`
+	Algorithms []string        `json:"keyid_hash_algorithms,omitempty"`
+	Value      json.RawMessage `json:"keyval"`
 
 	ids    []string
 	idOnce sync.Once
@@ -62,10 +62,6 @@ func (k *Key) ContainsID(id string) bool {
 		}
 	}
 	return false
-}
-
-type KeyValue struct {
-	Public HexBytes `json:"public"`
 }
 
 func DefaultExpires(role string) time.Time {
@@ -114,29 +110,6 @@ func (r *Root) AddKey(key *Key) bool {
 		}
 	}
 	return changed
-}
-
-// UniqueKeys returns the unique keys for each associated role.
-// We might have multiple key IDs that correspond to the same key.
-func (r Root) UniqueKeys() map[string][]*Key {
-	keysByRole := make(map[string][]*Key)
-	for name, role := range r.Roles {
-		seen := make(map[string]struct{})
-		keys := []*Key{}
-		for _, id := range role.KeyIDs {
-			// Double-check that there is actually a key with that ID.
-			if key, ok := r.Keys[id]; ok {
-				val := key.Value.Public.String()
-				if _, ok := seen[val]; ok {
-					continue
-				}
-				seen[val] = struct{}{}
-				keys = append(keys, key)
-			}
-		}
-		keysByRole[name] = keys
-	}
-	return keysByRole
 }
 
 type Role struct {

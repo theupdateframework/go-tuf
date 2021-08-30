@@ -11,6 +11,8 @@ import (
 
 	cjson "github.com/tent/canonical-json-go"
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/keys"
+	tkeys "github.com/theupdateframework/go-tuf/keys"
 	"github.com/theupdateframework/go-tuf/sign"
 	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
@@ -57,10 +59,10 @@ type LocalStore interface {
 	Commit(bool, map[string]int, map[string]data.Hashes) error
 
 	// GetSigningKeys return a list of signing keys for a role.
-	GetSigningKeys(string) ([]sign.Signer, error)
+	GetSigningKeys(string) ([]keys.Signer, error)
 
 	// SavePrivateKey adds a signing key to a role.
-	SavePrivateKey(string, *sign.PrivateKey) error
+	SavePrivateKey(string, *keys.PrivateKey) error
 
 	// Clean is used to remove all staged manifests.
 	Clean() error
@@ -318,7 +320,7 @@ func (r *Repo) GenKey(role string) ([]string, error) {
 }
 
 func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) ([]string, error) {
-	key, err := sign.GenerateEd25519Key()
+	key, err := keys.GenerateEd25519Key()
 	if err != nil {
 		return []string{}, err
 	}
@@ -330,7 +332,7 @@ func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) ([]string, e
 	return key.PublicData().IDs(), nil
 }
 
-func (r *Repo) AddPrivateKey(role string, key *sign.PrivateKey) error {
+func (r *Repo) AddPrivateKey(role string, key *keys.PrivateKey) error {
 	return r.AddPrivateKeyWithExpires(role, key, data.DefaultExpires(role))
 }
 
@@ -390,6 +392,38 @@ func (r *Repo) AddVerificationKeyWithExpiration(keyRole string, pk *data.Key, ex
 
 func validExpires(expires time.Time) bool {
 	return expires.Sub(time.Now()) > 0
+}
+
+// UniqueKeys returns the unique keys for each associated role.
+// We might have multiple key IDs that correspond to the same key.
+func (r Root) UniqueKeys() map[string][]*data.Key {
+	keysByRole := make(map[string][]*data.Key)
+	for name, role := range r.Roles {
+		seen := make(map[string]struct{})
+		keys := []*data.Key{}
+		for _, id := range role.KeyIDs {
+			// Double-check that there is actually a key with that ID.
+			if key, ok := r.Keys[id]; ok {
+				if kt, found := tkeys.KeyMap.Load(key.Type); found {
+					k := kt.(func() tkeys.Verifier)()
+					if k != nil {
+						key, err := k.UnmarshalKey(key)
+						if err != nil {
+							val := key.Public()
+							if _, ok := seen[val]; ok {
+								continue
+							}
+							seen[val] = struct{}{}
+							keys = append(keys, key)
+						}
+
+					}
+				}
+			}
+		}
+		keysByRole[name] = keys
+	}
+	return keysByRole
 }
 
 func (r *Repo) RootKeys() ([]*data.Key, error) {

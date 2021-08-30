@@ -1,32 +1,39 @@
-package sign
+package keys
 
 import (
+	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/json"
 	"sync"
 
 	"github.com/theupdateframework/go-tuf/data"
-	"golang.org/x/crypto/ed25519"
 )
 
-type PrivateKey struct {
-	Type       string          `json:"keytype"`
-	Scheme     string          `json:"scheme,omitempty"`
-	Algorithms []string        `json:"keyid_hash_algorithms,omitempty"`
-	Value      PrivateKeyValue `json:"keyval"`
+func init() {
+	KeyMap.Store(data.KeySchemeEd25519, NewP256)
 }
 
-type PrivateKeyValue struct {
-	Public  data.HexBytes `json:"public"`
-	Private data.HexBytes `json:"private"`
+func NewP256() Verifier {
+	v := ed25519Verifier{}
+	return &v
 }
 
-func (k *PrivateKey) PublicData() *data.Key {
-	return &data.Key{
-		Type:       k.Type,
-		Scheme:     k.Scheme,
-		Algorithms: k.Algorithms,
-		Value:      data.KeyValue{Public: k.Value.Public},
+type ed25519Verifier struct {
+	public ed25519.PublicKey
+}
+
+func (e ed25519Verifier) Verify(msg, sig []byte) error {
+	if !ed25519.Verify(e.public, msg, sig) {
+		return ErrInvalid
 	}
+	return nil
+}
+
+func (e ed25519Verifier) ValidKey(v json.RawMessage) bool {
+	if err := json.Unmarshal(v, e.public); err != nil {
+		return false
+	}
+	return len(e.public) == ed25519.PublicKeySize
 }
 
 func (k *PrivateKey) Signer() Signer {
@@ -67,7 +74,7 @@ type ed25519Signer struct {
 var _ Signer = &ed25519Signer{}
 
 func (s *ed25519Signer) IDs() []string {
-	s.idOnce.Do(func() { s.ids = s.publicData().IDs() })
+	s.idOnce.Do(func() { s.ids = s.MarshalKey().IDs() })
 	return s.ids
 }
 
@@ -80,12 +87,13 @@ func (s *ed25519Signer) ContainsID(id string) bool {
 	return false
 }
 
-func (s *ed25519Signer) publicData() *data.Key {
+func (s *ed25519Signer) MarshalKey() *data.Key {
+	keyValBytes, _ := json.Marshal(data.KeyValue{Public: []byte(s.PrivateKey.Public().(ed25519.PublicKey))})
 	return &data.Key{
 		Type:       s.keyType,
 		Scheme:     s.keyScheme,
 		Algorithms: s.keyAlgorithms,
-		Value:      data.KeyValue{Public: []byte(s.PrivateKey.Public().(ed25519.PublicKey))},
+		Value:      keyValBytes,
 	}
 }
 

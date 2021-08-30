@@ -1,0 +1,67 @@
+package keys
+
+import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/sha256"
+	"encoding/asn1"
+	"encoding/json"
+	"errors"
+	"math/big"
+
+	"github.com/theupdateframework/go-tuf/data"
+)
+
+func init() {
+	KeyMap.Store(data.KeyTypeECDSA_SHA2_P256, NewEcdsa)
+}
+
+func NewEcdsa() Verifier {
+	v := p256Verifier{}
+	return &v
+}
+
+type ecdsaSignature struct {
+	R, S *big.Int
+}
+
+type p256Verifier struct {
+	public data.HexBytes `json:"public"`
+}
+
+func (p p256Verifier) Public() string {
+	return p.public.String()
+}
+
+func (p p256Verifier) Verify(msg, sigBytes []byte) error {
+	x, y := elliptic.Unmarshal(elliptic.P256(), p.public)
+	k := &ecdsa.PublicKey{
+		Curve: elliptic.P256(),
+		X:     x,
+		Y:     y,
+	}
+
+	var sig ecdsaSignature
+	if _, err := asn1.Unmarshal(sigBytes, &sig); err != nil {
+		return err
+	}
+
+	hash := sha256.Sum256(msg)
+
+	if !ecdsa.Verify(k, hash[:], sig.R, sig.S) {
+		return errors.New("verifyig ecdsa signature")
+	}
+	return nil
+}
+
+func (p p256Verifier) ValidKey(v json.RawMessage) bool {
+	if err := json.Unmarshal(v, p.public); err != nil {
+		return false
+	}
+	x, _ := elliptic.Unmarshal(elliptic.P256(), p.public)
+	return x != nil
+}
+
+func (p p256Verifier) UnmarshalKey(key data.Key) error {
+	return json.Unmarshal(key.Value, p.public)
+}

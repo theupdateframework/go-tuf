@@ -2,6 +2,7 @@ package verify
 
 import (
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/keys"
 )
 
 type Role struct {
@@ -60,14 +61,15 @@ func NewDelegationsVerifier(d *data.Delegations) (DelegationsVerifier, error) {
 }
 
 func (db *DB) AddKey(id string, k *data.Key) error {
-	v, ok := Verifiers[k.Type]
+	vt, ok := keys.KeyMap.Load(k.Type)
 	if !ok {
 		return nil
 	}
+	v := vt.(func() keys.Verifier)()
 	if !k.ContainsID(id) {
 		return ErrWrongID{}
 	}
-	if !v.ValidKey(k.Value.Public) {
+	if !v.ValidKey(k.Value) {
 		return ErrInvalidKey
 	}
 
