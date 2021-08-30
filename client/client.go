@@ -335,6 +335,7 @@ func (c *Client) updateRoots() error {
 		return err
 	}
 
+<<<<<<< HEAD
 	countDeleted := func(s1 map[string]bool, s2 map[string]bool) int {
 		c := 0
 		for k := range s1 {
@@ -369,6 +370,15 @@ func (c *Client) updateRoots() error {
 			for _, r := range deleteMeta[topLevelRolename] {
 				c.local.DeleteMeta(r)
 			}
+=======
+	// 5.3.11 If the timestamp and / or snapshot keys have been rotated,
+	// then delete the trusted timestamp and snapshot metadata files.
+	for topLevelRolename := range nonRootManifests {
+		if !reflect.DeepEqual(
+			nonRootManifests[topLevelRolename],
+			getKeyIDs(topLevelRolename)) {
+			c.local.DeleteMeta(topLevelRolename)
+>>>>>>> 6a1b949 (delete (instead of setting to an empty raw message) the top-level metadata when their key has changed.)
 		}
 	}
 
