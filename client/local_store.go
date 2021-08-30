@@ -18,3 +18,8 @@ func (m memoryLocalStore) SetMeta(name string, meta json.RawMessage) error {
 	m[name] = meta
 	return nil
 }
+
+func (m memoryLocalStore) DeleteMeta(name string) error {
+	delete(m, name)
+	return nil
+}

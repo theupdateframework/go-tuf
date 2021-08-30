@@ -35,6 +35,9 @@ type LocalStore interface {
 	// SetMeta persists the given top-level metadata in local storage, the
 	// name taking the same format as the keys returned by GetMeta.
 	SetMeta(name string, meta json.RawMessage) error
+
+	// DeleteMeta deletes a given metadata.
+	DeleteMeta(name string) error
 }
 
 // RemoteStore downloads top-level metadata and target files from a remote
