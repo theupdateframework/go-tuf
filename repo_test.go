@@ -15,6 +15,7 @@ import (
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/encrypted"
+	"github.com/theupdateframework/go-tuf/keys"
 	"github.com/theupdateframework/go-tuf/sign"
 	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
@@ -39,9 +40,41 @@ func (RepoSuite) TestNewRepoIndent(c *C) {
 	})
 }
 
+// UniqueKeys returns the unique keys for each associated role.
+// We might have multiple key IDs that correspond to the same key.
+func UniqueKeys(r *data.Root) map[string][]*data.Key {
+	keysByRole := make(map[string][]*data.Key)
+	for name, role := range r.Roles {
+		seen := make(map[string]struct{})
+		roleKeys := []*data.Key{}
+		for _, id := range role.KeyIDs {
+			// Double-check that there is actually a key with that ID.
+			if key, ok := r.Keys[id]; ok {
+				if kt, found := keys.KeyMap.Load(key.Type); found {
+					k := kt.(func() keys.SignerVerifier)()
+					if k.Verifier != nil {
+						err := k.Verifier.UnmarshalKey(key)
+						if err != nil {
+							val := k.Verifier.Public()
+							if _, ok := seen[val]; ok {
+								continue
+							}
+							seen[val] = struct{}{}
+							roleKeys = append(roleKeys, key)
+						}
+
+					}
+				}
+			}
+		}
+		keysByRole[name] = roleKeys
+	}
+	return keysByRole
+}
+
 // AssertNumUniqueKeys verifies that the number of unique root keys for a given role is as expected.
 func (*RepoSuite) assertNumUniqueKeys(c *C, root *data.Root, role string, num int) {
-	c.Assert(root.UniqueKeys()[role], HasLen, num)
+	c.Assert(UniqueKeys(root)[role], HasLen, num)
 }
 
 func testNewRepo(c *C, newRepo func(local LocalStore, hashAlgorithms ...string) (*Repo, error)) {

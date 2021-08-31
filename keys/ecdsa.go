@@ -16,9 +16,12 @@ func init() {
 	KeyMap.Store(data.KeyTypeECDSA_SHA2_P256, NewEcdsa)
 }
 
-func NewEcdsa() Verifier {
-	v := p256Verifier{}
-	return &v
+func NewEcdsa() SignerVerifier {
+	sv := SignerVerifier{
+		Signer:   nil,
+		Verifier: &p256Verifier{},
+	}
+	return sv
 }
 
 type ecdsaSignature struct {
@@ -26,15 +29,16 @@ type ecdsaSignature struct {
 }
 
 type p256Verifier struct {
-	public data.HexBytes `json:"public"`
+	PublicKey data.HexBytes `json:"public"`
+	key       *data.Key
 }
 
 func (p p256Verifier) Public() string {
-	return p.public.String()
+	return p.PublicKey.String()
 }
 
 func (p p256Verifier) Verify(msg, sigBytes []byte) error {
-	x, y := elliptic.Unmarshal(elliptic.P256(), p.public)
+	x, y := elliptic.Unmarshal(elliptic.P256(), p.PublicKey)
 	k := &ecdsa.PublicKey{
 		Curve: elliptic.P256(),
 		X:     x,
@@ -55,13 +59,18 @@ func (p p256Verifier) Verify(msg, sigBytes []byte) error {
 }
 
 func (p p256Verifier) ValidKey(v json.RawMessage) bool {
-	if err := json.Unmarshal(v, p.public); err != nil {
+	if err := json.Unmarshal(v, &p.PublicKey); err != nil {
 		return false
 	}
-	x, _ := elliptic.Unmarshal(elliptic.P256(), p.public)
+	x, _ := elliptic.Unmarshal(elliptic.P256(), p.PublicKey)
 	return x != nil
 }
 
-func (p p256Verifier) UnmarshalKey(key data.Key) error {
-	return json.Unmarshal(key.Value, p.public)
+func (p p256Verifier) UnmarshalKey(key *data.Key) error {
+	p.key = key
+	return json.Unmarshal(key.Value, &p.PublicKey)
+}
+
+func (p *p256Verifier) IDs() []string {
+	return p.key.IDs()
 }

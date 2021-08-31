@@ -12,6 +12,11 @@ import (
 // KeyMap stores mapping between key type strings and verifier constructors.
 var KeyMap sync.Map
 
+type SignerVerifier struct {
+	Signer   Signer
+	Verifier Verifier
+}
+
 var (
 	ErrInvalid = errors.New("tuf: signature verification failed")
 )
@@ -19,10 +24,13 @@ var (
 // A Verifier verifies public key signatures.
 type Verifier interface {
 	// UnmarshalKey takes key data to a working verifier implementation for the key type.
-	UnmarshalKey(key data.Key) error
+	UnmarshalKey(key *data.Key) error
 
 	// This is the public string used as a unique identifier for the verifier instance.
 	Public() string
+
+	// IDs returns the TUF key ids
+	IDs() []string
 
 	// Verify takes a message and signature, all as byte slices,
 	// and determines whether the signature is valid for the given
@@ -35,6 +43,15 @@ type Verifier interface {
 }
 
 type Signer interface {
+	// Marshal into a private key.
+	MarshalPrivate() (*data.PrivateKey, error)
+
+	// UnmarshalKey takes private key data to a working Signer implementation for the key type.
+	UnmarshalSigner(key *data.PrivateKey) error
+
+	// Returns the public data.Key from the private key
+	PublicData() *data.Key
+
 	// IDs returns the TUF key ids
 	IDs() []string
 
@@ -51,25 +68,4 @@ type Signer interface {
 	// The signer is expected to do its own hashing, so the full message will be
 	// provided as the message to Sign with a zero opts.HashFunc().
 	crypto.Signer
-}
-
-type PrivateKey struct {
-	Type       string          `json:"keytype"`
-	Scheme     string          `json:"scheme,omitempty"`
-	Algorithms []string        `json:"keyid_hash_algorithms,omitempty"`
-	Value      PrivateKeyValue `json:"keyval"`
-}
-
-type PrivateKeyValue struct {
-	Public  data.HexBytes `json:"public"`
-	Private data.HexBytes `json:"private"`
-}
-
-func (k *PrivateKey) PublicData() *data.Key {
-	return &data.Key{
-		Type:       k.Type,
-		Scheme:     k.Scheme,
-		Algorithms: k.Algorithms,
-		Value:      data.KeyValue{Public: k.Value.Public},
-	}
 }
