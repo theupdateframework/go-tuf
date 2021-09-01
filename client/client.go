@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"reflect"
 	"sort"
 	"time"
 
@@ -245,13 +244,13 @@ func (c *Client) updateRoots() error {
 
 	// Prepare for 5.3.11: If the timestamp and / or snapshot keys have been rotated,
 	// then delete the trusted timestamp and snapshot metadata files.
-	getKeyIDs := func(role string) []string {
+	getKeyIDs := func(role string) ([]string, int) {
 		keyIDs := make([]string, 0, len(c.db.GetRole(role).KeyIDs))
 		for k := range c.db.GetRole(role).KeyIDs {
 			keyIDs = append(keyIDs, k)
 		}
 		sort.Strings(keyIDs)
-		return keyIDs
+		return keyIDs, c.db.GetRole(role).Threshold
 	}
 
 	// The manifest looks like this:
@@ -261,8 +260,9 @@ func (c *Client) updateRoots() error {
 	//	"targets": ["KEYID4", "KEYID5", "KEYID6"]
 	// }
 	nonRootManifests := map[string][]string{"timestamp": {}, "snapshot": {}, "targets": {}}
+	nonRootThreshold := map[string]int{"timestamp": 1, "snapshot": 1, "targets": 1}
 	for k := range nonRootManifests {
-		nonRootManifests[k] = getKeyIDs(k)
+		nonRootManifests[k], nonRootThreshold[k] = getKeyIDs(k)
 	}
 
 	// 5.3.1 Temorarily turn on the consistent snapshots in order to download
@@ -348,13 +348,41 @@ func (c *Client) updateRoots() error {
 		return err
 	}
 
-	// 5.3.11 If the timestamp and / or snapshot keys have been rotated,
-	// then delete the trusted timestamp and snapshot metadata files.
+	countDeleted := func(s1 []string, s2 []string) int {
+		c := len(s1)
+		p2 := 0
+		for _, v := range s1 {
+			for p2 < len(s2) && v >= s2[p2] {
+				if v == s2[p2] {
+					c--
+					p2++
+					break
+				}
+				p2++
+			}
+		}
+		return c
+	}
+
+	// 5.3.11 To recover from fast-forward attack, certain metadata files need
+	// to be deleted if a threshold of keys are revoked.
+	// List of metadata that should be deleted per role if a threshold of keys
+	// are revoked:
+	// timestamp -> delete timestamp.json
+	// snapshot ->  delete timestamp.json and snapshot.json
+	// targets ->   delete snapshot.json and targets.json
 	for topLevelRolename := range nonRootManifests {
-		if !reflect.DeepEqual(
-			nonRootManifests[topLevelRolename],
-			getKeyIDs(topLevelRolename)) {
-			c.local.DeleteMeta(topLevelRolename)
+		keyIDs, _ := getKeyIDs(topLevelRolename)
+		if countDeleted(nonRootManifests[topLevelRolename], keyIDs) >= nonRootThreshold[topLevelRolename] {
+			deleteMeta := map[string][]string{
+				"timestamp": {"timestamp.json"},
+				"snapshot":  {"timestamp.json", "snapshot.json"},
+				"targets":   {"snapshot.json", "targets.json"},
+			}
+
+			for _, r := range deleteMeta[topLevelRolename] {
+				c.local.DeleteMeta(r)
+			}
 		}
 	}
 
