@@ -539,6 +539,61 @@ func (s *ClientSuite) TestUpdateRace(c *C) {
 	}
 }
 
+func (s *ClientSuite) TestFastForwardAttackRecovery(c *C) {
+	var tests = []struct {
+		fixturePath       string
+		expectMetaDeleted map[string]bool
+	}{
+		// No non-root-metadata recovery if root keys are revoked only.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_root",
+			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
+		// No non-root-metadata recovery if root keys are revoked only even threshold number of root keys are revoked.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_root",
+			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
+		// No snapshot metadata recovery less than threashold keys changed.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_snapshot",
+			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
+		// Delete snapshot and timestamp metadata if threashold number of keys changed.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_snapshot",
+			map[string]bool{"root.json": false, "timestamp.json": true, "snapshot.json": true, "targets.json": false}},
+		// No targets metadata recovery less than threashold keys changed.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_targets",
+			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
+		// Delete targets and snapshot metadata if threashold number of keys changed.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_targets",
+			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": true, "targets.json": true}},
+		// No timestamp metadata recovery less than threashold keys changed.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_timestamp",
+			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
+		// Delete timestamp metadata if threashold number of keys changed.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_timestamp",
+			map[string]bool{"root.json": false, "timestamp.json": true, "snapshot.json": false, "targets.json": false}},
+	}
+	for _, test := range tests {
+		e := verify.IsExpired
+		verify.IsExpired = func(t time.Time) bool { return false }
+		tufClient, closer := initRootTest(c, test.fixturePath, true)
+		c.Assert(tufClient.updateRoots(), IsNil)
+		m, err := tufClient.local.GetMeta()
+		c.Assert(err, IsNil)
+		for md, deleted := range test.expectMetaDeleted {
+			if deleted {
+				if _, ok := m[md]; ok {
+					c.Fatalf("Metadata %s is not deleted!", md)
+				}
+			} else {
+				if _, ok := m[md]; !ok {
+					c.Fatalf("Metadata %s deleted!", md)
+				}
+			}
+		}
+		closer()
+		verify.IsExpired = e
+
+	}
+
+}
+
 func (s *ClientSuite) TestNewTargets(c *C) {
 	client := s.newClient(c)
 	files, err := client.Update()

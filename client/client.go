@@ -7,6 +7,11 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+<<<<<<< HEAD
+=======
+	"sort"
+	"time"
+>>>>>>> 78b1631 (test for fast forward attack recovery)
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/util"
@@ -236,12 +241,22 @@ func (c *Client) updateRoots() error {
 
 	// Prepare for 5.3.11: If the timestamp and / or snapshot keys have been rotated,
 	// then delete the trusted timestamp and snapshot metadata files.
+<<<<<<< HEAD
 	getKeyInfo := func(role string) KeyInfo {
 		keyIDs := make(map[string]bool)
+=======
+	getKeyIDs := func(role string) ([]string, int) {
+		keyIDs := make([]string, 0, len(c.db.GetRole(role).KeyIDs))
+>>>>>>> 78b1631 (test for fast forward attack recovery)
 		for k := range c.db.GetRole(role).KeyIDs {
 			keyIDs[k] = true
 		}
+<<<<<<< HEAD
 		return KeyInfo{keyIDs, c.db.GetRole(role).Threshold}
+=======
+		sort.Strings(keyIDs)
+		return keyIDs, c.db.GetRole(role).Threshold
+>>>>>>> 78b1631 (test for fast forward attack recovery)
 	}
 
 	// The nonRootKeyInfo looks like this:
@@ -250,10 +265,17 @@ func (c *Client) updateRoots() error {
 	//	"snapshot": {KeyIDs={"KEYID3": true}, Threshold=1},
 	//	"targets": {KeyIDs={"KEYID4": true, "KEYID5": true, "KEYID6": true}, Threshold=1}
 	// }
+<<<<<<< HEAD
 
 	nonRootKeyInfo := map[string]KeyInfo{"timestamp": {}, "snapshot": {}, "targets": {}}
 	for k := range nonRootKeyInfo {
 		nonRootKeyInfo[k] = getKeyInfo(k)
+=======
+	nonRootManifests := map[string][]string{"timestamp": {}, "snapshot": {}, "targets": {}}
+	nonRootThreshold := map[string]int{"timestamp": 1, "snapshot": 1, "targets": 1}
+	for k := range nonRootManifests {
+		nonRootManifests[k], nonRootThreshold[k] = getKeyIDs(k)
+>>>>>>> 78b1631 (test for fast forward attack recovery)
 	}
 
 	// 5.3.1 Temorarily turn on the consistent snapshots in order to download
@@ -336,11 +358,25 @@ func (c *Client) updateRoots() error {
 	}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	countDeleted := func(s1 map[string]bool, s2 map[string]bool) int {
 		c := 0
 		for k := range s1 {
 			if _, ok := s2[k]; !ok {
 				c++
+=======
+	countDeleted := func(s1 []string, s2 []string) int {
+		c := len(s1)
+		p2 := 0
+		for _, v := range s1 {
+			for p2 < len(s2) && v >= s2[p2] {
+				if v == s2[p2] {
+					c--
+					p2++
+					break
+				}
+				p2++
+>>>>>>> 78b1631 (test for fast forward attack recovery)
 			}
 		}
 		return c
@@ -350,6 +386,7 @@ func (c *Client) updateRoots() error {
 	// to be deleted if a threshold of keys are revoked.
 	// List of metadata that should be deleted per role if a threshold of keys
 	// are revoked:
+<<<<<<< HEAD
 	// (based on the ongoing PR: https://github.com/mnm678/specification/tree/e50151d9df632299ddea364c4f44fe8ca9c10184)
 	// timestamp -> delete timestamp.json
 	// snapshot ->  delete timestamp.json and snapshot.json
@@ -379,6 +416,23 @@ func (c *Client) updateRoots() error {
 			getKeyIDs(topLevelRolename)) {
 			c.local.DeleteMeta(topLevelRolename)
 >>>>>>> 6a1b949 (delete (instead of setting to an empty raw message) the top-level metadata when their key has changed.)
+=======
+	// timestamp -> delete timestamp.json
+	// snapshot ->  delete timestamp.json and snapshot.json
+	// targets ->   delete snapshot.json and targets.json
+	for topLevelRolename := range nonRootManifests {
+		keyIDs, _ := getKeyIDs(topLevelRolename)
+		if countDeleted(nonRootManifests[topLevelRolename], keyIDs) >= nonRootThreshold[topLevelRolename] {
+			deleteMeta := map[string][]string{
+				"timestamp": {"timestamp.json"},
+				"snapshot":  {"timestamp.json", "snapshot.json"},
+				"targets":   {"snapshot.json", "targets.json"},
+			}
+
+			for _, r := range deleteMeta[topLevelRolename] {
+				c.local.DeleteMeta(r)
+			}
+>>>>>>> 78b1631 (test for fast forward attack recovery)
 		}
 	}
 
