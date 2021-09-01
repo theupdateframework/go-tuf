@@ -69,13 +69,12 @@ func (db *DB) AddKey(id string, k *data.Key) error {
 		return ErrWrongID{}
 	}
 	v := vt.(func() keys.SignerVerifier)()
-	if v.Verifier != nil && !v.Verifier.ValidKey(k.Value) {
+	if v.Verifier == nil || !v.Verifier.ValidKey(k.Value) {
 		return ErrInvalidKey
 	}
 	if err := v.Verifier.UnmarshalKey(k); err != nil {
 		return ErrInvalidKey
 	}
-
 	db.keys[id] = &v.Verifier
 
 	return nil
@@ -125,8 +124,8 @@ func (db *DB) addRole(name string, r *data.Role) error {
 	return nil
 }
 
-func (db *DB) GetKey(id string) keys.Verifier {
-	return *db.keys[id]
+func (db *DB) GetKey(id string) *keys.Verifier {
+	return db.keys[id]
 }
 
 func (db *DB) GetRole(name string) *Role {

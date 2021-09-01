@@ -30,6 +30,7 @@ func privateKeySigners(privateKeys []*data.PrivateKey) []keys.Signer {
 			continue
 		}
 		res[i] = sv.Signer
+		_ = sv.Signer.IDs()
 	}
 	return res
 }

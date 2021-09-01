@@ -6,11 +6,14 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/json"
+	"errors"
 	"io"
 	"testing"
 	"time"
 
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/keys"
 	"github.com/theupdateframework/go-tuf/sign"
 	"golang.org/x/crypto/ed25519"
 
@@ -28,13 +31,18 @@ type ecdsaSigner struct {
 	*ecdsa.PrivateKey
 }
 
+type ecdsaPublic struct {
+	PublicKey data.HexBytes `json:"public"`
+}
+
 func (s ecdsaSigner) PublicData() *data.Key {
 	pub := s.Public().(*ecdsa.PublicKey)
+	keyValBytes, _ := json.Marshal(ecdsaPublic{PublicKey: elliptic.Marshal(pub.Curve, pub.X, pub.Y)})
 	return &data.Key{
 		Type:       data.KeyTypeECDSA_SHA2_P256,
 		Scheme:     data.KeySchemeECDSA_SHA2_P256,
 		Algorithms: data.KeyAlgorithms,
-		Value:      data.KeyValue{Public: elliptic.Marshal(pub.Curve, pub.X, pub.Y)},
+		Value:      keyValBytes,
 	}
 }
 
@@ -57,6 +65,14 @@ func (ecdsaSigner) Type() string {
 
 func (ecdsaSigner) Scheme() string {
 	return data.KeySchemeECDSA_SHA2_P256
+}
+
+func (ecdsaSigner) MarshalPrivate() (*data.PrivateKey, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (ecdsaSigner) UnmarshalSigner(key *data.PrivateKey) error {
+	return errors.New("not implemented")
 }
 
 func (VerifySuite) Test(c *C) {
@@ -112,8 +128,8 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "more than enough signatures",
 			mut: func(t *test) {
-				k, _ := sign.GenerateEd25519Key()
-				sign.Sign(t.s, k.Signer())
+				k, _ := keys.GenerateEd25519Key()
+				sign.Sign(t.s, k)
 				t.keys = append(t.keys, k.PublicData())
 				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, k.PublicData().IDs()...)
 			},
@@ -129,15 +145,15 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "unknown key",
 			mut: func(t *test) {
-				k, _ := sign.GenerateEd25519Key()
-				sign.Sign(t.s, k.Signer())
+				k, _ := keys.GenerateEd25519Key()
+				sign.Sign(t.s, k)
 			},
 		},
 		{
 			name: "unknown key below threshold",
 			mut: func(t *test) {
-				k, _ := sign.GenerateEd25519Key()
-				sign.Sign(t.s, k.Signer())
+				k, _ := keys.GenerateEd25519Key()
+				sign.Sign(t.s, k)
 				t.roles["root"].Threshold = 2
 			},
 			err: ErrRoleThreshold{2, 1},
@@ -145,16 +161,16 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "unknown keys in db",
 			mut: func(t *test) {
-				k, _ := sign.GenerateEd25519Key()
-				sign.Sign(t.s, k.Signer())
+				k, _ := keys.GenerateEd25519Key()
+				sign.Sign(t.s, k)
 				t.keys = append(t.keys, k.PublicData())
 			},
 		},
 		{
 			name: "unknown keys in db below threshold",
 			mut: func(t *test) {
-				k, _ := sign.GenerateEd25519Key()
-				sign.Sign(t.s, k.Signer())
+				k, _ := keys.GenerateEd25519Key()
+				sign.Sign(t.s, k)
 				t.keys = append(t.keys, k.PublicData())
 				t.roles["root"].Threshold = 2
 			},
@@ -214,8 +230,8 @@ func (VerifySuite) Test(c *C) {
 			t.typ = t.role
 		}
 		if t.keys == nil && t.s == nil {
-			k, _ := sign.GenerateEd25519Key()
-			t.s, _ = sign.Marshal(&signedMeta{Type: t.typ, Version: t.ver, Expires: *t.exp}, k.Signer())
+			k, _ := keys.GenerateEd25519Key()
+			t.s, _ = sign.Marshal(&signedMeta{Type: t.typ, Version: t.ver, Expires: *t.exp}, k)
 			t.keys = []*data.Key{k.PublicData()}
 		}
 		if t.roles == nil {

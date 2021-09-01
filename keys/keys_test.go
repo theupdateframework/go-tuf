@@ -24,7 +24,7 @@ func (KeysSuite) TestSignerKeyIDs(c *C) {
 	privKey, err := key.MarshalPrivate()
 	c.Assert(err, IsNil)
 	privKey.Scheme = ""
-	err = key.UnmarshalSigner(*privKey)
+	err = key.UnmarshalSigner(privKey)
 	c.Assert(err, IsNil)
 	c.Assert(key.PublicData().IDs(), DeepEquals, key.IDs())
 
@@ -35,7 +35,7 @@ func (KeysSuite) TestSignerKeyIDs(c *C) {
 	privKey, err = key.MarshalPrivate()
 	c.Assert(err, IsNil)
 	privKey.Algorithms = []string{}
-	err = key.UnmarshalSigner(*privKey)
+	err = key.UnmarshalSigner(privKey)
 	c.Assert(err, IsNil)
 	c.Assert(key.PublicData().IDs(), DeepEquals, key.IDs())
 }

@@ -51,16 +51,6 @@ type PrivateKey struct {
 	Scheme     string          `json:"scheme,omitempty"`
 	Algorithms []string        `json:"keyid_hash_algorithms,omitempty"`
 	Value      json.RawMessage `json:"keyval"`
-	Private    json.RawMessage
-}
-
-func (k *PrivateKey) PublicData() *Key {
-	return &Key{
-		Type:       k.Type,
-		Scheme:     k.Scheme,
-		Algorithms: k.Algorithms,
-		Value:      k.Value,
-	}
 }
 
 func (k *Key) IDs() []string {

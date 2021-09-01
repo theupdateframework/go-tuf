@@ -86,14 +86,14 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 			continue
 		}
 
-		if err := key.Verify(msg, sig.Signature); err != nil {
+		if err := (*key).Verify(msg, sig.Signature); err != nil {
 			return ErrInvalid
 		}
 
 		// Only consider this key valid if we haven't seen any of it's
 		// key ids before.
 		if _, ok := seen[sig.KeyID]; !ok {
-			for _, id := range key.IDs() {
+			for _, id := range (*key).IDs() {
 				seen[id] = struct{}{}
 			}
 

@@ -16,7 +16,6 @@ import (
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/encrypted"
 	"github.com/theupdateframework/go-tuf/keys"
-	"github.com/theupdateframework/go-tuf/sign"
 	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
 	"golang.org/x/crypto/ed25519"
@@ -54,7 +53,7 @@ func UniqueKeys(r *data.Root) map[string][]*data.Key {
 					k := kt.(func() keys.SignerVerifier)()
 					if k.Verifier != nil {
 						err := k.Verifier.UnmarshalKey(key)
-						if err != nil {
+						if err == nil {
 							val := k.Verifier.Public()
 							if _, ok := seen[val]; ok {
 								continue
@@ -62,7 +61,6 @@ func UniqueKeys(r *data.Root) map[string][]*data.Key {
 							seen[val] = struct{}{}
 							roleKeys = append(roleKeys, key)
 						}
-
 					}
 				}
 			}
@@ -75,6 +73,36 @@ func UniqueKeys(r *data.Root) map[string][]*data.Key {
 // AssertNumUniqueKeys verifies that the number of unique root keys for a given role is as expected.
 func (*RepoSuite) assertNumUniqueKeys(c *C, root *data.Root, role string, num int) {
 	c.Assert(UniqueKeys(root)[role], HasLen, num)
+}
+
+func (*RepoSuite) getVerifier(c *C, key *data.Key) keys.Verifier {
+	vt, ok := keys.KeyMap.Load(key.Type)
+	if !ok {
+		c.Errorf("error loading key implementation")
+	}
+	v := vt.(func() keys.SignerVerifier)()
+	if v.Verifier == nil {
+		c.Errorf("error loading verifier implementation")
+	}
+	if err := v.Verifier.UnmarshalKey(key); err != nil {
+		c.Errorf("error unmarshalling key")
+	}
+	return v.Verifier
+}
+
+func getSigner(c *C, key *data.PrivateKey) keys.Signer {
+	vt, ok := keys.KeyMap.Load(key.Type)
+	if !ok {
+		c.Errorf("error loading key implementation")
+	}
+	v := vt.(func() keys.SignerVerifier)()
+	if v.Signer == nil {
+		c.Errorf("error loading signer implementation")
+	}
+	if err := v.Signer.UnmarshalSigner(key); err != nil {
+		c.Errorf("error unmarshalling key")
+	}
+	return v.Signer
 }
 
 func testNewRepo(c *C, newRepo func(local LocalStore, hashAlgorithms ...string) (*Repo, error)) {
@@ -208,7 +236,8 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 			c.Fatal("missing key")
 		}
 		c.Assert(k.IDs(), DeepEquals, ids)
-		c.Assert(k.Value.Public, HasLen, ed25519.PublicKeySize)
+		pk := rs.getVerifier(c, k)
+		c.Assert(pk.Public(), HasLen, ed25519.PublicKeySize)
 	}
 
 	// check root key + role are in db
@@ -217,7 +246,7 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 	for _, keyID := range ids {
 		rootKey := db.GetKey(keyID)
 		c.Assert(rootKey, NotNil)
-		c.Assert(rootKey.IDs(), DeepEquals, ids)
+		c.Assert((*rootKey).IDs(), DeepEquals, ids)
 		role := db.GetRole("root")
 		c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(ids))
 
@@ -231,8 +260,9 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 		rootKeys, err := r.RootKeys()
 		c.Assert(err, IsNil)
 		c.Assert(rootKeys, HasLen, 1)
-		c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
-		c.Assert(rootKeys[0].Value.Public, DeepEquals, rootKey.Value.Public)
+		c.Assert(rootKeys[0].IDs(), DeepEquals, (*rootKey).IDs())
+		pk := rs.getVerifier(c, rootKeys[0])
+		c.Assert(pk.Public(), DeepEquals, (*rootKey).Public())
 	}
 
 	rootKey := db.GetKey(ids[0])
@@ -264,7 +294,7 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 		}
 		key := db.GetKey(id)
 		c.Assert(key, NotNil)
-		c.Assert(key.ContainsID(id), Equals, true)
+		c.Assert((*key).Key().ContainsID(id), Equals, true)
 	}
 	role := db.GetRole("targets")
 	c.Assert(role.KeyIDs, DeepEquals, targetKeyIDs)
@@ -273,7 +303,7 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 	rootKeys, err := r.RootKeys()
 	c.Assert(err, IsNil)
 	c.Assert(rootKeys, HasLen, 1)
-	c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
+	c.Assert(rootKeys[0].IDs(), DeepEquals, (*rootKey).IDs())
 
 	// check the keys were saved correctly
 	localKeys, err := local.GetSigningKeys("targets")
@@ -320,7 +350,7 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 	c.Assert(stagedRoot.Roles, DeepEquals, root.Roles)
 }
 
-func addPrivateKey(c *C, r *Repo, role string, key *sign.PrivateKey) []string {
+func addPrivateKey(c *C, r *Repo, role string, key keys.Signer) []string {
 	err := r.AddPrivateKey(role, key)
 	c.Assert(err, IsNil)
 	keyids := key.PublicData().IDs()
@@ -329,7 +359,7 @@ func addPrivateKey(c *C, r *Repo, role string, key *sign.PrivateKey) []string {
 }
 
 func addGeneratedPrivateKey(c *C, r *Repo, role string) []string {
-	key, err := sign.GenerateEd25519Key()
+	key, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	return addPrivateKey(c, r, role, key)
 }
@@ -340,7 +370,7 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 	c.Assert(err, IsNil)
 
 	// generate a key for an unknown role
-	key, err := sign.GenerateEd25519Key()
+	key, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	err = r.AddPrivateKey("foo", key)
 	c.Assert(err, Equals, ErrInvalidRole{"foo"})
@@ -367,7 +397,8 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 			c.Fatalf("missing key %s", keyID)
 		}
 		c.Assert(k.IDs(), DeepEquals, ids)
-		c.Assert(k.Value.Public, HasLen, ed25519.PublicKeySize)
+		pk := rs.getVerifier(c, k)
+		c.Assert(pk.Public(), HasLen, ed25519.PublicKeySize)
 	}
 
 	// check root key + role are in db
@@ -376,7 +407,7 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 	for _, keyID := range ids {
 		rootKey := db.GetKey(keyID)
 		c.Assert(rootKey, NotNil)
-		c.Assert(rootKey.IDs(), DeepEquals, ids)
+		c.Assert((*rootKey).IDs(), DeepEquals, ids)
 		role := db.GetRole("root")
 		c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(ids))
 
@@ -390,8 +421,9 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 		rootKeys, err := r.RootKeys()
 		c.Assert(err, IsNil)
 		c.Assert(rootKeys, HasLen, 1)
-		c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
-		c.Assert(rootKeys[0].Value.Public, DeepEquals, rootKey.Value.Public)
+		c.Assert(rootKeys[0].IDs(), DeepEquals, (*rootKey).IDs())
+		pk := rs.getVerifier(c, rootKeys[0])
+		c.Assert(pk.Public(), DeepEquals, (*rootKey).Public())
 	}
 
 	rootKey := db.GetKey(ids[0])
@@ -423,7 +455,7 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 		}
 		key := db.GetKey(id)
 		c.Assert(key, NotNil)
-		c.Assert(key.ContainsID(id), Equals, true)
+		c.Assert((*key).Key().ContainsID(id), Equals, true)
 	}
 	role := db.GetRole("targets")
 	c.Assert(role.KeyIDs, DeepEquals, targetKeyIDs)
@@ -432,7 +464,7 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 	rootKeys, err := r.RootKeys()
 	c.Assert(err, IsNil)
 	c.Assert(rootKeys, HasLen, 1)
-	c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
+	c.Assert(rootKeys[0].IDs(), DeepEquals, (*rootKey).IDs())
 
 	// check the keys were saved correctly
 	localKeys, err := local.GetSigningKeys("targets")
@@ -582,9 +614,11 @@ func (rs *RepoSuite) TestSign(c *C) {
 	}
 
 	// signing with an available key generates a signature
-	key, err := sign.GenerateEd25519Key()
+	key, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
-	c.Assert(local.SavePrivateKey("root", key), IsNil)
+	privateKey, err := key.MarshalPrivate()
+	c.Assert(err, IsNil)
+	c.Assert(local.SavePrivateKey("root", privateKey), IsNil)
 	c.Assert(r.Sign("root.json"), IsNil)
 	checkSigIDs(key.PublicData().IDs()...)
 
@@ -593,9 +627,11 @@ func (rs *RepoSuite) TestSign(c *C) {
 	checkSigIDs(key.PublicData().IDs()...)
 
 	// signing with a new available key generates another signature
-	newKey, err := sign.GenerateEd25519Key()
+	newKey, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
-	c.Assert(local.SavePrivateKey("root", newKey), IsNil)
+	newPrivateKey, err := newKey.MarshalPrivate()
+	c.Assert(err, IsNil)
+	c.Assert(local.SavePrivateKey("root", newPrivateKey), IsNil)
 	c.Assert(r.Sign("root.json"), IsNil)
 	checkSigIDs(append(key.PublicData().IDs(), newKey.PublicData().IDs()...)...)
 }
@@ -1190,13 +1226,13 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 	passphrase := []byte("s3cr3t")
 	store := FileSystemStore(tmp.path, testPassphraseFunc(passphrase))
 
-	assertKeys := func(role string, enc bool, expected []*sign.PrivateKey) {
+	assertKeys := func(role string, enc bool, expected []*data.PrivateKey) {
 		keysJSON := tmp.readFile("keys/" + role + ".json")
 		pk := &persistedKeys{}
 		c.Assert(json.Unmarshal(keysJSON, pk), IsNil)
 
 		// check the persisted keys are correct
-		var actual []*sign.PrivateKey
+		var actual []*data.PrivateKey
 		if enc {
 			c.Assert(pk.Encrypted, Equals, true)
 			decrypted, err := encrypted.Decrypt(pk.Data, passphrase)
@@ -1216,33 +1252,42 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 		c.Assert(err, IsNil)
 		c.Assert(signers, HasLen, len(expected))
 		for i, s := range signers {
-			c.Assert(s.IDs(), DeepEquals, expected[i].PublicData().IDs())
+			v := getSigner(c, expected[i])
+			c.Assert(s.IDs(), DeepEquals, v.IDs())
 		}
 	}
 
 	// save a key and check it gets encrypted
-	key, err := sign.GenerateEd25519Key()
+	key, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
-	c.Assert(store.SavePrivateKey("root", key), IsNil)
-	assertKeys("root", true, []*sign.PrivateKey{key})
+	privateKey, err := key.MarshalPrivate()
+	c.Assert(err, IsNil)
+	c.Assert(store.SavePrivateKey("root", privateKey), IsNil)
+	assertKeys("root", true, []*data.PrivateKey{privateKey})
 
 	// save another key and check it gets added to the existing keys
-	newKey, err := sign.GenerateEd25519Key()
+	newKey, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
-	c.Assert(store.SavePrivateKey("root", newKey), IsNil)
-	assertKeys("root", true, []*sign.PrivateKey{key, newKey})
+	newPrivateKey, err := newKey.MarshalPrivate()
+	c.Assert(err, IsNil)
+	c.Assert(store.SavePrivateKey("root", newPrivateKey), IsNil)
+	assertKeys("root", true, []*data.PrivateKey{privateKey, newPrivateKey})
 
 	// check saving a key to an encrypted file without a passphrase fails
 	insecureStore := FileSystemStore(tmp.path, nil)
-	key, err = sign.GenerateEd25519Key()
+	key, err = keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
-	c.Assert(insecureStore.SavePrivateKey("root", key), Equals, ErrPassphraseRequired{"root"})
+	privateKey, err = key.MarshalPrivate()
+	c.Assert(err, IsNil)
+	c.Assert(insecureStore.SavePrivateKey("root", privateKey), Equals, ErrPassphraseRequired{"root"})
 
 	// save a key to an insecure store and check it is not encrypted
-	key, err = sign.GenerateEd25519Key()
+	key, err = keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
-	c.Assert(insecureStore.SavePrivateKey("targets", key), IsNil)
-	assertKeys("targets", false, []*sign.PrivateKey{key})
+	privateKey, err = key.MarshalPrivate()
+	c.Assert(err, IsNil)
+	c.Assert(insecureStore.SavePrivateKey("targets", privateKey), IsNil)
+	assertKeys("targets", false, []*data.PrivateKey{privateKey})
 }
 
 func (rs *RepoSuite) TestManageMultipleTargets(c *C) {
@@ -1358,7 +1403,7 @@ func (rs *RepoSuite) TestUnknownKeyIDs(c *C) {
 	genKey(c, r, "timestamp")
 
 	// add a new key to the root metadata with an unknown key id.
-	key, err := sign.GenerateEd25519Key()
+	key, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 
 	root, err := r.root()
@@ -1477,25 +1522,25 @@ func (rs *RepoSuite) TestAddOrUpdateSignatures(c *C) {
 	c.Assert(r.Init(false), IsNil)
 
 	// generate root key offline and add as a verification key
-	rootKey, err := sign.GenerateEd25519Key()
+	rootKey, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	c.Assert(r.AddVerificationKey("root", rootKey.PublicData()), IsNil)
-	targetsKey, err := sign.GenerateEd25519Key()
+	targetsKey, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	c.Assert(r.AddVerificationKey("targets", targetsKey.PublicData()), IsNil)
-	snapshotKey, err := sign.GenerateEd25519Key()
+	snapshotKey, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	c.Assert(r.AddVerificationKey("snapshot", snapshotKey.PublicData()), IsNil)
-	timestampKey, err := sign.GenerateEd25519Key()
+	timestampKey, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	c.Assert(r.AddVerificationKey("timestamp", timestampKey.PublicData()), IsNil)
 
 	// generate signatures externally and append
 	rootMeta, err := r.SignedMeta("root.json")
 	c.Assert(err, IsNil)
-	rootSig, err := rootKey.Signer().Sign(rand.Reader, rootMeta.Signed, crypto.Hash(0))
+	rootSig, err := rootKey.Sign(rand.Reader, rootMeta.Signed, crypto.Hash(0))
 	c.Assert(err, IsNil)
-	for _, id := range rootKey.Signer().IDs() {
+	for _, id := range rootKey.IDs() {
 		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
 			KeyID:     id,
 			Signature: rootSig}), IsNil)
@@ -1505,9 +1550,9 @@ func (rs *RepoSuite) TestAddOrUpdateSignatures(c *C) {
 	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
 	targetsMeta, err := r.SignedMeta("targets.json")
 	c.Assert(err, IsNil)
-	targetsSig, err := targetsKey.Signer().Sign(rand.Reader, targetsMeta.Signed, crypto.Hash(0))
+	targetsSig, err := targetsKey.Sign(rand.Reader, targetsMeta.Signed, crypto.Hash(0))
 	c.Assert(err, IsNil)
-	for _, id := range targetsKey.Signer().IDs() {
+	for _, id := range targetsKey.IDs() {
 		r.AddOrUpdateSignature("targets.json", data.Signature{
 			KeyID:     id,
 			Signature: targetsSig})
@@ -1517,9 +1562,9 @@ func (rs *RepoSuite) TestAddOrUpdateSignatures(c *C) {
 	c.Assert(r.Snapshot(CompressionTypeNone), IsNil)
 	snapshotMeta, err := r.SignedMeta("snapshot.json")
 	c.Assert(err, IsNil)
-	snapshotSig, err := snapshotKey.Signer().Sign(rand.Reader, snapshotMeta.Signed, crypto.Hash(0))
+	snapshotSig, err := snapshotKey.Sign(rand.Reader, snapshotMeta.Signed, crypto.Hash(0))
 	c.Assert(err, IsNil)
-	for _, id := range snapshotKey.Signer().IDs() {
+	for _, id := range snapshotKey.IDs() {
 		r.AddOrUpdateSignature("snapshot.json", data.Signature{
 			KeyID:     id,
 			Signature: snapshotSig})
@@ -1528,9 +1573,9 @@ func (rs *RepoSuite) TestAddOrUpdateSignatures(c *C) {
 	c.Assert(r.Timestamp(), IsNil)
 	timestampMeta, err := r.SignedMeta("timestamp.json")
 	c.Assert(err, IsNil)
-	timestampSig, err := timestampKey.Signer().Sign(rand.Reader, timestampMeta.Signed, crypto.Hash(0))
+	timestampSig, err := timestampKey.Sign(rand.Reader, timestampMeta.Signed, crypto.Hash(0))
 	c.Assert(err, IsNil)
-	for _, id := range timestampKey.Signer().IDs() {
+	for _, id := range timestampKey.IDs() {
 		r.AddOrUpdateSignature("timestamp.json", data.Signature{
 			KeyID:     id,
 			Signature: timestampSig})
@@ -1550,48 +1595,48 @@ func (rs *RepoSuite) TestBadAddOrUpdateSignatures(c *C) {
 	c.Assert(r.Init(false), IsNil)
 
 	// generate root key offline and add as a verification key
-	rootKey, err := sign.GenerateEd25519Key()
+	rootKey, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	c.Assert(r.AddVerificationKey("root", rootKey.PublicData()), IsNil)
-	targetsKey, err := sign.GenerateEd25519Key()
+	targetsKey, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	c.Assert(r.AddVerificationKey("targets", targetsKey.PublicData()), IsNil)
-	snapshotKey, err := sign.GenerateEd25519Key()
+	snapshotKey, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	c.Assert(r.AddVerificationKey("snapshot", snapshotKey.PublicData()), IsNil)
-	timestampKey, err := sign.GenerateEd25519Key()
+	timestampKey, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	c.Assert(r.AddVerificationKey("timestamp", timestampKey.PublicData()), IsNil)
 
 	// add a signature with a bad role
 	rootMeta, err := r.SignedMeta("root.json")
 	c.Assert(err, IsNil)
-	rootSig, err := rootKey.Signer().Sign(rand.Reader, rootMeta.Signed, crypto.Hash(0))
+	rootSig, err := rootKey.Sign(rand.Reader, rootMeta.Signed, crypto.Hash(0))
 	c.Assert(err, IsNil)
-	for _, id := range rootKey.Signer().IDs() {
+	for _, id := range rootKey.IDs() {
 		c.Assert(r.AddOrUpdateSignature("invalid_root.json", data.Signature{
 			KeyID:     id,
 			Signature: rootSig}), Equals, ErrInvalidRole{"invalid_root"})
 	}
 
 	// add a root signature with an key ID that is for the targets role
-	for _, id := range targetsKey.Signer().IDs() {
+	for _, id := range targetsKey.IDs() {
 		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
 			KeyID:     id,
 			Signature: rootSig}), Equals, verify.ErrInvalidKey)
 	}
 
 	// attempt to add a bad signature to root
-	badSig, err := rootKey.Signer().Sign(rand.Reader, []byte(""), crypto.Hash(0))
+	badSig, err := rootKey.Sign(rand.Reader, []byte(""), crypto.Hash(0))
 	c.Assert(err, IsNil)
-	for _, id := range rootKey.Signer().IDs() {
+	for _, id := range rootKey.IDs() {
 		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
 			KeyID:     id,
 			Signature: badSig}), Equals, verify.ErrInvalid)
 	}
 
 	// add the correct root signature
-	for _, id := range rootKey.Signer().IDs() {
+	for _, id := range rootKey.IDs() {
 		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
 			KeyID:     id,
 			Signature: rootSig}), IsNil)
@@ -1616,7 +1661,7 @@ func (rs *RepoSuite) TestBadAddOrUpdateSignatures(c *C) {
 
 	// re-adding should not duplicate. this is checked by verifying
 	// signature key IDs match with the map of role key IDs.
-	for _, id := range rootKey.Signer().IDs() {
+	for _, id := range rootKey.IDs() {
 		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
 			KeyID:     id,
 			Signature: rootSig}), IsNil)

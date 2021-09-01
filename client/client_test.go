@@ -14,6 +14,7 @@ import (
 	cjson "github.com/tent/canonical-json-go"
 	tuf "github.com/theupdateframework/go-tuf"
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/keys"
 	"github.com/theupdateframework/go-tuf/sign"
 	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
@@ -352,7 +353,7 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 		for _, id := range ids {
 			key := client.db.GetKey(id)
 			c.Assert(key, NotNil)
-			c.Assert(key.IDs(), DeepEquals, ids)
+			c.Assert((*key).IDs(), DeepEquals, ids)
 		}
 		role := client.db.GetRole(name)
 		c.Assert(role, NotNil)
@@ -410,7 +411,7 @@ func (s *ClientSuite) TestNewTimestampKey(c *C) {
 	for _, newID := range newIDs {
 		key := client.db.GetKey(newID)
 		c.Assert(key, NotNil)
-		c.Assert(key.IDs(), DeepEquals, newIDs)
+		c.Assert((*key).IDs(), DeepEquals, newIDs)
 	}
 	role := client.db.GetRole("timestamp")
 	c.Assert(role, NotNil)
@@ -449,7 +450,7 @@ func (s *ClientSuite) TestNewSnapshotKey(c *C) {
 	for _, newID := range newIDs {
 		key := client.db.GetKey(newID)
 		c.Assert(key, NotNil)
-		c.Assert(key.IDs(), DeepEquals, newIDs)
+		c.Assert((*key).IDs(), DeepEquals, newIDs)
 	}
 	role := client.db.GetRole("snapshot")
 	c.Assert(role, NotNil)
@@ -491,7 +492,7 @@ func (s *ClientSuite) TestNewTargetsKey(c *C) {
 	for _, newID := range newIDs {
 		key := client.db.GetKey(newID)
 		c.Assert(key, NotNil)
-		c.Assert(key.IDs(), DeepEquals, newIDs)
+		c.Assert((*key).IDs(), DeepEquals, newIDs)
 	}
 	role := client.db.GetRole("targets")
 	c.Assert(role, NotNil)
@@ -914,7 +915,7 @@ func (s *ClientSuite) TestUnknownKeyIDs(c *C) {
 	c.Assert(json.Unmarshal(rootJSON, &root), IsNil)
 
 	// update remote root.json to add a new key with an unknown id
-	key, err := sign.GenerateEd25519Key()
+	key, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 
 	root.Signed.Keys["unknown-key-id"] = key.PublicData()

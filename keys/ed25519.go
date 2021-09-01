@@ -37,16 +37,20 @@ func (e ed25519Verifier) Verify(msg, sig []byte) error {
 	return nil
 }
 
-func (e ed25519Verifier) ValidKey(v json.RawMessage) bool {
-	if err := json.Unmarshal(v, &e.PublicKey); err != nil {
+func (e *ed25519Verifier) ValidKey(v json.RawMessage) bool {
+	if err := json.Unmarshal(v, e); err != nil {
 		return false
 	}
 	return len(e.PublicKey) == ed25519.PublicKeySize
 }
 
-func (e ed25519Verifier) UnmarshalKey(key *data.Key) error {
+func (e ed25519Verifier) Key() *data.Key {
+	return e.key
+}
+
+func (e *ed25519Verifier) UnmarshalKey(key *data.Key) error {
 	e.key = key
-	return json.Unmarshal(key.Value, &e.PublicKey)
+	return json.Unmarshal(key.Value, e)
 }
 
 func (e ed25519Verifier) IDs() []string {
@@ -90,13 +94,13 @@ func (e ed25519Signer) MarshalPrivate() (*data.PrivateKey, error) {
 	}, nil
 }
 
-func (e ed25519Signer) UnmarshalSigner(key *data.PrivateKey) error {
+func (e *ed25519Signer) UnmarshalSigner(key *data.PrivateKey) error {
 	keyValue := &ed25519PrivateKeyValue{}
 	if err := json.Unmarshal(key.Value, keyValue); err != nil {
 		return err
 	}
-	e = ed25519Signer{
-		PrivateKey:    ed25519.PrivateKey(keyValue.Private),
+	*e = ed25519Signer{
+		PrivateKey:    ed25519.PrivateKey(data.HexBytes(keyValue.Private)),
 		keyType:       key.Type,
 		keyScheme:     key.Scheme,
 		keyAlgorithms: key.Algorithms,

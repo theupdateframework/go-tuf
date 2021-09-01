@@ -58,17 +58,21 @@ func (p p256Verifier) Verify(msg, sigBytes []byte) error {
 	return nil
 }
 
-func (p p256Verifier) ValidKey(v json.RawMessage) bool {
-	if err := json.Unmarshal(v, &p.PublicKey); err != nil {
+func (p *p256Verifier) ValidKey(v json.RawMessage) bool {
+	if err := json.Unmarshal(v, p); err != nil {
 		return false
 	}
 	x, _ := elliptic.Unmarshal(elliptic.P256(), p.PublicKey)
 	return x != nil
 }
 
-func (p p256Verifier) UnmarshalKey(key *data.Key) error {
+func (p p256Verifier) Key() *data.Key {
+	return p.key
+}
+
+func (p *p256Verifier) UnmarshalKey(key *data.Key) error {
 	p.key = key
-	return json.Unmarshal(key.Value, &p.PublicKey)
+	return json.Unmarshal(key.Value, p)
 }
 
 func (p *p256Verifier) IDs() []string {

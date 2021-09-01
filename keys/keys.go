@@ -40,6 +40,9 @@ type Verifier interface {
 	// ValidKey returns true if the provided public key is valid and usable to
 	// verify signatures with this verifier.
 	ValidKey(value json.RawMessage) bool
+
+	// Key returns the data.Key object associated with the verifier.
+	Key() *data.Key
 }
 
 type Signer interface {

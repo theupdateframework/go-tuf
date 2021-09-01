@@ -324,23 +324,18 @@ func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) ([]string, e
 		return []string{}, err
 	}
 
-	privKey, err := key.MarshalPrivate()
-	if err != nil {
-		return []string{}, err
-	}
-
-	if err = r.AddPrivateKeyWithExpires(keyRole, privKey, expires); err != nil {
+	if err = r.AddPrivateKeyWithExpires(keyRole, key, expires); err != nil {
 		return []string{}, err
 	}
 
 	return key.PublicData().IDs(), nil
 }
 
-func (r *Repo) AddPrivateKey(role string, key *data.PrivateKey) error {
+func (r *Repo) AddPrivateKey(role string, key keys.Signer) error {
 	return r.AddPrivateKeyWithExpires(role, key, data.DefaultExpires(role))
 }
 
-func (r *Repo) AddPrivateKeyWithExpires(keyRole string, key *data.PrivateKey, expires time.Time) error {
+func (r *Repo) AddPrivateKeyWithExpires(keyRole string, key keys.Signer, expires time.Time) error {
 	if !verify.ValidRole(keyRole) {
 		return ErrInvalidRole{keyRole}
 	}
@@ -349,12 +344,20 @@ func (r *Repo) AddPrivateKeyWithExpires(keyRole string, key *data.PrivateKey, ex
 		return ErrInvalidExpires{expires}
 	}
 
-	if err := r.local.SavePrivateKey(keyRole, key); err != nil {
+	privKey, err := key.MarshalPrivate()
+	if err != nil {
 		return err
 	}
-	pk := key.PublicData()
 
-	return r.AddVerificationKeyWithExpiration(keyRole, pk, expires)
+	if err := r.local.SavePrivateKey(keyRole, privKey); err != nil {
+		return err
+	}
+
+	if err = r.AddVerificationKeyWithExpiration(keyRole, key.PublicData(), expires); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *Repo) AddVerificationKey(keyRole string, pk *data.Key) error {
@@ -399,38 +402,8 @@ func validExpires(expires time.Time) bool {
 }
 
 /*
-// UniqueKeys returns the unique keys for each associated role.
-// We might have multiple key IDs that correspond to the same key.
-func (r Root) UniqueKeys() map[string][]*data.Key {
-	keysByRole := make(map[string][]*data.Key)
-	for name, role := range r.Roles {
-		seen := make(map[string]struct{})
-		keys := []*data.Key{}
-		for _, id := range role.KeyIDs {
-			// Double-check that there is actually a key with that ID.
-			if key, ok := r.Keys[id]; ok {
-				if kt, found := tkeys.KeyMap.Load(key.Type); found {
-					k := kt.(func() tkeys.Verifier)()
-					if k != nil {
-						key, err := k.UnmarshalKey(key)
-						if err != nil {
-							val := key.Public()
-							if _, ok := seen[val]; ok {
-								continue
-							}
-							seen[val] = struct{}{}
-							keys = append(keys, key)
-						}
 
-					}
-				}
-			}
-		}
-		keysByRole[name] = keys
-	}
-	return keysByRole
-}
-*/
+ */
 
 func (r *Repo) RootKeys() ([]*data.Key, error) {
 	root, err := r.root()
