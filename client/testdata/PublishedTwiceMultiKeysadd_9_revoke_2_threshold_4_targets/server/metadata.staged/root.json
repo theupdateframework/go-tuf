@@ -2,13 +2,21 @@
  "signatures": [
   {
    "keyid": "d4dab4b4d68b91665a6d0dac5b4e64677aa6d853fc787669168b4b4ba9822129",
+<<<<<<< HEAD
    "sig": "f2678ee2821897766b73b6daebed8d3223637889619a41d4df01e8bf1d783fba2e2e918553160dd8d7fd8a33eebba2d95bff1aa05499375c8dd33f8cd1313607"
+=======
+   "sig": "795b9cc62ffedf914f0f68dfbaebb23f014f9d9aab76758713c3a2d0411b2f5e26394cb78e30ee13cb11b92c09537164fd63929c6051e8f954a76934457e7c04"
+>>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
   }
  ],
  "signed": {
   "_type": "root",
   "consistent_snapshot": true,
+<<<<<<< HEAD
   "expires": "2031-09-05T22:22:22Z",
+=======
+  "expires": "2020-12-31T05:48:20Z",
+>>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
   "keys": {
    "06e78858e726b48732eaae08a5731465587d322f4e63c0fae62ec13537c0a1cb": {
     "keyid_hash_algorithms": [

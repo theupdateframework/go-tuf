@@ -2,17 +2,30 @@
  "signatures": [
   {
    "keyid": "3a05831328273e4b821c3bbe1fed0c5332749d8e071675879af26a401a5c85ae",
+<<<<<<< HEAD
    "sig": "5a935b9fd36135d768abd187f8b10dc8fc72fa4b1f7cbd4512dd87dd1874ca211f6ea8b8017655459503ec5137834225f38e56328acf0213d7177f226f0c870d"
+=======
+   "sig": "1d668531c7a0960cf90825faa684106a8aef0799c1b47e72301bac45d87f2dd42c14f1a3ac7db862323ca5177dd4fd686573ea92aea99638f17414dde561c00b"
+>>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
   }
  ],
  "signed": {
   "_type": "timestamp",
+<<<<<<< HEAD
   "expires": "2021-09-09T02:22:19Z",
   "meta": {
    "snapshot.json": {
     "hashes": {
      "sha256": "ce521160cdbdb49723320a3d011b7eceffeb517afd830e92b9903a8e0129130e",
      "sha512": "c4733bda574d21d4d15dd79c356095f941cfe8e3cfd5a447993fb0f8f0aa8807c481a281933a701c86f778fee3332ab391bceb32f008bc62305ee3f1b101aeec"
+=======
+  "expires": "2020-01-02T00:00:00Z",
+  "meta": {
+   "snapshot.json": {
+    "hashes": {
+     "sha256": "f4ca389c2c9fbc592d91d4e693c31113b8803a11bcb5ecd973581fa0e3d34ce0",
+     "sha512": "92a0989e44c0e9f16d3e56268a3b8dd4e4416ee2ac91a4c871a405f1e426062651ec4effa0078fc4409c8b0422ccad9b1aa197db58f178406f398562b2e98195"
+>>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
     },
     "length": 431,
     "version": 1

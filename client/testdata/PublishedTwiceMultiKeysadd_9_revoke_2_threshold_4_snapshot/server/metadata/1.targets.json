@@ -2,7 +2,11 @@
  "signatures": [
   {
    "keyid": "e4dae3872d28d29f7624a702bfd25f68453544d597229ee9e0a8569d1f940cf4",
+<<<<<<< HEAD
    "sig": "e43a0caa312b7e93503cd993528ff39467b239d058063588578123e1d705153b4c1a195476c51279e65f790b8381b629643cf54f4dccb37b5d984062ab685302"
+=======
+   "sig": "c150e8ed5d352f366a979f4c4b9d556350c414c2da7ef1279045aaed3438c60872142d0dfe5ddbb627fec2d8fb7c5d8e692e04a87230b78d74714c5db035620a"
+>>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
   }
  ],
  "signed": {
@@ -11,7 +15,11 @@
    "keys": {},
    "roles": []
   },
+<<<<<<< HEAD
   "expires": "2021-12-08T09:49:29Z",
+=======
+  "expires": "2020-04-01T07:27:10Z",
+>>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
   "spec_version": "1.0.0",
   "targets": {},
   "version": 1
