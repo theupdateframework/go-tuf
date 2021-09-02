@@ -52,16 +52,9 @@ func commit(dir string, repo *tuf.Repo) {
 func addKeys(repo *tuf.Repo, roleKeys map[string][]*data.PrivateKey) {
 	for role, keyList := range roleKeys {
 		for _, key := range keyList {
-			st, ok := keys.KeyMap.Load(key.Type)
-			if !ok {
-				panic(fmt.Printf("error loading key implementation"))
-			}
-			s := st.(func() keys.SignerVerifier)()
-			if s.Signer == nil {
-				panic(fmt.Printf("error loading signer implementation"))
-			}
-			assertNotNil(s.Signer.UnmarshalSigner(key))
-			assertNotNil(repo.AddPrivateKeyWithExpires(role, s.Signer, expirationDate))
+			signer, err := keys.GetSigner(key)
+			assertNotNil(err)
+			assertNotNil(repo.AddPrivateKeyWithExpires(role, signer, expirationDate))
 		}
 	}
 }
@@ -79,16 +72,9 @@ func addTargets(repo *tuf.Repo, dir string, files map[string][]byte) {
 
 func revokeKeys(repo *tuf.Repo, role string, keyList []*data.PrivateKey) {
 	for _, key := range keyList {
-		st, ok := keys.KeyMap.Load(key.Type)
-		if !ok {
-			panic("error loading key implementation")
-		}
-		s := st.(func() keys.SignerVerifier)()
-		if s.Signer == nil {
-			panic("error loading signer implementation")
-		}
-		assertNotNil(s.Signer.UnmarshalSigner(key))
-		assertNotNil(repo.RevokeKeyWithExpires(role, s.Signer.IDs()[0], expirationDate))
+		signer, err := keys.GetSigner(key)
+		assertNotNil(err)
+		assertNotNil(repo.RevokeKeyWithExpires(role, signer.IDs()[0], expirationDate))
 	}
 }
 

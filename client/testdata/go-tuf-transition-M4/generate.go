@@ -70,16 +70,9 @@ func addTargets(repo *tuf.Repo, dir string, files map[string][]byte) {
 
 func revokeKeys(repo *tuf.Repo, role string, keyList []*data.PrivateKey) {
 	for _, key := range keyList {
-		st, ok := keys.KeyMap.Load(key.Type)
-		if !ok {
-			panic("error loading key implementation")
-		}
-		s := st.(func() keys.SignerVerifier)()
-		if s.Signer == nil {
-			panic("error loading signer implementation")
-		}
-		assertNotNil(s.Signer.UnmarshalSigner(key))
-		assertNotNil(repo.RevokeKeyWithExpires(role, s.Signer.PublicData().IDs()[0], expirationDate))
+		signer, err := keys.GetSigner(key)
+		assertNotNil(err)
+		assertNotNil(repo.RevokeKeyWithExpires(role, signer.PublicData().IDs()[0], expirationDate))
 	}
 }
 

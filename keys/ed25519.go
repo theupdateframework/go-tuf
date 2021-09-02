@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"sync"
 
 	"github.com/theupdateframework/go-tuf/data"
@@ -37,20 +38,19 @@ func (e *ed25519Verifier) Verify(msg, sig []byte) error {
 	return nil
 }
 
-func (e *ed25519Verifier) ValidKey(v json.RawMessage) bool {
-	if err := json.Unmarshal(v, e); err != nil {
-		return false
-	}
-	return len(e.PublicKey) == ed25519.PublicKeySize
-}
-
 func (e *ed25519Verifier) Key() *data.Key {
 	return e.key
 }
 
 func (e *ed25519Verifier) UnmarshalKey(key *data.Key) error {
 	e.key = key
-	return json.Unmarshal(key.Value, e)
+	if err := json.Unmarshal(key.Value, e); err != nil {
+		return errors.New("unmarshalling key")
+	}
+	if len(e.PublicKey) != ed25519.PublicKeySize {
+		return errors.New("unmarshalling key")
+	}
+	return nil
 }
 
 func (e *ed25519Verifier) IDs() []string {

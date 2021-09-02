@@ -18,19 +18,11 @@ import (
 func privateKeySigners(privateKeys []*data.PrivateKey) []keys.Signer {
 	res := make([]keys.Signer, len(privateKeys))
 	for i, k := range privateKeys {
-		svt, ok := keys.KeyMap.Load(k.Type)
-		if !ok {
+		signer, err := keys.GetSigner(k)
+		if err != nil {
 			continue
 		}
-		sv := svt.(func() keys.SignerVerifier)()
-		if sv.Signer == nil {
-			continue
-		}
-		if err := sv.Signer.UnmarshalSigner(k); err != nil {
-			continue
-		}
-		res[i] = sv.Signer
-		_ = sv.Signer.IDs()
+		res[i] = signer
 	}
 	return res
 }

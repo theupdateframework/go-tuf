@@ -43,21 +43,6 @@ func (t *testDestination) Delete() error {
 	return nil
 }
 
-func getVerifier(c *C, key *data.Key) keys.Verifier {
-	vt, ok := keys.KeyMap.Load(key.Type)
-	if !ok {
-		c.Errorf("error loading key implementation")
-	}
-	v := vt.(func() keys.SignerVerifier)()
-	if v.Verifier == nil {
-		c.Errorf("error loading verifier implementation")
-	}
-	if err := v.Verifier.UnmarshalKey(key); err != nil {
-		c.Errorf("error unmarshalling key")
-	}
-	return v.Verifier
-}
-
 func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 	// start file server
 	cwd, err := os.Getwd()
@@ -80,7 +65,8 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 		key := &data.Key{}
 		c.Assert(json.NewDecoder(f).Decode(key), IsNil)
 		c.Assert(key.Type, Equals, "ed25519")
-		pk := getVerifier(c, key)
+		pk, err := keys.GetVerifier(key)
+		c.Assert(err, IsNil)
 		c.Assert(pk.Public(), HasLen, ed25519.PublicKeySize)
 		client := client.NewClient(client.MemoryLocalStore(), remote)
 		c.Assert(client.Init([]*data.Key{key}, 1), IsNil)

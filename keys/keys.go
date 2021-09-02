@@ -2,7 +2,6 @@ package keys
 
 import (
 	"crypto"
-	"encoding/json"
 	"errors"
 	"sync"
 
@@ -18,12 +17,15 @@ type SignerVerifier struct {
 }
 
 var (
-	ErrInvalid = errors.New("tuf: signature verification failed")
+	ErrInvalid    = errors.New("tuf: signature verification failed")
+	ErrInvalidKey = errors.New("invalid key")
 )
 
 // A Verifier verifies public key signatures.
 type Verifier interface {
 	// UnmarshalKey takes key data to a working verifier implementation for the key type.
+	// This performs any validation over the data.Key to ensure that the verifier is usable
+	// to verify signatures.
 	UnmarshalKey(key *data.Key) error
 
 	// This is the public string used as a unique identifier for the verifier instance.
@@ -36,10 +38,6 @@ type Verifier interface {
 	// and determines whether the signature is valid for the given
 	// key and message.
 	Verify(msg, sig []byte) error
-
-	// ValidKey returns true if the provided public key is valid and usable to
-	// verify signatures with this verifier.
-	ValidKey(value json.RawMessage) bool
 
 	// Key returns the data.Key object associated with the verifier.
 	Key() *data.Key
@@ -71,4 +69,34 @@ type Signer interface {
 	// The signer is expected to do its own hashing, so the full message will be
 	// provided as the message to Sign with a zero opts.HashFunc().
 	crypto.Signer
+}
+
+func GetVerifier(key *data.Key) (Verifier, error) {
+	st, ok := KeyMap.Load(key.Type)
+	if !ok {
+		return nil, ErrInvalidKey
+	}
+	s := st.(func() SignerVerifier)()
+	if s.Verifier == nil {
+		return nil, ErrInvalidKey
+	}
+	if err := s.Verifier.UnmarshalKey(key); err != nil {
+		return nil, ErrInvalidKey
+	}
+	return s.Verifier, nil
+}
+
+func GetSigner(key *data.PrivateKey) (Signer, error) {
+	st, ok := KeyMap.Load(key.Type)
+	if !ok {
+		return nil, ErrInvalidKey
+	}
+	s := st.(func() SignerVerifier)()
+	if s.Signer == nil {
+		return nil, ErrInvalidKey
+	}
+	if err := s.Signer.UnmarshalSigner(key); err != nil {
+		return nil, ErrInvalidKey
+	}
+	return s.Signer, nil
 }

@@ -49,20 +49,16 @@ func UniqueKeys(r *data.Root) map[string][]*data.Key {
 		for _, id := range role.KeyIDs {
 			// Double-check that there is actually a key with that ID.
 			if key, ok := r.Keys[id]; ok {
-				if kt, found := keys.KeyMap.Load(key.Type); found {
-					k := kt.(func() keys.SignerVerifier)()
-					if k.Verifier != nil {
-						err := k.Verifier.UnmarshalKey(key)
-						if err == nil {
-							val := k.Verifier.Public()
-							if _, ok := seen[val]; ok {
-								continue
-							}
-							seen[val] = struct{}{}
-							roleKeys = append(roleKeys, key)
-						}
-					}
+				verifier, err := keys.GetVerifier(key)
+				if err != nil {
+					continue
 				}
+				val := verifier.Public()
+				if _, ok := seen[val]; ok {
+					continue
+				}
+				seen[val] = struct{}{}
+				roleKeys = append(roleKeys, key)
 			}
 		}
 		keysByRole[name] = roleKeys
@@ -73,36 +69,6 @@ func UniqueKeys(r *data.Root) map[string][]*data.Key {
 // AssertNumUniqueKeys verifies that the number of unique root keys for a given role is as expected.
 func (*RepoSuite) assertNumUniqueKeys(c *C, root *data.Root, role string, num int) {
 	c.Assert(UniqueKeys(root)[role], HasLen, num)
-}
-
-func (*RepoSuite) getVerifier(c *C, key *data.Key) keys.Verifier {
-	vt, ok := keys.KeyMap.Load(key.Type)
-	if !ok {
-		c.Errorf("error loading key implementation")
-	}
-	v := vt.(func() keys.SignerVerifier)()
-	if v.Verifier == nil {
-		c.Errorf("error loading verifier implementation")
-	}
-	if err := v.Verifier.UnmarshalKey(key); err != nil {
-		c.Errorf("error unmarshalling key")
-	}
-	return v.Verifier
-}
-
-func getSigner(c *C, key *data.PrivateKey) keys.Signer {
-	vt, ok := keys.KeyMap.Load(key.Type)
-	if !ok {
-		c.Errorf("error loading key implementation")
-	}
-	v := vt.(func() keys.SignerVerifier)()
-	if v.Signer == nil {
-		c.Errorf("error loading signer implementation")
-	}
-	if err := v.Signer.UnmarshalSigner(key); err != nil {
-		c.Errorf("error unmarshalling key")
-	}
-	return v.Signer
 }
 
 func testNewRepo(c *C, newRepo func(local LocalStore, hashAlgorithms ...string) (*Repo, error)) {
@@ -236,7 +202,8 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 			c.Fatal("missing key")
 		}
 		c.Assert(k.IDs(), DeepEquals, ids)
-		pk := rs.getVerifier(c, k)
+		pk, err := keys.GetVerifier(k)
+		c.Assert(err, IsNil)
 		c.Assert(pk.Public(), HasLen, ed25519.PublicKeySize)
 	}
 
@@ -261,7 +228,8 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 		c.Assert(err, IsNil)
 		c.Assert(rootKeys, HasLen, 1)
 		c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
-		pk := rs.getVerifier(c, rootKeys[0])
+		pk, err := keys.GetVerifier(rootKeys[0])
+		c.Assert(err, IsNil)
 		c.Assert(pk.Public(), DeepEquals, rootKey.Public())
 	}
 
@@ -397,7 +365,8 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 			c.Fatalf("missing key %s", keyID)
 		}
 		c.Assert(k.IDs(), DeepEquals, ids)
-		pk := rs.getVerifier(c, k)
+		pk, err := keys.GetVerifier(k)
+		c.Assert(err, IsNil)
 		c.Assert(pk.Public(), HasLen, ed25519.PublicKeySize)
 	}
 
@@ -422,7 +391,8 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 		c.Assert(err, IsNil)
 		c.Assert(rootKeys, HasLen, 1)
 		c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
-		pk := rs.getVerifier(c, rootKeys[0])
+		pk, err := keys.GetVerifier(rootKeys[0])
+		c.Assert(err, IsNil)
 		c.Assert(pk.Public(), DeepEquals, rootKey.Public())
 	}
 
@@ -1252,7 +1222,8 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 		c.Assert(err, IsNil)
 		c.Assert(signers, HasLen, len(expected))
 		for i, s := range signers {
-			v := getSigner(c, expected[i])
+			v, err := keys.GetSigner(expected[i])
+			c.Assert(err, IsNil)
 			c.Assert(s.IDs(), DeepEquals, v.IDs())
 		}
 	}

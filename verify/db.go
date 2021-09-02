@@ -61,22 +61,14 @@ func NewDelegationsVerifier(d *data.Delegations) (DelegationsVerifier, error) {
 }
 
 func (db *DB) AddKey(id string, k *data.Key) error {
-	vt, ok := keys.KeyMap.Load(k.Type)
-	if !ok {
-		return nil
-	}
 	if !k.ContainsID(id) {
 		return ErrWrongID{}
 	}
-	v := vt.(func() keys.SignerVerifier)()
-	if v.Verifier == nil || !v.Verifier.ValidKey(k.Value) {
+	verifier, err := keys.GetVerifier(k)
+	if err != nil {
 		return ErrInvalidKey
 	}
-	if err := v.Verifier.UnmarshalKey(k); err != nil {
-		return ErrInvalidKey
-	}
-	db.keys[id] = v.Verifier
-
+	db.keys[id] = verifier
 	return nil
 }
 
