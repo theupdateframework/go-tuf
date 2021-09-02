@@ -54,7 +54,7 @@ func (TypesSuite) TestRootAddKey(c *C) {
 	var hexbytes HexBytes
 	err := json.Unmarshal([]byte(public), &hexbytes)
 	c.Assert(err, IsNil)
-	keyValBytes, _ := json.Marshal(ed25519Public{PublicKey: hexbytes})
+	keyValBytes, err := json.Marshal(ed25519Public{PublicKey: hexbytes})
 	c.Assert(err, IsNil)
 
 	key := &Key{

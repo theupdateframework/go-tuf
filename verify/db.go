@@ -17,13 +17,13 @@ func (r *Role) ValidKey(id string) bool {
 
 type DB struct {
 	roles map[string]*Role
-	keys  map[string]*keys.Verifier
+	keys  map[string]keys.Verifier
 }
 
 func NewDB() *DB {
 	return &DB{
 		roles: make(map[string]*Role),
-		keys:  make(map[string]*keys.Verifier),
+		keys:  make(map[string]keys.Verifier),
 	}
 }
 
@@ -41,7 +41,7 @@ func (d *DelegationsVerifier) Unmarshal(b []byte, v interface{}, role string, mi
 func NewDelegationsVerifier(d *data.Delegations) (DelegationsVerifier, error) {
 	db := &DB{
 		roles: make(map[string]*Role, len(d.Roles)),
-		keys:  make(map[string]*keys.Verifier, len(d.Keys)),
+		keys:  make(map[string]keys.Verifier, len(d.Keys)),
 	}
 	for _, r := range d.Roles {
 		if _, ok := topLevelRoles[r.Name]; ok {
@@ -75,7 +75,7 @@ func (db *DB) AddKey(id string, k *data.Key) error {
 	if err := v.Verifier.UnmarshalKey(k); err != nil {
 		return ErrInvalidKey
 	}
-	db.keys[id] = &v.Verifier
+	db.keys[id] = v.Verifier
 
 	return nil
 }
@@ -124,8 +124,12 @@ func (db *DB) addRole(name string, r *data.Role) error {
 	return nil
 }
 
-func (db *DB) GetKey(id string) *keys.Verifier {
-	return db.keys[id]
+func (db *DB) GetKey(id string) (keys.Verifier, error) {
+	k, ok := db.keys[id]
+	if !ok {
+		return nil, ErrMissingKey
+	}
+	return k, nil
 }
 
 func (db *DB) GetRole(name string) *Role {

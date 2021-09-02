@@ -343,7 +343,8 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	for _, ids := range s.keyIDs {
 		c.Assert(len(ids) > 0, Equals, true)
 		for _, id := range ids {
-			c.Assert(client.db.GetKey(id), IsNil)
+			_, err := client.db.GetKey(id)
+			c.Assert(err, NotNil)
 		}
 	}
 
@@ -351,9 +352,9 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	for name, ids := range newKeyIDs {
 		c.Assert(len(ids) > 0, Equals, true)
 		for _, id := range ids {
-			key := client.db.GetKey(id)
-			c.Assert(key, NotNil)
-			c.Assert((*key).IDs(), DeepEquals, ids)
+			key, err := client.db.GetKey(id)
+			c.Assert(err, IsNil)
+			c.Assert(key.IDs(), DeepEquals, ids)
 		}
 		role := client.db.GetRole(name)
 		c.Assert(role, NotNil)
@@ -406,12 +407,13 @@ func (s *ClientSuite) TestNewTimestampKey(c *C) {
 
 	// check key has been replaced in db
 	for _, oldID := range oldIDs {
-		c.Assert(client.db.GetKey(oldID), IsNil)
+		_, err := client.db.GetKey(oldID)
+		c.Assert(err, NotNil)
 	}
 	for _, newID := range newIDs {
-		key := client.db.GetKey(newID)
-		c.Assert(key, NotNil)
-		c.Assert((*key).IDs(), DeepEquals, newIDs)
+		key, err := client.db.GetKey(newID)
+		c.Assert(err, IsNil)
+		c.Assert(key.IDs(), DeepEquals, newIDs)
 	}
 	role := client.db.GetRole("timestamp")
 	c.Assert(role, NotNil)
@@ -445,12 +447,13 @@ func (s *ClientSuite) TestNewSnapshotKey(c *C) {
 
 	// check key has been replaced in db
 	for _, oldID := range oldIDs {
-		c.Assert(client.db.GetKey(oldID), IsNil)
+		_, err := client.db.GetKey(oldID)
+		c.Assert(err, NotNil)
 	}
 	for _, newID := range newIDs {
-		key := client.db.GetKey(newID)
-		c.Assert(key, NotNil)
-		c.Assert((*key).IDs(), DeepEquals, newIDs)
+		key, err := client.db.GetKey(newID)
+		c.Assert(err, IsNil)
+		c.Assert(key.IDs(), DeepEquals, newIDs)
 	}
 	role := client.db.GetRole("snapshot")
 	c.Assert(role, NotNil)
@@ -487,12 +490,13 @@ func (s *ClientSuite) TestNewTargetsKey(c *C) {
 
 	// check key has been replaced in db
 	for _, oldID := range oldIDs {
-		c.Assert(client.db.GetKey(oldID), IsNil)
+		_, err := client.db.GetKey(oldID)
+		c.Assert(err, NotNil)
 	}
 	for _, newID := range newIDs {
-		key := client.db.GetKey(newID)
-		c.Assert(key, NotNil)
-		c.Assert((*key).IDs(), DeepEquals, newIDs)
+		key, err := client.db.GetKey(newID)
+		c.Assert(err, IsNil)
+		c.Assert(key.IDs(), DeepEquals, newIDs)
 	}
 	role := client.db.GetRole("targets")
 	c.Assert(role, NotNil)

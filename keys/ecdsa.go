@@ -33,11 +33,11 @@ type p256Verifier struct {
 	key       *data.Key
 }
 
-func (p p256Verifier) Public() string {
+func (p *p256Verifier) Public() string {
 	return p.PublicKey.String()
 }
 
-func (p p256Verifier) Verify(msg, sigBytes []byte) error {
+func (p *p256Verifier) Verify(msg, sigBytes []byte) error {
 	x, y := elliptic.Unmarshal(elliptic.P256(), p.PublicKey)
 	k := &ecdsa.PublicKey{
 		Curve: elliptic.P256(),
@@ -66,7 +66,7 @@ func (p *p256Verifier) ValidKey(v json.RawMessage) bool {
 	return x != nil
 }
 
-func (p p256Verifier) Key() *data.Key {
+func (p *p256Verifier) Key() *data.Key {
 	return p.key
 }
 

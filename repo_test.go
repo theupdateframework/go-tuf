@@ -244,9 +244,9 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 	db, err := r.db()
 	c.Assert(err, IsNil)
 	for _, keyID := range ids {
-		rootKey := db.GetKey(keyID)
-		c.Assert(rootKey, NotNil)
-		c.Assert((*rootKey).IDs(), DeepEquals, ids)
+		rootKey, err := db.GetKey(keyID)
+		c.Assert(err, IsNil)
+		c.Assert(rootKey.IDs(), DeepEquals, ids)
 		role := db.GetRole("root")
 		c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(ids))
 
@@ -260,13 +260,13 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 		rootKeys, err := r.RootKeys()
 		c.Assert(err, IsNil)
 		c.Assert(rootKeys, HasLen, 1)
-		c.Assert(rootKeys[0].IDs(), DeepEquals, (*rootKey).IDs())
+		c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
 		pk := rs.getVerifier(c, rootKeys[0])
-		c.Assert(pk.Public(), DeepEquals, (*rootKey).Public())
+		c.Assert(pk.Public(), DeepEquals, rootKey.Public())
 	}
 
-	rootKey := db.GetKey(ids[0])
-	c.Assert(rootKey, NotNil)
+	rootKey, err := db.GetKey(ids[0])
+	c.Assert(err, IsNil)
 
 	// generate two targets keys
 	genKey(c, r, "targets")
@@ -292,9 +292,9 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 		if !ok {
 			c.Fatal("missing key")
 		}
-		key := db.GetKey(id)
-		c.Assert(key, NotNil)
-		c.Assert((*key).Key().ContainsID(id), Equals, true)
+		key, err := db.GetKey(id)
+		c.Assert(err, IsNil)
+		c.Assert(key.Key().ContainsID(id), Equals, true)
 	}
 	role := db.GetRole("targets")
 	c.Assert(role.KeyIDs, DeepEquals, targetKeyIDs)
@@ -303,7 +303,7 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 	rootKeys, err := r.RootKeys()
 	c.Assert(err, IsNil)
 	c.Assert(rootKeys, HasLen, 1)
-	c.Assert(rootKeys[0].IDs(), DeepEquals, (*rootKey).IDs())
+	c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
 
 	// check the keys were saved correctly
 	localKeys, err := local.GetSigningKeys("targets")
@@ -405,9 +405,9 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 	db, err := r.db()
 	c.Assert(err, IsNil)
 	for _, keyID := range ids {
-		rootKey := db.GetKey(keyID)
-		c.Assert(rootKey, NotNil)
-		c.Assert((*rootKey).IDs(), DeepEquals, ids)
+		rootKey, err := db.GetKey(keyID)
+		c.Assert(err, IsNil)
+		c.Assert(rootKey.IDs(), DeepEquals, ids)
 		role := db.GetRole("root")
 		c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(ids))
 
@@ -421,13 +421,13 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 		rootKeys, err := r.RootKeys()
 		c.Assert(err, IsNil)
 		c.Assert(rootKeys, HasLen, 1)
-		c.Assert(rootKeys[0].IDs(), DeepEquals, (*rootKey).IDs())
+		c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
 		pk := rs.getVerifier(c, rootKeys[0])
-		c.Assert(pk.Public(), DeepEquals, (*rootKey).Public())
+		c.Assert(pk.Public(), DeepEquals, rootKey.Public())
 	}
 
-	rootKey := db.GetKey(ids[0])
-	c.Assert(rootKey, NotNil)
+	rootKey, err := db.GetKey(ids[0])
+	c.Assert(err, IsNil)
 
 	// generate two targets keys
 	addGeneratedPrivateKey(c, r, "targets")
@@ -453,9 +453,9 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 		if !ok {
 			c.Fatal("missing key")
 		}
-		key := db.GetKey(id)
-		c.Assert(key, NotNil)
-		c.Assert((*key).Key().ContainsID(id), Equals, true)
+		key, err := db.GetKey(id)
+		c.Assert(err, IsNil)
+		c.Assert(key.Key().ContainsID(id), Equals, true)
 	}
 	role := db.GetRole("targets")
 	c.Assert(role.KeyIDs, DeepEquals, targetKeyIDs)
@@ -464,7 +464,7 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 	rootKeys, err := r.RootKeys()
 	c.Assert(err, IsNil)
 	c.Assert(rootKeys, HasLen, 1)
-	c.Assert(rootKeys[0].IDs(), DeepEquals, (*rootKey).IDs())
+	c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.IDs())
 
 	// check the keys were saved correctly
 	localKeys, err := local.GetSigningKeys("targets")

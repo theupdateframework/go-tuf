@@ -43,7 +43,7 @@ func MemoryStore(meta map[string]json.RawMessage, files map[string][]byte) Local
 		meta:       meta,
 		stagedMeta: make(map[string]json.RawMessage),
 		files:      files,
-		signers:    make(map[string][]*data.PrivateKey),
+		signers:    make(map[string][]keys.Signer),
 	}
 }
 
@@ -51,7 +51,7 @@ type memoryStore struct {
 	meta       map[string]json.RawMessage
 	stagedMeta map[string]json.RawMessage
 	files      map[string][]byte
-	signers    map[string][]*data.PrivateKey
+	signers    map[string][]keys.Signer
 }
 
 func (m *memoryStore) GetMeta() (map[string]json.RawMessage, error) {
@@ -103,11 +103,12 @@ func (m *memoryStore) Commit(consistentSnapshot bool, versions map[string]int, h
 }
 
 func (m *memoryStore) GetSigningKeys(role string) ([]keys.Signer, error) {
-	return privateKeySigners(m.signers[role]), nil
+	return m.signers[role], nil
 }
 
 func (m *memoryStore) SavePrivateKey(role string, key *data.PrivateKey) error {
-	m.signers[role] = append(m.signers[role], key)
+	signers := privateKeySigners([]*data.PrivateKey{key})
+	m.signers[role] = append(m.signers[role], signers...)
 	return nil
 }
 
