@@ -476,28 +476,36 @@ func (s *ClientSuite) TestFastForwardAttackRecovery(c *C) {
 		fixturePath       string
 		expectMetaDeleted map[string]bool
 	}{
-		// No non-root-metadata recovery if root keys are revoked only.
+		// Each of the following test cases each has a two sets of TUF metadata:
+		// (1) client's initial, and (2) server's current.
+		// The naming format is PublishedTwiceMultiKeysadd_X_revoke_Y_threshold_Z_ROLE
+		// The client includes TUF metadata before key rotation for TUF ROLE with X keys.
+		// The server includes updated TUF metadata after key rotation. The
+		// rotation involves revoking Y keys from the initial keys.
+		// For each test, the TUF client's will be initialized to the client files.
+		// The test checks whether the client is  able to update itself properly.
+
+		// Fast-forward recovery is not needed if less than threshold keys are revoked.
 		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_root",
 			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
-		// No non-root-metadata recovery if root keys are revoked only even threshold number of root keys are revoked.
-		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_root",
-			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
-		// No snapshot metadata recovery less than threashold keys changed.
 		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_snapshot",
 			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
-		// Delete snapshot and timestamp metadata if threashold number of keys changed.
-		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_snapshot",
-			map[string]bool{"root.json": false, "timestamp.json": true, "snapshot.json": true, "targets.json": false}},
-		// No targets metadata recovery less than threashold keys changed.
 		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_targets",
 			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
-		// Delete targets and snapshot metadata if threashold number of keys changed.
-		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_targets",
-			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": true, "targets.json": true}},
-		// No timestamp metadata recovery less than threashold keys changed.
 		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_timestamp",
 			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
-		// Delete timestamp metadata if threashold number of keys changed.
+
+		// Fast-forward recovery not needed if root keys are revoked, even when the threshold number of root keys are revoked.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_root",
+			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
+
+		// Delete snapshot and timestamp metadata if threashold number of snapshot keys are revoked.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_snapshot",
+			map[string]bool{"root.json": false, "timestamp.json": true, "snapshot.json": true, "targets.json": false}},
+		// Delete targets and snapshot metadata if threashold number of targets keys are revoked.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_targets",
+			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": true, "targets.json": true}},
+		// Delete timestamp metadata if threashold number of timestamp keys are revoked.
 		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_timestamp",
 			map[string]bool{"root.json": false, "timestamp.json": true, "snapshot.json": false, "targets.json": false}},
 	}
