@@ -263,13 +263,10 @@ func (c *Client) updateRoots() error {
 >>>>>>> 78b1631 (test for fast forward attack recovery)
 =======
 	getKeyInfo := func(role string) KeyInfo {
-		//keyIDs := make([]string, 0, len(c.db.GetRole(role).KeyIDs))
 		keyIDs := make(map[string]bool)
 		for k := range c.db.GetRole(role).KeyIDs {
-			//keyIDs = append(keyIDs, k)
 			keyIDs[k] = true
 		}
-		//sort.Strings(keyIDs)
 		return KeyInfo{keyIDs, c.db.GetRole(role).Threshold}
 >>>>>>> 2fc418a (addressed several comments.)
 	}
@@ -295,7 +292,6 @@ func (c *Client) updateRoots() error {
 =======
 
 	nonRootKeyInfo := map[string]KeyInfo{"timestamp": {}, "snapshot": {}, "targets": {}}
-	//nonRootThreshold := map[string]int{"timestamp": 1, "snapshot": 1, "targets": 1}
 	for k := range nonRootKeyInfo {
 		nonRootKeyInfo[k] = getKeyInfo(k)
 >>>>>>> 2fc418a (addressed several comments.)

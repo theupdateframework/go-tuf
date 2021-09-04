@@ -794,7 +794,11 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 
 	// add soon to expire root.json to local storage
 	s.genKeyExpired(c, "timestamp")
+<<<<<<< HEAD
 	c.Assert(s.repo.Snapshot(), IsNil)
+=======
+	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+>>>>>>> d9a4507 (addressed more comments. Set the rootVersion in loadAndVerifyLocalRootMeta. Fixed a buggy test.)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	c.Assert(s.repo.Commit(), IsNil)
 	s.syncLocal(c)
@@ -802,7 +806,11 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 	// add far expiring root.json to remote storage
 	s.genKey(c, "timestamp")
 	s.addRemoteTarget(c, "bar.txt")
+<<<<<<< HEAD
 	c.Assert(s.repo.Snapshot(), IsNil)
+=======
+	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+>>>>>>> d9a4507 (addressed more comments. Set the rootVersion in loadAndVerifyLocalRootMeta. Fixed a buggy test.)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
@@ -833,8 +841,14 @@ func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
 		s.assertErrExpired(c, err, "timestamp.json")
 	})
 
+<<<<<<< HEAD
 	c.Assert(s.repo.SnapshotWithExpires(s.expiredTime), IsNil)
+=======
+	c.Assert(s.repo.SnapshotWithExpires(tuf.CompressionTypeNone, s.expiredTime), IsNil)
+	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+>>>>>>> d9a4507 (addressed more comments. Set the rootVersion in loadAndVerifyLocalRootMeta. Fixed a buggy test.)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 	s.withMetaExpired(func() {
 		_, err := client.Update()
@@ -867,7 +881,11 @@ func (s *ClientSuite) TestUpdateLocalRootExpiredKeyChange(c *C) {
 
 	// add soon to expire root.json to local storage
 	s.genKeyExpired(c, "timestamp")
+<<<<<<< HEAD
 	c.Assert(s.repo.Snapshot(), IsNil)
+=======
+	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+>>>>>>> d9a4507 (addressed more comments. Set the rootVersion in loadAndVerifyLocalRootMeta. Fixed a buggy test.)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	c.Assert(s.repo.Commit(), IsNil)
 	s.syncLocal(c)
