@@ -245,25 +245,21 @@ func (c *Client) updateRoots() error {
 	// Prepare for 5.3.11: If the timestamp and / or snapshot keys have been rotated,
 	// then delete the trusted timestamp and snapshot metadata files.
 	getKeyInfo := func(role string) KeyInfo {
-		//keyIDs := make([]string, 0, len(c.db.GetRole(role).KeyIDs))
 		keyIDs := make(map[string]bool)
 		for k := range c.db.GetRole(role).KeyIDs {
-			//keyIDs = append(keyIDs, k)
 			keyIDs[k] = true
 		}
-		//sort.Strings(keyIDs)
 		return KeyInfo{keyIDs, c.db.GetRole(role).Threshold}
 	}
 
-	// The manifest looks like this:
+	// The nonRootKeyInfo looks like this:
 	// {
-	//	"timestamp": ["KEYID1", "KEYID2"],
-	//	"snapshot": ["KEYID3"],
-	//	"targets": ["KEYID4", "KEYID5", "KEYID6"]
+	//	"timestamp": {KeyIDs={"KEYID1": true, "KEYID2": true}, Threshold=2},
+	//	"snapshot": {KeyIDs={"KEYID3": true}, Threshold=1},
+	//	"targets": {KeyIDs={"KEYID4": true, "KEYID5": true, "KEYID6": true}, Threshold=1}
 	// }
 
 	nonRootKeyInfo := map[string]KeyInfo{"timestamp": {}, "snapshot": {}, "targets": {}}
-	//nonRootThreshold := map[string]int{"timestamp": 1, "snapshot": 1, "targets": 1}
 	for k := range nonRootKeyInfo {
 		nonRootKeyInfo[k] = getKeyInfo(k)
 	}
@@ -299,9 +295,8 @@ func (c *Client) updateRoots() error {
 			if _, ok := err.(ErrMissingRemoteMetadata); ok {
 				// stop when the next root can't be downloaded
 				break
-			} else {
-				return err
 			}
+			return err
 		}
 
 		// 5.3.4 Check for an arbitrary software attack.
@@ -369,7 +364,11 @@ func (c *Client) updateRoots() error {
 	// timestamp -> delete timestamp.json
 	// snapshot ->  delete timestamp.json and snapshot.json
 	// targets ->   delete snapshot.json and targets.json
+	//
+	// nonRootKeyInfo contains the keys and thresholds from root.json
+	// that were on disk before the root update process begins.
 	for topLevelRolename := range nonRootKeyInfo {
+		// ki contains the keys and thresholds from the latest downloaded root.json.
 		ki := getKeyInfo(topLevelRolename)
 		if countDeleted(nonRootKeyInfo[topLevelRolename].KeyIDs, ki.KeyIDs) >= nonRootKeyInfo[topLevelRolename].Threshold {
 			deleteMeta := map[string][]string{
@@ -479,6 +478,7 @@ func (c *Client) loadAndVerifyLocalRootMeta() error {
 		return err
 	}
 	c.consistentSnapshot = root.ConsistentSnapshot
+	c.rootVer = root.Version
 	c.db = ndb
 	return nil
 }

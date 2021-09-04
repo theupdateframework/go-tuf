@@ -726,15 +726,20 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 
 	// add soon to expire root.json to local storage
 	s.genKeyExpired(c, "timestamp")
+	c.Assert(s.repo.Snapshot(), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncLocal(c)
 
 	// add far expiring root.json to remote storage
 	s.genKey(c, "timestamp")
 	s.addRemoteTarget(c, "bar.txt")
+	c.Assert(s.repo.Snapshot(), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 
-	const expectedRootVersion = 2
+	const expectedRootVersion = 3
 
 	// check the update downloads the non expired remote root.json and
 	// restarts itself, thus successfully updating
@@ -761,7 +766,9 @@ func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
 	})
 
 	c.Assert(s.repo.SnapshotWithExpires(s.expiredTime), IsNil)
+	c.Assert(s.repo.Snapshot(), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 	s.withMetaExpired(func() {
 		_, err := client.Update()
@@ -794,7 +801,9 @@ func (s *ClientSuite) TestUpdateLocalRootExpiredKeyChange(c *C) {
 
 	// add soon to expire root.json to local storage
 	s.genKeyExpired(c, "timestamp")
+	c.Assert(s.repo.Snapshot(), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncLocal(c)
 
 	// replace all keys
