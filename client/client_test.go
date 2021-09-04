@@ -766,9 +766,7 @@ func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
 	})
 
 	c.Assert(s.repo.SnapshotWithExpires(s.expiredTime), IsNil)
-	c.Assert(s.repo.Snapshot(), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
-	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 	s.withMetaExpired(func() {
 		_, err := client.Update()
