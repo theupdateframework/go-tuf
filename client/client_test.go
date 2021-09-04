@@ -845,10 +845,12 @@ func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
 	c.Assert(s.repo.SnapshotWithExpires(s.expiredTime), IsNil)
 =======
 	c.Assert(s.repo.SnapshotWithExpires(tuf.CompressionTypeNone, s.expiredTime), IsNil)
+<<<<<<< HEAD
 	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
 >>>>>>> d9a4507 (addressed more comments. Set the rootVersion in loadAndVerifyLocalRootMeta. Fixed a buggy test.)
+=======
+>>>>>>> d538c3b (Fixed a buggy test.)
 	c.Assert(s.repo.Timestamp(), IsNil)
-	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 	s.withMetaExpired(func() {
 		_, err := client.Update()
