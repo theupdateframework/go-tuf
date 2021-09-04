@@ -567,13 +567,13 @@ func (s *ClientSuite) TestFastForwardAttackRecovery(c *C) {
 		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_root",
 			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
 
-		// Delete snapshot and timestamp metadata if threashold number of snapshot keys are revoked.
+		// Delete snapshot and timestamp metadata if a threshold number of snapshot keys are revoked.
 		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_snapshot",
 			map[string]bool{"root.json": false, "timestamp.json": true, "snapshot.json": true, "targets.json": false}},
-		// Delete targets and snapshot metadata if threashold number of targets keys are revoked.
+		// Delete targets and snapshot metadata if a threshold number of targets keys are revoked.
 		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_targets",
 			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": true, "targets.json": true}},
-		// Delete timestamp metadata if threashold number of timestamp keys are revoked.
+		// Delete timestamp metadata if a threshold number of timestamp keys are revoked.
 		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_timestamp",
 			map[string]bool{"root.json": false, "timestamp.json": true, "snapshot.json": false, "targets.json": false}},
 	}
