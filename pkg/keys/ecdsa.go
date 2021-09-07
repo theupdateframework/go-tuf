@@ -69,7 +69,3 @@ func (p *p256Verifier) UnmarshalKey(key *data.Key) error {
 	p.key = key
 	return nil
 }
-
-func (p *p256Verifier) IDs() []string {
-	return p.key.IDs()
-}

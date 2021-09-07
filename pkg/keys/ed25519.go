@@ -54,10 +54,6 @@ func (e *ed25519Verifier) UnmarshalKey(key *data.Key) error {
 	return nil
 }
 
-func (e *ed25519Verifier) IDs() []string {
-	return e.key.IDs()
-}
-
 type ed25519PrivateKeyValue struct {
 	Public  data.HexBytes `json:"public"`
 	Private data.HexBytes `json:"private"`
