@@ -17,48 +17,29 @@ type signedMeta struct {
 
 func (db *DB) VerifyIgnoreExpiredCheck(s *data.Signed, role string, minVersion int) error {
 	if err := db.VerifySignatures(s, role); err != nil {
-		return nil, err
+		return err
 	}
 
-	sm = &signedMeta{}
+	sm := &signedMeta{}
 	if err := json.Unmarshal(s.Signed, sm); err != nil {
-		return nil, err
+		return err
 	}
 
 	if isTopLevelRole(role) {
 		// Top-level roles can only sign metadata of the same type (e.g. snapshot
 		// metadata must be signed by the snapshot role).
 		if strings.ToLower(sm.Type) != strings.ToLower(role) {
-			return nil, ErrWrongMetaType
+			return ErrWrongMetaType
 		}
 	} else {
 		// Delegated (non-top-level) roles may only sign targets metadata.
 		if strings.ToLower(sm.Type) != "targets" {
-			return nil, ErrWrongMetaType
+			return ErrWrongMetaType
 		}
 	}
 
 	if sm.Version < minVersion {
-<<<<<<< HEAD
 		return ErrLowVersion{sm.Version, minVersion}
-=======
-		return nil, ErrLowVersion{sm.Version, minVersion}
-	}
-
-	return sm, nil
-}
-
-func (db *DB) Verify(s *data.Signed, role string, minVersion int) error {
-
-	sm, err := db.VerifyIgnoreExpiredCheck(s, role, minVersion)
-
-	if err != nil {
-		return err
-	}
-
-	if IsExpired(sm.Expires) {
-		return ErrExpired{sm.Expires}
->>>>>>> 535e9ed (fix race condition related to the expired check.)
 	}
 
 	return nil
@@ -149,6 +130,23 @@ func (db *DB) Unmarshal(b []byte, v interface{}, role string, minVersion int) er
 	}
 	if err := db.Verify(s, role, minVersion); err != nil {
 		return err
+	}
+	return json.Unmarshal(s.Signed, v)
+}
+
+// UnmarshalExpired is exactly like Unmarshal except ignores expired timestamp error.
+func (db *DB) UnmarshalIgnoreExpired(b []byte, v interface{}, role string, minVersion int) error {
+	s := &data.Signed{}
+	if err := json.Unmarshal(b, s); err != nil {
+		return err
+	}
+	// Note: If verification fails, then we wont attempt to unmarshal
+	// unless when verification error is errExpired.
+	verifyErr := db.Verify(s, role, minVersion)
+	if verifyErr != nil {
+		if _, ok := verifyErr.(ErrExpired); !ok {
+			return verifyErr
+		}
 	}
 	return json.Unmarshal(s.Signed, v)
 }
