@@ -9,12 +9,15 @@ import (
 	"log"
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	"sort"
 =======
 >>>>>>> 2fc418a (addressed several comments.)
 	"time"
 >>>>>>> 78b1631 (test for fast forward attack recovery)
+=======
+>>>>>>> 5326b91 (fix race condition related to the expired check.)
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/util"
@@ -557,7 +560,11 @@ func (c *Client) loadAndVerifyLocalRootMeta(ignoreExpiredCheck bool) error {
 	}
 	// Any trusted local root metadata version must be greater than 0.
 	if ignoreExpiredCheck {
+<<<<<<< HEAD
 		if err := ndb.VerifyIgnoreExpiredCheck(s, "root", 0); err != nil {
+=======
+		if _, err := ndb.VerifyIgnoreExpiredCheck(s, "root", 0); err != nil {
+>>>>>>> 5326b91 (fix race condition related to the expired check.)
 			return err
 		}
 	} else {
