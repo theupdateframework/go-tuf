@@ -534,6 +534,17 @@ func (s *ClientSuite) TestFastForwardAttackRecovery(c *C) {
 
 }
 
+func (s *ClientSuite) TestUpdateRace(c *C) {
+	// Tests race condition for the client update. You need to run the test with -race flag:
+	// go test -race
+	for i := 0; i < 2; i++ {
+		go func() {
+			c := NewClient(MemoryLocalStore(), newFakeRemoteStore())
+			c.Update()
+		}()
+	}
+}
+
 func (s *ClientSuite) TestNewTargets(c *C) {
 	client := s.newClient(c)
 	files, err := client.Update()

@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"time"
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/util"
@@ -219,17 +218,10 @@ func (c *Client) Update() (data.TargetFiles, error) {
 
 func (c *Client) updateRoots() error {
 	// https://theupdateframework.github.io/specification/v1.0.19/index.html#load-trusted-root
-	// Temporarily deactivate expiration check. This is consistent with 5.3.6:
-	// Note that the expiration of the trusted root metadata file does not
-	// matter, because we will attempt to update it in the next step.
-	e := verify.IsExpired
-	defer func() { verify.IsExpired = e }()
-	verify.IsExpired = func(t time.Time) bool { return false }
-
 	// 5.2 Load the trusted root metadata file. We assume that a good,
 	// trusted copy of this file was shipped with the package manager
 	// or software updater using an out-of-band process.
-	if err := c.loadAndVerifyLocalRootMeta(); err != nil {
+	if err := c.loadAndVerifyLocalRootMeta( /*ignoreExpiredCheck=*/ true); err != nil {
 		return err
 	}
 	m, err := c.local.GetMeta()
@@ -337,12 +329,9 @@ func (c *Client) updateRoots() error {
 
 	} // End of the for loop.
 
-	// Activate the check for expiration.
-	verify.IsExpired = e
-
 	// 5.3.10 Check for a freeze attack.
-	// NOTE: this will check for any, including freeze, attack.
-	if err := c.loadAndVerifyLocalRootMeta(); err != nil {
+	// NOTE: This will check for any, including freeze, attack.
+	if err := c.loadAndVerifyLocalRootMeta( /*ignoreExpiredCheck=*/ false); err != nil {
 		return err
 	}
 
@@ -392,7 +381,7 @@ func (c *Client) updateRoots() error {
 // The verification of local files is purely for consistency, if an attacker
 // has compromised the local storage, there is no guarantee it can be trusted.
 func (c *Client) getLocalMeta() error {
-	if err := c.loadAndVerifyLocalRootMeta(); err != nil {
+	if err := c.loadAndVerifyLocalRootMeta( /*ignoreExpiredCheck=*/ false); err != nil {
 		return err
 	}
 
@@ -435,7 +424,7 @@ func (c *Client) getLocalMeta() error {
 // loadAndVerifyLocalRootMeta decodes and verifies root metadata from
 // local storage and loads the top-level keys. This method first clears
 // the DB for top-level keys and then loads the new keys.
-func (c *Client) loadAndVerifyLocalRootMeta() error {
+func (c *Client) loadAndVerifyLocalRootMeta(ignoreExpiredCheck bool) error {
 	meta, err := c.local.GetMeta()
 	if err != nil {
 		return err
@@ -474,8 +463,14 @@ func (c *Client) loadAndVerifyLocalRootMeta() error {
 		}
 	}
 	// Any trusted local root metadata version must be greater than 0.
-	if err := ndb.Verify(s, "root", 0); err != nil {
-		return err
+	if ignoreExpiredCheck {
+		if _, err := ndb.VerifyIgnoreExpiredCheck(s, "root", 0); err != nil {
+			return err
+		}
+	} else {
+		if err := ndb.Verify(s, "root", 0); err != nil {
+			return err
+		}
 	}
 	c.consistentSnapshot = root.ConsistentSnapshot
 	c.rootVer = root.Version
