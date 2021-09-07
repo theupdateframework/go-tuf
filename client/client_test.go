@@ -442,7 +442,7 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 		{"testdata/PublishedTwice", false, nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// New root update (root role key rotation) succeeds.
 		{"testdata/PublishedTwiceWithRotatedKeys_root", false, nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// New root update for versions above 1 (root role key rotation) succeeds.
+		// New root update (root role key rotation) for versions greater than 1 succeeds.
 		{"testdata/Published5TimesWithRotatedKeys_root", false, nil, map[string]int{"root": 5, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// New root update (snapshot role key rotation) succeeds.
 		{"testdata/PublishedTwiceWithRotatedKeys_snapshot", false, nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 1}},
