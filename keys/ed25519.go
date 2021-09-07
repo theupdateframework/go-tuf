@@ -5,21 +5,22 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
-	"sync"
 
 	"github.com/theupdateframework/go-tuf/data"
 )
 
 func init() {
-	KeyMap.Store(data.KeySchemeEd25519, NewP256)
+	SignerMap.Store(data.KeySchemeEd25519, NewP256Signer)
+	VerifierMap.Store(data.KeySchemeEd25519, NewP256Verifier)
+
 }
 
-func NewP256() SignerVerifier {
-	sv := SignerVerifier{
-		Signer:   &ed25519Signer{},
-		Verifier: &ed25519Verifier{},
-	}
-	return sv
+func NewP256Signer() Signer {
+	return &ed25519Signer{}
+}
+
+func NewP256Verifier() Verifier {
+	return &ed25519Verifier{}
 }
 
 type ed25519Verifier struct {
@@ -38,7 +39,7 @@ func (e *ed25519Verifier) Verify(msg, sig []byte) error {
 	return nil
 }
 
-func (e *ed25519Verifier) Key() *data.Key {
+func (e *ed25519Verifier) MarshalKey() *data.Key {
 	return e.key
 }
 
@@ -62,6 +63,14 @@ type ed25519PrivateKeyValue struct {
 	Private data.HexBytes `json:"private"`
 }
 
+type ed25519Signer struct {
+	ed25519.PrivateKey
+
+	keyType       string
+	keyScheme     string
+	keyAlgorithms []string
+}
+
 func GenerateEd25519Key() (*ed25519Signer, error) {
 	_, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -78,7 +87,7 @@ func GenerateEd25519Key() (*ed25519Signer, error) {
 	}, nil
 }
 
-func (e *ed25519Signer) MarshalPrivate() (*data.PrivateKey, error) {
+func (e *ed25519Signer) MarshalSigner() (*data.PrivateKey, error) {
 	valueBytes, err := json.Marshal(ed25519PrivateKeyValue{
 		Public:  data.HexBytes([]byte(e.PrivateKey.Public().(ed25519.PublicKey))),
 		Private: data.HexBytes(e.PrivateKey),
@@ -116,38 +125,4 @@ func (e *ed25519Signer) PublicData() *data.Key {
 		Algorithms: e.keyAlgorithms,
 		Value:      keyValBytes,
 	}
-}
-
-type ed25519Signer struct {
-	ed25519.PrivateKey
-
-	keyType       string
-	keyScheme     string
-	keyAlgorithms []string
-	ids           []string
-	idOnce        sync.Once
-}
-
-// var _ Signer = &ed25519Signer{}
-
-func (s *ed25519Signer) IDs() []string {
-	s.idOnce.Do(func() { s.ids = s.PublicData().IDs() })
-	return s.ids
-}
-
-func (s *ed25519Signer) ContainsID(id string) bool {
-	for _, keyid := range s.IDs() {
-		if id == keyid {
-			return true
-		}
-	}
-	return false
-}
-
-func (s *ed25519Signer) Type() string {
-	return s.keyType
-}
-
-func (s *ed25519Signer) Scheme() string {
-	return s.keyScheme
 }

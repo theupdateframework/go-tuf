@@ -10,7 +10,7 @@ import (
 )
 
 func Sign(s *data.Signed, k keys.Signer) error {
-	ids := k.IDs()
+	ids := k.PublicData().IDs()
 	signatures := make([]data.Signature, 0, len(s.Signatures)+1)
 	for _, sig := range s.Signatures {
 		found := false

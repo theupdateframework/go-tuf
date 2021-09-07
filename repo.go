@@ -344,7 +344,7 @@ func (r *Repo) AddPrivateKeyWithExpires(keyRole string, key keys.Signer, expires
 		return ErrInvalidExpires{expires}
 	}
 
-	privKey, err := key.MarshalPrivate()
+	privKey, err := key.MarshalSigner()
 	if err != nil {
 		return err
 	}
@@ -640,7 +640,7 @@ func (r *Repo) getSigningKeys(name string) ([]keys.Signer, error) {
 	}
 	keys := make([]keys.Signer, 0, len(role.KeyIDs))
 	for _, key := range signingKeys {
-		for _, id := range key.IDs() {
+		for _, id := range key.PublicData().IDs() {
 			if _, ok := role.KeyIDs[id]; ok {
 				keys = append(keys, key)
 			}

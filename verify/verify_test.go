@@ -59,15 +59,7 @@ func (s ecdsaSigner) ContainsID(id string) bool {
 	return s.PublicData().ContainsID(id)
 }
 
-func (ecdsaSigner) Type() string {
-	return data.KeyTypeECDSA_SHA2_P256
-}
-
-func (ecdsaSigner) Scheme() string {
-	return data.KeySchemeECDSA_SHA2_P256
-}
-
-func (ecdsaSigner) MarshalPrivate() (*data.PrivateKey, error) {
+func (ecdsaSigner) MarshalSigner() (*data.PrivateKey, error) {
 	return nil, errors.New("not implemented")
 }
 

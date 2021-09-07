@@ -13,15 +13,11 @@ import (
 )
 
 func init() {
-	KeyMap.Store(data.KeyTypeECDSA_SHA2_P256, NewEcdsa)
+	VerifierMap.Store(data.KeyTypeECDSA_SHA2_P256, NewEcdsaVerifier)
 }
 
-func NewEcdsa() SignerVerifier {
-	sv := SignerVerifier{
-		Signer:   nil,
-		Verifier: &p256Verifier{},
-	}
-	return sv
+func NewEcdsaVerifier() Verifier {
+	return &p256Verifier{}
 }
 
 type ecdsaSignature struct {
@@ -58,7 +54,7 @@ func (p *p256Verifier) Verify(msg, sigBytes []byte) error {
 	return nil
 }
 
-func (p *p256Verifier) Key() *data.Key {
+func (p *p256Verifier) MarshalKey() *data.Key {
 	return p.key
 }
 

@@ -354,7 +354,7 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 		for _, id := range ids {
 			key, err := client.db.GetKey(id)
 			c.Assert(err, IsNil)
-			c.Assert(key.IDs(), DeepEquals, ids)
+			c.Assert(key.MarshalKey().IDs(), DeepEquals, ids)
 		}
 		role := client.db.GetRole(name)
 		c.Assert(role, NotNil)
@@ -413,7 +413,7 @@ func (s *ClientSuite) TestNewTimestampKey(c *C) {
 	for _, newID := range newIDs {
 		key, err := client.db.GetKey(newID)
 		c.Assert(err, IsNil)
-		c.Assert(key.IDs(), DeepEquals, newIDs)
+		c.Assert(key.MarshalKey().IDs(), DeepEquals, newIDs)
 	}
 	role := client.db.GetRole("timestamp")
 	c.Assert(role, NotNil)
@@ -453,7 +453,7 @@ func (s *ClientSuite) TestNewSnapshotKey(c *C) {
 	for _, newID := range newIDs {
 		key, err := client.db.GetKey(newID)
 		c.Assert(err, IsNil)
-		c.Assert(key.IDs(), DeepEquals, newIDs)
+		c.Assert(key.MarshalKey().IDs(), DeepEquals, newIDs)
 	}
 	role := client.db.GetRole("snapshot")
 	c.Assert(role, NotNil)
@@ -496,7 +496,7 @@ func (s *ClientSuite) TestNewTargetsKey(c *C) {
 	for _, newID := range newIDs {
 		key, err := client.db.GetKey(newID)
 		c.Assert(err, IsNil)
-		c.Assert(key.IDs(), DeepEquals, newIDs)
+		c.Assert(key.MarshalKey().IDs(), DeepEquals, newIDs)
 	}
 	role := client.db.GetRole("targets")
 	c.Assert(role, NotNil)

@@ -74,7 +74,7 @@ func revokeKeys(repo *tuf.Repo, role string, keyList []*data.PrivateKey) {
 	for _, key := range keyList {
 		signer, err := keys.GetSigner(key)
 		assertNotNil(err)
-		assertNotNil(repo.RevokeKeyWithExpires(role, signer.IDs()[0], expirationDate))
+		assertNotNil(repo.RevokeKeyWithExpires(role, signer.PublicData().IDs()[0], expirationDate))
 	}
 }
 
