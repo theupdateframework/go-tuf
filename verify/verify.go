@@ -15,35 +15,46 @@ type signedMeta struct {
 	Version int       `json:"version"`
 }
 
-func (db *DB) Verify(s *data.Signed, role string, minVersion int) error {
+func (db *DB) VerifyIgnoreExpiredCheck(s *data.Signed, role string, minVersion int) (sm *signedMeta, err error) {
 	if err := db.VerifySignatures(s, role); err != nil {
-		return err
+		return nil, err
 	}
 
-	sm := &signedMeta{}
+	sm = &signedMeta{}
 	if err := json.Unmarshal(s.Signed, sm); err != nil {
-		return err
+		return nil, err
 	}
 
 	if isTopLevelRole(role) {
 		// Top-level roles can only sign metadata of the same type (e.g. snapshot
 		// metadata must be signed by the snapshot role).
 		if strings.ToLower(sm.Type) != strings.ToLower(role) {
-			return ErrWrongMetaType
+			return nil, ErrWrongMetaType
 		}
 	} else {
 		// Delegated (non-top-level) roles may only sign targets metadata.
 		if strings.ToLower(sm.Type) != "targets" {
-			return ErrWrongMetaType
+			return nil, ErrWrongMetaType
 		}
+	}
+
+	if sm.Version < minVersion {
+		return nil, ErrLowVersion{sm.Version, minVersion}
+	}
+
+	return sm, nil
+}
+
+func (db *DB) Verify(s *data.Signed, role string, minVersion int) error {
+
+	sm, err := db.VerifyIgnoreExpiredCheck(s, role, minVersion)
+
+	if err != nil {
+		return err
 	}
 
 	if IsExpired(sm.Expires) {
 		return ErrExpired{sm.Expires}
-	}
-
-	if sm.Version < minVersion {
-		return ErrLowVersion{sm.Version, minVersion}
 	}
 
 	return nil
