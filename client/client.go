@@ -464,7 +464,7 @@ func (c *Client) loadAndVerifyLocalRootMeta(ignoreExpiredCheck bool) error {
 	}
 	// Any trusted local root metadata version must be greater than 0.
 	if ignoreExpiredCheck {
-		if _, err := ndb.VerifyIgnoreExpiredCheck(s, "root", 0); err != nil {
+		if err := ndb.VerifyIgnoreExpiredCheck(s, "root", 0); err != nil {
 			return err
 		}
 	} else {
