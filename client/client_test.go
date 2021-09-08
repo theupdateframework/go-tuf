@@ -398,12 +398,7 @@ func newClientWithMeta(baseDir string, relPath string, serverAddr string) (*Clie
 func initRootTest(c *C, baseDir string) (*Client, func() error) {
 	l, err := startTUFRepoServer(baseDir, "server")
 	c.Assert(err, IsNil)
-	//e := verify.IsExpired
-	//if ignoreExpired {
-	//	verify.IsExpired = func(t time.Time) bool { return false }
-	//}
 	tufClient, err := newClientWithMeta(baseDir, "client/metadata/current", l.Addr().String())
-	//verify.IsExpired = e
 	c.Assert(err, IsNil)
 	return tufClient, l.Close
 }
