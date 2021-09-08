@@ -108,7 +108,7 @@ func generateRepoFS(c *C, dir string, files map[string][]byte, consistentSnapsho
 		c.Assert(ioutil.WriteFile(path, data, 0644), IsNil)
 		c.Assert(repo.AddTarget(file, nil), IsNil)
 	}
-	c.Assert(repo.Snapshot(tuf.CompressionTypeNone), IsNil)
+	c.Assert(repo.Snapshot(), IsNil)
 	c.Assert(repo.Timestamp(), IsNil)
 	c.Assert(repo.Commit(), IsNil)
 	return repo

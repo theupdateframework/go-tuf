@@ -40,7 +40,7 @@ func newRepo(dir string) *tuf.Repo {
 }
 
 func commit(dir string, repo *tuf.Repo) {
-	assertNotNil(repo.SnapshotWithExpires(tuf.CompressionTypeNone, expirationDate))
+	assertNotNil(repo.SnapshotWithExpires(expirationDate))
 	assertNotNil(repo.TimestampWithExpires(expirationDate))
 	assertNotNil(repo.Commit())
 
