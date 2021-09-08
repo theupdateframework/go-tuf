@@ -3,14 +3,19 @@
   {
    "keyid": "3a05831328273e4b821c3bbe1fed0c5332749d8e071675879af26a401a5c85ae",
 <<<<<<< HEAD
+<<<<<<< HEAD
    "sig": "a1103a31a49a08c4d55f30ae0d33681546a51624ab69ba23c0341b1c793890c685484cdb9e1d977463647952c5e02ed33211ed65c68ac4098ce4020dae6e100c"
 =======
    "sig": "1d668531c7a0960cf90825faa684106a8aef0799c1b47e72301bac45d87f2dd42c14f1a3ac7db862323ca5177dd4fd686573ea92aea99638f17414dde561c00b"
 >>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
+=======
+   "sig": "a1103a31a49a08c4d55f30ae0d33681546a51624ab69ba23c0341b1c793890c685484cdb9e1d977463647952c5e02ed33211ed65c68ac4098ce4020dae6e100c"
+>>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
   }
  ],
  "signed": {
   "_type": "timestamp",
+<<<<<<< HEAD
 <<<<<<< HEAD
   "expires": "2021-09-09T02:22:22Z",
   "meta": {
@@ -26,6 +31,14 @@
      "sha256": "f4ca389c2c9fbc592d91d4e693c31113b8803a11bcb5ecd973581fa0e3d34ce0",
      "sha512": "92a0989e44c0e9f16d3e56268a3b8dd4e4416ee2ac91a4c871a405f1e426062651ec4effa0078fc4409c8b0422ccad9b1aa197db58f178406f398562b2e98195"
 >>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
+=======
+  "expires": "2021-09-09T02:22:22Z",
+  "meta": {
+   "snapshot.json": {
+    "hashes": {
+     "sha256": "dbde9b61b9e213d0f958e7bc56c24578cfa8ff8dad84d938493d666b92c88ab6",
+     "sha512": "97537db8a0269dfa4d7c21d9eb1e9a9e4edfae7d46e016be1c2c3a72b80681daacda132cd00035cc3eec82047e7c45fc51516d153bbbea82b4c53d85a29bea0e"
+>>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
     },
     "length": 431,
     "version": 1

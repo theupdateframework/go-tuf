@@ -3,6 +3,7 @@
   {
    "keyid": "05e17c1501d627b2597322f80d33aacec6f30a507552d3326a88913422b0e30b",
 <<<<<<< HEAD
+<<<<<<< HEAD
    "sig": "8bac0ff7d2879f921a790e8fec79d2a51302ffae4a77c99b3a7e82f240fbbc9018bb9780e0121bad063c22cb642a689ff99be6f68d52a95b31b58b53ea9dcb04"
   },
   {
@@ -38,39 +39,46 @@
    "sig": "cd7e703e746ab9f9cc5f34bf44756b2ea60459156f07879b2f7bb2fe4e40b5c04c86e7c05be7aa3bf4bf8da1a2dd78180082adf5c6447ff3937cde01729e7b0b"
 =======
    "sig": "8c4c67870314d7b0fc006d3b867f19dde6eb089c6f9f13af713680f0aa639c59f39826d6b74caeb18dc55105b5e6bcd154c538643f2624f4e7808e4dd9d8460f"
+=======
+   "sig": "8bac0ff7d2879f921a790e8fec79d2a51302ffae4a77c99b3a7e82f240fbbc9018bb9780e0121bad063c22cb642a689ff99be6f68d52a95b31b58b53ea9dcb04"
+>>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
   },
   {
    "keyid": "06e78858e726b48732eaae08a5731465587d322f4e63c0fae62ec13537c0a1cb",
-   "sig": "8cf7fde491467c8da92d22ba7621abc090f5e55e395c7d38cfcbd0027b4ca025552645bc8277441f4806c5946b94b9fbc798ac3dd3a3629a9a09a68802b95505"
+   "sig": "63308da0902ee89139c2b8a116796320d0619279fa1328fab8f1b46ee4fdcceb9db6eba84ce832172adee01c2846daea1bc7e523b7e2b073d73a5927b370ad09"
   },
   {
    "keyid": "15024498e03f033ec92758a1dc7107b34eebe759b09827b02a7fb3c64ca3e586",
-   "sig": "2d05605f5e67aa26b099ee99725ec17483818276de9c2a8452c0f92a944e6514a1ad1dc3246a70377bde8cf2a3cde4d983f40994add5a54d6b7b682c1b246f09"
+   "sig": "4d7727495a2b932ac50587a4137938ca45a1f09265436358d476928022284ea37a70fd0e6362aa3108fa4efcb0352303b9c2b6ac8eac721cd49b7c951661c508"
   },
   {
    "keyid": "718fedad390b4d0d470b890781eb8c94e5a7e975aebe65fc0862246c945fce68",
-   "sig": "8bf4f8152389df61f11becf96d57c05a5eef4a5c781c5cc7db25a5bb36de1d25d387d20f6e99f40b2f238b8fd66cb64f7fa2cbc92c227a4f265c7b083c0bea0e"
+   "sig": "fc94225ac0e7d5291c9947c2dbe71213dc5a87b07b9587da68fc51fefa2b96d779ac93fe50de1528a5d277a23cfb98634d04c997bdd977a113c8d55edb1a0808"
   },
   {
    "keyid": "75b81ec1572cc1dd55f88f13f0f0217b4e7a25f1665deed40115b612ff9c0eb8",
-   "sig": "a143cb86cee40f1e789714d140cfe8b6442ad0a30227b608d14879b1c709caca81f8abe2c2ed2b7ad03f945b3a7b73536d7744ca016570c38a2a052ebd06e70f"
+   "sig": "b08e9bda9dcfb2de845372840e198c9eaf959214b9b789ecbd657f3d154583722bc2f5176576f09ce42843c4d8df73a5b0754795416fcff0acd9b254ef4f5c07"
   },
   {
    "keyid": "9ca81f7ff17f6218246474a51b47eb035741bc472557ef5ac493e279f446b85b",
-   "sig": "c2f5f087f1bb9708f48657789cf8516b3d974e2250d3ec0268e347e89fa6f9eaa9e9441f5402ce32735fe31750013c5dc1b53f4e9a93d748ff060fa94ad3fd07"
+   "sig": "b6ce890a37d85ec1f5b1b3457dcdb7ffe2b579a4d99c5b9a349ce8a7d4c8a488dbbe5c28e5cda43cedd33eeb9ebfeeaf515eba92c7f3cd79c19336e2b329bc06"
   },
   {
    "keyid": "e4dae3872d28d29f7624a702bfd25f68453544d597229ee9e0a8569d1f940cf4",
-   "sig": "e30433454d04537cf78d2e2217ab0abf04b7c928704d3e47698ba8a26a05160424ee251530fd1e1ab57383ddf18891b937693358d0c3f1697ddc69e57d846d0d"
+   "sig": "c5e7c14a30e712f047faa9fe05b65e4d08ca69f8937523d29a5c108a1c5cb2341b0c9504286e8c8ad9b22db336b132616ba285ea8a7af9afdbc31cb7133b7a0b"
   },
   {
    "keyid": "e9829d3f2fdff6d6f31002c17cf7f20cf0398e215ca0c0c44d075ccd76a26f62",
-   "sig": "9f238ccc205d3620dafcaedbefef5965de6ab10c5ff8fb04d7447b0f622e5bb24659f66ebca2a5a969b6e79999279566cf0301a88f5e74b67e1b47d12680dc03"
+   "sig": "32db9a53bb1da64800dbe52cd026dde39330be8b11813a64769d1490b282d6889f47aaa28245177f4e9f52588aed1c0fc5ef6fbd985c716fa583ccb3c21ba10b"
   },
   {
    "keyid": "f581c9aeff9989106aeeea35319d1d1f067149619a2ff005249d6f60560557be",
+<<<<<<< HEAD
    "sig": "5fd8e909a5fcf668ca958a89af88d58f65b680a3107cd18c4219d252e986c10178311a723b1c1b9cec6db269c056707d75793d688ef9b6984daafe315b5ecf06"
 >>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
+=======
+   "sig": "cd7e703e746ab9f9cc5f34bf44756b2ea60459156f07879b2f7bb2fe4e40b5c04c86e7c05be7aa3bf4bf8da1a2dd78180082adf5c6447ff3937cde01729e7b0b"
+>>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
   }
  ],
  "signed": {
@@ -80,10 +88,14 @@
    "roles": []
   },
 <<<<<<< HEAD
+<<<<<<< HEAD
   "expires": "2021-12-08T09:49:32Z",
 =======
   "expires": "2020-04-01T07:27:10Z",
 >>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
+=======
+  "expires": "2021-12-08T09:49:32Z",
+>>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
   "spec_version": "1.0.0",
   "targets": {},
   "version": 2

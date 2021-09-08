@@ -3,19 +3,27 @@
   {
    "keyid": "77dfdca206c0fe1b8e55d67d21dd0e195a0998a9d2b56c6d3ee8f68d04c21e93",
 <<<<<<< HEAD
+<<<<<<< HEAD
    "sig": "1c1862012f5e812fd09cc6b5d751a33b066e1b779ac9dfb3f582e540e4a2520e79b00a780e6805b184bbd5ff2e6a86a3e5c187a89fbe7bb238c0877bd8988507"
 =======
    "sig": "61db8765350398f7f750853337d9a55c5d6e790812d29146b5b45d5fd43d2a42c474a7a9fab263c3a50a28114a82f79dbf24ff1f99ae737a8d06f332f9f7d103"
 >>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
+=======
+   "sig": "1c1862012f5e812fd09cc6b5d751a33b066e1b779ac9dfb3f582e540e4a2520e79b00a780e6805b184bbd5ff2e6a86a3e5c187a89fbe7bb238c0877bd8988507"
+>>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
   }
  ],
  "signed": {
   "_type": "snapshot",
 <<<<<<< HEAD
+<<<<<<< HEAD
   "expires": "2021-09-15T02:22:22Z",
 =======
   "expires": "2020-01-08T00:00:00Z",
 >>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
+=======
+  "expires": "2021-09-15T02:22:22Z",
+>>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
   "meta": {
    "targets.json": {
     "version": 1

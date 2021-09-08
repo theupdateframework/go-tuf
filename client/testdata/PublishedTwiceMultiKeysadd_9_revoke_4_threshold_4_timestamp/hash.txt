@@ -1,5 +1,9 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 a45df5a70cffc47dcc9f48ede543fd6ba782f1961dbc0968b524173ea6002161
 =======
 ee787461faedf8a44242f3d6950aa1efd0136baaaddf682f2cb473cd652b1b98
 >>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
+=======
+a45df5a70cffc47dcc9f48ede543fd6ba782f1961dbc0968b524173ea6002161
+>>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
