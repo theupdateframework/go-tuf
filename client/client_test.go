@@ -395,15 +395,15 @@ func newClientWithMeta(baseDir string, relPath string, serverAddr string) (*Clie
 	return c, nil
 }
 
-func initRootTest(c *C, baseDir string, ignoreExpired bool) (*Client, func() error) {
+func initRootTest(c *C, baseDir string) (*Client, func() error) {
 	l, err := startTUFRepoServer(baseDir, "server")
 	c.Assert(err, IsNil)
-	e := verify.IsExpired
-	if ignoreExpired {
-		verify.IsExpired = func(t time.Time) bool { return false }
-	}
+	//e := verify.IsExpired
+	//if ignoreExpired {
+	//	verify.IsExpired = func(t time.Time) bool { return false }
+	//}
 	tufClient, err := newClientWithMeta(baseDir, "client/metadata/current", l.Addr().String())
-	verify.IsExpired = e
+	//verify.IsExpired = e
 	c.Assert(err, IsNil)
 	return tufClient, l.Close
 }
@@ -411,38 +411,39 @@ func initRootTest(c *C, baseDir string, ignoreExpired bool) (*Client, func() err
 func (s *ClientSuite) TestUpdateRoots(c *C) {
 	var tests = []struct {
 		fixturePath      string
-		isExpired        bool // Value retuned by verify.IsExpired.
 		expectedError    error
 		expectedVersions map[string]int
 	}{
 		// New root version update (no key update) succeeds.
-		{"testdata/PublishedTwice", false, nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		{"testdata/PublishedTwice", nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// New root update (root role key rotation) succeeds.
-		{"testdata/PublishedTwiceWithRotatedKeys_root", false, nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// New root update (root role key rotation) for versions greater than 1 succeeds.
-		{"testdata/Published5TimesWithRotatedKeys_root", false, nil, map[string]int{"root": 5, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		{"testdata/PublishedTwiceWithRotatedKeys_root_initialrootexpired", nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// New root update (root role key rotation) for versions greater than 1 succeeds when initial root is not expired.
+		{"testdata/Published5TimesWithRotatedKeys_root", nil, map[string]int{"root": 5, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// New root update (root role key rotation) for versions greater than 1 succeeds when initial root is expired.
+		{"testdata/Published5TimesWithRotatedKeys_root_initialrootexpired", nil, map[string]int{"root": 5, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// New expired root update (root role key rotation) for versions greater than 1 fails.
+		{"testdata/Published5TimesWithRotatedKeys_root_initialandlatestrootexpired", ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int{"root": 4, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// New root update (snapshot role key rotation) succeeds.
-		{"testdata/PublishedTwiceWithRotatedKeys_snapshot", false, nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 1}},
+		{"testdata/PublishedTwiceWithRotatedKeys_snapshot", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 1}},
 		// New root update (targets role key rotation) succeeds.
-		{"testdata/PublishedTwiceWithRotatedKeys_targets", false, nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 2}},
+		{"testdata/PublishedTwiceWithRotatedKeys_targets", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 2}},
 		// New root update (timestamp role key rotation) succeeds.
-		{"testdata/PublishedTwiceWithRotatedKeys_timestamp", false, nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 1, "targets": 1}},
+		{"testdata/PublishedTwiceWithRotatedKeys_timestamp", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 1, "targets": 1}},
 		// New expired root update fails.
-		{"testdata/PublishedTwiceWithRotatedKeys_root", true, ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int{}},
+		{"testdata/PublishedTwiceWithRotatedKeys_root_initialandlatestrootexpired", ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int{}},
 		// New root update with a rollback attack fails.
-		{"testdata/PublishedTwiceWithStaleVersion_root", false, verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), map[string]int{}},
+		{"testdata/PublishedTwiceWithStaleVersion_root", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), map[string]int{}},
 		// New root update with fast forward attack fails.
-		{"testdata/PublishedTwiceForwardVersionWithRotatedKeys_root", false, verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), map[string]int{}},
+		{"testdata/PublishedTwiceForwardVersionWithRotatedKeys_root", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), map[string]int{}},
 		// New root with invalid new root signature fails (n+1th root didn't sign off n+1).
-		{"testdata/PublishedTwiceInvalidNewRootSignatureWithRotatedKeys_root", false, errors.New("tuf: signature verification failed"), map[string]int{}},
+		{"testdata/PublishedTwiceInvalidNewRootSignatureWithRotatedKeys_root", errors.New("tuf: signature verification failed"), map[string]int{}},
 		// New root with invalid old root signature fails (nth root didn't sign off n+1).
-		{"testdata/PublishedTwiceInvalidOldRootSignatureWithRotatedKeys_root", false, errors.New("tuf: signature verification failed"), map[string]int{}},
+		{"testdata/PublishedTwiceInvalidOldRootSignatureWithRotatedKeys_root", errors.New("tuf: signature verification failed"), map[string]int{}},
 	}
 
 	for _, test := range tests {
-		e := verify.IsExpired
-		verify.IsExpired = func(t time.Time) bool { return test.isExpired }
-		tufClient, closer := initRootTest(c, test.fixturePath, true)
+		tufClient, closer := initRootTest(c, test.fixturePath)
 		_, err := tufClient.Update()
 		if test.expectedError == nil {
 			c.Assert(err, IsNil)
@@ -469,7 +470,6 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 			}
 		}
 		closer()
-		verify.IsExpired = e
 	}
 }
 
@@ -512,9 +512,7 @@ func (s *ClientSuite) TestFastForwardAttackRecovery(c *C) {
 			map[string]bool{"root.json": false, "timestamp.json": true, "snapshot.json": false, "targets.json": false}},
 	}
 	for _, test := range tests {
-		e := verify.IsExpired
-		verify.IsExpired = func(t time.Time) bool { return false }
-		tufClient, closer := initRootTest(c, test.fixturePath, true)
+		tufClient, closer := initRootTest(c, test.fixturePath)
 		c.Assert(tufClient.updateRoots(), IsNil)
 		m, err := tufClient.local.GetMeta()
 		c.Assert(err, IsNil)
@@ -530,8 +528,6 @@ func (s *ClientSuite) TestFastForwardAttackRecovery(c *C) {
 			}
 		}
 		closer()
-		verify.IsExpired = e
-
 	}
 
 }
