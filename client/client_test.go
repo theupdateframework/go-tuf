@@ -399,6 +399,7 @@ func initRootTest(c *C, baseDir string) (*Client, func() error) {
 	l, err := startTUFRepoServer(baseDir, "server")
 	c.Assert(err, IsNil)
 <<<<<<< HEAD
+<<<<<<< HEAD
 	tufClient, err := newClientWithMeta(baseDir, "client/metadata/current", l.Addr().String())
 =======
 	//e := verify.IsExpired
@@ -408,6 +409,9 @@ func initRootTest(c *C, baseDir string) (*Client, func() error) {
 	tufClient, err := newClientWithMeta(baseDir, "client/metadata/current", l.Addr().String())
 	//verify.IsExpired = e
 >>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
+=======
+	tufClient, err := newClientWithMeta(baseDir, "client/metadata/current", l.Addr().String())
+>>>>>>> 464801f (remove commented code)
 	c.Assert(err, IsNil)
 	return tufClient, l.Close
 }
