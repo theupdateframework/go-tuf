@@ -16,13 +16,6 @@ import (
 	"github.com/theupdateframework/go-tuf/verify"
 )
 
-type CompressionType uint8
-
-const (
-	CompressionTypeNone CompressionType = iota
-	CompressionTypeGzip
-)
-
 // topLevelManifests determines the order signatures are verified when committing.
 var topLevelManifests = []string{
 	"root.json",
@@ -761,11 +754,11 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 	return r.setMeta("targets.json", t)
 }
 
-func (r *Repo) Snapshot(t CompressionType) error {
-	return r.SnapshotWithExpires(t, data.DefaultExpires("snapshot"))
+func (r *Repo) Snapshot() error {
+	return r.SnapshotWithExpires(data.DefaultExpires("snapshot"))
 }
 
-func (r *Repo) SnapshotWithExpires(t CompressionType, expires time.Time) error {
+func (r *Repo) SnapshotWithExpires(expires time.Time) error {
 	if !validExpires(expires) {
 		return ErrInvalidExpires{expires}
 	}
@@ -778,7 +771,7 @@ func (r *Repo) SnapshotWithExpires(t CompressionType, expires time.Time) error {
 	if err != nil {
 		return err
 	}
-	// TODO: generate compressed manifests
+
 	for _, name := range snapshotManifests {
 		if err := r.verifySignature(name, db); err != nil {
 			return err
