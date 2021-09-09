@@ -75,7 +75,7 @@ no paths removes all files from the `targets` manifest.
 
 Expects a staged, fully signed `targets` manifest and stages an appropriate
 `snapshot` manifest. Optionally one can set number of days after which
-the snapshot manifest to expire.
+the snapshot manifest will expire.
 
 #### `tuf timestamp`
 
