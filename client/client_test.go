@@ -409,32 +409,50 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 		expectedError    error
 		expectedVersions map[string]int
 	}{
-		// New root version update (no key update) succeeds.
-		{"testdata/PublishedTwice", nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// New root update (root role key rotation) succeeds.
-		{"testdata/PublishedTwiceWithRotatedKeys_root_initialrootexpired", nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// New root update (root role key rotation) for versions greater than 1 succeeds when initial root is not expired.
-		{"testdata/Published5TimesWithRotatedKeys_root", nil, map[string]int{"root": 5, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// New root update (root role key rotation) for versions greater than 1 succeeds when initial root is expired.
-		{"testdata/Published5TimesWithRotatedKeys_root_initialrootexpired", nil, map[string]int{"root": 5, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// New expired root update (root role key rotation) for versions greater than 1 fails.
-		{"testdata/Published5TimesWithRotatedKeys_root_initialandlatestrootexpired", ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int{"root": 4, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// New root update (snapshot role key rotation) succeeds.
-		{"testdata/PublishedTwiceWithRotatedKeys_snapshot", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 1}},
-		// New root update (targets role key rotation) succeeds.
-		{"testdata/PublishedTwiceWithRotatedKeys_targets", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 2}},
-		// New root update (timestamp role key rotation) succeeds.
-		{"testdata/PublishedTwiceWithRotatedKeys_timestamp", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 1, "targets": 1}},
-		// New expired root update fails.
-		{"testdata/PublishedTwiceWithRotatedKeys_root_initialandlatestrootexpired", ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int{}},
-		// New root update with a rollback attack fails.
-		{"testdata/PublishedTwiceWithStaleVersion_root", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), map[string]int{}},
-		// New root update with fast forward attack fails.
-		{"testdata/PublishedTwiceForwardVersionWithRotatedKeys_root", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), map[string]int{}},
-		// New root with invalid new root signature fails (n+1th root didn't sign off n+1).
-		{"testdata/PublishedTwiceInvalidNewRootSignatureWithRotatedKeys_root", errors.New("tuf: signature verification failed"), map[string]int{}},
-		// New root with invalid old root signature fails (nth root didn't sign off n+1).
-		{"testdata/PublishedTwiceInvalidOldRootSignatureWithRotatedKeys_root", errors.New("tuf: signature verification failed"), map[string]int{}},
+		// Test cases for Client's root update:
+		// (1) Succeeds when there is no root update.
+		// (2) Succeeds updating root to version 2 when the client's initial root version is 1.
+		// (3) Succeeds updating root to version 2 when the client's initial root version is 1 and version 1 is expired.
+		// (4) Succeeds updating root to version 3 when the client's initial root version is 1 and root versions 1 and 2 are expired.
+		// (5) Succeeds updating root to version 3 when the client's initial root version is 2.
+		// (6) Fails updating root to version 3 when the client's initial root version is 1 and root versions 3 is expired.
+		// (7) Fails updating root to version 2 when the root the old root's signature is invalid (nth root didn't sign off n+1).
+		// (8) Fails updating root to version 2 when the root the new root's signature is invalid (n+1th root didn't sign off n+1).
+		// (9) Fails updating root to 2.root.json when the value of the version field inside it is 1 (rollback attack prevention).
+		// (10) Fails updating root to 2.root.json when the value of the version field inside it is 3 (rollforward attack prevention).
+
+		// Test (1)
+		{"testdata/Published1Time", nil, map[string]int{"root": 1, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// Test (2)
+		{"testdata/Published2Times_keyrotated", nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// Test (3)
+		{"testdata/Published2Times_keyrotated_initialrootexpired", nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// Test (4)
+		{"testdata/Published3Times_keyrotated_initialrootsexpired", nil, map[string]int{"root": 3, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// Test(5)
+		{"testdata/Published3Times_keyrotated_initialrootsexpired_clientversionis2", nil, map[string]int{"root": 3, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// Test (6)
+		{"testdata/Published3Times_keyrotated_latestrootexpired", ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// Test (7)
+		{"testdata/Published2Times_keyrotated_invalidOldRootSignature", errors.New("tuf: signature verification failed"), map[string]int{}},
+		// Test (8)
+		{"testdata/Published2Times_keyrotated_invalidNewRootSignature", errors.New("tuf: signature verification failed"), map[string]int{}},
+		// Test (9)
+		{"testdata/Published1Time_backwardRootVersion", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), map[string]int{}},
+		// Test (10)
+		{"testdata/Published3Times_keyrotated_forwardRootVersion", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), map[string]int{}},
+
+		// Test cases for checking the version of non-root metadata after their key is being rotated:
+		// (i) snapshot role key rotation increase the snapshot and timestamp.
+		// (ii) targets role key rotation increase the snapshot, timestamp, and targets.
+		// (iii) timestamp role key rotation increase the timestamp.
+
+		// Test (i)
+		{"testdata/Published2Times_snapshot_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 1}},
+		// Test (ii)
+		{"testdata/Published2Times_targets_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 2}},
+		// Test (iii)
+		{"testdata/Published2Times_timestamp_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 1, "targets": 1}},
 	}
 
 	for _, test := range tests {

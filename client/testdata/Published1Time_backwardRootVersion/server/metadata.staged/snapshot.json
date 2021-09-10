@@ -1,0 +1,19 @@
+{
+ "signatures": [
+  {
+   "keyid": "77dfdca206c0fe1b8e55d67d21dd0e195a0998a9d2b56c6d3ee8f68d04c21e93",
+   "sig": "a843cca3ba2840f3a8dc3de35c1a5e9fb5815c8f7fb85cc1abede0efec5f30864364015be96eff56b7078317ccb71947ace4691c033969bc4eb09e78b083c409"
+  }
+ ],
+ "signed": {
+  "_type": "snapshot",
+  "expires": "2021-09-17T04:46:02Z",
+  "meta": {
+   "targets.json": {
+    "version": 1
+   }
+  },
+  "spec_version": "1.0.0",
+  "version": 1
+ }
+}
