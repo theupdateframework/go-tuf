@@ -26,7 +26,7 @@ type Verifier interface {
 	// to verify signatures.
 	UnmarshalKey(key *data.Key) error
 
-	// Key returns the data.Key object associated with the verifier.
+	// MarshalKey returns the data.Key object associated with the verifier.
 	MarshalKey() *data.Key
 
 	// This is the public string used as a unique identifier for the verifier instance.
@@ -39,10 +39,10 @@ type Verifier interface {
 }
 
 type Signer interface {
-	// Marshal into a private key.
+	// MarshalSigner returns the private key data.
 	MarshalSigner() (*data.PrivateKey, error)
 
-	// UnmarshalKey takes private key data to a working Signer implementation for the key type.
+	// UnmarshalSigner takes private key data to a working Signer implementation for the key type.
 	UnmarshalSigner(key *data.PrivateKey) error
 
 	// Returns the public data.Key from the private key
