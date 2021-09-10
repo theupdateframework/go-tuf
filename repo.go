@@ -401,10 +401,6 @@ func validExpires(expires time.Time) bool {
 	return expires.Sub(time.Now()) > 0
 }
 
-/*
-
- */
-
 func (r *Repo) RootKeys() ([]*data.Key, error) {
 	root, err := r.root()
 	if err != nil {
