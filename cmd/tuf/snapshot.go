@@ -7,7 +7,7 @@ import (
 
 func init() {
 	register("snapshot", cmdSnapshot, `
-usage: tuf snapshot [--expires=<days>] [--compression=<format>]
+usage: tuf snapshot [--expires=<days>]
 
 Update the snapshot manifest.
 
@@ -17,13 +17,12 @@ Options:
 }
 
 func cmdSnapshot(args *docopt.Args, repo *tuf.Repo) error {
-	// TODO: parse --compression
 	if arg := args.String["--expires"]; arg != "" {
 		expires, err := parseExpires(arg)
 		if err != nil {
 			return err
 		}
-		return repo.SnapshotWithExpires(tuf.CompressionTypeNone, expires)
+		return repo.SnapshotWithExpires(expires)
 	}
-	return repo.Snapshot(tuf.CompressionTypeNone)
+	return repo.Snapshot()
 }
