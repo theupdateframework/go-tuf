@@ -2,13 +2,13 @@
  "signatures": [
   {
    "keyid": "d4dab4b4d68b91665a6d0dac5b4e64677aa6d853fc787669168b4b4ba9822129",
-   "sig": "5e25a5ee759833c37f8897ba1f137d761c6eab48f2c808bd73e156bcd92b9186c602226c5eb77859613caa2a73a2f7ba23179eb559153d34220baaf13aedfb02"
+   "sig": "c981b331d9fd0adec189ec55593735f05ded1d73d7999d67b882f56d2d2a201525d39c20a99cc9c1f03e9425ec607b1f57c7e24b540c0b0c671992cab26e4d07"
   }
  ],
  "signed": {
   "_type": "root",
   "consistent_snapshot": true,
-  "expires": "2021-09-10T04:37:44Z",
+  "expires": "2021-09-12T03:13:47Z",
   "keys": {
    "3a05831328273e4b821c3bbe1fed0c5332749d8e071675879af26a401a5c85ae": {
     "keyid_hash_algorithms": [

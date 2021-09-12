@@ -2,15 +2,7 @@
  "signatures": [
   {
    "keyid": "e4dae3872d28d29f7624a702bfd25f68453544d597229ee9e0a8569d1f940cf4",
-<<<<<<< HEAD
-<<<<<<< HEAD
-   "sig": "e43a0caa312b7e93503cd993528ff39467b239d058063588578123e1d705153b4c1a195476c51279e65f790b8381b629643cf54f4dccb37b5d984062ab685302"
-=======
-   "sig": "c150e8ed5d352f366a979f4c4b9d556350c414c2da7ef1279045aaed3438c60872142d0dfe5ddbb627fec2d8fb7c5d8e692e04a87230b78d74714c5db035620a"
->>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
-=======
-   "sig": "e43a0caa312b7e93503cd993528ff39467b239d058063588578123e1d705153b4c1a195476c51279e65f790b8381b629643cf54f4dccb37b5d984062ab685302"
->>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
+   "sig": "1c07f726a8988b2bbb150cd91c36fa2e0716eb904a89002e24f2382641d5f7680e04cbedbecf89034c8b6416b7a31d5c4bdcc20f0aa2cd976353828cda0e3e0e"
   }
  ],
  "signed": {
@@ -19,15 +11,7 @@
    "keys": {},
    "roles": []
   },
-<<<<<<< HEAD
-<<<<<<< HEAD
-  "expires": "2021-12-08T09:49:29Z",
-=======
-  "expires": "2020-04-01T07:27:10Z",
->>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
-=======
-  "expires": "2021-12-08T09:49:29Z",
->>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
+  "expires": "2031-09-09T23:20:18Z",
   "spec_version": "1.0.0",
   "targets": {},
   "version": 1

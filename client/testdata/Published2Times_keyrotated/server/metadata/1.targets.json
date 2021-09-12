@@ -2,7 +2,7 @@
  "signatures": [
   {
    "keyid": "e4dae3872d28d29f7624a702bfd25f68453544d597229ee9e0a8569d1f940cf4",
-   "sig": "ea8714a6fb9cb98223165378346ca4d6c3be5710c9b4c2eee5096c80adf57e9d9d3a32d85214a926cac7dceaa5bb503f6dea7ea027e41412b614e7be97d80a0d"
+   "sig": "f2cee9e31bda3f88b25b0153bb48a6cb21237e4c41a34bbae95f152b56975085bc04c4978eed6be76a3ead23ff76a1259ff07e7b45b04fb51865c9601713c905"
   }
  ],
  "signed": {
@@ -11,7 +11,7 @@
    "keys": {},
    "roles": []
   },
-  "expires": "2021-12-10T12:04:43Z",
+  "expires": "2031-09-09T23:13:37Z",
   "spec_version": "1.0.0",
   "targets": {},
   "version": 1

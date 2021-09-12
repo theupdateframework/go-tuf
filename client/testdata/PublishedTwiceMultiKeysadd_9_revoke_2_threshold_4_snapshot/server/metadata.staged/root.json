@@ -2,29 +2,13 @@
  "signatures": [
   {
    "keyid": "d4dab4b4d68b91665a6d0dac5b4e64677aa6d853fc787669168b4b4ba9822129",
-<<<<<<< HEAD
-<<<<<<< HEAD
-   "sig": "f3d8cd19d3137745cebcb38c8ccb7bd6de6981a71f59c49de73de535362b68a755831121f38a6b03efeb9297bddadd8d830480b7c0beb438f8379c35912af60d"
-=======
-   "sig": "aa0b940165ceaad32a38df5f880e2b665decae668d559a79247f3fd5ad3245335e1e23ea3f79eb17c91fa7fd4ea9b335223426f8014d30ad6bb1eaaec7637c0a"
->>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
-=======
-   "sig": "f3d8cd19d3137745cebcb38c8ccb7bd6de6981a71f59c49de73de535362b68a755831121f38a6b03efeb9297bddadd8d830480b7c0beb438f8379c35912af60d"
->>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
+   "sig": "06aa273601715be06bd54ca5f74d7e8e5e5130646a2a7e21fbcef3d30167bf001805f3df25b06b8c0de5e1d17dba8562c454011262c6523a4e64ce24390b4d0c"
   }
  ],
  "signed": {
   "_type": "root",
   "consistent_snapshot": true,
-<<<<<<< HEAD
-<<<<<<< HEAD
-  "expires": "2031-09-05T22:22:19Z",
-=======
-  "expires": "2020-12-31T05:48:20Z",
->>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
-=======
-  "expires": "2031-09-05T22:22:19Z",
->>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
+  "expires": "2031-09-09T23:20:19Z",
   "keys": {
    "06e78858e726b48732eaae08a5731465587d322f4e63c0fae62ec13537c0a1cb": {
     "keyid_hash_algorithms": [

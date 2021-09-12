@@ -1,9 +1,1 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-ed985d8e9f3b68ec5f17cc031d59b1172bb8c75942e88d81197abc30c6c8ef3b
-=======
-2e2b59f12e90b81be7d928b13c009a724af38999a75eb140ccfdb417ca0d60c5
->>>>>>> 05537c5 (add test fixtures for fast forward attack recovery.)
-=======
-ed985d8e9f3b68ec5f17cc031d59b1172bb8c75942e88d81197abc30c6c8ef3b
->>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
+0d1fafc3b1e2fba17b6702b14477333fd5ed2379cfc454304a93524503f2594e

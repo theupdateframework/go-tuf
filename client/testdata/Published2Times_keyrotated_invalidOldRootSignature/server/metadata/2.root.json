@@ -6,13 +6,13 @@
   },
   {
    "keyid": "d4dab4b4d68b91665a6d0dac5b4e64677aa6d853fc787669168b4b4ba9822129",
-   "sig": "e6e2a916b1703778992e0fc2ade0e07cb89801093bba83cb6211753d9b609580467b4ab9cf85678eaa1d5f11ea6dfbc2aa2838a4079e40dc39b5e3436751160d"
+   "sig": "4ba4216f3f0fcb14a39ff0690b48200a0b9b4bb3505433a1eaf8269e9eb73c78f36fa8b777fe69b3543b86845739ced2efe13f4d669724f6d6d2111b7dfe5c05"
   }
  ],
  "signed": {
   "_type": "root",
   "consistent_snapshot": true,
-  "expires": "2031-09-08T00:37:35Z",
+  "expires": "2031-09-09T23:13:38Z",
   "keys": {
    "05e17c1501d627b2597322f80d33aacec6f30a507552d3326a88913422b0e30b": {
     "keyid_hash_algorithms": [

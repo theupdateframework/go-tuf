@@ -2,11 +2,11 @@
  "signatures": [
   {
    "keyid": "05e17c1501d627b2597322f80d33aacec6f30a507552d3326a88913422b0e30b",
-   "sig": "32b459ae90e20156e3d1dca19bfab19f096e10b3d1b846dc5c97fbd21e9d7f22792d0d446db8aea74a6b3bbc4fd1968e1044c1ca1d6b1ca4aa35dfb2c1c55800"
+   "sig": "9d7c09bf862a443be7a1cf14c1d2bf2f812dea9ab33567f14a3b33ff52af70865fd11c17ed92d187bb319fd984709a6ed59cc3d216ee9f3151af0764eafa460d"
   },
   {
    "keyid": "e4dae3872d28d29f7624a702bfd25f68453544d597229ee9e0a8569d1f940cf4",
-   "sig": "6e4b10bea66f0af555fbce405809205bfed602c55a413fc8b1f24cdd9fd9d68aeff0bdcc657228327ddc5cac8aad5650bb0594ac5b9d89c7b6a379b4966aff0e"
+   "sig": "94541820374b4a4a7d92a8d7fbf22ab5e203c1da0559c21e1168f2ebcbcf19a939bf46f4c96cf678480708ff5549f14fec56e3163cce60f4e753f173ebbc6706"
   }
  ],
  "signed": {
@@ -15,7 +15,7 @@
    "keys": {},
    "roles": []
   },
-  "expires": "2021-12-10T12:04:47Z",
+  "expires": "2031-09-09T23:13:40Z",
   "spec_version": "1.0.0",
   "targets": {},
   "version": 2

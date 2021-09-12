@@ -398,20 +398,7 @@ func newClientWithMeta(baseDir string, relPath string, serverAddr string) (*Clie
 func initRootTest(c *C, baseDir string) (*Client, func() error) {
 	l, err := startTUFRepoServer(baseDir, "server")
 	c.Assert(err, IsNil)
-<<<<<<< HEAD
-<<<<<<< HEAD
 	tufClient, err := newClientWithMeta(baseDir, "client/metadata/current", l.Addr().String())
-=======
-	//e := verify.IsExpired
-	//if ignoreExpired {
-	//	verify.IsExpired = func(t time.Time) bool { return false }
-	//}
-	tufClient, err := newClientWithMeta(baseDir, "client/metadata/current", l.Addr().String())
-	//verify.IsExpired = e
->>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
-=======
-	tufClient, err := newClientWithMeta(baseDir, "client/metadata/current", l.Addr().String())
->>>>>>> 464801f (remove commented code)
 	c.Assert(err, IsNil)
 	return tufClient, l.Close
 }
@@ -422,9 +409,6 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 		expectedError    error
 		expectedVersions map[string]int
 	}{
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 		// Succeeds when there is no root update.
 		{"testdata/Published1Time", nil, map[string]int{"root": 1, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// Succeeds updating root from version 1 to version 2.
@@ -452,82 +436,6 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 		{"testdata/Published2Times_targets_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 2}},
 		// timestamp role key rotation increase the timestamp.
 		{"testdata/Published2Times_timestamp_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 1, "targets": 1}},
-=======
-		// New root version update (no key update) succeeds.
-		{"testdata/PublishedTwice", nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// New root update (root role key rotation) succeeds.
-		{"testdata/PublishedTwiceWithRotatedKeys_root_initialrootexpired", nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// New root update (root role key rotation) for versions greater than 1 succeeds when initial root is not expired.
-		{"testdata/Published5TimesWithRotatedKeys_root", nil, map[string]int{"root": 5, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// New root update (root role key rotation) for versions greater than 1 succeeds when initial root is expired.
-		{"testdata/Published5TimesWithRotatedKeys_root_initialrootexpired", nil, map[string]int{"root": 5, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// New expired root update (root role key rotation) for versions greater than 1 fails.
-		{"testdata/Published5TimesWithRotatedKeys_root_initialandlatestrootexpired", ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int{"root": 4, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// New root update (snapshot role key rotation) succeeds.
-		{"testdata/PublishedTwiceWithRotatedKeys_snapshot", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 1}},
-		// New root update (targets role key rotation) succeeds.
-		{"testdata/PublishedTwiceWithRotatedKeys_targets", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 2}},
-		// New root update (timestamp role key rotation) succeeds.
-		{"testdata/PublishedTwiceWithRotatedKeys_timestamp", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 1, "targets": 1}},
-		// New expired root update fails.
-		{"testdata/PublishedTwiceWithRotatedKeys_root_initialandlatestrootexpired", ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int{}},
-		// New root update with a rollback attack fails.
-		{"testdata/PublishedTwiceWithStaleVersion_root", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), map[string]int{}},
-		// New root update with fast forward attack fails.
-		{"testdata/PublishedTwiceForwardVersionWithRotatedKeys_root", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), map[string]int{}},
-		// New root with invalid new root signature fails (n+1th root didn't sign off n+1).
-		{"testdata/PublishedTwiceInvalidNewRootSignatureWithRotatedKeys_root", errors.New("tuf: signature verification failed"), map[string]int{}},
-		// New root with invalid old root signature fails (nth root didn't sign off n+1).
-<<<<<<< HEAD
-		{"testdata/PublishedTwiceInvalidOldRootSignatureWithRotatedKeys_root", false, errors.New("tuf: signature verification failed"), map[string]int{}},
->>>>>>> 36977d7 (add test for root update for client version above 1.)
-=======
-		{"testdata/PublishedTwiceInvalidOldRootSignatureWithRotatedKeys_root", errors.New("tuf: signature verification failed"), map[string]int{}},
->>>>>>> 0d6db4e (Avoid mocking IsExpired in the tests. Instead update test fixtured to have concerete timestamps (either expired or long exiring one))
-=======
-		// Test cases for Client's root update:
-		// (1) Succeeds when there is no root update.
-		// (2) Succeeds updating root to version 2 when the client's initial root version is 1.
-		// (3) Succeeds updating root to version 2 when the client's initial root version is 1 and version 1 is expired.
-		// (4) Succeeds updating root to version 3 when the client's initial root version is 1 and root versions 1 and 2 are expired.
-		// (5) Succeeds updating root to version 3 when the client's initial root version is 2.
-		// (6) Fails updating root to version 3 when the client's initial root version is 1 and root versions 3 is expired.
-		// (7) Fails updating root to version 2 when the root the old root's signature is invalid (nth root didn't sign off n+1).
-		// (8) Fails updating root to version 2 when the root the new root's signature is invalid (n+1th root didn't sign off n+1).
-		// (9) Fails updating root to 2.root.json when the value of the version field inside it is 1 (rollback attack prevention).
-		// (10) Fails updating root to 2.root.json when the value of the version field inside it is 3 (rollforward attack prevention).
-
-		// Test (1)
-=======
-		// Succeeds when there is no root update.
->>>>>>> 2a38d97 (updating the comments based on the feedbacks.)
-		{"testdata/Published1Time", nil, map[string]int{"root": 1, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// Succeeds updating root from version 1 to version 2.
-		{"testdata/Published2Times_keyrotated", nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// Succeeds updating root from version 1 to version 2 when the client's initial root version is expired.
-		{"testdata/Published2Times_keyrotated_initialrootexpired", nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// Succeeds updating root from version 1 to version 3 when versions 1 and 2 are expired.
-		{"testdata/Published3Times_keyrotated_initialrootsexpired", nil, map[string]int{"root": 3, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// Succeeds updating root from version 2 to version 3.
-		{"testdata/Published3Times_keyrotated_initialrootsexpired_clientversionis2", nil, map[string]int{"root": 3, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// Fails updating root from version 1 to version 3 when versions 1 and 3 are expired but version 2 is not expired.
-		{"testdata/Published3Times_keyrotated_latestrootexpired", ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
-		// Fails updating root from version 1 to version 2 when old root 1 did not sign off on it (nth root didn't sign off n+1).
-		{"testdata/Published2Times_keyrotated_invalidOldRootSignature", errors.New("tuf: signature verification failed"), map[string]int{}},
-		// Fails updating root from version 1 to version 2 when the new root 2 did not sign itself (n+1th root didn't sign off n+1)
-		{"testdata/Published2Times_keyrotated_invalidNewRootSignature", errors.New("tuf: signature verification failed"), map[string]int{}},
-		// Fails updating root to 2.root.json when the value of the version field inside it is 1 (rollback attack prevention).
-		{"testdata/Published1Time_backwardRootVersion", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), map[string]int{}},
-		// Fails updating root to 2.root.json when the value of the version field inside it is 3 (rollforward attack prevention).
-		{"testdata/Published3Times_keyrotated_forwardRootVersion", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), map[string]int{}},
-
-		// snapshot role key rotation increase the snapshot and timestamp.
-		{"testdata/Published2Times_snapshot_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 1}},
-		// targets role key rotation increase the snapshot, timestamp, and targets.
-		{"testdata/Published2Times_targets_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 2}},
-		// timestamp role key rotation increase the timestamp.
-		{"testdata/Published2Times_timestamp_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 1, "targets": 1}},
->>>>>>> 68a35d0 (update fixtures and clarify test comments.)
 	}
 
 	for _, test := range tests {
@@ -590,85 +498,9 @@ func (s *ClientSuite) TestFastForwardAttackRecovery(c *C) {
 			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
 
 		// Delete snapshot and timestamp metadata if a threshold number of snapshot keys are revoked.
-<<<<<<< HEAD
 		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_snapshot",
 			map[string]bool{"root.json": false, "timestamp.json": true, "snapshot.json": true, "targets.json": false}},
 		// Delete targets and snapshot metadata if a threshold number of targets keys are revoked.
-<<<<<<< HEAD
-		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_targets",
-			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": true, "targets.json": true}},
-		// Delete timestamp metadata if a threshold number of timestamp keys are revoked.
-		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_timestamp",
-			map[string]bool{"root.json": false, "timestamp.json": true, "snapshot.json": false, "targets.json": false}},
-	}
-	for _, test := range tests {
-		tufClient, closer := initRootTest(c, test.fixturePath)
-		c.Assert(tufClient.updateRoots(), IsNil)
-		m, err := tufClient.local.GetMeta()
-		c.Assert(err, IsNil)
-		for md, deleted := range test.expectMetaDeleted {
-			if deleted {
-				if _, ok := m[md]; ok {
-					c.Fatalf("Metadata %s is not deleted!", md)
-				}
-			} else {
-				if _, ok := m[md]; !ok {
-					c.Fatalf("Metadata %s deleted!", md)
-				}
-			}
-		}
-		closer()
-	}
-
-}
-
-func (s *ClientSuite) TestUpdateRace(c *C) {
-	// Tests race condition for the client update. You need to run the test with -race flag:
-	// go test -race
-	for i := 0; i < 2; i++ {
-		go func() {
-			c := NewClient(MemoryLocalStore(), newFakeRemoteStore())
-			c.Update()
-		}()
-	}
-}
-
-func (s *ClientSuite) TestFastForwardAttackRecovery(c *C) {
-	var tests = []struct {
-		fixturePath       string
-		expectMetaDeleted map[string]bool
-	}{
-		// Each of the following test cases each has a two sets of TUF metadata:
-		// (1) client's initial, and (2) server's current.
-		// The naming format is PublishedTwiceMultiKeysadd_X_revoke_Y_threshold_Z_ROLE
-		// The client includes TUF metadata before key rotation for TUF ROLE with X keys.
-		// The server includes updated TUF metadata after key rotation. The
-		// rotation involves revoking Y keys from the initial keys.
-		// For each test, the TUF client's will be initialized to the client files.
-		// The test checks whether the client is  able to update itself properly.
-
-		// Fast-forward recovery is not needed if less than threshold keys are revoked.
-		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_root",
-			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
-		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_snapshot",
-			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
-		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_targets",
-			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
-		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_timestamp",
-			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
-
-		// Fast-forward recovery not needed if root keys are revoked, even when the threshold number of root keys are revoked.
-		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_root",
-			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
-
-		// Delete snapshot and timestamp metadata if a threshold number of snapshot keys are revoked.
-=======
->>>>>>> 47323a8 (Update client/client_test.go)
-		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_snapshot",
-			map[string]bool{"root.json": false, "timestamp.json": true, "snapshot.json": true, "targets.json": false}},
-		// Delete targets and snapshot metadata if a threshold number of targets keys are revoked.
-=======
->>>>>>> a82f299 (Update client/client_test.go)
 		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_targets",
 			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": true, "targets.json": true}},
 		// Delete timestamp metadata if a threshold number of timestamp keys are revoked.
@@ -899,11 +731,7 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 
 	// add soon to expire root.json to local storage
 	s.genKeyExpired(c, "timestamp")
-<<<<<<< HEAD
 	c.Assert(s.repo.Snapshot(), IsNil)
-=======
-	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
->>>>>>> d9a4507 (addressed more comments. Set the rootVersion in loadAndVerifyLocalRootMeta. Fixed a buggy test.)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	c.Assert(s.repo.Commit(), IsNil)
 	s.syncLocal(c)
@@ -911,11 +739,7 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 	// add far expiring root.json to remote storage
 	s.genKey(c, "timestamp")
 	s.addRemoteTarget(c, "bar.txt")
-<<<<<<< HEAD
 	c.Assert(s.repo.Snapshot(), IsNil)
-=======
-	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
->>>>>>> d9a4507 (addressed more comments. Set the rootVersion in loadAndVerifyLocalRootMeta. Fixed a buggy test.)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
@@ -946,16 +770,9 @@ func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
 		s.assertErrExpired(c, err, "timestamp.json")
 	})
 
-<<<<<<< HEAD
 	c.Assert(s.repo.SnapshotWithExpires(s.expiredTime), IsNil)
-=======
-	c.Assert(s.repo.SnapshotWithExpires(tuf.CompressionTypeNone, s.expiredTime), IsNil)
-<<<<<<< HEAD
-	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
->>>>>>> d9a4507 (addressed more comments. Set the rootVersion in loadAndVerifyLocalRootMeta. Fixed a buggy test.)
-=======
->>>>>>> d538c3b (Fixed a buggy test.)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 	s.withMetaExpired(func() {
 		_, err := client.Update()
@@ -988,11 +805,7 @@ func (s *ClientSuite) TestUpdateLocalRootExpiredKeyChange(c *C) {
 
 	// add soon to expire root.json to local storage
 	s.genKeyExpired(c, "timestamp")
-<<<<<<< HEAD
 	c.Assert(s.repo.Snapshot(), IsNil)
-=======
-	c.Assert(s.repo.Snapshot(tuf.CompressionTypeNone), IsNil)
->>>>>>> d9a4507 (addressed more comments. Set the rootVersion in loadAndVerifyLocalRootMeta. Fixed a buggy test.)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	c.Assert(s.repo.Commit(), IsNil)
 	s.syncLocal(c)
