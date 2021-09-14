@@ -9,7 +9,10 @@ func init() {
 	register("sign", cmdSign, `
 usage: tuf sign <manifest>
 
-Sign a manifest.
+Sign a role's manifest.
+
+Signs the given role's staged manifest with all keys present in the 'keys'
+directory for that role.
 `)
 }
 

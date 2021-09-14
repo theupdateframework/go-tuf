@@ -13,6 +13,9 @@ usage: tuf remove [--expires=<days>] [--all] [<path>...]
 
 Remove target file(s).
 
+Alternatively, passphrases can be set via environment variables in the
+form of TUF_{{ROLE}}_PASSPHRASE
+
 Options:
   --all              Remove all target files.
   --expires=<days>   Set the targets manifest to expire <days> days from now.
