@@ -386,11 +386,13 @@ func newClientWithMeta(baseDir string, relPath string, serverAddr string) (*Clie
 	}
 	c := NewClient(MemoryLocalStore(), remote)
 	for _, m := range []string{"root.json", "snapshot.json", "timestamp.json", "targets.json"} {
-		metadataJSON, err := ioutil.ReadFile(initialStateDir + "/" + m)
-		if err != nil {
-			return nil, err
+		if _, err := os.Stat(initialStateDir + "/" + m); err == nil {
+			metadataJSON, err := ioutil.ReadFile(initialStateDir + "/" + m)
+			if err != nil {
+				return nil, err
+			}
+			c.local.SetMeta(m, metadataJSON)
 		}
-		c.local.SetMeta(m, metadataJSON)
 	}
 	return c, nil
 }
@@ -411,6 +413,8 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 	}{
 		// Succeeds when there is no root update.
 		{"testdata/Published1Time", nil, map[string]int{"root": 1, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// Succeeds when client only has root.json
+		{"testdata/Published1Time_client_root_only", nil, map[string]int{"root": 1, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// Succeeds updating root from version 1 to version 2.
 		{"testdata/Published2Times_keyrotated", nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// Succeeds updating root from version 1 to version 2 when the client's initial root version is expired.
@@ -429,6 +433,8 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 		{"testdata/Published1Time_backwardRootVersion", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), map[string]int{}},
 		// Fails updating root to 2.root.json when the value of the version field inside it is 3 (rollforward attack prevention).
 		{"testdata/Published3Times_keyrotated_forwardRootVersion", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), map[string]int{}},
+		// Fails updating when there is no local trusted root.
+		{"testdata/Published1Time_client_no_root", errors.New("tuf: no root keys found in local meta store"), map[string]int{}},
 
 		// snapshot role key rotation increase the snapshot and timestamp.
 		{"testdata/Published2Times_snapshot_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 1}},
