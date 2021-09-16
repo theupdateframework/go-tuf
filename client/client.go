@@ -716,21 +716,16 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 // Target returns the target metadata for a specific target if it
 // exists. If it does not, ErrNotFound will be returned.
 func (c *Client) Target(name string) (data.TargetFileMeta, error) {
-	m, err := c.Targets()
-	if err != nil {
-		return data.TargetFileMeta{}, err
-	}
-
-	target, ok := m[util.NormalizeTarget(name)]
-	if ok {
+	target, err := c.getTargetFileMeta(util.NormalizeTarget(name))
+	if err == nil {
 		return target, nil
 	}
 
-	if target, err = c.getTargetFileMeta(name); err == nil {
-		return target, nil
+	if _, ok := err.(ErrUnknownTarget); ok {
+		return data.TargetFileMeta{}, ErrNotFound{name}
 	}
 
-	return data.TargetFileMeta{}, ErrNotFound{name}
+	return data.TargetFileMeta{}, err
 }
 
 // Targets returns the complete list of available targets.
