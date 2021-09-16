@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
 	cjson "github.com/tent/canonical-json-go"
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/internal/signer"
 	"github.com/theupdateframework/go-tuf/sign"
 	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
@@ -605,7 +607,10 @@ func (r *Repo) getSigningKeys(name string) ([]sign.Signer, error) {
 		return nil, err
 	}
 	if name == "root" {
-		return signingKeys, nil
+		sorted := make([]sign.Signer, len(signingKeys))
+		copy(sorted, signingKeys)
+		sort.Sort(signer.ByIDs(sorted))
+		return sorted, nil
 	}
 	db, err := r.db()
 	if err != nil {
@@ -626,6 +631,9 @@ func (r *Repo) getSigningKeys(name string) ([]sign.Signer, error) {
 			}
 		}
 	}
+
+	sort.Sort(signer.ByIDs(keys))
+
 	return keys, nil
 }
 

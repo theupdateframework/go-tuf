@@ -9,6 +9,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -19,8 +21,15 @@ import (
 	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
 	"golang.org/x/crypto/ed25519"
+	"gopkg.in/check.v1"
 	. "gopkg.in/check.v1"
 )
+
+func sortStrings(in []string) []string {
+	out := append([]string{}, in...)
+	sort.Strings(out)
+	return out
+}
 
 // Hook up gocheck into the "go test" runner.
 func Test(t *testing.T) { TestingT(t) }
@@ -543,9 +552,17 @@ func (rs *RepoSuite) TestSign(c *C) {
 		s := &data.Signed{}
 		c.Assert(json.Unmarshal(rootJSON, s), IsNil)
 		c.Assert(s.Signatures, HasLen, len(keyIDs))
-		for i, id := range keyIDs {
-			c.Assert(s.Signatures[i].KeyID, Equals, id)
+
+		// Signatures may be in any order, so must sort key IDs before comparison.
+		wantKeyIDs := append([]string{}, keyIDs...)
+		sort.Strings(wantKeyIDs)
+
+		gotKeyIDs := []string{}
+		for _, sig := range s.Signatures {
+			gotKeyIDs = append(gotKeyIDs, sig.KeyID)
 		}
+
+		c.Assert(sortStrings(keyIDs), DeepEquals, sortStrings(gotKeyIDs))
 	}
 
 	// signing with an available key generates a signature
@@ -1170,17 +1187,38 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 			c.Assert(pk.Encrypted, Equals, false)
 			c.Assert(json.Unmarshal(pk.Data, &actual), IsNil)
 		}
+
 		c.Assert(actual, HasLen, len(expected))
-		for i, key := range expected {
-			c.Assert(expected[i], DeepEquals, key)
+
+		// Compare slices of unique elements disregarding order.
+		// This code throws an error for duplicate keys since we assert numMatches
+		// is 1.
+		for _, gotKey := range actual {
+			numMatches := 0
+			for _, wantKey := range expected {
+				if reflect.DeepEqual(gotKey, wantKey) {
+					numMatches++
+				}
+			}
+			c.Assert(numMatches, Equals, 1, check.Commentf("got: %+v, want: %+v", actual, expected))
 		}
 
 		// check GetKeys is correct
 		signers, err := store.GetSigningKeys(role)
 		c.Assert(err, IsNil)
 		c.Assert(signers, HasLen, len(expected))
-		for i, s := range signers {
-			c.Assert(s.IDs(), DeepEquals, expected[i].PublicData().IDs())
+
+		// Compare slices of unique elements disregarding order.
+		// This code throws an error for duplicate signers or ID slices in
+		// different orders since we assert numMatches is 1.
+		for _, s := range signers {
+			numMatches := 0
+			for _, e := range expected {
+				if reflect.DeepEqual(s.IDs(), e.PublicData().IDs()) {
+					numMatches++
+				}
+			}
+			c.Assert(numMatches, Equals, 1, check.Commentf("signers: %+v, expected: %+v", signers, expected))
 		}
 	}
 
