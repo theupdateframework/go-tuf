@@ -1205,7 +1205,7 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 				}
 			}
 
-			c.Assert(numMatches, Equals, expectedNumMatches, check.Commentf("got: %+v, want: %+v", actual, expected))
+			c.Assert(numMatches, Equals, expectedNumMatches, check.Commentf("actual: %+v, expected: %+v", actual, expected))
 		}
 
 		// check GetKeys is correct
