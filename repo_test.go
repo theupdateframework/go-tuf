@@ -1188,37 +1188,48 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 			c.Assert(json.Unmarshal(pk.Data, &actual), IsNil)
 		}
 
-		c.Assert(actual, HasLen, len(expected))
-
 		// Compare slices of unique elements disregarding order.
-		// This code throws an error for duplicate keys since we assert numMatches
-		// is 1.
+		c.Assert(actual, HasLen, len(expected))
 		for _, gotKey := range actual {
+			expectedNumMatches := 0
+			for _, x := range actual {
+				if reflect.DeepEqual(gotKey, x) {
+					expectedNumMatches++
+				}
+			}
+
 			numMatches := 0
 			for _, wantKey := range expected {
 				if reflect.DeepEqual(gotKey, wantKey) {
 					numMatches++
 				}
 			}
-			c.Assert(numMatches, Equals, 1, check.Commentf("got: %+v, want: %+v", actual, expected))
+
+			c.Assert(numMatches, Equals, expectedNumMatches, check.Commentf("got: %+v, want: %+v", actual, expected))
 		}
 
 		// check GetKeys is correct
 		signers, err := store.GetSigningKeys(role)
 		c.Assert(err, IsNil)
-		c.Assert(signers, HasLen, len(expected))
 
 		// Compare slices of unique elements disregarding order.
-		// This code throws an error for duplicate signers or ID slices in
-		// different orders since we assert numMatches is 1.
+		c.Assert(signers, HasLen, len(expected))
 		for _, s := range signers {
+			expectedNumMatches := 0
+			for _, x := range signers {
+				if reflect.DeepEqual(s, x) {
+					expectedNumMatches++
+				}
+			}
+
 			numMatches := 0
 			for _, e := range expected {
 				if reflect.DeepEqual(s.IDs(), e.PublicData().IDs()) {
 					numMatches++
 				}
 			}
-			c.Assert(numMatches, Equals, 1, check.Commentf("signers: %+v, expected: %+v", signers, expected))
+
+			c.Assert(numMatches, Equals, expectedNumMatches, check.Commentf("signers: %+v, expected: %+v", signers, expected))
 		}
 	}
 
