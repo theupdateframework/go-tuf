@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/util"
@@ -130,14 +131,12 @@ func newTestCase(c *C, name string, consistentSnapshot bool, options *HTTPRemote
 func (t *testCase) run(c *C) {
 	c.Logf("test case: %s consistent-snapshot: %t", t.name, t.consistentSnapshot)
 
-	init := true
 	for _, stepName := range t.testSteps {
-		t.runStep(c, stepName, init)
-		init = false
+		t.runStep(c, stepName)
 	}
 }
 
-func (t *testCase) runStep(c *C, stepName string, init bool) {
+func (t *testCase) runStep(c *C, stepName string) {
 	c.Logf("step: %s", stepName)
 
 	addr, cleanup := startFileServer(c, t.testDir)
@@ -147,17 +146,15 @@ func (t *testCase) runStep(c *C, stepName string, init bool) {
 	c.Assert(err, IsNil)
 
 	client := NewClient(t.local, remote)
-
 	// initiate a client with the root keys
-	if init {
-		keys := getKeys(c, remote)
-		c.Assert(client.Init(keys, 1), IsNil)
-	}
+	keys := getKeys(c, remote)
+	c.Assert(client.Init(keys, 1), IsNil)
 
 	// check update returns the correct updated targets
 	files, err := client.Update()
 	c.Assert(err, IsNil)
-	c.Assert(files, HasLen, 1)
+	l, _ := strconv.Atoi(stepName)
+	c.Assert(files, HasLen, l+1)
 
 	targetName := stepName
 	t.targets[targetName] = []byte(targetName)

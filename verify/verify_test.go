@@ -251,6 +251,35 @@ func (VerifySuite) Test(c *C) {
 	}
 }
 
+func (VerifySuite) TestVerifyIgnoreExpired(c *C) {
+	minVer := 10
+	role := "root"
+	k, _ := sign.GenerateEd25519Key()
+	s, _ := sign.Marshal(&signedMeta{Type: role, Version: minVer, Expires: time.Now().Add(-time.Hour)}, k.Signer())
+	keys := []*data.Key{k.PublicData()}
+	roles := map[string]*data.Role{
+		"root": {
+			KeyIDs:    keys[0].IDs(),
+			Threshold: 1,
+		},
+	}
+
+	db := NewDB()
+	for _, k := range keys {
+		for _, id := range k.IDs() {
+			err := db.AddKey(id, k)
+			c.Assert(err, IsNil)
+		}
+	}
+	for n, r := range roles {
+		err := db.AddRole(n, r)
+		c.Assert(err, IsNil)
+	}
+
+	err := db.VerifyIgnoreExpiredCheck(s, role, minVer)
+	c.Assert(err, IsNil)
+}
+
 func assertErrExpired(c *C, err error, expected ErrExpired) {
 	actual, ok := err.(ErrExpired)
 	if !ok {
