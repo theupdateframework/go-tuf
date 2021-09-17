@@ -11,7 +11,7 @@ func init() {
 	register("regenerate", cmdRegenerate, `
 usage: tuf regenerate [--consistent-snapshot=false]
 
-Recreate the targets manifest. Important: Not supported yet
+Recreate the targets metadata file. Important: Not supported yet
 
 Alternatively, passphrases can be set via environment variables in the
 form of TUF_{{ROLE}}_PASSPHRASE

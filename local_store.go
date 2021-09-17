@@ -131,7 +131,7 @@ func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 		_, err := os.Stat(path)
 		return os.IsNotExist(err)
 	}
-	for _, name := range topLevelManifests {
+	for _, name := range topLevelMetadata {
 		path := filepath.Join(f.stagedDir(), name)
 		if notExists(path) {
 			path = filepath.Join(f.repoDir(), name)

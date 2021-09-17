@@ -12,7 +12,7 @@ func init() {
 	register("clean", cmdClean, `
 usage: tuf clean
 
-Remove all staged manifests.
+Remove all staged metadata files.
 `)
 }
 

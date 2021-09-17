@@ -9,13 +9,13 @@ func init() {
 	register("timestamp", cmdTimestamp, `
 usage: tuf timestamp [--expires=<days>]
 
-Update the timestamp manifest.
+Update the timestamp metadata file.
 
 Alternatively, passphrases can be set via environment variables in the
 form of TUF_{{ROLE}}_PASSPHRASE
 
 Options:
-  --expires=<days>   Set the timestamp manifest to expire <days> days from now.
+  --expires=<days>   Set the timestamp metadata file to expire <days> days from now.
 `)
 }
 

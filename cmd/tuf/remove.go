@@ -18,7 +18,7 @@ form of TUF_{{ROLE}}_PASSPHRASE
 
 Options:
   --all              Remove all target files.
-  --expires=<days>   Set the targets manifest to expire <days> days from now.
+  --expires=<days>   Set the targets metadata file to expire <days> days from now.
 `)
 }
 

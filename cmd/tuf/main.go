@@ -30,16 +30,16 @@ Options:
 Commands:
   help          Show usage for a specific command
   init          Initialize a new repository
-  gen-key       Generate a new signing key for a specific manifest
+  gen-key       Generate a new signing key for a specific metadata file
   revoke-key    Revoke a signing key
   add           Add target file(s)
   remove        Remove a target file
-  snapshot      Update the snapshot manifest
-  timestamp     Update the timestamp manifest
-  sign          Sign a role's manifest
+  snapshot      Update the snapshot metadata file
+  timestamp     Update the timestamp metadata file
+  sign          Sign a role's metadata file
   commit        Commit staged files to the repository
-  regenerate    Recreate the targets manifest [Not supported yet]
-  clean         Remove all staged manifests
+  regenerate    Recreate the targets metadata file [Not supported yet]
+  clean         Remove all staged metadata files
   root-keys     Output a JSON serialized array of root keys to STDOUT
   set-threshold Sets the threshold for a role
 

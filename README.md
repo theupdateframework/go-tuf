@@ -21,9 +21,9 @@ A TUF repository has the following directory layout:
 The directories contain the following files:
 
 - `keys/` - signing keys (optionally encrypted) with filename pattern `ROLE.json`
-- `repository/` - signed manifests
+- `repository/` - signed metadata files
 - `repository/targets/` - hashed target files
-- `staged/` - either signed, unsigned or partially signed manifests
+- `staged/` - either signed, unsigned or partially signed metadata files
 - `staged/targets/` - unhashed target files
 
 ## CLI
@@ -52,42 +52,42 @@ initialized to do so when generating keys.
 Prompts the user for an encryption passphrase (unless the
 `--insecure-plaintext` flag is set), then generates a new signing key and
 writes it to the relevant key file in the `keys` directory. It also stages
-the addition of the new key to the `root` manifest. Alternatively, passphrases
+the addition of the new key to the `root` metadata file. Alternatively, passphrases
 can be set via environment variables in the form of `TUF_{{ROLE}}_PASSPHRASE`
 
 #### `tuf revoke-key [--expires=<days>] <role> <id>`
 
 Revoke a signing key
 
-The key will be removed from the root manifest, but the key will remain in the
+The key will be removed from the root metadata file, but the key will remain in the
 "keys" directory if present.
 
 #### `tuf add [<path>...]`
 
 Hashes files in the `staged/targets` directory at the given path(s), then
-updates and stages the `targets` manifest. Specifying no paths hashes all
+updates and stages the `targets` metadata file. Specifying no paths hashes all
 files in the `staged/targets` directory.
 
 #### `tuf remove [<path>...]`
 
-Stages the removal of files with the given path(s) from the `targets` manifest
+Stages the removal of files with the given path(s) from the `targets` metadata file
 (they get removed from the filesystem when the change is committed). Specifying
-no paths removes all files from the `targets` manifest.
+no paths removes all files from the `targets` metadata file.
 
 #### `tuf snapshot [--expires=<days>]`
 
-Expects a staged, fully signed `targets` manifest and stages an appropriate
-`snapshot` manifest. Optionally one can set number of days after which
-the snapshot manifest will expire.
+Expects a staged, fully signed `targets` metadata file and stages an appropriate
+`snapshot` metadata file. Optionally one can set number of days after which
+the `snapshot` metadata will expire.
 
 #### `tuf timestamp`
 
-Stages an appropriate `timestamp` manifest. If a `snapshot` manifest is staged,
+Stages an appropriate `timestamp` metadata file. If a `snapshot` metadata file is staged,
 it must be fully signed.
 
-#### `tuf sign <manifest>`
+#### `tuf sign <metadata>`
 
-Signs the given role's staged manifest with all keys present in the `keys`
+Signs the given role's staged metadata file with all keys present in the `keys`
 directory for that role.
 
 #### `tuf commit`
@@ -95,17 +95,17 @@ directory for that role.
 Verifies that all staged changes contain the correct information and are signed
 to the correct threshold, then moves the staged files into the `repository`
 directory. It also removes any target files which are not in the `targets`
-manifest.
+metadata file.
 
 #### `tuf regenerate [--consistent-snapshot=false]`
 
 Note: Not supported yet
 
-Recreates the `targets` manifest based on the files in `repository/targets`.
+Recreates the `targets` metadata file based on the files in `repository/targets`.
 
 #### `tuf clean`
 
-Removes all staged manifests and targets.
+Removes all staged metadata files and targets.
 
 #### `tuf root-keys`
 
@@ -137,7 +137,7 @@ staged changes and signing on each machine in turn before finally committing.
 
 Some key IDs are truncated for illustrative purposes.
 
-#### Create signed root manifest
+#### Create signed root metadata file
 
 Generate a root key on the root box:
 
@@ -213,11 +213,11 @@ Enter root keys passphrase:
 ```
 
 The staged `root.json` can now be copied back to the repo box ready to be
-committed alongside other manifests.
+committed alongside other metadata files.
 
 #### Add a target file
 
-Assuming a staged, signed `root` manifest and the file to add exists at
+Assuming a staged, signed `root` metadata file and the file to add exists at
 `staged/targets/foo/bar/baz.txt`:
 
 ```bash
@@ -381,7 +381,7 @@ $ tree .
 └── staged
 ```
 
-#### Regenerate manifests based on targets tree (Note: Not supported yet)
+#### Regenerate metadata files based on targets tree (Note: Not supported yet)
 
 ```bash
 $ tree .

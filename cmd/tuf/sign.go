@@ -7,15 +7,15 @@ import (
 
 func init() {
 	register("sign", cmdSign, `
-usage: tuf sign <manifest>
+usage: tuf sign <metadata>
 
-Sign a role's manifest.
+Sign a role's metadata file.
 
-Signs the given role's staged manifest with all keys present in the 'keys'
+Signs the given role's staged metadata file with all keys present in the 'keys'
 directory for that role.
 `)
 }
 
 func cmdSign(args *docopt.Args, repo *tuf.Repo) error {
-	return repo.Sign(args.String["<manifest>"])
+	return repo.Sign(args.String["<metadata>"])
 }
