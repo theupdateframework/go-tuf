@@ -25,12 +25,6 @@ import (
 	. "gopkg.in/check.v1"
 )
 
-func sortStrings(in []string) []string {
-	out := append([]string{}, in...)
-	sort.Strings(out)
-	return out
-}
-
 // Hook up gocheck into the "go test" runner.
 func Test(t *testing.T) { TestingT(t) }
 
@@ -561,8 +555,9 @@ func (rs *RepoSuite) TestSign(c *C) {
 		for _, sig := range s.Signatures {
 			gotKeyIDs = append(gotKeyIDs, sig.KeyID)
 		}
+		sort.Strings(gotKeyIDs)
 
-		c.Assert(sortStrings(keyIDs), DeepEquals, sortStrings(gotKeyIDs))
+		c.Assert(wantKeyIDs, DeepEquals, gotKeyIDs)
 	}
 
 	// signing with an available key generates a signature
