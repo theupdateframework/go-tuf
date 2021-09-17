@@ -13,7 +13,7 @@ func init() {
 usage: tuf clean
 
 Remove all staged manifests.
-  `)
+`)
 }
 
 func cmdClean(args *docopt.Args, repo *tuf.Repo) error {

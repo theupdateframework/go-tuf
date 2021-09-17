@@ -13,6 +13,9 @@ usage: tuf add [--expires=<days>] [--custom=<data>] [<path>...]
 
 Add target file(s).
 
+Alternatively, passphrases can be set via environment variables in the
+form of TUF_{{ROLE}}_PASSPHRASE
+
 Options:
   --expires=<days>   Set the targets manifest to expire <days> days from now.
   --custom=<data>    Set custom JSON data for the target(s).

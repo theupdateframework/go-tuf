@@ -946,7 +946,7 @@ func (r *Repo) Commit() error {
 		return err
 	}
 
-	// We can start incrementing versin numbers again now that we've
+	// We can start incrementing version numbers again now that we've
 	// successfully committed the metadata to the local store.
 	r.versionUpdated = make(map[string]struct{})
 

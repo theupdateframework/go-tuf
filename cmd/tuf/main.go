@@ -28,18 +28,19 @@ Options:
   --insecure-plaintext  Don't encrypt signing keys
 
 Commands:
-  help         Show usage for a specific command
-  gen-key      Generate a new signing key for a specific manifest
-  revoke-key   Revoke a signing key
-  add          Add target file(s)
-  remove       Remove a target file
-  snapshot     Update the snapshot manifest
-  timestamp    Update the timestamp manifest
-  sign         Sign a manifest
-  commit       Commit staged files to the repository
-  regenerate   Recreate the targets manifest
-  clean        Remove all staged manifests
-  root-keys    Output a JSON serialized array of root keys to STDOUT
+  help          Show usage for a specific command
+  init          Initialize a new repository
+  gen-key       Generate a new signing key for a specific manifest
+  revoke-key    Revoke a signing key
+  add           Add target file(s)
+  remove        Remove a target file
+  snapshot      Update the snapshot manifest
+  timestamp     Update the timestamp manifest
+  sign          Sign a role's manifest
+  commit        Commit staged files to the repository
+  regenerate    Recreate the targets manifest [Not supported yet]
+  clean         Remove all staged manifests
+  root-keys     Output a JSON serialized array of root keys to STDOUT
   set-threshold Sets the threshold for a role
 
 See "tuf help <command>" for more information on a specific command
