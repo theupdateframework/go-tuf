@@ -714,7 +714,8 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 }
 
 // Target returns the target metadata for a specific target if it
-// exists. If it does not, ErrNotFound will be returned.
+// exists, searching from top-level level targets then through
+// all delegations. If it does not, ErrNotFound will be returned.
 func (c *Client) Target(name string) (data.TargetFileMeta, error) {
 	target, err := c.getTargetFileMeta(util.NormalizeTarget(name))
 	if err == nil {
@@ -728,7 +729,7 @@ func (c *Client) Target(name string) (data.TargetFileMeta, error) {
 	return data.TargetFileMeta{}, err
 }
 
-// Targets returns the complete list of available targets.
+// Targets returns the complete list of available top-level targets.
 func (c *Client) Targets() (data.TargetFiles, error) {
 	// populate c.targets from local storage if not set
 	if c.targets == nil {
