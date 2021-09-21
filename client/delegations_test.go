@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
 )
 
@@ -127,6 +128,7 @@ func TestPersistedMeta(t *testing.T) {
 		file          string
 		targets       []expectedTargets
 		downloadError error
+		targetError   error
 		fileContent   string
 	}{
 		{
@@ -138,6 +140,7 @@ func TestPersistedMeta(t *testing.T) {
 				},
 			},
 			downloadError: ErrUnknownTarget{Name: "unknown", SnapshotVersion: 2},
+			targetError:   ErrNotFound{File: "unknown"},
 			fileContent:   "",
 		},
 		{
@@ -157,6 +160,7 @@ func TestPersistedMeta(t *testing.T) {
 				},
 			},
 			downloadError: nil,
+			targetError:   nil,
 			fileContent:   "Contents: b.txt",
 		},
 		{
@@ -192,6 +196,7 @@ func TestPersistedMeta(t *testing.T) {
 				},
 			},
 			downloadError: nil,
+			targetError:   nil,
 			fileContent:   "Contents: f.txt",
 		},
 	}
@@ -202,6 +207,14 @@ func TestPersistedMeta(t *testing.T) {
 			err = c.Download(tt.file, &dest)
 			assert.Equal(t, tt.downloadError, err)
 			assert.Equal(t, tt.fileContent, dest.String())
+
+			target, err := c.Target(tt.file)
+			assert.Equal(t, tt.targetError, err)
+			if tt.targetError == nil {
+				meta, err := util.GenerateTargetFileMeta(strings.NewReader(tt.fileContent), target.HashAlgorithms()...)
+				assert.Nil(t, err)
+				assert.Nil(t, util.TargetFileMetaEqual(target, meta))
+			}
 
 			p, err := c.local.GetMeta()
 			assert.Nil(t, err)
