@@ -11,6 +11,9 @@ usage: tuf timestamp [--expires=<days>]
 
 Update the timestamp manifest.
 
+Alternatively, passphrases can be set via environment variables in the
+form of TUF_{{ROLE}}_PASSPHRASE
+
 Options:
   --expires=<days>   Set the timestamp manifest to expire <days> days from now.
 `)

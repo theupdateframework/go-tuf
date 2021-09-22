@@ -13,192 +13,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
 )
-
-var (
-	defaultPathPatterns = []string{"tmp", "*"}
-	noMatchPathPatterns = []string{"vars", "null"}
-)
-
-func TestDelegationsIterator(t *testing.T) {
-	var iteratorTests = []struct {
-		testName    string
-		roles       map[string][]data.DelegatedRole
-		file        string
-		resultOrder []string
-		err         error
-	}{
-		{
-			testName: "no termination",
-			roles: map[string][]data.DelegatedRole{
-				"targets": {
-					{Name: "b", Paths: defaultPathPatterns},
-					{Name: "e", Paths: defaultPathPatterns},
-				},
-				"b": {
-					{Name: "c", Paths: defaultPathPatterns},
-				},
-				"c": {
-					{Name: "d", Paths: defaultPathPatterns},
-				},
-				"e": {
-					{Name: "f", Paths: defaultPathPatterns},
-					{Name: "g", Paths: defaultPathPatterns},
-				},
-				"g": {
-					{Name: "h", Paths: defaultPathPatterns},
-					{Name: "i", Paths: defaultPathPatterns},
-					{Name: "j", Paths: defaultPathPatterns},
-				},
-			},
-			file:        "",
-			resultOrder: []string{"targets", "b", "c", "d", "e", "f", "g", "h", "i", "j"},
-		},
-		{
-			testName: "terminated in b",
-			roles: map[string][]data.DelegatedRole{
-				"targets": {
-					{Name: "b", Paths: defaultPathPatterns, Terminating: true},
-					{Name: "e", Paths: defaultPathPatterns},
-				},
-				"b": {
-					{Name: "c", Paths: defaultPathPatterns},
-					{Name: "d", Paths: defaultPathPatterns},
-				},
-			},
-			file:        "",
-			resultOrder: []string{"targets", "b", "c", "d"},
-		},
-		{
-			testName: "path does not match b",
-			roles: map[string][]data.DelegatedRole{
-				"targets": {
-					{Name: "b", Paths: noMatchPathPatterns},
-					{Name: "e", Paths: defaultPathPatterns},
-				},
-				"b": {
-					{Name: "c", Paths: defaultPathPatterns},
-					{Name: "d", Paths: defaultPathPatterns},
-				},
-			},
-			file:        "",
-			resultOrder: []string{"targets", "e"},
-		},
-		{
-			testName: "path does not match b - path prefixes",
-			roles: map[string][]data.DelegatedRole{
-				"targets": {
-					{Name: "b", PathHashPrefixes: []string{"33472a4909"}},
-					{Name: "c", PathHashPrefixes: []string{"34c85d1ee84f61f10d7dc633"}},
-				},
-				"c": {
-					{Name: "d", PathHashPrefixes: []string{"8baf"}},
-					{Name: "e", PathHashPrefixes: []string{"34c85d1ee84f61f10d7dc633472a49096ed87f8f764bd597831eac371f40ac39"}},
-				},
-			},
-			file:        "/e/f/g.txt",
-			resultOrder: []string{"targets", "c", "e"},
-		},
-		{
-			testName: "err paths and pathHashPrefixes are set",
-			roles: map[string][]data.DelegatedRole{
-				"targets": {
-					{Name: "b", Paths: defaultPathPatterns, PathHashPrefixes: defaultPathPatterns},
-				},
-				"b": {},
-			},
-			file:        "",
-			resultOrder: []string{"targets"},
-			err:         data.ErrPathsAndPathHashesSet,
-		},
-		{
-			testName: "cycle avoided 1",
-			roles: map[string][]data.DelegatedRole{
-				"targets": {
-					{Name: "b", Paths: defaultPathPatterns},
-					{Name: "e", Paths: defaultPathPatterns},
-				},
-				"b": {
-					{Name: "targets", Paths: defaultPathPatterns},
-					{Name: "d", Paths: defaultPathPatterns},
-				},
-			},
-			file:        "",
-			resultOrder: []string{"targets", "b", "d", "e"},
-		},
-		{
-			testName: "cycle avoided 2",
-			roles: map[string][]data.DelegatedRole{
-				"targets": {
-					{Name: "targets", Paths: defaultPathPatterns},
-					{Name: "b", Paths: defaultPathPatterns},
-				},
-				"b": {
-					{Name: "targets", Paths: defaultPathPatterns},
-					{Name: "b", Paths: defaultPathPatterns},
-					{Name: "c", Paths: defaultPathPatterns},
-				},
-				"c": {
-					{Name: "c", Paths: defaultPathPatterns},
-				},
-			},
-			file:        "",
-			resultOrder: []string{"targets", "b", "c"},
-		},
-		{
-			testName: "diamond delegation",
-			roles: map[string][]data.DelegatedRole{
-				"targets": {
-					{Name: "b", Paths: defaultPathPatterns},
-					{Name: "c", Paths: defaultPathPatterns},
-				},
-				"b": {
-					{Name: "d", Paths: defaultPathPatterns},
-				},
-				"c": {
-					{Name: "d", Paths: defaultPathPatterns},
-				},
-			},
-			file:        "",
-			resultOrder: []string{"targets", "b", "d", "c"},
-		},
-		{
-			testName: "simple cycle",
-			roles: map[string][]data.DelegatedRole{
-				"targets": {
-					{Name: "a", Paths: defaultPathPatterns},
-				},
-				"a": {
-					{Name: "a", Paths: defaultPathPatterns},
-				},
-			},
-			file:        "",
-			resultOrder: []string{"targets", "a"},
-		},
-	}
-
-	for _, tt := range iteratorTests {
-		t.Run(tt.testName, func(t *testing.T) {
-			d := newDelegationsIterator(tt.file)
-			var iterationOrder []string
-			for {
-				r, ok := d.next()
-				if !ok {
-					break
-				}
-				iterationOrder = append(iterationOrder, r.delegatee.Name)
-				delegations, ok := tt.roles[r.delegatee.Name]
-				if !ok {
-					continue
-				}
-				err := d.add(delegations, r.delegatee.Name, verify.DelegationsVerifier{})
-				assert.Equal(t, tt.err, err)
-			}
-			assert.Equal(t, tt.resultOrder, iterationOrder)
-		})
-	}
-}
 
 func TestGetTargetMeta(t *testing.T) {
 	verify.IsExpired = func(t time.Time) bool { return false }
@@ -311,6 +128,7 @@ func TestPersistedMeta(t *testing.T) {
 		file          string
 		targets       []expectedTargets
 		downloadError error
+		targetError   error
 		fileContent   string
 	}{
 		{
@@ -322,6 +140,7 @@ func TestPersistedMeta(t *testing.T) {
 				},
 			},
 			downloadError: ErrUnknownTarget{Name: "unknown", SnapshotVersion: 2},
+			targetError:   ErrNotFound{File: "unknown"},
 			fileContent:   "",
 		},
 		{
@@ -341,6 +160,7 @@ func TestPersistedMeta(t *testing.T) {
 				},
 			},
 			downloadError: nil,
+			targetError:   nil,
 			fileContent:   "Contents: b.txt",
 		},
 		{
@@ -376,6 +196,7 @@ func TestPersistedMeta(t *testing.T) {
 				},
 			},
 			downloadError: nil,
+			targetError:   nil,
 			fileContent:   "Contents: f.txt",
 		},
 	}
@@ -386,6 +207,14 @@ func TestPersistedMeta(t *testing.T) {
 			err = c.Download(tt.file, &dest)
 			assert.Equal(t, tt.downloadError, err)
 			assert.Equal(t, tt.fileContent, dest.String())
+
+			target, err := c.Target(tt.file)
+			assert.Equal(t, tt.targetError, err)
+			if tt.targetError == nil {
+				meta, err := util.GenerateTargetFileMeta(strings.NewReader(tt.fileContent), target.HashAlgorithms()...)
+				assert.Nil(t, err)
+				assert.Nil(t, util.TargetFileMetaEqual(target, meta))
+			}
 
 			p, err := c.local.GetMeta()
 			assert.Nil(t, err)
