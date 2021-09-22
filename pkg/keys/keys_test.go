@@ -14,11 +14,11 @@ type KeysSuite struct{}
 var _ = Suite(&KeysSuite{})
 
 func (KeysSuite) TestSignerKeyIDs(c *C) {
-	key, err := GenerateEd25519Key()
+	_, err := GenerateEd25519Key()
 	c.Assert(err, IsNil)
 
 	// If we have a TUF-0.9 key, we won't have a scheme.
-	key, err = GenerateEd25519Key()
+	key, err := GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	privKey, err := key.MarshalSigner()
 	c.Assert(err, IsNil)

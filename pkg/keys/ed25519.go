@@ -46,10 +46,10 @@ func (e *ed25519Verifier) MarshalKey() *data.Key {
 func (e *ed25519Verifier) UnmarshalKey(key *data.Key) error {
 	e.key = key
 	if err := json.Unmarshal(key.Value, e); err != nil {
-		return errors.New("unmarshalling key")
+		return errors.New("unmarshalling ed25519 key")
 	}
 	if len(e.PublicKey) != ed25519.PublicKeySize {
-		return errors.New("unmarshalling key")
+		return errors.New("unexpected public key length for ed25519 key")
 	}
 	return nil
 }

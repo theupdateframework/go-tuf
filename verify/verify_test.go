@@ -60,11 +60,11 @@ func (s ecdsaSigner) ContainsID(id string) bool {
 }
 
 func (ecdsaSigner) MarshalSigner() (*data.PrivateKey, error) {
-	return nil, errors.New("not implemented")
+	return nil, errors.New("not implemented for test")
 }
 
 func (ecdsaSigner) UnmarshalSigner(key *data.PrivateKey) error {
-	return errors.New("not implemented")
+	return errors.New("not implemented for test")
 }
 
 func (VerifySuite) Test(c *C) {

@@ -14,11 +14,13 @@ import (
 )
 
 const (
-	KeyIDLength              = sha256.Size * 2
-	KeyTypeEd25519           = "ed25519"
-	KeyTypeECDSA_SHA2_P256   = "ecdsa-sha2-nistp256"
-	KeySchemeEd25519         = "ed25519"
-	KeySchemeECDSA_SHA2_P256 = "ecdsa-sha2-nistp256"
+	KeyIDLength                = sha256.Size * 2
+	KeyTypeEd25519             = "ed25519"
+	KeyTypeECDSA_SHA2_P256     = "ecdsa-sha2-nistp256"
+	KeySchemeEd25519           = "ed25519"
+	KeySchemeECDSA_SHA2_P256   = "ecdsa-sha2-nistp256"
+	KeyTypeRSASSA_PSS_SHA256   = "rsa"
+	KeySchemeRSASSA_PSS_SHA256 = "rsassa-pss-sha256"
 )
 
 var (

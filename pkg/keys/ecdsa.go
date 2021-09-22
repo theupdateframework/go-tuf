@@ -60,11 +60,11 @@ func (p *p256Verifier) MarshalKey() *data.Key {
 
 func (p *p256Verifier) UnmarshalKey(key *data.Key) error {
 	if err := json.Unmarshal(key.Value, p); err != nil {
-		return errors.New("unmarshalling key")
+		return errors.New("unmarshalling ecdsa key")
 	}
 	x, _ := elliptic.Unmarshal(elliptic.P256(), p.PublicKey)
 	if x == nil {
-		return errors.New("unmarshalling key")
+		return errors.New("invalid public key point for ecdsa key")
 	}
 	p.key = key
 	return nil
