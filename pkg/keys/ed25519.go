@@ -12,7 +12,6 @@ import (
 func init() {
 	SignerMap.Store(data.KeySchemeEd25519, NewP256Signer)
 	VerifierMap.Store(data.KeySchemeEd25519, NewP256Verifier)
-
 }
 
 func NewP256Signer() Signer {

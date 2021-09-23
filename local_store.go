@@ -15,7 +15,7 @@ import (
 	"github.com/theupdateframework/go-tuf/util"
 )
 
-func privateKeySigners(privateKeys []*data.PrivateKey) []keys.Signer {
+func signers(privateKeys []*data.PrivateKey) []keys.Signer {
 	res := make([]keys.Signer, len(privateKeys))
 	for i, k := range privateKeys {
 		signer, err := keys.GetSigner(k)
@@ -99,7 +99,7 @@ func (m *memoryStore) GetSigningKeys(role string) ([]keys.Signer, error) {
 }
 
 func (m *memoryStore) SavePrivateKey(role string, key *data.PrivateKey) error {
-	signers := privateKeySigners([]*data.PrivateKey{key})
+	signers := signers([]*data.PrivateKey{key})
 	m.signers[role] = append(m.signers[role], signers...)
 	return nil
 }
@@ -321,14 +321,14 @@ func (f *fileSystemStore) GetSigningKeys(role string) ([]keys.Signer, error) {
 	if keys, ok := f.signers[role]; ok {
 		return keys, nil
 	}
-	keys, _, err := f.loadKeys(role)
+	keys, _, err := f.loadPrivateKeys(role)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	f.signers[role] = privateKeySigners(keys)
+	f.signers[role] = signers(keys)
 	return f.signers[role], nil
 }
 
@@ -338,13 +338,13 @@ func (f *fileSystemStore) SavePrivateKey(role string, key *data.PrivateKey) erro
 	}
 
 	// add the key to the existing keys (if any)
-	keys, pass, err := f.loadKeys(role)
+	keys, pass, err := f.loadPrivateKeys(role)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	keys = append(keys, key)
 
-	// if loadKeys didn't return a passphrase (because no keys yet exist)
+	// if loadPrivateKeys didn't return a passphrase (because no keys yet exist)
 	// and passphraseFunc is set, get the passphrase so the keys file can
 	// be encrypted later (passphraseFunc being nil indicates the keys file
 	// should not be encrypted)
@@ -375,13 +375,13 @@ func (f *fileSystemStore) SavePrivateKey(role string, key *data.PrivateKey) erro
 	if err := util.AtomicallyWriteFile(f.keysPath(role), append(data, '\n'), 0600); err != nil {
 		return err
 	}
-	f.signers[role] = privateKeySigners(keys)
+	f.signers[role] = signers(keys)
 	return nil
 }
 
-// loadKeys loads keys for the given role and returns them along with the
+// loadPrivateKeys loads keys for the given role and returns them along with the
 // passphrase (if read) so that callers don't need to re-read it.
-func (f *fileSystemStore) loadKeys(role string) ([]*data.PrivateKey, []byte, error) {
+func (f *fileSystemStore) loadPrivateKeys(role string) ([]*data.PrivateKey, []byte, error) {
 	file, err := os.Open(f.keysPath(role))
 	if err != nil {
 		return nil, nil, err
