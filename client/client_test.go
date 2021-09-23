@@ -1120,7 +1120,7 @@ func (s *ClientSuite) TestUnknownKeyIDs(c *C) {
 	root.Signed.Keys["unknown-key-id"] = key.PublicData()
 
 	// re-sign the root metadata, then commit it back into the store.
-	signingKeys, err := s.store.GetSigningKeys("root")
+	signingKeys, err := s.store.GetSigners("root")
 	c.Assert(err, IsNil)
 
 	signedRoot, err := sign.Marshal(root.Signed, signingKeys...)

@@ -94,7 +94,7 @@ func (m *memoryStore) Commit(consistentSnapshot bool, versions map[string]int, h
 	return nil
 }
 
-func (m *memoryStore) GetSigningKeys(role string) ([]keys.Signer, error) {
+func (m *memoryStore) GetSigners(role string) ([]keys.Signer, error) {
 	return m.signers[role], nil
 }
 
@@ -317,7 +317,7 @@ func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]in
 	return f.Clean()
 }
 
-func (f *fileSystemStore) GetSigningKeys(role string) ([]keys.Signer, error) {
+func (f *fileSystemStore) GetSigners(role string) ([]keys.Signer, error) {
 	if keys, ok := f.signers[role]; ok {
 		return keys, nil
 	}

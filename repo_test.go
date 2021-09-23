@@ -218,7 +218,7 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 		c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(ids))
 
 		// check the key was saved correctly
-		localKeys, err := local.GetSigningKeys("root")
+		localKeys, err := local.GetSigners("root")
 		c.Assert(err, IsNil)
 		c.Assert(localKeys, HasLen, 1)
 		c.Assert(localKeys[0].PublicData().IDs(), DeepEquals, ids)
@@ -274,7 +274,7 @@ func (rs *RepoSuite) TestGenKey(c *C) {
 	c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.MarshalKey().IDs())
 
 	// check the keys were saved correctly
-	localKeys, err := local.GetSigningKeys("targets")
+	localKeys, err := local.GetSigners("targets")
 	c.Assert(err, IsNil)
 	c.Assert(localKeys, HasLen, 2)
 	for _, key := range localKeys {
@@ -381,7 +381,7 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 		c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(ids))
 
 		// check the key was saved correctly
-		localKeys, err := local.GetSigningKeys("root")
+		localKeys, err := local.GetSigners("root")
 		c.Assert(err, IsNil)
 		c.Assert(localKeys, HasLen, 1)
 		c.Assert(localKeys[0].PublicData().IDs(), DeepEquals, ids)
@@ -437,7 +437,7 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 	c.Assert(rootKeys[0].IDs(), DeepEquals, rootKey.MarshalKey().IDs())
 
 	// check the keys were saved correctly
-	localKeys, err := local.GetSigningKeys("targets")
+	localKeys, err := local.GetSigners("targets")
 	c.Assert(err, IsNil)
 	c.Assert(localKeys, HasLen, 2)
 	for _, key := range localKeys {
@@ -1215,7 +1215,7 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 		}
 
 		// check GetKeys is correct
-		signers, err := store.GetSigningKeys(role)
+		signers, err := store.GetSigners(role)
 		c.Assert(err, IsNil)
 		c.Assert(signers, HasLen, len(expected))
 		for i, s := range signers {

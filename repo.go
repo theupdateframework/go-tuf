@@ -50,8 +50,8 @@ type LocalStore interface {
 	// Commit is used to publish staged files to the repository
 	Commit(bool, map[string]int, map[string]data.Hashes) error
 
-	// GetSigningKeys return a list of signing keys for a role.
-	GetSigningKeys(string) ([]keys.Signer, error)
+	// GetSigners return a list of signing keys for a role.
+	GetSigners(string) ([]keys.Signer, error)
 
 	// SavePrivateKey adds a signing key to a role.
 	SavePrivateKey(string, *data.PrivateKey) error
@@ -609,7 +609,7 @@ func (r *Repo) AddOrUpdateSignature(roleFilename string, signature data.Signatur
 // keys are returned (revoked root keys still need to sign new root metadata so
 // clients can verify the new root.json and update their keys db accordingly).
 func (r *Repo) getSigningKeys(name string) ([]keys.Signer, error) {
-	signingKeys, err := r.local.GetSigningKeys(name)
+	signingKeys, err := r.local.GetSigners(name)
 	if err != nil {
 		return nil, err
 	}
