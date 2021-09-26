@@ -1,0 +1,23 @@
+project_name: tuf
+builds:
+  - ldflags:
+      - "-s -w"
+      - "-extldflags=-zrelro"
+      - "-extldflags=-znow"
+    env:
+      - "CGO_ENABLED=0"
+      - "GO111MODULE=on"
+      - "GOFLAGS=-mod=readonly -trimpath"
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+    main: ./cmd/tuf/
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sig"
+    stdin: '{{ .Env.COSIGN_PWD }}'
+    args: ["sign-blob", "-key=.github/cosign.key", "-output=${signature}", "${artifact}"]
+    artifacts: all
