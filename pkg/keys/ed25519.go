@@ -1,6 +1,7 @@
 package keys
 
 import (
+	"crypto"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
@@ -24,7 +25,7 @@ func NewP256Verifier() Verifier {
 
 type ed25519Verifier struct {
 	PublicKey data.HexBytes `json:"public"`
-	key       *data.Key
+	key       *data.PublicKey
 }
 
 func (e *ed25519Verifier) Public() string {
@@ -38,11 +39,11 @@ func (e *ed25519Verifier) Verify(msg, sig []byte) error {
 	return nil
 }
 
-func (e *ed25519Verifier) MarshalKey() *data.Key {
+func (e *ed25519Verifier) MarshalPublicKey() *data.PublicKey {
 	return e.key
 }
 
-func (e *ed25519Verifier) UnmarshalKey(key *data.Key) error {
+func (e *ed25519Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
 	e.key = key
 	if err := json.Unmarshal(key.Value, e); err != nil {
 		return err
@@ -82,7 +83,11 @@ func GenerateEd25519Key() (*ed25519Signer, error) {
 	}, nil
 }
 
-func (e *ed25519Signer) MarshalSigner() (*data.PrivateKey, error) {
+func (e *ed25519Signer) SignMessage(message []byte) ([]byte, error) {
+	return e.Sign(rand.Reader, message, crypto.Hash(0))
+}
+
+func (e *ed25519Signer) MarshalPrivateKey() (*data.PrivateKey, error) {
 	valueBytes, err := json.Marshal(ed25519PrivateKeyValue{
 		Public:  data.HexBytes([]byte(e.PrivateKey.Public().(ed25519.PublicKey))),
 		Private: data.HexBytes(e.PrivateKey),
@@ -98,7 +103,7 @@ func (e *ed25519Signer) MarshalSigner() (*data.PrivateKey, error) {
 	}, nil
 }
 
-func (e *ed25519Signer) UnmarshalSigner(key *data.PrivateKey) error {
+func (e *ed25519Signer) UnmarshalPrivateKey(key *data.PrivateKey) error {
 	keyValue := &ed25519PrivateKeyValue{}
 	if err := json.Unmarshal(key.Value, keyValue); err != nil {
 		return err
@@ -112,9 +117,9 @@ func (e *ed25519Signer) UnmarshalSigner(key *data.PrivateKey) error {
 	return nil
 }
 
-func (e *ed25519Signer) PublicData() *data.Key {
+func (e *ed25519Signer) PublicData() *data.PublicKey {
 	keyValBytes, _ := json.Marshal(ed25519Verifier{PublicKey: []byte(e.PrivateKey.Public().(ed25519.PublicKey))})
-	return &data.Key{
+	return &data.PublicKey{
 		Type:       e.keyType,
 		Scheme:     e.keyScheme,
 		Algorithms: e.keyAlgorithms,

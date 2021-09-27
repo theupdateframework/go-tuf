@@ -1,7 +1,6 @@
 package keys
 
 import (
-	"crypto"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -21,13 +20,13 @@ var (
 
 // A Verifier verifies public key signatures.
 type Verifier interface {
-	// UnmarshalKey takes key data to a working verifier implementation for the key type.
-	// This performs any validation over the data.Key to ensure that the verifier is usable
+	// UnmarshalPublicKey takes key data to a working verifier implementation for the key type.
+	// This performs any validation over the data.PublicKey to ensure that the verifier is usable
 	// to verify signatures.
-	UnmarshalKey(key *data.Key) error
+	UnmarshalPublicKey(key *data.PublicKey) error
 
-	// MarshalKey returns the data.Key object associated with the verifier.
-	MarshalKey() *data.Key
+	// MarshalPublicKey returns the data.PublicKey object associated with the verifier.
+	MarshalPublicKey() *data.PublicKey
 
 	// This is the public string used as a unique identifier for the verifier instance.
 	Public() string
@@ -39,28 +38,28 @@ type Verifier interface {
 }
 
 type Signer interface {
-	// MarshalSigner returns the private key data.
-	MarshalSigner() (*data.PrivateKey, error)
+	// MarshalPrivateKey returns the private key data.
+	MarshalPrivateKey() (*data.PrivateKey, error)
 
-	// UnmarshalSigner takes private key data to a working Signer implementation for the key type.
-	UnmarshalSigner(key *data.PrivateKey) error
+	// UnmarshalPrivateKey takes private key data to a working Signer implementation for the key type.
+	UnmarshalPrivateKey(key *data.PrivateKey) error
 
-	// Returns the public data.Key from the private key
-	PublicData() *data.Key
+	// Returns the public data.PublicKey from the private key
+	PublicData() *data.PublicKey
 
-	// Signer is used to sign messages and provides access to the public key.
+	// Sign returns the signature of the message.
 	// The signer is expected to do its own hashing, so the full message will be
 	// provided as the message to Sign with a zero opts.HashFunc().
-	crypto.Signer
+	SignMessage(message []byte) ([]byte, error)
 }
 
-func GetVerifier(key *data.Key) (Verifier, error) {
+func GetVerifier(key *data.PublicKey) (Verifier, error) {
 	st, ok := VerifierMap.Load(key.Type)
 	if !ok {
 		return nil, ErrInvalidKey
 	}
 	s := st.(func() Verifier)()
-	if err := s.UnmarshalKey(key); err != nil {
+	if err := s.UnmarshalPublicKey(key); err != nil {
 		return nil, errors.Wrap(err, "tuf: error unmarshalling key")
 	}
 	return s, nil
@@ -72,7 +71,7 @@ func GetSigner(key *data.PrivateKey) (Signer, error) {
 		return nil, ErrInvalidKey
 	}
 	s := st.(func() Signer)()
-	if err := s.UnmarshalSigner(key); err != nil {
+	if err := s.UnmarshalPrivateKey(key); err != nil {
 		return nil, errors.Wrap(err, "tuf: error unmarshalling key")
 	}
 	return s, nil

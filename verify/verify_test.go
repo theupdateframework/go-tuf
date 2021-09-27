@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
-	"io"
 	"testing"
 	"time"
 
@@ -35,10 +34,10 @@ type ecdsaPublic struct {
 	PublicKey data.HexBytes `json:"public"`
 }
 
-func (s ecdsaSigner) PublicData() *data.Key {
+func (s ecdsaSigner) PublicData() *data.PublicKey {
 	pub := s.Public().(*ecdsa.PublicKey)
 	keyValBytes, _ := json.Marshal(ecdsaPublic{PublicKey: elliptic.Marshal(pub.Curve, pub.X, pub.Y)})
-	return &data.Key{
+	return &data.PublicKey{
 		Type:       data.KeyTypeECDSA_SHA2_P256,
 		Scheme:     data.KeySchemeECDSA_SHA2_P256,
 		Algorithms: data.KeyAlgorithms,
@@ -46,27 +45,27 @@ func (s ecdsaSigner) PublicData() *data.Key {
 	}
 }
 
-func (s ecdsaSigner) Sign(rand io.Reader, msg []byte, opts crypto.SignerOpts) ([]byte, error) {
-	hash := sha256.Sum256(msg)
-	return s.PrivateKey.Sign(rand, hash[:], crypto.SHA256)
+func (s ecdsaSigner) SignMessage(message []byte) ([]byte, error) {
+	hash := sha256.Sum256(message)
+	return s.PrivateKey.Sign(rand.Reader, hash[:], crypto.SHA256)
 }
 
 func (s ecdsaSigner) ContainsID(id string) bool {
 	return s.PublicData().ContainsID(id)
 }
 
-func (ecdsaSigner) MarshalSigner() (*data.PrivateKey, error) {
+func (ecdsaSigner) MarshalPrivateKey() (*data.PrivateKey, error) {
 	return nil, errors.New("not implemented for test")
 }
 
-func (ecdsaSigner) UnmarshalSigner(key *data.PrivateKey) error {
+func (ecdsaSigner) UnmarshalPrivateKey(key *data.PrivateKey) error {
 	return errors.New("not implemented for test")
 }
 
 func (VerifySuite) Test(c *C) {
 	type test struct {
 		name  string
-		keys  []*data.Key
+		keys  []*data.PublicKey
 		roles map[string]*data.Role
 		s     *data.Signed
 		ver   int
@@ -186,7 +185,7 @@ func (VerifySuite) Test(c *C) {
 				s := ecdsaSigner{k}
 				sign.Sign(t.s, s)
 				t.s.Signatures = t.s.Signatures[1:]
-				t.keys = []*data.Key{s.PublicData()}
+				t.keys = []*data.PublicKey{s.PublicData()}
 				t.roles["root"].KeyIDs = s.PublicData().IDs()
 			},
 		},
@@ -220,7 +219,7 @@ func (VerifySuite) Test(c *C) {
 		if t.keys == nil && t.s == nil {
 			k, _ := keys.GenerateEd25519Key()
 			t.s, _ = sign.Marshal(&signedMeta{Type: t.typ, Version: t.ver, Expires: *t.exp}, k)
-			t.keys = []*data.Key{k.PublicData()}
+			t.keys = []*data.PublicKey{k.PublicData()}
 		}
 		if t.roles == nil {
 			t.roles = map[string]*data.Role{
@@ -260,7 +259,7 @@ func (VerifySuite) TestVerifyIgnoreExpired(c *C) {
 	role := "root"
 	k, _ := keys.GenerateEd25519Key()
 	s, _ := sign.Marshal(&signedMeta{Type: role, Version: minVer, Expires: time.Now().Add(-time.Hour)}, k)
-	keys := []*data.Key{k.PublicData()}
+	keys := []*data.PublicKey{k.PublicData()}
 	roles := map[string]*data.Role{
 		"root": {
 			KeyIDs:    keys[0].IDs(),

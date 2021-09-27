@@ -173,7 +173,7 @@ func (s *ClientSuite) addRemoteTarget(c *C, name string) {
 	s.syncRemote(c)
 }
 
-func (s *ClientSuite) rootKeys(c *C) []*data.Key {
+func (s *ClientSuite) rootKeys(c *C) []*data.PublicKey {
 	rootKeys, err := s.repo.RootKeys()
 	c.Assert(err, IsNil)
 	c.Assert(rootKeys, HasLen, 1)
@@ -347,7 +347,7 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	for _, ids := range s.keyIDs {
 		c.Assert(len(ids) > 0, Equals, true)
 		for _, id := range ids {
-			_, err := client.db.GetKey(id)
+			_, err := client.db.GetVerifier(id)
 			c.Assert(err, NotNil)
 		}
 	}
@@ -356,9 +356,9 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	for name, ids := range newKeyIDs {
 		c.Assert(len(ids) > 0, Equals, true)
 		for _, id := range ids {
-			key, err := client.db.GetKey(id)
+			verifier, err := client.db.GetVerifier(id)
 			c.Assert(err, IsNil)
-			c.Assert(key.MarshalKey().IDs(), DeepEquals, ids)
+			c.Assert(verifier.MarshalPublicKey().IDs(), DeepEquals, ids)
 		}
 		role := client.db.GetRole(name)
 		c.Assert(role, NotNil)
@@ -592,13 +592,13 @@ func (s *ClientSuite) TestNewTimestampKey(c *C) {
 
 	// check key has been replaced in db
 	for _, oldID := range oldIDs {
-		_, err := client.db.GetKey(oldID)
+		_, err := client.db.GetVerifier(oldID)
 		c.Assert(err, NotNil)
 	}
 	for _, newID := range newIDs {
-		key, err := client.db.GetKey(newID)
+		verifier, err := client.db.GetVerifier(newID)
 		c.Assert(err, IsNil)
-		c.Assert(key.MarshalKey().IDs(), DeepEquals, newIDs)
+		c.Assert(verifier.MarshalPublicKey().IDs(), DeepEquals, newIDs)
 	}
 	role := client.db.GetRole("timestamp")
 	c.Assert(role, NotNil)
@@ -632,13 +632,13 @@ func (s *ClientSuite) TestNewSnapshotKey(c *C) {
 
 	// check key has been replaced in db
 	for _, oldID := range oldIDs {
-		_, err := client.db.GetKey(oldID)
+		_, err := client.db.GetVerifier(oldID)
 		c.Assert(err, NotNil)
 	}
 	for _, newID := range newIDs {
-		key, err := client.db.GetKey(newID)
+		verifier, err := client.db.GetVerifier(newID)
 		c.Assert(err, IsNil)
-		c.Assert(key.MarshalKey().IDs(), DeepEquals, newIDs)
+		c.Assert(verifier.MarshalPublicKey().IDs(), DeepEquals, newIDs)
 	}
 	role := client.db.GetRole("snapshot")
 	c.Assert(role, NotNil)
@@ -675,13 +675,13 @@ func (s *ClientSuite) TestNewTargetsKey(c *C) {
 
 	// check key has been replaced in db
 	for _, oldID := range oldIDs {
-		_, err := client.db.GetKey(oldID)
+		_, err := client.db.GetVerifier(oldID)
 		c.Assert(err, NotNil)
 	}
 	for _, newID := range newIDs {
-		key, err := client.db.GetKey(newID)
+		verifier, err := client.db.GetVerifier(newID)
 		c.Assert(err, IsNil)
-		c.Assert(key.MarshalKey().IDs(), DeepEquals, newIDs)
+		c.Assert(verifier.MarshalPublicKey().IDs(), DeepEquals, newIDs)
 	}
 	role := client.db.GetRole("targets")
 	c.Assert(role, NotNil)
@@ -1114,10 +1114,10 @@ func (s *ClientSuite) TestUnknownKeyIDs(c *C) {
 	c.Assert(json.Unmarshal(rootJSON, &root), IsNil)
 
 	// update remote root.json to add a new key with an unknown id
-	key, err := keys.GenerateEd25519Key()
+	signer, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 
-	root.Signed.Keys["unknown-key-id"] = key.PublicData()
+	root.Signed.Keys["unknown-key-id"] = signer.PublicData()
 
 	// re-sign the root metadata, then commit it back into the store.
 	signingKeys, err := s.store.GetSigners("root")

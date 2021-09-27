@@ -348,11 +348,11 @@ func (r *Repo) AddPrivateKeyWithExpires(keyRole string, signer keys.Signer, expi
 	return nil
 }
 
-func (r *Repo) AddVerificationKey(keyRole string, pk *data.Key) error {
+func (r *Repo) AddVerificationKey(keyRole string, pk *data.PublicKey) error {
 	return r.AddVerificationKeyWithExpiration(keyRole, pk, data.DefaultExpires(keyRole))
 }
 
-func (r *Repo) AddVerificationKeyWithExpiration(keyRole string, pk *data.Key, expires time.Time) error {
+func (r *Repo) AddVerificationKeyWithExpiration(keyRole string, pk *data.PublicKey, expires time.Time) error {
 	root, err := r.root()
 	if err != nil {
 		return err
@@ -389,7 +389,7 @@ func validExpires(expires time.Time) bool {
 	return expires.Sub(time.Now()) > 0
 }
 
-func (r *Repo) RootKeys() ([]*data.Key, error) {
+func (r *Repo) RootKeys() ([]*data.PublicKey, error) {
 	root, err := r.root()
 	if err != nil {
 		return nil, err
@@ -402,7 +402,7 @@ func (r *Repo) RootKeys() ([]*data.Key, error) {
 	// We might have multiple key ids that correspond to the same key, so
 	// make sure we only return unique keys.
 	seen := make(map[string]struct{})
-	rootKeys := []*data.Key{}
+	rootKeys := []*data.PublicKey{}
 	for _, id := range role.KeyIDs {
 		key, ok := root.Keys[id]
 		if !ok {

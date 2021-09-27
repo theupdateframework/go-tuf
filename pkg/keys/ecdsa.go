@@ -26,7 +26,7 @@ type ecdsaSignature struct {
 
 type p256Verifier struct {
 	PublicKey data.HexBytes `json:"public"`
-	key       *data.Key
+	key       *data.PublicKey
 }
 
 func (p *p256Verifier) Public() string {
@@ -54,11 +54,11 @@ func (p *p256Verifier) Verify(msg, sigBytes []byte) error {
 	return nil
 }
 
-func (p *p256Verifier) MarshalKey() *data.Key {
+func (p *p256Verifier) MarshalPublicKey() *data.PublicKey {
 	return p.key
 }
 
-func (p *p256Verifier) UnmarshalKey(key *data.Key) error {
+func (p *p256Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
 	if err := json.Unmarshal(key.Value, p); err != nil {
 		return err
 	}

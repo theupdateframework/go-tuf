@@ -188,7 +188,7 @@ func startFileServer(c *C, dir string) (string, func() error) {
 	return addr, l.Close
 }
 
-func getKeys(c *C, remote RemoteStore) []*data.Key {
+func getKeys(c *C, remote RemoteStore) []*data.PublicKey {
 	r, _, err := remote.GetMeta("root.json")
 	c.Assert(err, IsNil)
 
@@ -202,7 +202,7 @@ func getKeys(c *C, remote RemoteStore) []*data.Key {
 	rootRole, exists := root.Signed.Roles["root"]
 	c.Assert(exists, Equals, true)
 
-	rootKeys := []*data.Key{}
+	rootKeys := []*data.PublicKey{}
 
 	for _, keyID := range rootRole.KeyIDs {
 		key, exists := root.Signed.Keys[keyID]

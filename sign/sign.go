@@ -1,9 +1,6 @@
 package sign
 
 import (
-	"crypto"
-	"crypto/rand"
-
 	cjson "github.com/tent/canonical-json-go"
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
@@ -25,7 +22,7 @@ func Sign(s *data.Signed, k keys.Signer) error {
 		}
 	}
 
-	sig, err := k.Sign(rand.Reader, s.Signed, crypto.Hash(0))
+	sig, err := k.SignMessage(s.Signed)
 	if err != nil {
 		return err
 	}

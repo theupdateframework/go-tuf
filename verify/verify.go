@@ -97,19 +97,19 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 		if !roleData.ValidKey(sig.KeyID) {
 			continue
 		}
-		key, err := db.GetKey(sig.KeyID)
+		verifier, err := db.GetVerifier(sig.KeyID)
 		if err != nil {
 			continue
 		}
 
-		if err := key.Verify(msg, sig.Signature); err != nil {
+		if err := verifier.Verify(msg, sig.Signature); err != nil {
 			return ErrInvalid
 		}
 
 		// Only consider this key valid if we haven't seen any of it's
 		// key ids before.
 		if _, ok := seen[sig.KeyID]; !ok {
-			for _, id := range key.MarshalKey().IDs() {
+			for _, id := range verifier.MarshalPublicKey().IDs() {
 				seen[id] = struct{}{}
 			}
 

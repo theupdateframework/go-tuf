@@ -341,7 +341,7 @@ func (f *fileSystemStore) SaveSigner(role string, signer keys.Signer) error {
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	key, err := signer.MarshalSigner()
+	key, err := signer.MarshalPrivateKey()
 	if err != nil {
 		return err
 	}

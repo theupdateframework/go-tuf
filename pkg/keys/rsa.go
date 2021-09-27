@@ -2,6 +2,7 @@ package keys
 
 import (
 	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -15,16 +16,21 @@ import (
 
 func init() {
 	VerifierMap.Store(data.KeyTypeRSASSA_PSS_SHA256, NewRsaVerifier)
+	SignerMap.Store(data.KeyTypeRSASSA_PSS_SHA256, NewRsaSigner)
 }
 
 func NewRsaVerifier() Verifier {
 	return &rsaVerifier{}
 }
 
+func NewRsaSigner() Signer {
+	return &rsaSigner{}
+}
+
 type rsaVerifier struct {
 	PublicKey string `json:"public"`
 	rsaKey    *rsa.PublicKey
-	key       *data.Key
+	key       *data.PublicKey
 }
 
 func (p *rsaVerifier) Public() string {
@@ -44,11 +50,11 @@ func (p *rsaVerifier) Verify(msg, sigBytes []byte) error {
 	return rsa.VerifyPSS(p.rsaKey, crypto.SHA256, hash[:], sigBytes, &rsa.PSSOptions{})
 }
 
-func (p *rsaVerifier) MarshalKey() *data.Key {
+func (p *rsaVerifier) MarshalPublicKey() *data.PublicKey {
 	return p.key
 }
 
-func (p *rsaVerifier) UnmarshalKey(key *data.Key) error {
+func (p *rsaVerifier) UnmarshalPublicKey(key *data.PublicKey) error {
 	if err := json.Unmarshal(key.Value, p); err != nil {
 		return err
 	}
@@ -80,4 +86,54 @@ func parseKey(data string) (*rsa.PublicKey, error) {
 		return rsaPub, nil
 	}
 	return nil, errors.New("tuf: error unmarshalling rsa key")
+}
+
+type rsaSigner struct {
+	*rsa.PrivateKey
+}
+
+type rsaPublic struct {
+	// PEM encoded public key.
+	PublicKey string `json:"public"`
+}
+
+func (s *rsaSigner) PublicData() *data.PublicKey {
+	pub, _ := x509.MarshalPKIXPublicKey(s.Public().(*rsa.PublicKey))
+	pubBytes := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PUBLIC KEY",
+		Bytes: pub,
+	})
+
+	keyValBytes, _ := json.Marshal(rsaPublic{PublicKey: string(pubBytes)})
+	return &data.PublicKey{
+		Type:       data.KeyTypeRSASSA_PSS_SHA256,
+		Scheme:     data.KeySchemeRSASSA_PSS_SHA256,
+		Algorithms: data.KeyAlgorithms,
+		Value:      keyValBytes,
+	}
+}
+
+func (s *rsaSigner) SignMessage(message []byte) ([]byte, error) {
+	hash := sha256.Sum256(message)
+	return rsa.SignPSS(rand.Reader, s.PrivateKey, crypto.SHA256, hash[:], &rsa.PSSOptions{})
+}
+
+func (s *rsaSigner) ContainsID(id string) bool {
+	return s.PublicData().ContainsID(id)
+}
+
+func (s *rsaSigner) MarshalPrivateKey() (*data.PrivateKey, error) {
+	return nil, errors.New("not implemented for test")
+}
+
+func (s *rsaSigner) UnmarshalPrivateKey(key *data.PrivateKey) error {
+	return errors.New("not implemented for test")
+}
+
+func GenerateRsaKey() (*rsaSigner, error) {
+	privkey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, err
+	}
+	return &rsaSigner{privkey}, nil
 }

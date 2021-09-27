@@ -29,9 +29,9 @@ func main() {
 		keys := [][]*data.PrivateKey{}
 
 		for i := 0; i < 2; i++ {
-			key, err := keys.GenerateEd25519Key()
+			signer, err := keys.GenerateEd25519Key()
 			assertNotNil(err)
-			keys = append(keys, []*data.PrivateKey{key})
+			keys = append(keys, []*data.PrivateKey{signer})
 		}
 
 		roles[name] = keys

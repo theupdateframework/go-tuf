@@ -38,7 +38,7 @@ type Signature struct {
 	Signature HexBytes `json:"sig"`
 }
 
-type Key struct {
+type PublicKey struct {
 	Type       string          `json:"keytype"`
 	Scheme     string          `json:"scheme"`
 	Algorithms []string        `json:"keyid_hash_algorithms,omitempty"`
@@ -55,7 +55,7 @@ type PrivateKey struct {
 	Value      json.RawMessage `json:"keyval"`
 }
 
-func (k *Key) IDs() []string {
+func (k *PublicKey) IDs() []string {
 	k.idOnce.Do(func() {
 		data, _ := cjson.Marshal(k)
 		digest := sha256.Sum256(data)
@@ -64,7 +64,7 @@ func (k *Key) IDs() []string {
 	return k.ids
 }
 
-func (k *Key) ContainsID(id string) bool {
+func (k *PublicKey) ContainsID(id string) bool {
 	for _, keyid := range k.IDs() {
 		if id == keyid {
 			return true
@@ -89,12 +89,12 @@ func DefaultExpires(role string) time.Time {
 }
 
 type Root struct {
-	Type        string           `json:"_type"`
-	SpecVersion string           `json:"spec_version"`
-	Version     int              `json:"version"`
-	Expires     time.Time        `json:"expires"`
-	Keys        map[string]*Key  `json:"keys"`
-	Roles       map[string]*Role `json:"roles"`
+	Type        string                `json:"_type"`
+	SpecVersion string                `json:"spec_version"`
+	Version     int                   `json:"version"`
+	Expires     time.Time             `json:"expires"`
+	Keys        map[string]*PublicKey `json:"keys"`
+	Roles       map[string]*Role      `json:"roles"`
 
 	ConsistentSnapshot bool `json:"consistent_snapshot"`
 }
@@ -104,13 +104,13 @@ func NewRoot() *Root {
 		Type:               "root",
 		SpecVersion:        "1.0",
 		Expires:            DefaultExpires("root"),
-		Keys:               make(map[string]*Key),
+		Keys:               make(map[string]*PublicKey),
 		Roles:              make(map[string]*Role),
 		ConsistentSnapshot: true,
 	}
 }
 
-func (r *Root) AddKey(key *Key) bool {
+func (r *Root) AddKey(key *PublicKey) bool {
 	changed := false
 	for _, id := range key.IDs() {
 		if _, ok := r.Keys[id]; !ok {
@@ -205,8 +205,8 @@ type Targets struct {
 // Delegations represents the edges from a parent Targets role to one or more
 // delegated target roles. See spec v1.0.19 section 4.5.
 type Delegations struct {
-	Keys  map[string]*Key `json:"keys"`
-	Roles []DelegatedRole `json:"roles"`
+	Keys  map[string]*PublicKey `json:"keys"`
+	Roles []DelegatedRole       `json:"roles"`
 }
 
 // DelegatedRole describes a delegated role, including what paths it is
