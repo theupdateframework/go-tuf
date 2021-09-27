@@ -326,7 +326,7 @@ func addPrivateKey(c *C, r *Repo, role string, key keys.Signer) []string {
 	return keyids
 }
 
-func addGeneratedPrivateKey(c *C, r *Repo, role string) []string {
+func generateAndAddPrivateKey(c *C, r *Repo, role string) []string {
 	key, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	return addPrivateKey(c, r, role, key)
@@ -400,8 +400,8 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 	c.Assert(err, IsNil)
 
 	// generate two targets keys
-	addGeneratedPrivateKey(c, r, "targets")
-	addGeneratedPrivateKey(c, r, "targets")
+	generateAndAddPrivateKey(c, r, "targets")
+	generateAndAddPrivateKey(c, r, "targets")
 
 	// check root metadata is correct
 	root, err = r.root()
@@ -481,8 +481,8 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 	c.Assert(stagedRoot.Roles, DeepEquals, root.Roles)
 
 	// commit to make sure we don't modify metadata after committing metadata.
-	addGeneratedPrivateKey(c, r, "snapshot")
-	addGeneratedPrivateKey(c, r, "timestamp")
+	generateAndAddPrivateKey(c, r, "snapshot")
+	generateAndAddPrivateKey(c, r, "timestamp")
 	c.Assert(r.AddTargets([]string{}, nil), IsNil)
 	c.Assert(r.Snapshot(), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
@@ -586,9 +586,7 @@ func (rs *RepoSuite) TestSign(c *C) {
 	// signing with an available key generates a signature
 	key, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
-	privateKey, err := key.MarshalSigner()
-	c.Assert(err, IsNil)
-	c.Assert(local.SavePrivateKey("root", privateKey), IsNil)
+	c.Assert(local.SaveSigner("root", key), IsNil)
 	c.Assert(r.Sign("root.json"), IsNil)
 	checkSigIDs(key.PublicData().IDs()...)
 
@@ -599,9 +597,7 @@ func (rs *RepoSuite) TestSign(c *C) {
 	// signing with a new available key generates another signature
 	newKey, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
-	newPrivateKey, err := newKey.MarshalSigner()
-	c.Assert(err, IsNil)
-	c.Assert(local.SavePrivateKey("root", newPrivateKey), IsNil)
+	c.Assert(local.SaveSigner("root", newKey), IsNil)
 	c.Assert(r.Sign("root.json"), IsNil)
 	checkSigIDs(append(key.PublicData().IDs(), newKey.PublicData().IDs()...)...)
 }
@@ -1230,7 +1226,7 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 	c.Assert(err, IsNil)
 	privateKey, err := key.MarshalSigner()
 	c.Assert(err, IsNil)
-	c.Assert(store.SavePrivateKey("root", privateKey), IsNil)
+	c.Assert(store.SaveSigner("root", key), IsNil)
 	assertKeys("root", true, []*data.PrivateKey{privateKey})
 
 	// save another key and check it gets added to the existing keys
@@ -1238,7 +1234,7 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 	c.Assert(err, IsNil)
 	newPrivateKey, err := newKey.MarshalSigner()
 	c.Assert(err, IsNil)
-	c.Assert(store.SavePrivateKey("root", newPrivateKey), IsNil)
+	c.Assert(store.SaveSigner("root", newKey), IsNil)
 	assertKeys("root", true, []*data.PrivateKey{privateKey, newPrivateKey})
 
 	// check saving a key to an encrypted file without a passphrase fails
@@ -1247,14 +1243,14 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 	c.Assert(err, IsNil)
 	privateKey, err = key.MarshalSigner()
 	c.Assert(err, IsNil)
-	c.Assert(insecureStore.SavePrivateKey("root", privateKey), Equals, ErrPassphraseRequired{"root"})
+	c.Assert(insecureStore.SaveSigner("root", key), Equals, ErrPassphraseRequired{"root"})
 
 	// save a key to an insecure store and check it is not encrypted
 	key, err = keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 	privateKey, err = key.MarshalSigner()
 	c.Assert(err, IsNil)
-	c.Assert(insecureStore.SavePrivateKey("targets", privateKey), IsNil)
+	c.Assert(insecureStore.SaveSigner("targets", key), IsNil)
 	assertKeys("targets", false, []*data.PrivateKey{privateKey})
 }
 

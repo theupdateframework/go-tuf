@@ -50,7 +50,7 @@ func (p *rsaVerifier) MarshalKey() *data.Key {
 
 func (p *rsaVerifier) UnmarshalKey(key *data.Key) error {
 	if err := json.Unmarshal(key.Value, p); err != nil {
-		return errors.Wrap(err, "unmarshalling rsa key")
+		return err
 	}
 	var err error
 	p.rsaKey, err = parseKey(p.PublicKey)
@@ -65,7 +65,7 @@ func (p *rsaVerifier) UnmarshalKey(key *data.Key) error {
 func parseKey(data string) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode([]byte(data))
 	if block == nil {
-		return nil, errors.New("invalid pem public key")
+		return nil, errors.New("tuf: pem decoding public key failed")
 	}
 	rsaPub, err := x509.ParsePKCS1PublicKey(block.Bytes)
 	if err == nil {
@@ -75,9 +75,9 @@ func parseKey(data string) (*rsa.PublicKey, error) {
 	if err == nil {
 		rsaPub, ok := key.(*rsa.PublicKey)
 		if !ok {
-			return nil, errors.New("parsing invalid rsa key")
+			return nil, errors.New("tuf: invalid rsa key")
 		}
 		return rsaPub, nil
 	}
-	return nil, errors.New("unmarshalling rsa key")
+	return nil, errors.New("tuf: error unmarshalling rsa key")
 }

@@ -98,9 +98,8 @@ func (m *memoryStore) GetSigners(role string) ([]keys.Signer, error) {
 	return m.signers[role], nil
 }
 
-func (m *memoryStore) SavePrivateKey(role string, key *data.PrivateKey) error {
-	signers := signers([]*data.PrivateKey{key})
-	m.signers[role] = append(m.signers[role], signers...)
+func (m *memoryStore) SaveSigner(role string, signer keys.Signer) error {
+	m.signers[role] = append(m.signers[role], signer)
 	return nil
 }
 
@@ -332,7 +331,7 @@ func (f *fileSystemStore) GetSigners(role string) ([]keys.Signer, error) {
 	return f.signers[role], nil
 }
 
-func (f *fileSystemStore) SavePrivateKey(role string, key *data.PrivateKey) error {
+func (f *fileSystemStore) SaveSigner(role string, signer keys.Signer) error {
 	if err := f.createDirs(); err != nil {
 		return err
 	}
@@ -340,6 +339,10 @@ func (f *fileSystemStore) SavePrivateKey(role string, key *data.PrivateKey) erro
 	// add the key to the existing keys (if any)
 	keys, pass, err := f.loadPrivateKeys(role)
 	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	key, err := signer.MarshalSigner()
+	if err != nil {
 		return err
 	}
 	keys = append(keys, key)
@@ -375,7 +378,7 @@ func (f *fileSystemStore) SavePrivateKey(role string, key *data.PrivateKey) erro
 	if err := util.AtomicallyWriteFile(f.keysPath(role), append(data, '\n'), 0600); err != nil {
 		return err
 	}
-	f.signers[role] = signers(keys)
+	f.signers[role] = append(f.signers[role], signer)
 	return nil
 }
 

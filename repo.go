@@ -50,11 +50,11 @@ type LocalStore interface {
 	// Commit is used to publish staged files to the repository
 	Commit(bool, map[string]int, map[string]data.Hashes) error
 
-	// GetSigners return a list of signing keys for a role.
+	// GetSigners return a list of signers for a role.
 	GetSigners(string) ([]keys.Signer, error)
 
-	// SavePrivateKey adds a signing key to a role.
-	SavePrivateKey(string, *data.PrivateKey) error
+	// SavePrivateKey adds a signer to a role.
+	SaveSigner(string, keys.Signer) error
 
 	// Clean is used to remove all staged manifests.
 	Clean() error
@@ -312,23 +312,23 @@ func (r *Repo) GenKey(role string) ([]string, error) {
 }
 
 func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) ([]string, error) {
-	key, err := keys.GenerateEd25519Key()
+	signer, err := keys.GenerateEd25519Key()
 	if err != nil {
 		return []string{}, err
 	}
 
-	if err = r.AddPrivateKeyWithExpires(keyRole, key, expires); err != nil {
+	if err = r.AddPrivateKeyWithExpires(keyRole, signer, expires); err != nil {
 		return []string{}, err
 	}
 
-	return key.PublicData().IDs(), nil
+	return signer.PublicData().IDs(), nil
 }
 
-func (r *Repo) AddPrivateKey(role string, key keys.Signer) error {
-	return r.AddPrivateKeyWithExpires(role, key, data.DefaultExpires(role))
+func (r *Repo) AddPrivateKey(role string, signer keys.Signer) error {
+	return r.AddPrivateKeyWithExpires(role, signer, data.DefaultExpires(role))
 }
 
-func (r *Repo) AddPrivateKeyWithExpires(keyRole string, key keys.Signer, expires time.Time) error {
+func (r *Repo) AddPrivateKeyWithExpires(keyRole string, signer keys.Signer, expires time.Time) error {
 	if !verify.ValidRole(keyRole) {
 		return ErrInvalidRole{keyRole}
 	}
@@ -337,16 +337,11 @@ func (r *Repo) AddPrivateKeyWithExpires(keyRole string, key keys.Signer, expires
 		return ErrInvalidExpires{expires}
 	}
 
-	privKey, err := key.MarshalSigner()
-	if err != nil {
+	if err := r.local.SaveSigner(keyRole, signer); err != nil {
 		return err
 	}
 
-	if err := r.local.SavePrivateKey(keyRole, privKey); err != nil {
-		return err
-	}
-
-	if err = r.AddVerificationKeyWithExpiration(keyRole, key.PublicData(), expires); err != nil {
+	if err := r.AddVerificationKeyWithExpiration(keyRole, signer.PublicData(), expires); err != nil {
 		return err
 	}
 

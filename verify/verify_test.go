@@ -51,10 +51,6 @@ func (s ecdsaSigner) Sign(rand io.Reader, msg []byte, opts crypto.SignerOpts) ([
 	return s.PrivateKey.Sign(rand, hash[:], crypto.SHA256)
 }
 
-func (s ecdsaSigner) IDs() []string {
-	return s.PublicData().IDs()
-}
-
 func (s ecdsaSigner) ContainsID(id string) bool {
 	return s.PublicData().ContainsID(id)
 }

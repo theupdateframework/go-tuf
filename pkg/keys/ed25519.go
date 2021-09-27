@@ -4,8 +4,8 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
-	"errors"
 
+	"github.com/pkg/errors"
 	"github.com/theupdateframework/go-tuf/data"
 )
 
@@ -33,7 +33,7 @@ func (e *ed25519Verifier) Public() string {
 
 func (e *ed25519Verifier) Verify(msg, sig []byte) error {
 	if !ed25519.Verify([]byte(e.PublicKey), msg, sig) {
-		return ErrInvalid
+		return errors.New("tuf: ed25519 signature verification failed")
 	}
 	return nil
 }
@@ -45,10 +45,10 @@ func (e *ed25519Verifier) MarshalKey() *data.Key {
 func (e *ed25519Verifier) UnmarshalKey(key *data.Key) error {
 	e.key = key
 	if err := json.Unmarshal(key.Value, e); err != nil {
-		return errors.New("unmarshalling ed25519 key")
+		return err
 	}
 	if len(e.PublicKey) != ed25519.PublicKeySize {
-		return errors.New("unexpected public key length for ed25519 key")
+		return errors.New("tuf: unexpected public key length for ed25519 key")
 	}
 	return nil
 }

@@ -49,7 +49,7 @@ func (p *p256Verifier) Verify(msg, sigBytes []byte) error {
 	hash := sha256.Sum256(msg)
 
 	if !ecdsa.Verify(k, hash[:], sig.R, sig.S) {
-		return errors.New("verifying ecdsa signature")
+		return errors.New("tuf: ecdsa signature verification failed")
 	}
 	return nil
 }
@@ -60,11 +60,11 @@ func (p *p256Verifier) MarshalKey() *data.Key {
 
 func (p *p256Verifier) UnmarshalKey(key *data.Key) error {
 	if err := json.Unmarshal(key.Value, p); err != nil {
-		return errors.New("unmarshalling ecdsa key")
+		return err
 	}
 	x, _ := elliptic.Unmarshal(elliptic.P256(), p.PublicKey)
 	if x == nil {
-		return errors.New("invalid public key point for ecdsa key")
+		return errors.New("tuf: invalid ecdsa public key point")
 	}
 	p.key = key
 	return nil

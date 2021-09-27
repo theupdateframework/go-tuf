@@ -46,10 +46,6 @@ func (s rsaSigner) Sign(rand io.Reader, msg []byte, opts crypto.SignerOpts) ([]b
 	return rsa.SignPSS(rand, s.PrivateKey, crypto.SHA256, hash[:], &rsa.PSSOptions{})
 }
 
-func (s rsaSigner) IDs() []string {
-	return s.PublicData().IDs()
-}
-
 func (s rsaSigner) ContainsID(id string) bool {
 	return s.PublicData().ContainsID(id)
 }
