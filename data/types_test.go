@@ -44,7 +44,7 @@ func (TypesSuite) TestKeyIDs(c *C) {
 	key = PublicKey{
 		Type:       KeyTypeEd25519,
 		Scheme:     KeySchemeEd25519,
-		Algorithms: KeyAlgorithms,
+		Algorithms: HashAlgorithms,
 		Value:      keyValBytes,
 	}
 	c.Assert(key.IDs(), DeepEquals, []string{keyid10algos})
@@ -96,7 +96,7 @@ func (TypesSuite) TestRoleAddKeyIDs(c *C) {
 	key = &PublicKey{
 		Type:       KeyTypeEd25519,
 		Scheme:     KeySchemeEd25519,
-		Algorithms: KeyAlgorithms,
+		Algorithms: HashAlgorithms,
 		Value:      keyValBytes,
 	}
 

@@ -311,7 +311,7 @@ func (r *Repo) GenKey(role string) ([]string, error) {
 	return r.GenKeyWithExpires(role, data.DefaultExpires("root"))
 }
 
-func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) ([]string, error) {
+func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (keyids []string, err error) {
 	signer, err := keys.GenerateEd25519Key()
 	if err != nil {
 		return []string{}, err
@@ -320,8 +320,8 @@ func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) ([]string, e
 	if err = r.AddPrivateKeyWithExpires(keyRole, signer, expires); err != nil {
 		return []string{}, err
 	}
-
-	return signer.PublicData().IDs(), nil
+	keyids = signer.PublicData().IDs()
+	return
 }
 
 func (r *Repo) AddPrivateKey(role string, signer keys.Signer) error {

@@ -79,7 +79,7 @@ func GenerateEd25519Key() (*ed25519Signer, error) {
 		PrivateKey:    ed25519.PrivateKey(data.HexBytes(private)),
 		keyType:       data.KeyTypeEd25519,
 		keyScheme:     data.KeySchemeEd25519,
-		keyAlgorithms: data.KeyAlgorithms,
+		keyAlgorithms: data.HashAlgorithms,
 	}, nil
 }
 

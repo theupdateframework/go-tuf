@@ -108,7 +108,7 @@ func (s *rsaSigner) PublicData() *data.PublicKey {
 	return &data.PublicKey{
 		Type:       data.KeyTypeRSASSA_PSS_SHA256,
 		Scheme:     data.KeySchemeRSASSA_PSS_SHA256,
-		Algorithms: data.KeyAlgorithms,
+		Algorithms: data.HashAlgorithms,
 		Value:      keyValBytes,
 	}
 }

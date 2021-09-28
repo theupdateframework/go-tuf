@@ -40,7 +40,7 @@ func (s ecdsaSigner) PublicData() *data.PublicKey {
 	return &data.PublicKey{
 		Type:       data.KeyTypeECDSA_SHA2_P256,
 		Scheme:     data.KeySchemeECDSA_SHA2_P256,
-		Algorithms: data.KeyAlgorithms,
+		Algorithms: data.HashAlgorithms,
 		Value:      keyValBytes,
 	}
 }

@@ -16,7 +16,7 @@ func (Ed25519Suite) TestUnmarshalEd25519(c *C) {
 	badKey := &data.PublicKey{
 		Type:       data.KeyTypeRSASSA_PSS_SHA256,
 		Scheme:     data.KeySchemeRSASSA_PSS_SHA256,
-		Algorithms: data.KeyAlgorithms,
+		Algorithms: data.HashAlgorithms,
 		Value:      badKeyValue,
 	}
 	verifier := NewP256Verifier()

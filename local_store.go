@@ -16,13 +16,13 @@ import (
 )
 
 func signers(privateKeys []*data.PrivateKey) []keys.Signer {
-	res := make([]keys.Signer, len(privateKeys))
-	for i, k := range privateKeys {
+	res := make([]keys.Signer, 0, len(privateKeys))
+	for _, k := range privateKeys {
 		signer, err := keys.GetSigner(k)
 		if err != nil {
 			continue
 		}
-		res[i] = signer
+		res = append(res, signer)
 	}
 	return res
 }
