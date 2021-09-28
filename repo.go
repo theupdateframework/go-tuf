@@ -103,7 +103,11 @@ func (r *Repo) Init(consistentSnapshot bool) error {
 	}
 	root := data.NewRoot()
 	root.ConsistentSnapshot = consistentSnapshot
-	return r.setMeta("root.json", root)
+	err = r.setMeta("root.json", root)
+	if err == nil {
+		fmt.Println("Repository initialized")
+	}
+	return err
 }
 
 func (r *Repo) db() (*verify.DB, error) {
