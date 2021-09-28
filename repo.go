@@ -718,7 +718,7 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom json.RawMessage, exp
 
 	err = r.setMeta("targets.json", t)
 	if err == nil {
-		fmt.Println("Targets that are currently added/staged:")
+		fmt.Println("Added/staged targets:")
 		for k := range t.Targets {
 			fmt.Println("*", k)
 		}
@@ -748,19 +748,25 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 	if err != nil {
 		return err
 	}
+	removed_targets := []string{}
 	if len(paths) == 0 {
+		for rt := range t.Targets {
+			removed_targets = append(removed_targets, rt)
+		}
 		t.Targets = make(data.TargetFiles)
 	} else {
 		removed := false
 		for _, path := range paths {
 			path = util.NormalizeTarget(path)
 			if _, ok := t.Targets[path]; !ok {
+				fmt.Println("The following target is not present:", path)
 				continue
 			}
 			removed = true
 			// G2 -> we no longer desire any readers to ever observe non-prefix targets.
 			delete(t.Targets, "/"+path)
 			delete(t.Targets, path)
+			removed_targets = append(removed_targets, path)
 		}
 		if !removed {
 			return nil
@@ -771,7 +777,23 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 		t.Version++
 		r.versionUpdated["targets.json"] = struct{}{}
 	}
-	return r.setMeta("targets.json", t)
+
+	err = r.setMeta("targets.json", t)
+	if err == nil {
+		fmt.Println("Removed targets:")
+		for _, v := range removed_targets {
+			fmt.Println("*", v)
+		}
+		if len(t.Targets) != 0 {
+			fmt.Println("Added/staged targets:")
+			for k := range t.Targets {
+				fmt.Println("*", k)
+			}
+		} else {
+			fmt.Println("There are no added/staged targets")
+		}
+	}
+	return err
 }
 
 func (r *Repo) Snapshot() error {
