@@ -4,12 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	cjson "github.com/tent/canonical-json-go"
 )
 
@@ -57,7 +57,10 @@ type PrivateKey struct {
 
 func (k *PublicKey) IDs() []string {
 	k.idOnce.Do(func() {
-		data, _ := cjson.Marshal(k)
+		data, err := cjson.Marshal(k)
+		if err != nil {
+			panic(errors.Wrap(err, "tuf: error creating key ID"))
+		}
 		digest := sha256.Sum256(data)
 		k.ids = []string{hex.EncodeToString(digest[:])}
 	})
