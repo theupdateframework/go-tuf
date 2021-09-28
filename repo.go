@@ -715,7 +715,15 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom json.RawMessage, exp
 		t.Version++
 		r.versionUpdated["targets.json"] = struct{}{}
 	}
-	return r.setMeta("targets.json", t)
+
+	err = r.setMeta("targets.json", t)
+	if err == nil {
+		fmt.Println("Targets that are currently added/staged:")
+		for k := range t.Targets {
+			fmt.Println("*", k)
+		}
+	}
+	return err
 }
 
 func (r *Repo) RemoveTarget(path string) error {
