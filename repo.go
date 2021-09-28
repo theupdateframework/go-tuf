@@ -476,7 +476,11 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 		r.versionUpdated["root.json"] = struct{}{}
 	}
 
-	return r.setMeta("root.json", root)
+	err = r.setMeta("root.json", root)
+	if err == nil {
+		fmt.Println("Revoked", keyRole, "key with ID", id)
+	}
+	return err
 }
 
 func (r *Repo) jsonMarshal(v interface{}) ([]byte, error) {
