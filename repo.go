@@ -865,7 +865,12 @@ func (r *Repo) TimestampWithExpires(expires time.Time) error {
 		timestamp.Version++
 		r.versionUpdated["timestamp.json"] = struct{}{}
 	}
-	return r.setMeta("timestamp.json", timestamp)
+
+	err = r.setMeta("timestamp.json", timestamp)
+	if err == nil {
+		fmt.Println("Staged timestamp.json metadata with expiration date:", timestamp.Expires)
+	}
+	return err
 }
 
 func (r *Repo) fileVersions() (map[string]int, error) {

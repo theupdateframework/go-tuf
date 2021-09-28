@@ -80,10 +80,11 @@ Expects a staged, fully signed `targets` metadata file and stages an appropriate
 `snapshot` metadata file. Optionally one can set number of days after which
 the `snapshot` metadata will expire.
 
-#### `tuf timestamp`
+#### `tuf timestamp [--expires=<days>]`
 
 Stages an appropriate `timestamp` metadata file. If a `snapshot` metadata file is staged,
-it must be fully signed.
+it must be fully signed. Optionally one can set number of days after which
+the timestamp metadata will expire.
 
 #### `tuf sign <metadata>`
 
