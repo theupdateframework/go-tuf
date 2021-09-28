@@ -537,7 +537,11 @@ func (r *Repo) Sign(roleFilename string) error {
 		return err
 	}
 	r.meta[roleFilename] = b
-	return r.local.SetMeta(roleFilename, b)
+	err = r.local.SetMeta(roleFilename, b)
+	if err == nil {
+		fmt.Println("Signed", roleFilename, "with", len(keys), "key(s)")
+	}
+	return err
 }
 
 // AddOrUpdateSignature allows users to add or update a signature generated with an external tool.
