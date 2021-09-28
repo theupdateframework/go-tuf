@@ -829,7 +829,11 @@ func (r *Repo) SnapshotWithExpires(expires time.Time) error {
 		snapshot.Version++
 		r.versionUpdated["snapshot.json"] = struct{}{}
 	}
-	return r.setMeta("snapshot.json", snapshot)
+	err = r.setMeta("snapshot.json", snapshot)
+	if err == nil {
+		fmt.Println("Staged snapshot.json metadata with expiration date:", snapshot.Expires)
+	}
+	return err
 }
 
 func (r *Repo) Timestamp() error {
