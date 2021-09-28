@@ -515,7 +515,7 @@ func (s *ClientSuite) TestFastForwardAttackRecovery(c *C) {
 	}
 	for _, test := range tests {
 		tufClient, closer := initRootTest(c, test.fixturePath)
-		c.Assert(tufClient.updateRoots(), IsNil)
+		c.Assert(tufClient.UpdateRoots(), IsNil)
 		m, err := tufClient.local.GetMeta()
 		c.Assert(err, IsNil)
 		for md, deleted := range test.expectMetaDeleted {
