@@ -115,8 +115,12 @@ should be distributed to clients for performing initial updates.
 
 #### `tuf set-threshold <role> <threshold>`
 
-Sets the `role` threshold, the required number of keys for signing, to
+Sets the `role` threshold (required number of keys for signing) to
 `threshold`.
+
+#### `tuf get-threshold <role>`
+
+Outputs the `role` threshold (required number of keys for signing).
 
 #### Usage of environment variables
 

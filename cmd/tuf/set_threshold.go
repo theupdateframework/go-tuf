@@ -28,6 +28,6 @@ func cmdSetThreshold(args *docopt.Args, repo *tuf.Repo) error {
 		return err
 	}
 
-	fmt.Println("Set ", role, "threshold to", threshold)
+	fmt.Println("The treshold for", role, "role is", threshold)
 	return nil
 }

@@ -42,6 +42,7 @@ Commands:
   clean         Remove all staged metadata files
   root-keys     Output a JSON serialized array of root keys to STDOUT
   set-threshold Sets the threshold for a role
+  get-threshold Outputs the threshold for a role
 
 See "tuf help <command>" for more information on a specific command
 `
