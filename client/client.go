@@ -151,7 +151,7 @@ func (c *Client) Init(rootKeys []*data.Key, threshold int) error {
 //
 // https://theupdateframework.github.io/specification/v1.0.19/index.html#load-trusted-root
 func (c *Client) Update() (data.TargetFiles, error) {
-	if err := c.updateRoots(); err != nil {
+	if err := c.UpdateRoots(); err != nil {
 		if _, ok := err.(verify.ErrExpired); ok {
 			// For backward compatibility, we wrap the ErrExpired inside
 			// ErrDecodeFailed.
@@ -216,7 +216,7 @@ func (c *Client) Update() (data.TargetFiles, error) {
 	return updatedTargets, nil
 }
 
-func (c *Client) updateRoots() error {
+func (c *Client) UpdateRoots() error {
 	// https://theupdateframework.github.io/specification/v1.0.19/index.html#load-trusted-root
 	// 5.2 Load the trusted root metadata file. We assume that a good,
 	// trusted copy of this file was shipped with the package manager
