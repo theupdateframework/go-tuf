@@ -993,15 +993,14 @@ func (r *Repo) Commit() error {
 		return err
 	}
 
-	if err := r.local.Commit(root.ConsistentSnapshot, versions, hashes); err != nil {
-		return err
+	err = r.local.Commit(root.ConsistentSnapshot, versions, hashes)
+	if err == nil {
+		// We can start incrementing version numbers again now that we've
+		// successfully committed the metadata to the local store.
+		r.versionUpdated = make(map[string]struct{})
+		fmt.Println("Committed successfully")
 	}
-
-	// We can start incrementing version numbers again now that we've
-	// successfully committed the metadata to the local store.
-	r.versionUpdated = make(map[string]struct{})
-
-	return nil
+	return err
 }
 
 func (r *Repo) Clean() error {
