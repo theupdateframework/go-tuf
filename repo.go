@@ -1004,7 +1004,11 @@ func (r *Repo) Commit() error {
 }
 
 func (r *Repo) Clean() error {
-	return r.local.Clean()
+	err := r.local.Clean()
+	if err == nil {
+		fmt.Println("Removed all staged metadata and target files")
+	}
+	return err
 }
 
 func (r *Repo) verifySignature(roleFilename string, db *verify.DB) error {
