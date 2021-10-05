@@ -9,13 +9,13 @@ func init() {
 	register("snapshot", cmdSnapshot, `
 usage: tuf snapshot [--expires=<days>]
 
-Update the snapshot manifest.
+Update the snapshot metadata file.
 
 Alternatively, passphrases can be set via environment variables in the
 form of TUF_{{ROLE}}_PASSPHRASE
 
 Options:
-  --expires=<days>   Set the snapshot manifest to expire <days> days from now.
+  --expires=<days>   Set the snapshot metadata file to expire <days> days from now.
 `)
 }
 
