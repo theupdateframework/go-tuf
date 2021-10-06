@@ -33,7 +33,7 @@ func cmdInit(args *docopt.Args, client *tuf.Client) error {
 			return err
 		}
 	}
-	var rootKeys []*data.Key
+	var rootKeys []*data.PublicKey
 	if err := json.NewDecoder(in).Decode(&rootKeys); err != nil {
 		return err
 	}

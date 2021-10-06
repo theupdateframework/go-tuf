@@ -110,7 +110,7 @@ func NewClient(local LocalStore, remote RemoteStore) *Client {
 // The latest root.json is fetched from remote storage, verified using rootKeys
 // and threshold, and then saved in local storage. It is expected that rootKeys
 // were securely distributed with the software being updated.
-func (c *Client) Init(rootKeys []*data.Key, threshold int) error {
+func (c *Client) Init(rootKeys []*data.PublicKey, threshold int) error {
 	if len(rootKeys) < threshold {
 		return ErrInsufficientKeys
 	}

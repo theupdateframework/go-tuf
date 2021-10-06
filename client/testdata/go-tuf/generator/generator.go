@@ -11,14 +11,15 @@ import (
 	"time"
 
 	tuf "github.com/theupdateframework/go-tuf"
-	"github.com/theupdateframework/go-tuf/sign"
+	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/pkg/keys"
 )
 
 var expirationDate = time.Date(2100, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 type persistedKeys struct {
 	Encrypted bool               `json:"encrypted"`
-	Data      []*sign.PrivateKey `json:"data"`
+	Data      []*data.PrivateKey `json:"data"`
 }
 
 func assertNotNil(err error) {
@@ -48,10 +49,12 @@ func commit(dir string, repo *tuf.Repo) {
 	assertNotNil(os.RemoveAll(filepath.Join(dir, "keys")))
 }
 
-func addKeys(repo *tuf.Repo, roleKeys map[string][]*sign.PrivateKey) {
-	for role, keys := range roleKeys {
-		for _, key := range keys {
-			assertNotNil(repo.AddPrivateKeyWithExpires(role, key, expirationDate))
+func addKeys(repo *tuf.Repo, roleKeys map[string][]*data.PrivateKey) {
+	for role, keyList := range roleKeys {
+		for _, key := range keyList {
+			signer, err := keys.GetSigner(key)
+			assertNotNil(err)
+			assertNotNil(repo.AddPrivateKeyWithExpires(role, signer, expirationDate))
 		}
 	}
 }
@@ -67,16 +70,18 @@ func addTargets(repo *tuf.Repo, dir string, files map[string][]byte) {
 	assertNotNil(repo.AddTargetsWithExpires(paths, nil, expirationDate))
 }
 
-func revokeKeys(repo *tuf.Repo, role string, keys []*sign.PrivateKey) {
-	for _, key := range keys {
-		assertNotNil(repo.RevokeKeyWithExpires(role, key.PublicData().IDs()[0], expirationDate))
+func revokeKeys(repo *tuf.Repo, role string, keyList []*data.PrivateKey) {
+	for _, key := range keyList {
+		signer, err := keys.GetSigner(key)
+		assertNotNil(err)
+		assertNotNil(repo.RevokeKeyWithExpires(role, signer.PublicData().IDs()[0], expirationDate))
 	}
 }
 
-func generateRepos(dir string, roleKeys map[string][][]*sign.PrivateKey, consistentSnapshot bool) {
+func generateRepos(dir string, roleKeys map[string][][]*data.PrivateKey, consistentSnapshot bool) {
 	// Collect all the initial keys we'll use when creating repositories.
 	// We'll modify this to reflect rotated keys.
-	keys := map[string][]*sign.PrivateKey{
+	keys := map[string][]*data.PrivateKey{
 		"root":      roleKeys["root"][0],
 		"targets":   roleKeys["targets"][0],
 		"snapshot":  roleKeys["snapshot"][0],
@@ -104,7 +109,7 @@ func generateRepos(dir string, roleKeys map[string][][]*sign.PrivateKey, consist
 
 		// Actually rotate the keys
 		revokeKeys(repo, role, roleKeys[role][0])
-		addKeys(repo, map[string][]*sign.PrivateKey{
+		addKeys(repo, map[string][]*data.PrivateKey{
 			role: roleKeys[role][1],
 		})
 		keys[role] = roleKeys[role][1]
@@ -131,7 +136,7 @@ func Generate(dir string, keysPath string, consistentSnapshot bool) {
 	f, err := os.Open(keysPath)
 	assertNotNil(err)
 
-	var roleKeys map[string][][]*sign.PrivateKey
+	var roleKeys map[string][][]*data.PrivateKey
 	assertNotNil(json.NewDecoder(f).Decode(&roleKeys))
 
 	log.Printf("generating %s", dir)

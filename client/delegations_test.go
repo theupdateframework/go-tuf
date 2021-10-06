@@ -271,7 +271,7 @@ func initTestDelegationClient(t *testing.T, dirPrefix string) (*Client, func() e
 	root := &data.Root{}
 	assert.Nil(t, json.Unmarshal(rawFile, s))
 	assert.Nil(t, json.Unmarshal(s.Signed, root))
-	var keys []*data.Key
+	var keys []*data.PublicKey
 	for _, sig := range s.Signatures {
 		k, ok := root.Keys[sig.KeyID]
 		if ok {

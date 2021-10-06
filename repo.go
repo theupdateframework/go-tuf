@@ -11,6 +11,7 @@ import (
 
 	cjson "github.com/tent/canonical-json-go"
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/sign"
 	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
@@ -49,11 +50,11 @@ type LocalStore interface {
 	// Commit is used to publish staged files to the repository
 	Commit(bool, map[string]int, map[string]data.Hashes) error
 
-	// GetSigningKeys return a list of signing keys for a role.
-	GetSigningKeys(string) ([]sign.Signer, error)
+	// GetSigners return a list of signers for a role.
+	GetSigners(string) ([]keys.Signer, error)
 
-	// SavePrivateKey adds a signing key to a role.
-	SavePrivateKey(string, *sign.PrivateKey) error
+	// SavePrivateKey adds a signer to a role.
+	SaveSigner(string, keys.Signer) error
 
 	// Clean is used to remove all staged metadata files.
 	Clean() error
@@ -310,24 +311,24 @@ func (r *Repo) GenKey(role string) ([]string, error) {
 	return r.GenKeyWithExpires(role, data.DefaultExpires("root"))
 }
 
-func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) ([]string, error) {
-	key, err := sign.GenerateEd25519Key()
+func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (keyids []string, err error) {
+	signer, err := keys.GenerateEd25519Key()
 	if err != nil {
 		return []string{}, err
 	}
 
-	if err = r.AddPrivateKeyWithExpires(keyRole, key, expires); err != nil {
+	if err = r.AddPrivateKeyWithExpires(keyRole, signer, expires); err != nil {
 		return []string{}, err
 	}
-
-	return key.PublicData().IDs(), nil
+	keyids = signer.PublicData().IDs()
+	return
 }
 
-func (r *Repo) AddPrivateKey(role string, key *sign.PrivateKey) error {
-	return r.AddPrivateKeyWithExpires(role, key, data.DefaultExpires(role))
+func (r *Repo) AddPrivateKey(role string, signer keys.Signer) error {
+	return r.AddPrivateKeyWithExpires(role, signer, data.DefaultExpires(role))
 }
 
-func (r *Repo) AddPrivateKeyWithExpires(keyRole string, key *sign.PrivateKey, expires time.Time) error {
+func (r *Repo) AddPrivateKeyWithExpires(keyRole string, signer keys.Signer, expires time.Time) error {
 	if !verify.ValidRole(keyRole) {
 		return ErrInvalidRole{keyRole}
 	}
@@ -336,19 +337,22 @@ func (r *Repo) AddPrivateKeyWithExpires(keyRole string, key *sign.PrivateKey, ex
 		return ErrInvalidExpires{expires}
 	}
 
-	if err := r.local.SavePrivateKey(keyRole, key); err != nil {
+	if err := r.local.SaveSigner(keyRole, signer); err != nil {
 		return err
 	}
-	pk := key.PublicData()
 
-	return r.AddVerificationKeyWithExpiration(keyRole, pk, expires)
+	if err := r.AddVerificationKeyWithExpiration(keyRole, signer.PublicData(), expires); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (r *Repo) AddVerificationKey(keyRole string, pk *data.Key) error {
+func (r *Repo) AddVerificationKey(keyRole string, pk *data.PublicKey) error {
 	return r.AddVerificationKeyWithExpiration(keyRole, pk, data.DefaultExpires(keyRole))
 }
 
-func (r *Repo) AddVerificationKeyWithExpiration(keyRole string, pk *data.Key, expires time.Time) error {
+func (r *Repo) AddVerificationKeyWithExpiration(keyRole string, pk *data.PublicKey, expires time.Time) error {
 	root, err := r.root()
 	if err != nil {
 		return err
@@ -385,7 +389,7 @@ func validExpires(expires time.Time) bool {
 	return expires.Sub(time.Now()) > 0
 }
 
-func (r *Repo) RootKeys() ([]*data.Key, error) {
+func (r *Repo) RootKeys() ([]*data.PublicKey, error) {
 	root, err := r.root()
 	if err != nil {
 		return nil, err
@@ -398,7 +402,7 @@ func (r *Repo) RootKeys() ([]*data.Key, error) {
 	// We might have multiple key ids that correspond to the same key, so
 	// make sure we only return unique keys.
 	seen := make(map[string]struct{})
-	rootKeys := []*data.Key{}
+	rootKeys := []*data.PublicKey{}
 	for _, id := range role.KeyIDs {
 		key, ok := root.Keys[id]
 		if !ok {
@@ -599,8 +603,8 @@ func (r *Repo) AddOrUpdateSignature(roleFilename string, signature data.Signatur
 // been revoked are omitted), except for the root role in which case all local
 // keys are returned (revoked root keys still need to sign new root metadata so
 // clients can verify the new root.json and update their keys db accordingly).
-func (r *Repo) getSigningKeys(name string) ([]sign.Signer, error) {
-	signingKeys, err := r.local.GetSigningKeys(name)
+func (r *Repo) getSigningKeys(name string) ([]keys.Signer, error) {
+	signingKeys, err := r.local.GetSigners(name)
 	if err != nil {
 		return nil, err
 	}
@@ -618,9 +622,9 @@ func (r *Repo) getSigningKeys(name string) ([]sign.Signer, error) {
 	if len(role.KeyIDs) == 0 {
 		return nil, nil
 	}
-	keys := make([]sign.Signer, 0, len(role.KeyIDs))
+	keys := make([]keys.Signer, 0, len(role.KeyIDs))
 	for _, key := range signingKeys {
-		for _, id := range key.IDs() {
+		for _, id := range key.PublicData().IDs() {
 			if _, ok := role.KeyIDs[id]; ok {
 				keys = append(keys, key)
 			}

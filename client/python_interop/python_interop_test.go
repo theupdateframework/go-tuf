@@ -15,6 +15,7 @@ import (
 	tuf "github.com/theupdateframework/go-tuf"
 	client "github.com/theupdateframework/go-tuf/client"
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/util"
 	"golang.org/x/crypto/ed25519"
 	. "gopkg.in/check.v1"
@@ -61,12 +62,14 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 		// initiate a client with the root keys
 		f, err := os.Open(filepath.Join(testDataDir, dir, "keystore", "root_key.pub"))
 		c.Assert(err, IsNil)
-		key := &data.Key{}
+		key := &data.PublicKey{}
 		c.Assert(json.NewDecoder(f).Decode(key), IsNil)
 		c.Assert(key.Type, Equals, "ed25519")
-		c.Assert(key.Value.Public, HasLen, ed25519.PublicKeySize)
+		pk, err := keys.GetVerifier(key)
+		c.Assert(err, IsNil)
+		c.Assert(pk.Public(), HasLen, ed25519.PublicKeySize)
 		client := client.NewClient(client.MemoryLocalStore(), remote)
-		c.Assert(client.Init([]*data.Key{key}, 1), IsNil)
+		c.Assert(client.Init([]*data.PublicKey{key}, 1), IsNil)
 
 		// check update returns the correct updated targets
 		files, err := client.Update()
