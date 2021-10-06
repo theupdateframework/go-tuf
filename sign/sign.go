@@ -65,7 +65,6 @@ func Marshal(v interface{}, keys ...Signer) (*data.Signed, error) {
 		return nil, err
 	}
 	s := &data.Signed{Signed: b}
-
 	for _, k := range keys {
 		if err := Sign(s, k); err != nil {
 			return nil, err

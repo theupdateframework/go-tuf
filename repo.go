@@ -500,13 +500,7 @@ func (r *Repo) setMeta(roleFilename string, meta interface{}) error {
 	if err != nil {
 		return err
 	}
-
-	// Sign in a deterministic order.
-	sortedKeys := make([]sign.Signer, len(keys))
-	copy(sortedKeys, keys)
-	sort.Sort(signer.ByIDs(sortedKeys))
-
-	s, err := sign.Marshal(meta, sortedKeys...)
+	s, err := sign.Marshal(meta, keys...)
 	if err != nil {
 		return err
 	}
@@ -536,13 +530,7 @@ func (r *Repo) Sign(roleFilename string) error {
 	if len(keys) == 0 {
 		return ErrInsufficientKeys{roleFilename}
 	}
-
-	// Sign in a deterministic order.
-	sortedKeys := make([]sign.Signer, len(keys))
-	copy(sortedKeys, keys)
-	sort.Sort(signer.ByIDs(sortedKeys))
-
-	for _, k := range sortedKeys {
+	for _, k := range keys {
 		sign.Sign(s, k)
 	}
 
@@ -619,7 +607,10 @@ func (r *Repo) getSigningKeys(name string) ([]sign.Signer, error) {
 		return nil, err
 	}
 	if name == "root" {
-		return signingKeys, nil
+		sorted := make([]sign.Signer, len(signingKeys))
+		copy(sorted, signingKeys)
+		sort.Sort(signer.ByIDs(sorted))
+		return sorted, nil
 	}
 	db, err := r.db()
 	if err != nil {
@@ -640,6 +631,8 @@ func (r *Repo) getSigningKeys(name string) ([]sign.Signer, error) {
 			}
 		}
 	}
+
+	sort.Sort(signer.ByIDs(keys))
 
 	return keys, nil
 }
