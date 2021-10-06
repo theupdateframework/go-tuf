@@ -478,7 +478,7 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 
 	err = r.setMeta("root.json", root)
 	if err == nil {
-		fmt.Println("Revoked", keyRole, "key with ID", id)
+		fmt.Println("Revoked", keyRole, "key with ID", id, "in root metadata")
 	}
 	return err
 }
