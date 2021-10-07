@@ -117,6 +117,10 @@ should be distributed to clients for performing initial updates.
 Sets the `role` threshold, the required number of keys for signing, to
 `threshold`.
 
+#### `tuf change-passphrase <role>`
+
+Changes the passphrase for given role keys file.
+
 #### Usage of environment variables
 
 The `tuf` CLI supports receiving passphrases via environment variables in
