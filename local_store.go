@@ -348,7 +348,10 @@ func (f *fileSystemStore) ChangePassphrase(role string) error {
 	// Read the existing keys (if any)
 	// If encrypted, will prompt for existing passphrase
 	keys, _, err := f.loadPrivateKeys(role)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Printf("Failed to change passphrase. Missing keys file for %s role. \n", role)
+		}
 		return err
 	}
 	// Prompt for new passphrase
