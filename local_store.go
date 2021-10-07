@@ -3,6 +3,7 @@ package tuf
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -91,6 +92,13 @@ func (m *memoryStore) Commit(consistentSnapshot bool, versions map[string]int, h
 			m.meta[path] = meta
 		}
 	}
+	return nil
+}
+
+// ChangePassphrase changes the passphrase for a role keys file
+func (f *memoryStore) ChangePassphrase(role string) error {
+	/* Not needed, keys are not stored nor encrypted
+	anywhere with this type of storage backend */
 	return nil
 }
 
@@ -329,6 +337,41 @@ func (f *fileSystemStore) GetSigners(role string) ([]keys.Signer, error) {
 	}
 	f.signers[role] = signers(keys)
 	return f.signers[role], nil
+}
+
+// ChangePassphrase changes the passphrase for a role keys file
+func (f *fileSystemStore) ChangePassphrase(role string) error {
+	// No need to proceed if passphrase func is not set
+	if f.passphraseFunc == nil {
+		return ErrPassphraseRequired{role}
+	}
+	// Read the existing keys (if any)
+	// If encrypted, will prompt for existing passphrase
+	keys, _, err := f.loadPrivateKeys(role)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	// Prompt for new passphrase
+	fmt.Println("Enter your new", role, "keys passphrase")
+	pass, err := f.passphraseFunc(role, true)
+	if err != nil {
+		return err
+	}
+	// Proceed saving the keys
+	pk := &persistedKeys{Encrypted: true}
+	pk.Data, err = encrypted.Marshal(keys, pass)
+	if err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(pk, "", "\t")
+	if err != nil {
+		return err
+	}
+	if err := util.AtomicallyWriteFile(f.keysPath(role), append(data, '\n'), 0600); err != nil {
+		return err
+	}
+	fmt.Println("Passphrase for", role, "keys file changed successfully")
+	return nil
 }
 
 func (f *fileSystemStore) SaveSigner(role string, signer keys.Signer) error {
