@@ -1256,7 +1256,7 @@ func (rs *RepoSuite) TestHashAlgorithm(c *C) {
 }
 
 func testPassphraseFunc(p []byte) util.PassphraseFunc {
-	return func(string, bool) ([]byte, error) { return p, nil }
+	return func(string, bool, bool) ([]byte, error) { return p, nil }
 }
 
 func (rs *RepoSuite) TestKeyPersistence(c *C) {
