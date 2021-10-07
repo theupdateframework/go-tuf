@@ -125,11 +125,14 @@ func parseExpires(arg string) (time.Time, error) {
 	return time.Now().AddDate(0, 0, days).UTC(), nil
 }
 
-func getPassphrase(role string, confirm bool) ([]byte, error) {
+func getPassphrase(role string, confirm bool, change bool) ([]byte, error) {
 	if pass := os.Getenv(fmt.Sprintf("TUF_%s_PASSPHRASE", strings.ToUpper(role))); pass != "" {
 		return []byte(pass), nil
 	}
-
+	// Alter role string if we are prompting for a passphrase change
+	if change {
+		role = fmt.Sprintf("new %s", role)
+	}
 	fmt.Printf("Enter %s keys passphrase: ", role)
 	passphrase, err := terminal.ReadPassword(int(syscall.Stdin))
 	fmt.Println()

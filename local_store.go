@@ -352,8 +352,7 @@ func (f *fileSystemStore) ChangePassphrase(role string) error {
 		return err
 	}
 	// Prompt for new passphrase
-	fmt.Println("Enter your new", role, "keys passphrase")
-	pass, err := f.passphraseFunc(role, true)
+	pass, err := f.passphraseFunc(role, true, true)
 	if err != nil {
 		return err
 	}
@@ -370,7 +369,7 @@ func (f *fileSystemStore) ChangePassphrase(role string) error {
 	if err := util.AtomicallyWriteFile(f.keysPath(role), append(data, '\n'), 0600); err != nil {
 		return err
 	}
-	fmt.Println("Passphrase for", role, "keys file changed successfully")
+	fmt.Printf("Successfully changed passphrase for %s keys file\n", role)
 	return nil
 }
 
@@ -395,7 +394,7 @@ func (f *fileSystemStore) SaveSigner(role string, signer keys.Signer) error {
 	// be encrypted later (passphraseFunc being nil indicates the keys file
 	// should not be encrypted)
 	if pass == nil && f.passphraseFunc != nil {
-		pass, err = f.passphraseFunc(role, true)
+		pass, err = f.passphraseFunc(role, true, false)
 		if err != nil {
 			return err
 		}
@@ -455,7 +454,7 @@ func (f *fileSystemStore) loadPrivateKeys(role string) ([]*data.PrivateKey, []by
 	// try the empty string as the password first
 	pass := []byte("")
 	if err := encrypted.Unmarshal(pk.Data, &keys, pass); err != nil {
-		pass, err = f.passphraseFunc(role, false)
+		pass, err = f.passphraseFunc(role, false, false)
 		if err != nil {
 			return nil, nil, err
 		}
