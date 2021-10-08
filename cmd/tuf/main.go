@@ -127,7 +127,9 @@ func parseExpires(arg string) (time.Time, error) {
 }
 
 func getPassphrase(role string, confirm bool, change bool) ([]byte, error) {
-	if pass := os.Getenv(fmt.Sprintf("TUF_%s_PASSPHRASE", strings.ToUpper(role))); pass != "" {
+	// In case of change we need to prompt explicitly for a new passphrase
+	// and not read it from the environment variable, if present
+	if pass := os.Getenv(fmt.Sprintf("TUF_%s_PASSPHRASE", strings.ToUpper(role))); pass != "" && !change {
 		return []byte(pass), nil
 	}
 	// Alter role string if we are prompting for a passphrase change
