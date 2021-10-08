@@ -1,9 +1,10 @@
 package keys
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/theupdateframework/go-tuf/data"
 )
 
@@ -60,7 +61,7 @@ func GetVerifier(key *data.PublicKey) (Verifier, error) {
 	}
 	s := st.(func() Verifier)()
 	if err := s.UnmarshalPublicKey(key); err != nil {
-		return nil, errors.Wrap(err, "tuf: error unmarshalling key")
+		return nil, fmt.Errorf("tuf: error unmarshalling key: %w", err)
 	}
 	return s, nil
 }
@@ -72,7 +73,7 @@ func GetSigner(key *data.PrivateKey) (Signer, error) {
 	}
 	s := st.(func() Signer)()
 	if err := s.UnmarshalPrivateKey(key); err != nil {
-		return nil, errors.Wrap(err, "tuf: error unmarshalling key")
+		return nil, fmt.Errorf("tuf: error unmarshalling key: %w", err)
 	}
 	return s, nil
 }

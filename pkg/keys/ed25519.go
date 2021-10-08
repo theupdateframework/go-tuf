@@ -5,8 +5,8 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 
-	"github.com/pkg/errors"
 	"github.com/theupdateframework/go-tuf/data"
 )
 
