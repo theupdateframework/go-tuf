@@ -8,8 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-
-	"github.com/pkg/errors"
+	"errors"
 
 	"github.com/theupdateframework/go-tuf/data"
 )
