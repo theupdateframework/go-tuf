@@ -246,7 +246,7 @@ func TestCustomField(t *testing.T) {
 	root := Root{
 		Type:               "root",
 		SpecVersion:        "1.0",
-		Keys:               make(map[string]*Key),
+		Keys:               make(map[string]*PublicKey),
 		Roles:              make(map[string]*Role),
 		ConsistentSnapshot: true,
 		Custom:             &testCustomJSON,
