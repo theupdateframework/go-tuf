@@ -1,67 +1,68 @@
 package signer_test
 
 import (
-	"crypto"
+	"encoding/json"
 	"reflect"
 	"sort"
 	"testing"
 
+	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/internal/signer"
-	"github.com/theupdateframework/go-tuf/sign"
+	"github.com/theupdateframework/go-tuf/pkg/keys"
 )
 
 type mockSigner struct {
-	ids []string
-
-	crypto.Signer
+	value json.RawMessage
 }
 
-func (s *mockSigner) IDs() []string {
-	return s.ids
+func (s *mockSigner) MarshalPrivateKey() (*data.PrivateKey, error) {
+	panic("not implemented")
+	return nil, nil
 }
 
-func (s *mockSigner) ContainsID(id string) bool {
-	for _, keyid := range s.IDs() {
-		if id == keyid {
-			return true
-		}
+func (s *mockSigner) UnmarshalPrivateKey(key *data.PrivateKey) error {
+	panic("not implemented")
+	return nil
+}
+
+func (s *mockSigner) PublicData() *data.PublicKey {
+	return &data.PublicKey{
+		Type:       "mock",
+		Scheme:     "mock",
+		Algorithms: []string{"mock"},
+		Value:      s.value,
 	}
-	return false
 }
-
-func (s *mockSigner) Type() string {
-	return "type"
-}
-
-func (s *mockSigner) Scheme() string {
-	return "scheme"
+func (s *mockSigner) SignMessage(message []byte) ([]byte, error) {
+	panic("not implemented")
+	return nil, nil
 }
 
 func TestSignerSortByIDs(t *testing.T) {
 	s1 := &mockSigner{
-		ids: []string{"c", "b", "a"},
+		value: json.RawMessage(`{"mock": 1}`),
 	}
 	s2 := &mockSigner{
-		ids: []string{"a", "d", "z"},
+		value: json.RawMessage(`{"mock": 2}`),
 	}
 	s3 := &mockSigner{
-		ids: []string{"x", "y"},
+		value: json.RawMessage(`{"mock": 3}`),
 	}
 	s4 := &mockSigner{
-		ids: []string{"x", "y", "z"},
+		value: json.RawMessage(`{"mock": 4}`),
 	}
 	s5 := &mockSigner{
-		ids: []string{"z", "z", "z"},
+		value: json.RawMessage(`{"mock": 5}`),
 	}
 
-	s := []sign.Signer{
-		s4, s5, s3, s2, s1,
+	s := []keys.Signer{
+		s1, s2, s3, s4, s5,
 	}
 
 	sort.Sort(signer.ByIDs(s))
 
-	sorted := []sign.Signer{
-		s1, s2, s3, s4, s5,
+	sorted := []keys.Signer{
+		s4, s1, s5, s2, s3,
 	}
 
 	if !reflect.DeepEqual(s, sorted) {

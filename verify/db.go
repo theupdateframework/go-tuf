@@ -2,6 +2,7 @@ package verify
 
 import (
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/pkg/keys"
 )
 
 type Role struct {
@@ -15,14 +16,14 @@ func (r *Role) ValidKey(id string) bool {
 }
 
 type DB struct {
-	roles map[string]*Role
-	keys  map[string]*data.Key
+	roles     map[string]*Role
+	verifiers map[string]keys.Verifier
 }
 
 func NewDB() *DB {
 	return &DB{
-		roles: make(map[string]*Role),
-		keys:  make(map[string]*data.Key),
+		roles:     make(map[string]*Role),
+		verifiers: make(map[string]keys.Verifier),
 	}
 }
 
@@ -39,8 +40,8 @@ func (d *DelegationsVerifier) Unmarshal(b []byte, v interface{}, role string, mi
 // unmarshals.
 func NewDelegationsVerifier(d *data.Delegations) (DelegationsVerifier, error) {
 	db := &DB{
-		roles: make(map[string]*Role, len(d.Roles)),
-		keys:  make(map[string]*data.Key, len(d.Keys)),
+		roles:     make(map[string]*Role, len(d.Roles)),
+		verifiers: make(map[string]keys.Verifier, len(d.Keys)),
 	}
 	for _, r := range d.Roles {
 		if _, ok := topLevelRoles[r.Name]; ok {
@@ -59,20 +60,15 @@ func NewDelegationsVerifier(d *data.Delegations) (DelegationsVerifier, error) {
 	return DelegationsVerifier{db}, nil
 }
 
-func (db *DB) AddKey(id string, k *data.Key) error {
-	v, ok := Verifiers[k.Type]
-	if !ok {
-		return nil
-	}
+func (db *DB) AddKey(id string, k *data.PublicKey) error {
 	if !k.ContainsID(id) {
 		return ErrWrongID{}
 	}
-	if !v.ValidKey(k.Value.Public) {
+	verifier, err := keys.GetVerifier(k)
+	if err != nil {
 		return ErrInvalidKey
 	}
-
-	db.keys[id] = k
-
+	db.verifiers[id] = verifier
 	return nil
 }
 
@@ -120,8 +116,12 @@ func (db *DB) addRole(name string, r *data.Role) error {
 	return nil
 }
 
-func (db *DB) GetKey(id string) *data.Key {
-	return db.keys[id]
+func (db *DB) GetVerifier(id string) (keys.Verifier, error) {
+	k, ok := db.verifiers[id]
+	if !ok {
+		return nil, ErrMissingKey
+	}
+	return k, nil
 }
 
 func (db *DB) GetRole(name string) *Role {

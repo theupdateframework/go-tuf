@@ -12,8 +12,8 @@ func init() {
 	register("clean", cmdClean, `
 usage: tuf clean
 
-Remove all staged manifests.
-  `)
+Remove all staged metadata files.
+`)
 }
 
 func cmdClean(args *docopt.Args, repo *tuf.Repo) error {

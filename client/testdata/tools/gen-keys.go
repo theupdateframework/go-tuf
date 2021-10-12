@@ -10,7 +10,7 @@ import (
 	"io/ioutil"
 	"time"
 
-	sign "github.com/theupdateframework/go-tuf/sign"
+	"github.com/theupdateframework/go-tuf/data"
 )
 
 var expirationDate = time.Date(2100, time.January, 1, 0, 0, 0, 0, time.UTC)
@@ -23,15 +23,15 @@ func main() {
 		"timestamp",
 	}
 
-	roles := make(map[string][][]*sign.PrivateKey)
+	roles := make(map[string][][]*data.PrivateKey)
 
 	for _, name := range rolenames {
-		keys := [][]*sign.PrivateKey{}
+		keys := [][]*data.PrivateKey{}
 
 		for i := 0; i < 2; i++ {
-			key, err := sign.GenerateEd25519Key()
+			signer, err := keys.GenerateEd25519Key()
 			assertNotNil(err)
-			keys = append(keys, []*sign.PrivateKey{key})
+			keys = append(keys, []*data.PrivateKey{signer})
 		}
 
 		roles[name] = keys

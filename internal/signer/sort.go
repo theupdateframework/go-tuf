@@ -3,13 +3,14 @@ package signer
 import (
 	"sort"
 
-	"github.com/theupdateframework/go-tuf/sign"
+	"github.com/theupdateframework/go-tuf/pkg/keys"
 )
 
-// ByIDs implements sort.Interface for []sign.Signer based on the sorted
-// IDs() for each Signer. This facilitates deterministic order of signatures,
-// which prevents tests that use fixtures from being flaky.
-type ByIDs []sign.Signer
+// ByIDs implements sort.Interface for []keys.Signer based on
+// the sorted public IDs() for each Signer. This facilitates
+// deterministic order of signatures, which prevents tests
+// that use fixtures from being flaky.
+type ByIDs []keys.Signer
 
 func (b ByIDs) Len() int {
 	return len(b)
@@ -20,12 +21,12 @@ func (b ByIDs) Swap(i, j int) {
 }
 
 func (b ByIDs) Less(i, j int) bool {
-	ids := b[i].IDs()
+	ids := b[i].PublicData().IDs()
 	iIDs := make([]string, len(ids))
 	copy(iIDs, ids)
 	sort.Strings(iIDs)
 
-	ids = b[j].IDs()
+	ids = b[j].PublicData().IDs()
 	jIDs := make([]string, len(ids))
 	copy(jIDs, ids)
 	sort.Strings(jIDs)

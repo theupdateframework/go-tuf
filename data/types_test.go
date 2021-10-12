@@ -23,23 +23,29 @@ type TypesSuite struct{}
 
 var _ = Suite(&TypesSuite{})
 
+type ed25519Public struct {
+	PublicKey HexBytes `json:"public"`
+}
+
 func (TypesSuite) TestKeyIDs(c *C) {
 	var hexbytes HexBytes
 	err := json.Unmarshal([]byte(public), &hexbytes)
 	c.Assert(err, IsNil)
+	keyValBytes, err := json.Marshal(ed25519Public{PublicKey: hexbytes})
+	c.Assert(err, IsNil)
 
-	key := Key{
+	key := PublicKey{
 		Type:   KeyTypeEd25519,
 		Scheme: KeySchemeEd25519,
-		Value:  KeyValue{Public: hexbytes},
+		Value:  keyValBytes,
 	}
 	c.Assert(key.IDs(), DeepEquals, []string{keyid10})
 
-	key = Key{
+	key = PublicKey{
 		Type:       KeyTypeEd25519,
 		Scheme:     KeySchemeEd25519,
-		Algorithms: KeyAlgorithms,
-		Value:      KeyValue{Public: hexbytes},
+		Algorithms: HashAlgorithms,
+		Value:      keyValBytes,
 	}
 	c.Assert(key.IDs(), DeepEquals, []string{keyid10algos})
 }
@@ -48,11 +54,13 @@ func (TypesSuite) TestRootAddKey(c *C) {
 	var hexbytes HexBytes
 	err := json.Unmarshal([]byte(public), &hexbytes)
 	c.Assert(err, IsNil)
+	keyValBytes, err := json.Marshal(ed25519Public{PublicKey: hexbytes})
+	c.Assert(err, IsNil)
 
-	key := &Key{
+	key := &PublicKey{
 		Type:   KeyTypeEd25519,
 		Scheme: KeySchemeEd25519,
-		Value:  KeyValue{Public: hexbytes},
+		Value:  keyValBytes,
 	}
 
 	root := NewRoot()
@@ -65,11 +73,13 @@ func (TypesSuite) TestRoleAddKeyIDs(c *C) {
 	var hexbytes HexBytes
 	err := json.Unmarshal([]byte(public), &hexbytes)
 	c.Assert(err, IsNil)
+	keyValBytes, err := json.Marshal(ed25519Public{PublicKey: hexbytes})
+	c.Assert(err, IsNil)
 
-	key := &Key{
+	key := &PublicKey{
 		Type:   KeyTypeEd25519,
 		Scheme: KeySchemeEd25519,
-		Value:  KeyValue{Public: hexbytes},
+		Value:  keyValBytes,
 	}
 
 	role := &Role{}
@@ -83,11 +93,11 @@ func (TypesSuite) TestRoleAddKeyIDs(c *C) {
 	c.Assert(role.KeyIDs, DeepEquals, []string{keyid10})
 
 	// Add another key.
-	key = &Key{
+	key = &PublicKey{
 		Type:       KeyTypeEd25519,
 		Scheme:     KeySchemeEd25519,
-		Algorithms: KeyAlgorithms,
-		Value:      KeyValue{Public: hexbytes},
+		Algorithms: HashAlgorithms,
+		Value:      keyValBytes,
 	}
 
 	// Adding the key again doesn't modify the array.

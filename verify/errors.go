@@ -51,6 +51,15 @@ func (e ErrLowVersion) Error() string {
 	return fmt.Sprintf("version %d is lower than current version %d", e.Actual, e.Current)
 }
 
+type ErrWrongVersion struct {
+	Given    int
+	Expected int
+}
+
+func (e ErrWrongVersion) Error() string {
+	return fmt.Sprintf("version %d does not match the expected version %d", e.Given, e.Expected)
+}
+
 type ErrRoleThreshold struct {
 	Expected int
 	Actual   int

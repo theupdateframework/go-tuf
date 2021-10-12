@@ -15,7 +15,7 @@ type signedMeta struct {
 	Version int       `json:"version"`
 }
 
-func (db *DB) Verify(s *data.Signed, role string, minVersion int) error {
+func (db *DB) VerifyIgnoreExpiredCheck(s *data.Signed, role string, minVersion int) error {
 	if err := db.VerifySignatures(s, role); err != nil {
 		return err
 	}
@@ -38,12 +38,28 @@ func (db *DB) Verify(s *data.Signed, role string, minVersion int) error {
 		}
 	}
 
-	if IsExpired(sm.Expires) {
-		return ErrExpired{sm.Expires}
-	}
-
 	if sm.Version < minVersion {
 		return ErrLowVersion{sm.Version, minVersion}
+	}
+
+	return nil
+}
+
+func (db *DB) Verify(s *data.Signed, role string, minVersion int) error {
+
+	err := db.VerifyIgnoreExpiredCheck(s, role, minVersion)
+
+	if err != nil {
+		return err
+	}
+
+	sm := &signedMeta{}
+	if err := json.Unmarshal(s.Signed, sm); err != nil {
+		return err
+	}
+
+	if IsExpired(sm.Expires) {
+		return ErrExpired{sm.Expires}
 	}
 
 	return nil
@@ -81,19 +97,19 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 		if !roleData.ValidKey(sig.KeyID) {
 			continue
 		}
-		key := db.GetKey(sig.KeyID)
-		if key == nil {
+		verifier, err := db.GetVerifier(sig.KeyID)
+		if err != nil {
 			continue
 		}
 
-		if err := Verifiers[key.Type].Verify(key.Value.Public, msg, sig.Signature); err != nil {
-			return err
+		if err := verifier.Verify(msg, sig.Signature); err != nil {
+			return ErrInvalid
 		}
 
 		// Only consider this key valid if we haven't seen any of it's
 		// key ids before.
 		if _, ok := seen[sig.KeyID]; !ok {
-			for _, id := range key.IDs() {
+			for _, id := range verifier.MarshalPublicKey().IDs() {
 				seen[id] = struct{}{}
 			}
 
@@ -114,6 +130,23 @@ func (db *DB) Unmarshal(b []byte, v interface{}, role string, minVersion int) er
 	}
 	if err := db.Verify(s, role, minVersion); err != nil {
 		return err
+	}
+	return json.Unmarshal(s.Signed, v)
+}
+
+// UnmarshalExpired is exactly like Unmarshal except ignores expired timestamp error.
+func (db *DB) UnmarshalIgnoreExpired(b []byte, v interface{}, role string, minVersion int) error {
+	s := &data.Signed{}
+	if err := json.Unmarshal(b, s); err != nil {
+		return err
+	}
+	// Note: If verification fails, then we wont attempt to unmarshal
+	// unless when verification error is errExpired.
+	verifyErr := db.Verify(s, role, minVersion)
+	if verifyErr != nil {
+		if _, ok := verifyErr.(ErrExpired); !ok {
+			return verifyErr
+		}
 	}
 	return json.Unmarshal(s.Signed, v)
 }

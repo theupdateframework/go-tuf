@@ -3,17 +3,22 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	cjson "github.com/tent/canonical-json-go"
 	tuf "github.com/theupdateframework/go-tuf"
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/sign"
 	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
@@ -168,7 +173,7 @@ func (s *ClientSuite) addRemoteTarget(c *C, name string) {
 	s.syncRemote(c)
 }
 
-func (s *ClientSuite) rootKeys(c *C) []*data.Key {
+func (s *ClientSuite) rootKeys(c *C) []*data.PublicKey {
 	rootKeys, err := s.repo.RootKeys()
 	c.Assert(err, IsNil)
 	c.Assert(rootKeys, HasLen, 1)
@@ -298,7 +303,7 @@ func (s *ClientSuite) TestNoChangeUpdate(c *C) {
 	_, err := client.Update()
 	c.Assert(err, IsNil)
 	_, err = client.Update()
-	c.Assert(IsLatestSnapshot(err), Equals, true)
+	c.Assert(err, IsNil)
 }
 
 func (s *ClientSuite) TestNewTimestamp(c *C) {
@@ -308,7 +313,7 @@ func (s *ClientSuite) TestNewTimestamp(c *C) {
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncRemote(c)
 	_, err := client.Update()
-	c.Assert(IsLatestSnapshot(err), Equals, true)
+	c.Assert(err, IsNil)
 	c.Assert(client.timestampVer > version, Equals, true)
 }
 
@@ -342,7 +347,8 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	for _, ids := range s.keyIDs {
 		c.Assert(len(ids) > 0, Equals, true)
 		for _, id := range ids {
-			c.Assert(client.db.GetKey(id), IsNil)
+			_, err := client.db.GetVerifier(id)
+			c.Assert(err, NotNil)
 		}
 	}
 
@@ -350,13 +356,194 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	for name, ids := range newKeyIDs {
 		c.Assert(len(ids) > 0, Equals, true)
 		for _, id := range ids {
-			key := client.db.GetKey(id)
-			c.Assert(key, NotNil)
-			c.Assert(key.IDs(), DeepEquals, ids)
+			verifier, err := client.db.GetVerifier(id)
+			c.Assert(err, IsNil)
+			c.Assert(verifier.MarshalPublicKey().IDs(), DeepEquals, ids)
 		}
 		role := client.db.GetRole(name)
 		c.Assert(role, NotNil)
 		c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(ids))
+	}
+}
+
+// startTUFRepoServer starts a HTTP server to serve a TUF Repo.
+func startTUFRepoServer(baseDir string, relPath string) (net.Listener, error) {
+	serverDir := filepath.Join(baseDir, relPath)
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	go http.Serve(l, http.FileServer(http.Dir(serverDir)))
+	return l, err
+}
+
+// newClientWithMeta creates new client and sets the root metadata for it.
+func newClientWithMeta(baseDir string, relPath string, serverAddr string) (*Client, error) {
+	initialStateDir := filepath.Join(baseDir, relPath)
+	opts := &HTTPRemoteOptions{
+		MetadataPath: "metadata",
+		TargetsPath:  "targets",
+	}
+
+	remote, err := HTTPRemoteStore(fmt.Sprintf("http://%s/", serverAddr), opts, nil)
+	if err != nil {
+		return nil, err
+	}
+	c := NewClient(MemoryLocalStore(), remote)
+	for _, m := range []string{"root.json", "snapshot.json", "timestamp.json", "targets.json"} {
+		if _, err := os.Stat(initialStateDir + "/" + m); err == nil {
+			metadataJSON, err := ioutil.ReadFile(initialStateDir + "/" + m)
+			if err != nil {
+				return nil, err
+			}
+			c.local.SetMeta(m, metadataJSON)
+		}
+	}
+	return c, nil
+}
+
+func initRootTest(c *C, baseDir string) (*Client, func() error) {
+	l, err := startTUFRepoServer(baseDir, "server")
+	c.Assert(err, IsNil)
+	tufClient, err := newClientWithMeta(baseDir, "client/metadata/current", l.Addr().String())
+	c.Assert(err, IsNil)
+	return tufClient, l.Close
+}
+
+func (s *ClientSuite) TestUpdateRoots(c *C) {
+	var tests = []struct {
+		fixturePath      string
+		expectedError    error
+		expectedVersions map[string]int
+	}{
+		// Succeeds when there is no root update.
+		{"testdata/Published1Time", nil, map[string]int{"root": 1, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// Succeeds when client only has root.json
+		{"testdata/Published1Time_client_root_only", nil, map[string]int{"root": 1, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// Succeeds updating root from version 1 to version 2.
+		{"testdata/Published2Times_keyrotated", nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// Succeeds updating root from version 1 to version 2 when the client's initial root version is expired.
+		{"testdata/Published2Times_keyrotated_initialrootexpired", nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// Succeeds updating root from version 1 to version 3 when versions 1 and 2 are expired.
+		{"testdata/Published3Times_keyrotated_initialrootsexpired", nil, map[string]int{"root": 3, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// Succeeds updating root from version 2 to version 3.
+		{"testdata/Published3Times_keyrotated_initialrootsexpired_clientversionis2", nil, map[string]int{"root": 3, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// Fails updating root from version 1 to version 3 when versions 1 and 3 are expired but version 2 is not expired.
+		{"testdata/Published3Times_keyrotated_latestrootexpired", ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		// Fails updating root from version 1 to version 2 when old root 1 did not sign off on it (nth root didn't sign off n+1).
+		{"testdata/Published2Times_keyrotated_invalidOldRootSignature", errors.New("tuf: signature verification failed"), map[string]int{}},
+		// Fails updating root from version 1 to version 2 when the new root 2 did not sign itself (n+1th root didn't sign off n+1)
+		{"testdata/Published2Times_keyrotated_invalidNewRootSignature", errors.New("tuf: signature verification failed"), map[string]int{}},
+		// Fails updating root to 2.root.json when the value of the version field inside it is 1 (rollback attack prevention).
+		{"testdata/Published1Time_backwardRootVersion", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), map[string]int{}},
+		// Fails updating root to 2.root.json when the value of the version field inside it is 3 (rollforward attack prevention).
+		{"testdata/Published3Times_keyrotated_forwardRootVersion", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), map[string]int{}},
+		// Fails updating when there is no local trusted root.
+		{"testdata/Published1Time_client_no_root", errors.New("tuf: no root keys found in local meta store"), map[string]int{}},
+
+		// snapshot role key rotation increase the snapshot and timestamp.
+		{"testdata/Published2Times_snapshot_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 1}},
+		// targets role key rotation increase the snapshot, timestamp, and targets.
+		{"testdata/Published2Times_targets_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 2}},
+		// timestamp role key rotation increase the timestamp.
+		{"testdata/Published2Times_timestamp_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 1, "targets": 1}},
+	}
+
+	for _, test := range tests {
+		tufClient, closer := initRootTest(c, test.fixturePath)
+		_, err := tufClient.Update()
+		if test.expectedError == nil {
+			c.Assert(err, IsNil)
+			// Check if the root.json is being saved in non-volatile storage.
+			tufClient.getLocalMeta()
+			versionMethods := map[string]int{"root": tufClient.rootVer,
+				"timestamp": tufClient.timestampVer,
+				"snapshot":  tufClient.snapshotVer,
+				"targets":   tufClient.targetsVer}
+			for m, v := range test.expectedVersions {
+				assert.Equal(c, v, versionMethods[m])
+			}
+		} else {
+			// For backward compatibility, the update root returns
+			// ErrDecodeFailed that wraps the verify.ErrExpired.
+			if _, ok := test.expectedError.(ErrDecodeFailed); ok {
+				decodeErr, ok := err.(ErrDecodeFailed)
+				c.Assert(ok, Equals, true)
+				c.Assert(decodeErr.File, Equals, "root.json")
+				_, ok = decodeErr.Err.(verify.ErrExpired)
+				c.Assert(ok, Equals, true)
+			} else {
+				assert.Equal(c, test.expectedError, err)
+			}
+		}
+		closer()
+	}
+}
+
+func (s *ClientSuite) TestFastForwardAttackRecovery(c *C) {
+	var tests = []struct {
+		fixturePath       string
+		expectMetaDeleted map[string]bool
+	}{
+		// Each of the following test cases each has a two sets of TUF metadata:
+		// (1) client's initial, and (2) server's current.
+		// The naming format is PublishedTwiceMultiKeysadd_X_revoke_Y_threshold_Z_ROLE
+		// The client includes TUF metadata before key rotation for TUF ROLE with X keys.
+		// The server includes updated TUF metadata after key rotation. The
+		// rotation involves revoking Y keys from the initial keys.
+		// For each test, the TUF client's will be initialized to the client files.
+		// The test checks whether the client is  able to update itself properly.
+
+		// Fast-forward recovery is not needed if less than threshold keys are revoked.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_root",
+			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_snapshot",
+			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_targets",
+			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_2_threshold_4_timestamp",
+			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
+
+		// Fast-forward recovery not needed if root keys are revoked, even when the threshold number of root keys are revoked.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_root",
+			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": false, "targets.json": false}},
+
+		// Delete snapshot and timestamp metadata if a threshold number of snapshot keys are revoked.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_snapshot",
+			map[string]bool{"root.json": false, "timestamp.json": true, "snapshot.json": true, "targets.json": false}},
+		// Delete targets and snapshot metadata if a threshold number of targets keys are revoked.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_targets",
+			map[string]bool{"root.json": false, "timestamp.json": false, "snapshot.json": true, "targets.json": true}},
+		// Delete timestamp metadata if a threshold number of timestamp keys are revoked.
+		{"testdata/PublishedTwiceMultiKeysadd_9_revoke_4_threshold_4_timestamp",
+			map[string]bool{"root.json": false, "timestamp.json": true, "snapshot.json": false, "targets.json": false}},
+	}
+	for _, test := range tests {
+		tufClient, closer := initRootTest(c, test.fixturePath)
+		c.Assert(tufClient.UpdateRoots(), IsNil)
+		m, err := tufClient.local.GetMeta()
+		c.Assert(err, IsNil)
+		for md, deleted := range test.expectMetaDeleted {
+			if deleted {
+				if _, ok := m[md]; ok {
+					c.Fatalf("Metadata %s is not deleted!", md)
+				}
+			} else {
+				if _, ok := m[md]; !ok {
+					c.Fatalf("Metadata %s deleted!", md)
+				}
+			}
+		}
+		closer()
+	}
+
+}
+
+func (s *ClientSuite) TestUpdateRace(c *C) {
+	// Tests race condition for the client update. You need to run the test with -race flag:
+	// go test -race
+	for i := 0; i < 2; i++ {
+		go func() {
+			c := NewClient(MemoryLocalStore(), newFakeRemoteStore())
+			c.Update()
+		}()
 	}
 }
 
@@ -405,12 +592,13 @@ func (s *ClientSuite) TestNewTimestampKey(c *C) {
 
 	// check key has been replaced in db
 	for _, oldID := range oldIDs {
-		c.Assert(client.db.GetKey(oldID), IsNil)
+		_, err := client.db.GetVerifier(oldID)
+		c.Assert(err, NotNil)
 	}
 	for _, newID := range newIDs {
-		key := client.db.GetKey(newID)
-		c.Assert(key, NotNil)
-		c.Assert(key.IDs(), DeepEquals, newIDs)
+		verifier, err := client.db.GetVerifier(newID)
+		c.Assert(err, IsNil)
+		c.Assert(verifier.MarshalPublicKey().IDs(), DeepEquals, newIDs)
 	}
 	role := client.db.GetRole("timestamp")
 	c.Assert(role, NotNil)
@@ -444,12 +632,13 @@ func (s *ClientSuite) TestNewSnapshotKey(c *C) {
 
 	// check key has been replaced in db
 	for _, oldID := range oldIDs {
-		c.Assert(client.db.GetKey(oldID), IsNil)
+		_, err := client.db.GetVerifier(oldID)
+		c.Assert(err, NotNil)
 	}
 	for _, newID := range newIDs {
-		key := client.db.GetKey(newID)
-		c.Assert(key, NotNil)
-		c.Assert(key.IDs(), DeepEquals, newIDs)
+		verifier, err := client.db.GetVerifier(newID)
+		c.Assert(err, IsNil)
+		c.Assert(verifier.MarshalPublicKey().IDs(), DeepEquals, newIDs)
 	}
 	role := client.db.GetRole("snapshot")
 	c.Assert(role, NotNil)
@@ -486,12 +675,13 @@ func (s *ClientSuite) TestNewTargetsKey(c *C) {
 
 	// check key has been replaced in db
 	for _, oldID := range oldIDs {
-		c.Assert(client.db.GetKey(oldID), IsNil)
+		_, err := client.db.GetVerifier(oldID)
+		c.Assert(err, NotNil)
 	}
 	for _, newID := range newIDs {
-		key := client.db.GetKey(newID)
-		c.Assert(key, NotNil)
-		c.Assert(key.IDs(), DeepEquals, newIDs)
+		verifier, err := client.db.GetVerifier(newID)
+		c.Assert(err, IsNil)
+		c.Assert(verifier.MarshalPublicKey().IDs(), DeepEquals, newIDs)
 	}
 	role := client.db.GetRole("targets")
 	c.Assert(role, NotNil)
@@ -552,13 +742,20 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 
 	// add soon to expire root.json to local storage
 	s.genKeyExpired(c, "timestamp")
+	c.Assert(s.repo.Snapshot(), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncLocal(c)
 
 	// add far expiring root.json to remote storage
 	s.genKey(c, "timestamp")
 	s.addRemoteTarget(c, "bar.txt")
+	c.Assert(s.repo.Snapshot(), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
+
+	const expectedRootVersion = 3
 
 	// check the update downloads the non expired remote root.json and
 	// restarts itself, thus successfully updating
@@ -567,10 +764,9 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 		if _, ok := err.(verify.ErrExpired); !ok {
 			c.Fatalf("expected err to have type signed.ErrExpired, got %T", err)
 		}
-
-		client := NewClient(s.local, s.remote)
 		_, err = client.Update()
 		c.Assert(err, IsNil)
+		c.Assert(client.rootVer, Equals, expectedRootVersion)
 	})
 }
 
@@ -587,6 +783,7 @@ func (s *ClientSuite) TestUpdateRemoteExpired(c *C) {
 
 	c.Assert(s.repo.SnapshotWithExpires(s.expiredTime), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 	s.withMetaExpired(func() {
 		_, err := client.Update()
@@ -619,14 +816,18 @@ func (s *ClientSuite) TestUpdateLocalRootExpiredKeyChange(c *C) {
 
 	// add soon to expire root.json to local storage
 	s.genKeyExpired(c, "timestamp")
+	c.Assert(s.repo.Snapshot(), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncLocal(c)
 
 	// replace all keys
 	newKeyIDs := make(map[string][]string)
 	for role, ids := range s.keyIDs {
-		c.Assert(s.repo.RevokeKey(role, ids[0]), IsNil)
-		newKeyIDs[role] = s.genKey(c, role)
+		if role != "snapshot" && role != "timestamp" && role != "targets" {
+			c.Assert(s.repo.RevokeKey(role, ids[0]), IsNil)
+			newKeyIDs[role] = s.genKey(c, role)
+		}
 	}
 
 	// update metadata
@@ -704,7 +905,6 @@ func (s *ClientSuite) TestUpdateReplayAttack(c *C) {
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncRemote(c)
 	_, err := client.Update()
-	c.Assert(IsLatestSnapshot(err), Equals, true)
 	c.Assert(client.timestampVer > version, Equals, true)
 
 	// replace remote timestamp.json with the old one
@@ -914,13 +1114,13 @@ func (s *ClientSuite) TestUnknownKeyIDs(c *C) {
 	c.Assert(json.Unmarshal(rootJSON, &root), IsNil)
 
 	// update remote root.json to add a new key with an unknown id
-	key, err := sign.GenerateEd25519Key()
+	signer, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
 
-	root.Signed.Keys["unknown-key-id"] = key.PublicData()
+	root.Signed.Keys["unknown-key-id"] = signer.PublicData()
 
 	// re-sign the root metadata, then commit it back into the store.
-	signingKeys, err := s.store.GetSigningKeys("root")
+	signingKeys, err := s.store.GetSigners("root")
 	c.Assert(err, IsNil)
 
 	signedRoot, err := sign.Marshal(root.Signed, signingKeys...)
