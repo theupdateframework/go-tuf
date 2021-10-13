@@ -99,6 +99,7 @@ type Root struct {
 	Expires     time.Time             `json:"expires"`
 	Keys        map[string]*PublicKey `json:"keys"`
 	Roles       map[string]*Role      `json:"roles"`
+	Custom      *json.RawMessage      `json:"custom,omitempty"`
 
 	ConsistentSnapshot bool `json:"consistent_snapshot"`
 }
@@ -171,11 +172,12 @@ type SnapshotFileMeta struct {
 type SnapshotFiles map[string]SnapshotFileMeta
 
 type Snapshot struct {
-	Type        string        `json:"_type"`
-	SpecVersion string        `json:"spec_version"`
-	Version     int           `json:"version"`
-	Expires     time.Time     `json:"expires"`
-	Meta        SnapshotFiles `json:"meta"`
+	Type        string           `json:"_type"`
+	SpecVersion string           `json:"spec_version"`
+	Version     int              `json:"version"`
+	Expires     time.Time        `json:"expires"`
+	Meta        SnapshotFiles    `json:"meta"`
+	Custom      *json.RawMessage `json:"custom,omitempty"`
 }
 
 func NewSnapshot() *Snapshot {
@@ -198,12 +200,13 @@ func (f TargetFileMeta) HashAlgorithms() []string {
 }
 
 type Targets struct {
-	Type        string       `json:"_type"`
-	SpecVersion string       `json:"spec_version"`
-	Version     int          `json:"version"`
-	Expires     time.Time    `json:"expires"`
-	Targets     TargetFiles  `json:"targets"`
-	Delegations *Delegations `json:"delegations,omitempty"`
+	Type        string           `json:"_type"`
+	SpecVersion string           `json:"spec_version"`
+	Version     int              `json:"version"`
+	Expires     time.Time        `json:"expires"`
+	Targets     TargetFiles      `json:"targets"`
+	Delegations *Delegations     `json:"delegations,omitempty"`
+	Custom      *json.RawMessage `json:"custom,omitempty"`
 }
 
 // Delegations represents the edges from a parent Targets role to one or more
@@ -304,11 +307,12 @@ type TimestampFileMeta struct {
 type TimestampFiles map[string]TimestampFileMeta
 
 type Timestamp struct {
-	Type        string         `json:"_type"`
-	SpecVersion string         `json:"spec_version"`
-	Version     int            `json:"version"`
-	Expires     time.Time      `json:"expires"`
-	Meta        TimestampFiles `json:"meta"`
+	Type        string           `json:"_type"`
+	SpecVersion string           `json:"spec_version"`
+	Version     int              `json:"version"`
+	Expires     time.Time        `json:"expires"`
+	Meta        TimestampFiles   `json:"meta"`
+	Custom      *json.RawMessage `json:"custom,omitempty"`
 }
 
 func NewTimestamp() *Timestamp {
