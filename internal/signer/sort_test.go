@@ -2,7 +2,6 @@ package signer_test
 
 import (
 	"encoding/json"
-	"reflect"
 	"sort"
 	"testing"
 
@@ -61,11 +60,17 @@ func TestSignerSortByIDs(t *testing.T) {
 
 	sort.Sort(signer.ByIDs(s))
 
-	sorted := []keys.Signer{
-		s4, s1, s5, s2, s3,
+	signerIDs := []string{}
+
+	for i, signer := range s {
+		ids := signer.PublicData().IDs()
+		if len(ids) != 1 {
+			t.Errorf("Signer %v IDs %v should have length 1", i, ids)
+		}
+		signerIDs = append(signerIDs, ids[0])
 	}
 
-	if !reflect.DeepEqual(s, sorted) {
-		t.Errorf("Signers incorrectly sorted: got %+v, want %+v", s, sorted)
+	if !sort.StringsAreSorted(signerIDs) {
+		t.Errorf("Signers incorrectly sorted: %+v", signerIDs)
 	}
 }
