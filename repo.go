@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
 	cjson "github.com/tent/canonical-json-go"
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/internal/signer"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/sign"
 	"github.com/theupdateframework/go-tuf/util"
@@ -498,7 +500,7 @@ func (r *Repo) jsonMarshal(v interface{}) ([]byte, error) {
 }
 
 func (r *Repo) setMeta(roleFilename string, meta interface{}) error {
-	keys, err := r.getSigningKeys(strings.TrimSuffix(roleFilename, ".json"))
+	keys, err := r.getSortedSigningKeys(strings.TrimSuffix(roleFilename, ".json"))
 	if err != nil {
 		return err
 	}
@@ -525,7 +527,7 @@ func (r *Repo) Sign(roleFilename string) error {
 		return err
 	}
 
-	keys, err := r.getSigningKeys(role)
+	keys, err := r.getSortedSigningKeys(role)
 	if err != nil {
 		return err
 	}
@@ -597,19 +599,22 @@ func (r *Repo) AddOrUpdateSignature(roleFilename string, signature data.Signatur
 	return r.local.SetMeta(roleFilename, b)
 }
 
-// getSigningKeys returns available signing keys.
+// getSortedSigningKeys returns available signing keys, sorted by key ID.
 //
 // Only keys contained in the keys db are returned (i.e. local keys which have
 // been revoked are omitted), except for the root role in which case all local
 // keys are returned (revoked root keys still need to sign new root metadata so
 // clients can verify the new root.json and update their keys db accordingly).
-func (r *Repo) getSigningKeys(name string) ([]keys.Signer, error) {
+func (r *Repo) getSortedSigningKeys(name string) ([]keys.Signer, error) {
 	signingKeys, err := r.local.GetSigners(name)
 	if err != nil {
 		return nil, err
 	}
 	if name == "root" {
-		return signingKeys, nil
+		sorted := make([]keys.Signer, len(signingKeys))
+		copy(sorted, signingKeys)
+		sort.Sort(signer.ByIDs(sorted))
+		return sorted, nil
 	}
 	db, err := r.db()
 	if err != nil {
@@ -630,6 +635,9 @@ func (r *Repo) getSigningKeys(name string) ([]keys.Signer, error) {
 			}
 		}
 	}
+
+	sort.Sort(signer.ByIDs(keys))
+
 	return keys, nil
 }
 

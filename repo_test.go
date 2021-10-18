@@ -9,16 +9,20 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	cjson "github.com/tent/canonical-json-go"
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/encrypted"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
 	"golang.org/x/crypto/ed25519"
+	"gopkg.in/check.v1"
 	. "gopkg.in/check.v1"
 )
 
@@ -578,9 +582,18 @@ func (rs *RepoSuite) TestSign(c *C) {
 		s := &data.Signed{}
 		c.Assert(json.Unmarshal(rootJSON, s), IsNil)
 		c.Assert(s.Signatures, HasLen, len(keyIDs))
-		for i, id := range keyIDs {
-			c.Assert(s.Signatures[i].KeyID, Equals, id)
+
+		// Signatures may be in any order, so must sort key IDs before comparison.
+		wantKeyIDs := append([]string{}, keyIDs...)
+		sort.Strings(wantKeyIDs)
+
+		gotKeyIDs := []string{}
+		for _, sig := range s.Signatures {
+			gotKeyIDs = append(gotKeyIDs, sig.KeyID)
 		}
+		sort.Strings(gotKeyIDs)
+
+		c.Assert(wantKeyIDs, DeepEquals, gotKeyIDs)
 	}
 
 	// signing with an available key generates a signature
@@ -1205,19 +1218,58 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 			c.Assert(pk.Encrypted, Equals, false)
 			c.Assert(json.Unmarshal(pk.Data, &actual), IsNil)
 		}
+
+		// Compare slices of unique elements disregarding order.
 		c.Assert(actual, HasLen, len(expected))
-		for i, key := range expected {
-			c.Assert(expected[i], DeepEquals, key)
+		for _, gotKey := range actual {
+			expectedNumMatches := 0
+			for _, x := range actual {
+				if reflect.DeepEqual(gotKey, x) {
+					expectedNumMatches++
+				}
+			}
+
+			numMatches := 0
+			for _, wantKey := range expected {
+				wantCanon, err := cjson.Marshal(wantKey)
+				c.Assert(err, IsNil)
+
+				gotCanon, err := cjson.Marshal(gotKey)
+				c.Assert(err, IsNil)
+
+				if string(wantCanon) == string(gotCanon) {
+					numMatches++
+				}
+			}
+
+			c.Assert(numMatches, Equals, expectedNumMatches, check.Commentf("actual: %+v, expected: %+v", actual, expected))
 		}
 
 		// check GetKeys is correct
 		signers, err := store.GetSigners(role)
 		c.Assert(err, IsNil)
+
+		// Compare slices of unique elements disregarding order.
 		c.Assert(signers, HasLen, len(expected))
-		for i, s := range signers {
-			v, err := keys.GetSigner(expected[i])
-			c.Assert(err, IsNil)
-			c.Assert(s.PublicData().IDs(), DeepEquals, v.PublicData().IDs())
+		for _, s := range signers {
+			expectedNumMatches := 0
+			for _, x := range signers {
+				if reflect.DeepEqual(s, x) {
+					expectedNumMatches++
+				}
+			}
+
+			numMatches := 0
+			for _, e := range expected {
+				v, err := keys.GetSigner(e)
+				c.Assert(err, IsNil)
+
+				if reflect.DeepEqual(s.PublicData().IDs(), v.PublicData().IDs()) {
+					numMatches++
+				}
+			}
+
+			c.Assert(numMatches, Equals, expectedNumMatches, check.Commentf("signers: %+v, expected: %+v", signers, expected))
 		}
 	}
 
