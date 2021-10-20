@@ -563,6 +563,64 @@ func (rs *RepoSuite) TestRevokeKey(c *C) {
 	c.Assert(targetsRole.KeyIDs, DeepEquals, target2IDs)
 }
 
+func (rs *RepoSuite) TestRevokeKeyInMultipleRoles(c *C) {
+	local := MemoryStore(make(map[string]json.RawMessage), nil)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// generate keys. add a root key that is shared with the targets role
+	genKey(c, r, "root")
+	sharedSigner, err := keys.GenerateEd25519Key()
+	sharedIDs := sharedSigner.PublicData().IDs()
+	c.Assert(err, IsNil)
+	c.Assert(r.AddVerificationKey("targets", sharedSigner.PublicData()), IsNil)
+	c.Assert(r.AddVerificationKey("root", sharedSigner.PublicData()), IsNil)
+	targetIDs := genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+	root, err := r.root()
+	c.Assert(err, IsNil)
+	c.Assert(root.Roles, NotNil)
+	c.Assert(root.Roles, HasLen, 4)
+	c.Assert(root.Keys, NotNil)
+	rs.assertNumUniqueKeys(c, root, "root", 2)
+	rs.assertNumUniqueKeys(c, root, "targets", 2)
+	rs.assertNumUniqueKeys(c, root, "snapshot", 1)
+	rs.assertNumUniqueKeys(c, root, "timestamp", 1)
+
+	// revoke a key
+	targetsRole, ok := root.Roles["targets"]
+	if !ok {
+		c.Fatal("missing targets role")
+	}
+	c.Assert(targetsRole.KeyIDs, HasLen, len(targetIDs)+len(sharedIDs))
+	id := targetsRole.KeyIDs[0]
+	c.Assert(r.RevokeKey("targets", id), IsNil)
+
+	// make sure all the other key ids were also revoked
+	for _, id := range sharedIDs {
+		c.Assert(r.RevokeKey("targets", id), DeepEquals, ErrKeyNotFound{"targets", id})
+	}
+
+	// check root was updated
+	root, err = r.root()
+	c.Assert(err, IsNil)
+	c.Assert(root.Roles, NotNil)
+	c.Assert(root.Roles, HasLen, 4)
+	c.Assert(root.Keys, NotNil)
+	// the shared root/targets signer should still be present in root keys
+	rs.assertNumUniqueKeys(c, root, "root", 2)
+	rs.assertNumUniqueKeys(c, root, "targets", 1)
+	rs.assertNumUniqueKeys(c, root, "snapshot", 1)
+	rs.assertNumUniqueKeys(c, root, "timestamp", 1)
+	targetsRole, ok = root.Roles["targets"]
+	if !ok {
+		c.Fatal("missing targets role")
+	}
+	c.Assert(targetsRole.KeyIDs, HasLen, 1)
+	c.Assert(targetsRole.KeyIDs, DeepEquals, targetIDs)
+}
+
 func (rs *RepoSuite) TestSign(c *C) {
 	meta := map[string]json.RawMessage{"root.json": []byte(`{"signed":{},"signatures":[]}`)}
 	local := MemoryStore(meta, nil)
