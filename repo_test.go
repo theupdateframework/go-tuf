@@ -1193,14 +1193,20 @@ func (rs *RepoSuite) TestHashAlgorithm(c *C) {
 	}
 }
 
-func testPassphraseFunc(p []byte) util.PassphraseFunc {
-	return func(string, bool, bool) ([]byte, error) { return p, nil }
-}
-
 func (rs *RepoSuite) TestKeyPersistence(c *C) {
 	tmp := newTmpDir(c)
-	passphrase := []byte("s3cr3t")
-	store := FileSystemStore(tmp.path, testPassphraseFunc(passphrase))
+	oldPassphrase := []byte("old_s3cr3t")
+	newPassphrase := []byte("new_s3cr3t")
+	// returnNewPassphrase is used to force the passphrase function to return the new passphrase when called by the SaveSigner() method
+	returnNewPassphrase := false
+	// passphrase mock function
+	testPassphraseFunc := func(a string, b, change bool) ([]byte, error) {
+		if change || returnNewPassphrase {
+			return newPassphrase, nil
+		}
+		return oldPassphrase, nil
+	}
+	store := FileSystemStore(tmp.path, testPassphraseFunc)
 
 	assertKeys := func(role string, enc bool, expected []*data.PrivateKey) {
 		keysJSON := tmp.readFile("keys/" + role + ".json")
@@ -1209,9 +1215,13 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 
 		// check the persisted keys are correct
 		var actual []*data.PrivateKey
+		pass := oldPassphrase
 		if enc {
 			c.Assert(pk.Encrypted, Equals, true)
-			decrypted, err := encrypted.Decrypt(pk.Data, passphrase)
+			if returnNewPassphrase {
+				pass = newPassphrase
+			}
+			decrypted, err := encrypted.Decrypt(pk.Data, pass)
 			c.Assert(err, IsNil)
 			c.Assert(json.Unmarshal(decrypted, &actual), IsNil)
 		} else {
@@ -1302,6 +1312,45 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(insecureStore.SaveSigner("targets", signer), IsNil)
 	assertKeys("targets", false, []*data.PrivateKey{privateKey})
+
+	// Test changing the passphrase
+	// 1. Create a secure store with a passphrase (create new object and temp folder so we discard any previous state)
+	tmp = newTmpDir(c)
+	store = FileSystemStore(tmp.path, testPassphraseFunc)
+
+	// 2. Test changing the passphrase when the keys file does not exist - should FAIL
+	c.Assert(store.ChangePassphrase("root"), NotNil)
+
+	// 3. Generate a new key
+	signer, err = keys.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	privateKey, err = signer.MarshalPrivateKey()
+	c.Assert(err, IsNil)
+	c.Assert(store.SaveSigner("root", signer), IsNil)
+
+	// 4. Verify the key file can be decrypted using the original passphrase - should SUCCEED
+	assertKeys("root", true, []*data.PrivateKey{privateKey})
+
+	// 5. Change the passphrase (our mock passphrase function is called with change=true thus returning the newPassphrase value)
+	c.Assert(store.ChangePassphrase("root"), IsNil)
+
+	// 6. Try to add a key and implicitly decrypt the keys file using the OLD passphrase - should FAIL
+	newKey, err = keys.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	newPrivateKey, err = newKey.MarshalPrivateKey()
+	c.Assert(err, IsNil)
+	c.Assert(store.SaveSigner("root", newKey), NotNil)
+
+	// 7. Try to add a key and implicitly decrypt the keys using the NEW passphrase - should SUCCEED
+	returnNewPassphrase = true
+	newKey, err = keys.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	newPrivateKey, err = newKey.MarshalPrivateKey()
+	c.Assert(err, IsNil)
+	c.Assert(store.SaveSigner("root", newKey), IsNil)
+
+	// 8. Verify again that the key entries are what we expect after decrypting them using the NEW passphrase
+	assertKeys("root", true, []*data.PrivateKey{privateKey, newPrivateKey})
 }
 
 func (rs *RepoSuite) TestManageMultipleTargets(c *C) {
