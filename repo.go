@@ -453,7 +453,8 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 		return ErrKeyNotFound{keyRole, id}
 	}
 
-	keyIDs := make([]string, 0, len(role.KeyIDs))
+	// Create a list of filtered key IDs that do not contain the revoked key IDs.
+	filteredKeyIDs := make([]string, 0, len(role.KeyIDs))
 
 	// There may be multiple keyids that correspond to this key, so
 	// filter all of them out.
@@ -461,12 +462,12 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 		if key.ContainsID(keyID) {
 			continue
 		}
-		keyIDs = append(keyIDs, keyID)
+		filteredKeyIDs = append(filteredKeyIDs, keyID)
 	}
-	if len(keyIDs) == len(role.KeyIDs) {
+	if len(filteredKeyIDs) == len(role.KeyIDs) {
 		return ErrKeyNotFound{keyRole, id}
 	}
-	role.KeyIDs = keyIDs
+	role.KeyIDs = filteredKeyIDs
 	root.Roles[keyRole] = role
 
 	// Only delete the key from root.Keys if the key is no longer in use by
