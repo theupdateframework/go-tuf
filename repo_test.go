@@ -569,12 +569,14 @@ func (rs *RepoSuite) TestRevokeKeyInMultipleRoles(c *C) {
 	c.Assert(err, IsNil)
 
 	// generate keys. add a root key that is shared with the targets role
-	genKey(c, r, "root")
-	sharedSigner, err := keys.GenerateEd25519Key()
-	sharedIDs := sharedSigner.PublicData().IDs()
+	rootSigner, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
-	c.Assert(r.AddVerificationKey("targets", sharedSigner.PublicData()), IsNil)
+	c.Assert(r.AddVerificationKey("root", rootSigner.PublicData()), IsNil)
+	sharedSigner, err := keys.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	sharedIDs := sharedSigner.PublicData().IDs()
 	c.Assert(r.AddVerificationKey("root", sharedSigner.PublicData()), IsNil)
+	c.Assert(r.AddVerificationKey("targets", sharedSigner.PublicData()), IsNil)
 	targetIDs := genKey(c, r, "targets")
 	genKey(c, r, "snapshot")
 	genKey(c, r, "timestamp")
@@ -609,6 +611,8 @@ func (rs *RepoSuite) TestRevokeKeyInMultipleRoles(c *C) {
 	c.Assert(root.Roles, HasLen, 4)
 	c.Assert(root.Keys, NotNil)
 	// the shared root/targets signer should still be present in root keys
+	c.Assert(UniqueKeys(root)["root"], DeepEquals,
+		[]*data.PublicKey{rootSigner.PublicData(), sharedSigner.PublicData()})
 	rs.assertNumUniqueKeys(c, root, "root", 2)
 	rs.assertNumUniqueKeys(c, root, "targets", 1)
 	rs.assertNumUniqueKeys(c, root, "snapshot", 1)

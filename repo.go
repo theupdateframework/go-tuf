@@ -469,16 +469,17 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 	role.KeyIDs = keyIDs
 	root.Roles[keyRole] = role
 
-	// Only delete the key from root.Keys if no other role is using that key.
-	delete_key := true
+	// Only delete the key from root.Keys if the key is no longer in use by
+	// any other role.
+	key_in_use := true
 	for _, role := range root.Roles {
 		for _, keyID := range role.KeyIDs {
 			if key.ContainsID(keyID) {
-				delete_key = false
+				key_in_use = false
 			}
 		}
 	}
-	if delete_key {
+	if key_in_use {
 		for _, keyID := range key.IDs() {
 			delete(root.Keys, keyID)
 		}
