@@ -2,6 +2,7 @@ package tuf
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -701,6 +702,37 @@ func (r *Repo) AddTarget(path string, custom json.RawMessage) error {
 
 func (r *Repo) AddTargets(paths []string, custom json.RawMessage) error {
 	return r.AddTargetsWithExpires(paths, custom, data.DefaultExpires("targets"))
+}
+
+func (r *Repo) AddDigestTargets(digest string, length int64, custom json.RawMessage) error {
+	expires := data.DefaultExpires("targets")
+
+	t, err := r.targets()
+	if err != nil {
+		return err
+	}
+	hashes := make([]string, 1)
+	hashes[0] = strings.Split(digest, ":")[1]
+
+	meta := data.FileMeta{Length: length, Hashes: make(data.Hashes, len(hashes))}
+	meta.Hashes["sha256"], err = hex.DecodeString(hashes[0])
+
+	path := digest
+
+	if len(custom) > 0 {
+		meta.Custom = &custom
+	} else if t, ok := t.Targets[path]; ok {
+		meta.Custom = t.Custom
+	}
+
+	t.Targets[digest] = data.TargetFileMeta{meta}
+
+	t.Expires = expires.Round(time.Second)
+	if _, ok := r.versionUpdated["targets.json"]; !ok {
+		t.Version++
+		r.versionUpdated["targets.json"] = struct{}{}
+	}
+	return r.setMeta("targets.json", t)
 }
 
 func (r *Repo) AddTargetWithExpires(path string, custom json.RawMessage, expires time.Time) error {

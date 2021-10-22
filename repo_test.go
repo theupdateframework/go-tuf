@@ -3,6 +3,7 @@ package tuf
 import (
 	"crypto"
 	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1794,4 +1795,34 @@ func (rs *RepoSuite) TestBadAddOrUpdateSignatures(c *C) {
 			Signature: rootSig}), IsNil)
 	}
 	checkSigIDs("root.json")
+}
+
+func (rs *RepoSuite) TestSignDigest(c *C){
+	files := map[string][]byte{"foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	digest := "sha256:bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c"
+	size := int64(42)
+
+	c.Assert(r.AddDigestTargets(digest, size, nil), IsNil)
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	digest_bytes, err := hex.DecodeString("bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c")
+	hex_digest_bytes := data.HexBytes(digest_bytes)
+	c.Assert(err, IsNil)
+
+	targets, err := r.targets()
+		c.Assert(err, IsNil)
+	c.Assert(targets.Targets["sha256:bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c"].FileMeta.Length, Equals, size)
+	c.Assert(targets.Targets["sha256:bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c"].FileMeta.Hashes["sha256"], DeepEquals, hex_digest_bytes)
+
 }
