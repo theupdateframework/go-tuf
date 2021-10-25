@@ -459,10 +459,9 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 	// There may be multiple keyids that correspond to this key, so
 	// filter all of them out.
 	for _, keyID := range role.KeyIDs {
-		if key.ContainsID(keyID) {
-			continue
+		if !key.ContainsID(keyID) {
+			filteredKeyIDs = append(filteredKeyIDs, keyID)
 		}
-		filteredKeyIDs = append(filteredKeyIDs, keyID)
 	}
 	if len(filteredKeyIDs) == len(role.KeyIDs) {
 		return ErrKeyNotFound{keyRole, id}
@@ -472,15 +471,15 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 
 	// Only delete the key from root.Keys if the key is no longer in use by
 	// any other role.
-	key_in_use := true
+	key_in_use := false
 	for _, role := range root.Roles {
 		for _, keyID := range role.KeyIDs {
 			if key.ContainsID(keyID) {
-				key_in_use = false
+				key_in_use = true
 			}
 		}
 	}
-	if key_in_use {
+	if !key_in_use {
 		for _, keyID := range key.IDs() {
 			delete(root.Keys, keyID)
 		}
