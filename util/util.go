@@ -280,7 +280,7 @@ func AtomicallyWriteFile(filename string, data []byte, perm os.FileMode) error {
 		return err
 	}
 
-	if err = os.Chmod(filename, perm); err != nil {
+	if err = os.Chmod(f.Name(), perm); err != nil {
 		f.Close()
 		os.Remove(f.Name())
 		return err

@@ -74,7 +74,7 @@ func DefaultExpires(role string) time.Time {
 	case "snapshot":
 		t = time.Now().AddDate(0, 0, 7)
 	case "timestamp":
-		t = time.Now().AddDate(0, 0, 1)
+		t = time.Now().AddDate(0, 0, 7)
 	}
 	return t.UTC().Round(time.Second)
 }
