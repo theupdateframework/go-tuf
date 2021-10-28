@@ -712,10 +712,11 @@ func (r *Repo) AddDigestTargets(digest string, length int64, custom json.RawMess
 		return err
 	}
 	hashes := make([]string, 1)
-	hashes[0] = strings.Split(digest, ":")[1]
+	split_digest := strings.Split(digest, ":")
+	hashes[0] = split_digest[1]
 
 	meta := data.FileMeta{Length: length, Hashes: make(data.Hashes, len(hashes))}
-	meta.Hashes["sha256"], err = hex.DecodeString(hashes[0])
+	meta.Hashes[split_digest[0]], err = hex.DecodeString(hashes[0])
 
 	path := digest
 
