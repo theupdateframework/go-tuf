@@ -453,25 +453,37 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 		return ErrKeyNotFound{keyRole, id}
 	}
 
-	keyIDs := make([]string, 0, len(role.KeyIDs))
+	// Create a list of filtered key IDs that do not contain the revoked key IDs.
+	filteredKeyIDs := make([]string, 0, len(role.KeyIDs))
 
 	// There may be multiple keyids that correspond to this key, so
 	// filter all of them out.
 	for _, keyID := range role.KeyIDs {
-		if key.ContainsID(keyID) {
-			continue
+		if !key.ContainsID(keyID) {
+			filteredKeyIDs = append(filteredKeyIDs, keyID)
 		}
-		keyIDs = append(keyIDs, keyID)
 	}
-	if len(keyIDs) == len(role.KeyIDs) {
+	if len(filteredKeyIDs) == len(role.KeyIDs) {
 		return ErrKeyNotFound{keyRole, id}
 	}
-	role.KeyIDs = keyIDs
-
-	for _, keyID := range key.IDs() {
-		delete(root.Keys, keyID)
-	}
+	role.KeyIDs = filteredKeyIDs
 	root.Roles[keyRole] = role
+
+	// Only delete the key from root.Keys if the key is no longer in use by
+	// any other role.
+	key_in_use := false
+	for _, role := range root.Roles {
+		for _, keyID := range role.KeyIDs {
+			if key.ContainsID(keyID) {
+				key_in_use = true
+			}
+		}
+	}
+	if !key_in_use {
+		for _, keyID := range key.IDs() {
+			delete(root.Keys, keyID)
+		}
+	}
 	root.Expires = expires.Round(time.Second)
 	if _, ok := r.versionUpdated["root.json"]; !ok {
 		root.Version++
