@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/flynn/go-docopt"
@@ -23,5 +24,10 @@ func cmdRootKeys(args *docopt.Args, repo *tuf.Repo) error {
 	if err != nil {
 		return err
 	}
-	return json.NewEncoder(os.Stdout).Encode(keys)
+	data, err := json.Marshal(keys)
+	if err == nil {
+		fmt.Fprintf(os.Stderr, "The resulting JSON should be distributed to clients for performing initial updates:\n\n")
+		fmt.Fprintln(os.Stdout, string(data))
+	}
+	return err
 }

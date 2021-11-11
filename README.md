@@ -80,10 +80,11 @@ Expects a staged, fully signed `targets` metadata file and stages an appropriate
 `snapshot` metadata file. Optionally one can set number of days after which
 the `snapshot` metadata will expire.
 
-#### `tuf timestamp`
+#### `tuf timestamp [--expires=<days>]`
 
 Stages an appropriate `timestamp` metadata file. If a `snapshot` metadata file is staged,
-it must be fully signed.
+it must be fully signed. Optionally one can set number of days after which
+the timestamp metadata will expire.
 
 #### `tuf sign <metadata>`
 
@@ -114,8 +115,12 @@ should be distributed to clients for performing initial updates.
 
 #### `tuf set-threshold <role> <threshold>`
 
-Sets the `role` threshold, the required number of keys for signing, to
+Sets `role`'s threshold (required number of keys for signing) to
 `threshold`.
+
+#### `tuf get-threshold <role>`
+
+Outputs `role`'s threshold (required number of keys for signing).
 
 #### Usage of environment variables
 

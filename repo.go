@@ -106,7 +106,11 @@ func (r *Repo) Init(consistentSnapshot bool) error {
 	}
 	root := data.NewRoot()
 	root.ConsistentSnapshot = consistentSnapshot
-	return r.setMeta("root.json", root)
+	err = r.setMeta("root.json", root)
+	if err == nil {
+		fmt.Println("Repository initialized")
+	}
+	return err
 }
 
 func (r *Repo) db() (*verify.DB, error) {
@@ -490,7 +494,11 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 		r.versionUpdated["root.json"] = struct{}{}
 	}
 
-	return r.setMeta("root.json", root)
+	err = r.setMeta("root.json", root)
+	if err == nil {
+		fmt.Println("Revoked", keyRole, "key with ID", id, "in root metadata")
+	}
+	return err
 }
 
 func (r *Repo) jsonMarshal(v interface{}) ([]byte, error) {
@@ -555,7 +563,11 @@ func (r *Repo) Sign(roleFilename string) error {
 		return err
 	}
 	r.meta[roleFilename] = b
-	return r.local.SetMeta(roleFilename, b)
+	err = r.local.SetMeta(roleFilename, b)
+	if err == nil {
+		fmt.Println("Signed", roleFilename, "with", len(keys), "key(s)")
+	}
+	return err
 }
 
 // AddOrUpdateSignature allows users to add or update a signature generated with an external tool.
@@ -727,7 +739,15 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom json.RawMessage, exp
 		t.Version++
 		r.versionUpdated["targets.json"] = struct{}{}
 	}
-	return r.setMeta("targets.json", t)
+
+	err = r.setMeta("targets.json", t)
+	if err == nil {
+		fmt.Println("Added/staged targets:")
+		for k := range t.Targets {
+			fmt.Println("*", k)
+		}
+	}
+	return err
 }
 
 func (r *Repo) RemoveTarget(path string) error {
@@ -752,19 +772,25 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 	if err != nil {
 		return err
 	}
+	removed_targets := []string{}
 	if len(paths) == 0 {
+		for rt := range t.Targets {
+			removed_targets = append(removed_targets, rt)
+		}
 		t.Targets = make(data.TargetFiles)
 	} else {
 		removed := false
 		for _, path := range paths {
 			path = util.NormalizeTarget(path)
 			if _, ok := t.Targets[path]; !ok {
+				fmt.Println("The following target is not present:", path)
 				continue
 			}
 			removed = true
 			// G2 -> we no longer desire any readers to ever observe non-prefix targets.
 			delete(t.Targets, "/"+path)
 			delete(t.Targets, path)
+			removed_targets = append(removed_targets, path)
 		}
 		if !removed {
 			return nil
@@ -775,7 +801,23 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 		t.Version++
 		r.versionUpdated["targets.json"] = struct{}{}
 	}
-	return r.setMeta("targets.json", t)
+
+	err = r.setMeta("targets.json", t)
+	if err == nil {
+		fmt.Println("Removed targets:")
+		for _, v := range removed_targets {
+			fmt.Println("*", v)
+		}
+		if len(t.Targets) != 0 {
+			fmt.Println("Added/staged targets:")
+			for k := range t.Targets {
+				fmt.Println("*", k)
+			}
+		} else {
+			fmt.Println("There are no added/staged targets")
+		}
+	}
+	return err
 }
 
 func (r *Repo) Snapshot() error {
@@ -811,7 +853,11 @@ func (r *Repo) SnapshotWithExpires(expires time.Time) error {
 		snapshot.Version++
 		r.versionUpdated["snapshot.json"] = struct{}{}
 	}
-	return r.setMeta("snapshot.json", snapshot)
+	err = r.setMeta("snapshot.json", snapshot)
+	if err == nil {
+		fmt.Println("Staged snapshot.json metadata with expiration date:", snapshot.Expires)
+	}
+	return err
 }
 
 func (r *Repo) Timestamp() error {
@@ -843,7 +889,12 @@ func (r *Repo) TimestampWithExpires(expires time.Time) error {
 		timestamp.Version++
 		r.versionUpdated["timestamp.json"] = struct{}{}
 	}
-	return r.setMeta("timestamp.json", timestamp)
+
+	err = r.setMeta("timestamp.json", timestamp)
+	if err == nil {
+		fmt.Println("Staged timestamp.json metadata with expiration date:", timestamp.Expires)
+	}
+	return err
 }
 
 func (r *Repo) fileVersions() (map[string]int, error) {
@@ -966,19 +1017,22 @@ func (r *Repo) Commit() error {
 		return err
 	}
 
-	if err := r.local.Commit(root.ConsistentSnapshot, versions, hashes); err != nil {
-		return err
+	err = r.local.Commit(root.ConsistentSnapshot, versions, hashes)
+	if err == nil {
+		// We can start incrementing version numbers again now that we've
+		// successfully committed the metadata to the local store.
+		r.versionUpdated = make(map[string]struct{})
+		fmt.Println("Committed successfully")
 	}
-
-	// We can start incrementing version numbers again now that we've
-	// successfully committed the metadata to the local store.
-	r.versionUpdated = make(map[string]struct{})
-
-	return nil
+	return err
 }
 
 func (r *Repo) Clean() error {
-	return r.local.Clean()
+	err := r.local.Clean()
+	if err == nil {
+		fmt.Println("Removed all staged metadata and target files")
+	}
+	return err
 }
 
 func (r *Repo) verifySignature(roleFilename string, db *verify.DB) error {
