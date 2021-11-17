@@ -1797,7 +1797,7 @@ func (rs *RepoSuite) TestBadAddOrUpdateSignatures(c *C) {
 	checkSigIDs("root.json")
 }
 
-func (rs *RepoSuite) TestSignDigest(c *C){
+func (rs *RepoSuite) TestSignDigest(c *C) {
 	files := map[string][]byte{"foo.txt": []byte("foo")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
@@ -1811,7 +1811,7 @@ func (rs *RepoSuite) TestSignDigest(c *C){
 	digest := "sha256:bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c"
 	size := int64(42)
 
-	c.Assert(r.AddDigestTargets(digest, size, nil), IsNil)
+	c.Assert(r.AddDigestTargets(digest, size, nil, ""), IsNil)
 	c.Assert(r.Snapshot(), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
@@ -1821,7 +1821,7 @@ func (rs *RepoSuite) TestSignDigest(c *C){
 	c.Assert(err, IsNil)
 
 	targets, err := r.targets()
-		c.Assert(err, IsNil)
+	c.Assert(err, IsNil)
 	c.Assert(targets.Targets["sha256:bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c"].FileMeta.Length, Equals, size)
 	c.Assert(targets.Targets["sha256:bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c"].FileMeta.Hashes["sha256"], DeepEquals, hex_digest_bytes)
 

@@ -704,21 +704,29 @@ func (r *Repo) AddTargets(paths []string, custom json.RawMessage) error {
 	return r.AddTargetsWithExpires(paths, custom, data.DefaultExpires("targets"))
 }
 
-func (r *Repo) AddDigestTargets(digest string, length int64, custom json.RawMessage) error {
+func (r *Repo) AddDigestTargets(digest string, length int64, custom json.RawMessage, path string) error {
 	expires := data.DefaultExpires("targets")
 
 	t, err := r.targets()
 	if err != nil {
 		return err
 	}
-	hashes := make([]string, 1)
-	split_digest := strings.Split(digest, ":")
-	hashes[0] = split_digest[1]
+	splitDigest := strings.Split(digest, ":")
+	if len(splitDigest) != 2 {
+		return fmt.Errorf("incorrect format for digest: %s", digest)
+	}
+	hash := splitDigest[1]
+	hashAlg := splitDigest[0]
 
-	meta := data.FileMeta{Length: length, Hashes: make(data.Hashes, len(hashes))}
-	meta.Hashes[split_digest[0]], err = hex.DecodeString(hashes[0])
+	meta := data.FileMeta{Length: length, Hashes: make(data.Hashes, 1)}
+	meta.Hashes[hashAlg], err = hex.DecodeString(hash)
+	if err != nil {
+		return err
+	}
 
-	path := digest
+	if path == "" {
+		path = digest
+	}
 
 	if len(custom) > 0 {
 		meta.Custom = &custom
@@ -728,12 +736,7 @@ func (r *Repo) AddDigestTargets(digest string, length int64, custom json.RawMess
 
 	t.Targets[digest] = data.TargetFileMeta{meta}
 
-	t.Expires = expires.Round(time.Second)
-	if _, ok := r.versionUpdated["targets.json"]; !ok {
-		t.Version++
-		r.versionUpdated["targets.json"] = struct{}{}
-	}
-	return r.setMeta("targets.json", t)
+	return r.WriteTargetWithExpires(t, expires)
 }
 
 func (r *Repo) AddTargetWithExpires(path string, custom json.RawMessage, expires time.Time) error {
@@ -775,6 +778,10 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom json.RawMessage, exp
 	}); err != nil {
 		return err
 	}
+	return r.WriteTargetWithExpires(t, expires)
+}
+
+func (r *Repo) WriteTargetWithExpires(t *data.Targets, expires time.Time) error {
 	t.Expires = expires.Round(time.Second)
 	if !r.local.FileIsStaged("targets.json") {
 		t.Version++
