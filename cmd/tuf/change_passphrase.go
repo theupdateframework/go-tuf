@@ -12,7 +12,8 @@ usage: tuf change-passphrase <role>
 Changes the passphrase for given role keys file.
 
 Alternatively, passphrases can be passed via environment variables in the
-form of TUF_{{ROLE}}_PASSPHRASE
+form of TUF_{{ROLE}}_PASSPHRASE for existing ones and
+TUF_NEW_{{ROLE}}_PASSPHRASE for setting new ones.
 `)
 }
 
