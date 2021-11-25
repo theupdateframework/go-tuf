@@ -134,6 +134,12 @@ func getPassphrase(role string, confirm bool, change bool) ([]byte, error) {
 	}
 	// Alter role string if we are prompting for a passphrase change
 	if change {
+		// Check if environment variable for new passphrase exist
+		if new_pass := os.Getenv(fmt.Sprintf("TUF_NEW_%s_PASSPHRASE", strings.ToUpper(role))); new_pass != "" {
+			// If so, just read the new passphrase from it and return
+			return []byte(new_pass), nil
+		}
+		// No environment variable set, so proceed prompting for new passphrase
 		role = fmt.Sprintf("new %s", role)
 	}
 	fmt.Printf("Enter %s keys passphrase: ", role)
