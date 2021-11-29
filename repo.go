@@ -58,11 +58,13 @@ type LocalStore interface {
 	// SaveSigner adds a signer to a role.
 	SaveSigner(string, keys.Signer) error
 
-	// ChangePassphrase changes the passphrase for a role keys file.
-	ChangePassphrase(string) error
-
 	// Clean is used to remove all staged metadata files.
 	Clean() error
+}
+
+type PassphraseChanger interface {
+	// ChangePassphrase changes the passphrase for a role keys file.
+	ChangePassphrase(string) error
 }
 
 type Repo struct {
@@ -316,7 +318,12 @@ func (r *Repo) ChangePassphrase(keyRole string) error {
 	if !verify.ValidRole(keyRole) {
 		return ErrInvalidRole{keyRole}
 	}
-	return r.local.ChangePassphrase(keyRole)
+
+	if p, ok := r.local.(PassphraseChanger); ok {
+		return p.ChangePassphrase(keyRole)
+	}
+
+	return ErrChangePassphraseNotSupported
 }
 
 func (r *Repo) GenKey(role string) ([]string, error) {

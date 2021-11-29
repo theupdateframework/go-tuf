@@ -95,13 +95,6 @@ func (m *memoryStore) Commit(consistentSnapshot bool, versions map[string]int, h
 	return nil
 }
 
-// ChangePassphrase changes the passphrase for a role keys file
-func (f *memoryStore) ChangePassphrase(role string) error {
-	/* Not needed, keys are not stored nor encrypted
-	anywhere with this type of storage backend */
-	return nil
-}
-
 func (m *memoryStore) GetSigners(role string) ([]keys.Signer, error) {
 	return m.signers[role], nil
 }
@@ -339,7 +332,8 @@ func (f *fileSystemStore) GetSigners(role string) ([]keys.Signer, error) {
 	return f.signers[role], nil
 }
 
-// ChangePassphrase changes the passphrase for a role keys file
+// ChangePassphrase changes the passphrase for a role keys file. Implements
+// PassphraseChanger interface.
 func (f *fileSystemStore) ChangePassphrase(role string) error {
 	// No need to proceed if passphrase func is not set
 	if f.passphraseFunc == nil {
