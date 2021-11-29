@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	ErrInitNotAllowed = errors.New("tuf: repository already initialized")
-	ErrNewRepository  = errors.New("tuf: repository not yet committed")
+	ErrInitNotAllowed               = errors.New("tuf: repository already initialized")
+	ErrNewRepository                = errors.New("tuf: repository not yet committed")
+	ErrChangePassphraseNotSupported = errors.New("tuf: store does not support changing passphrase")
 )
 
 type ErrMissingMetadata struct {

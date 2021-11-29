@@ -1381,7 +1381,7 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 	store = FileSystemStore(tmp.path, testPassphraseFunc)
 
 	// 2. Test changing the passphrase when the keys file does not exist - should FAIL
-	c.Assert(store.ChangePassphrase("root"), NotNil)
+	c.Assert(store.(PassphraseChanger).ChangePassphrase("root"), NotNil)
 
 	// 3. Generate a new key
 	signer, err = keys.GenerateEd25519Key()
@@ -1394,7 +1394,7 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 	assertKeys("root", true, []*data.PrivateKey{privateKey})
 
 	// 5. Change the passphrase (our mock passphrase function is called with change=true thus returning the newPassphrase value)
-	c.Assert(store.ChangePassphrase("root"), IsNil)
+	c.Assert(store.(PassphraseChanger).ChangePassphrase("root"), IsNil)
 
 	// 6. Try to add a key and implicitly decrypt the keys file using the OLD passphrase - should FAIL
 	newKey, err = keys.GenerateEd25519Key()
