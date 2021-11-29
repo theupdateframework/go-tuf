@@ -1179,7 +1179,7 @@ func generateRepoFS(c *C, dir string, files map[string][]byte, consistentSnapsho
 	return repo
 }
 
-func (s *ClientSuite) TestVerifyDigest(c *C){
+func (s *ClientSuite) TestVerifyDigest(c *C) {
 	client := s.newClient(c)
 	files, err := client.Update()
 
