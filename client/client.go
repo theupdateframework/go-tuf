@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"strings"
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/util"
@@ -842,8 +843,12 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 	return nil
 }
 
-func (c *Client) VerifyDigest(digest string, length int64) (err error) {
-	localMeta, _ := c.targets[digest]
+func (c *Client) VerifyDigest(digest string, length int64, path string) (err error) {
+	targetName := path
+	if path == "" {
+		targetName = digest
+	}
+	localMeta, _ := c.targets[targetName]
 
 	hashes := make([]string, 1)
 	hashes[0] = strings.Split(digest, ":")[1]
