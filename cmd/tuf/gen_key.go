@@ -21,6 +21,8 @@ with the addition of the key's ID to the role's list of key IDs.
 Alternatively, passphrases can be set via environment variables in the
 form of TUF_{{ROLE}}_PASSPHRASE
 
+If Fulcio is true, this generates a Fulcio OIDC issued key with the current user's ID.
+
 Options:
   --expires=<days>   Set the root metadata file to expire <days> days from now.
 `)

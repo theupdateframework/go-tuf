@@ -22,19 +22,12 @@ func Sign(s *data.Signed, k keys.Signer) error {
 		}
 	}
 
-	sig, err := k.SignMessage(s.Signed)
+	sigs, err := k.SignMessage(s.Signed)
 	if err != nil {
 		return err
 	}
 
-	s.Signatures = signatures
-	for _, id := range ids {
-		s.Signatures = append(s.Signatures, data.Signature{
-			KeyID:     id,
-			Signature: sig,
-		})
-	}
-
+	s.Signatures = append(signatures, sigs...)
 	return nil
 }
 

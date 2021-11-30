@@ -112,9 +112,22 @@ func (s *rsaSigner) PublicData() *data.PublicKey {
 	}
 }
 
-func (s *rsaSigner) SignMessage(message []byte) ([]byte, error) {
+func (s *rsaSigner) SignMessage(message []byte) ([]data.Signature, error) {
 	hash := sha256.Sum256(message)
-	return rsa.SignPSS(rand.Reader, s.PrivateKey, crypto.SHA256, hash[:], &rsa.PSSOptions{})
+	sig, err := rsa.SignPSS(rand.Reader, s.PrivateKey, crypto.SHA256, hash[:], &rsa.PSSOptions{})
+	if err != nil {
+		return nil, err
+	}
+	ids := s.PublicData().IDs()
+	sigs := make([]data.Signature, 0, len(ids))
+	for _, id := range ids {
+		sigs = append(sigs, data.Signature{
+			KeyID:     id,
+			Signature: sig,
+		})
+	}
+	return sigs, nil
+
 }
 
 func (s *rsaSigner) ContainsID(id string) bool {

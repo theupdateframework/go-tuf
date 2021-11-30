@@ -92,8 +92,20 @@ func NewEd25519Signer(keyValue Ed25519PrivateKeyValue) *ed25519Signer {
 	}
 }
 
-func (e *ed25519Signer) SignMessage(message []byte) ([]byte, error) {
-	return e.Sign(rand.Reader, message, crypto.Hash(0))
+func (e *ed25519Signer) SignMessage(message []byte) ([]data.Signature, error) {
+	sig, err := e.Sign(rand.Reader, message, crypto.Hash(0))
+	if err != nil {
+		return nil, err
+	}
+	ids := e.PublicData().IDs()
+	sigs := make([]data.Signature, 0, len(ids))
+	for _, id := range ids {
+		sigs = append(sigs, data.Signature{
+			KeyID:     id,
+			Signature: sig,
+		})
+	}
+	return sigs, nil
 }
 
 func (e *ed25519Signer) MarshalPrivateKey() (*data.PrivateKey, error) {

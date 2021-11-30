@@ -1671,10 +1671,8 @@ func (rs *RepoSuite) TestAddOrUpdateSignatures(c *C) {
 	c.Assert(err, IsNil)
 	rootSig, err := rootKey.SignMessage(rootMeta.Signed)
 	c.Assert(err, IsNil)
-	for _, id := range rootKey.PublicData().IDs() {
-		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
-			KeyID:     id,
-			Signature: rootSig}), IsNil)
+	for _, sig := range rootSig {
+		c.Assert(r.AddOrUpdateSignature("root.json", sig), IsNil)
 	}
 
 	// add targets and sign
@@ -1683,10 +1681,8 @@ func (rs *RepoSuite) TestAddOrUpdateSignatures(c *C) {
 	c.Assert(err, IsNil)
 	targetsSig, err := targetsKey.SignMessage(targetsMeta.Signed)
 	c.Assert(err, IsNil)
-	for _, id := range targetsKey.PublicData().IDs() {
-		r.AddOrUpdateSignature("targets.json", data.Signature{
-			KeyID:     id,
-			Signature: targetsSig})
+	for _, sig := range targetsSig {
+		r.AddOrUpdateSignature("targets.json", sig)
 	}
 
 	// snapshot and timestamp
@@ -1695,10 +1691,8 @@ func (rs *RepoSuite) TestAddOrUpdateSignatures(c *C) {
 	c.Assert(err, IsNil)
 	snapshotSig, err := snapshotKey.SignMessage(snapshotMeta.Signed)
 	c.Assert(err, IsNil)
-	for _, id := range snapshotKey.PublicData().IDs() {
-		r.AddOrUpdateSignature("snapshot.json", data.Signature{
-			KeyID:     id,
-			Signature: snapshotSig})
+	for _, sig := range snapshotSig {
+		r.AddOrUpdateSignature("snapshot.json", sig)
 	}
 
 	c.Assert(r.Timestamp(), IsNil)
@@ -1706,10 +1700,8 @@ func (rs *RepoSuite) TestAddOrUpdateSignatures(c *C) {
 	c.Assert(err, IsNil)
 	timestampSig, err := timestampKey.SignMessage(timestampMeta.Signed)
 	c.Assert(err, IsNil)
-	for _, id := range timestampKey.PublicData().IDs() {
-		r.AddOrUpdateSignature("timestamp.json", data.Signature{
-			KeyID:     id,
-			Signature: timestampSig})
+	for _, sig := range timestampSig {
+		r.AddOrUpdateSignature("timestamp.json", sig)
 	}
 
 	// commit successfully!

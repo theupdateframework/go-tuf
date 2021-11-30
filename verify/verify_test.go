@@ -45,9 +45,22 @@ func (s ecdsaSigner) PublicData() *data.PublicKey {
 	}
 }
 
-func (s ecdsaSigner) SignMessage(message []byte) ([]byte, error) {
+func (s ecdsaSigner) SignMessage(message []byte) ([]data.Signature, error) {
 	hash := sha256.Sum256(message)
-	return s.PrivateKey.Sign(rand.Reader, hash[:], crypto.SHA256)
+	sig, err := s.PrivateKey.Sign(rand.Reader, hash[:], crypto.SHA256)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := s.PublicData().IDs()
+	sigs := make([]data.Signature, 0, len(ids))
+	for _, id := range ids {
+		sigs = append(sigs, data.Signature{
+			KeyID:     id,
+			Signature: sig,
+		})
+	}
+	return sigs, nil
 }
 
 func (s ecdsaSigner) ContainsID(id string) bool {

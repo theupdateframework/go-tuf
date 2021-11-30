@@ -30,7 +30,7 @@ func (s *mockSigner) PublicData() *data.PublicKey {
 		Value:      s.value,
 	}
 }
-func (s *mockSigner) SignMessage(message []byte) ([]byte, error) {
+func (s *mockSigner) SignMessage(message []byte) ([]data.Signature, error) {
 	panic("not implemented")
 }
 

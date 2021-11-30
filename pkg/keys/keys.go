@@ -51,7 +51,8 @@ type Signer interface {
 	// Sign returns the signature of the message.
 	// The signer is expected to do its own hashing, so the full message will be
 	// provided as the message to Sign with a zero opts.HashFunc().
-	SignMessage(message []byte) ([]byte, error)
+	// TODO: Consider having this return a data.Signature that may include the certificate.
+	SignMessage(message []byte) ([]data.Signature, error)
 }
 
 func GetVerifier(key *data.PublicKey) (Verifier, error) {
