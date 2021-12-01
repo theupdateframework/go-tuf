@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/stretchr/testify/assert"
-	cjson "github.com/tent/canonical-json-go"
 	. "gopkg.in/check.v1"
 )
 
@@ -218,7 +218,7 @@ func TestDelegatedRoleJSON(t *testing.T) {
 
 	for _, tt := range tts {
 		t.Run(tt.testName, func(t *testing.T) {
-			b, err := cjson.Marshal(tt.d)
+			b, err := cjson.EncodeCanonical(tt.d)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.rawCJSON, string(b))
 

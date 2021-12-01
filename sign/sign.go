@@ -1,7 +1,7 @@
 package sign
 
 import (
-	cjson "github.com/tent/canonical-json-go"
+	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
 )
@@ -39,7 +39,7 @@ func Sign(s *data.Signed, k keys.Signer) error {
 }
 
 func Marshal(v interface{}, keys ...keys.Signer) (*data.Signed, error) {
-	b, err := cjson.Marshal(v)
+	b, err := cjson.EncodeCanonical(v)
 	if err != nil {
 		return nil, err
 	}
