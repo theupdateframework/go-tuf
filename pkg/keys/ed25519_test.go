@@ -33,6 +33,6 @@ func (Ed25519Suite) TestSignVerify(c *C) {
 	pubKey, err := GetVerifier(publicData)
 	c.Assert(err, IsNil)
 	for _, sig := range sigs {
-		c.Assert(pubKey.Verify(msg, sig.Signature), IsNil)
+		c.Assert(pubKey.Verify(msg, sig), IsNil)
 	}
 }

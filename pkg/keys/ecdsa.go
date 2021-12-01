@@ -33,7 +33,7 @@ func (p *p256Verifier) Public() string {
 	return p.PublicKey.String()
 }
 
-func (p *p256Verifier) Verify(msg, sigBytes []byte) error {
+func (p *p256Verifier) Verify(msg []byte, signature data.Signature) error {
 	x, y := elliptic.Unmarshal(elliptic.P256(), p.PublicKey)
 	k := &ecdsa.PublicKey{
 		Curve: elliptic.P256(),
@@ -42,7 +42,7 @@ func (p *p256Verifier) Verify(msg, sigBytes []byte) error {
 	}
 
 	var sig ecdsaSignature
-	if _, err := asn1.Unmarshal(sigBytes, &sig); err != nil {
+	if _, err := asn1.Unmarshal(signature.Signature, &sig); err != nil {
 		return err
 	}
 

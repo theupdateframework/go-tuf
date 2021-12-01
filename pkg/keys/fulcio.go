@@ -1,6 +1,7 @@
 package keys
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/ecdsa"
@@ -8,6 +9,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -21,6 +23,7 @@ import (
 	"github.com/go-openapi/strfmt"
 	"github.com/sigstore/fulcio/pkg/generated/client/operations"
 	"github.com/sigstore/fulcio/pkg/generated/models"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 	"github.com/theupdateframework/go-tuf/data"
 )
@@ -48,11 +51,44 @@ func (e *fulcioVerifier) Public() string {
 	return fmt.Sprintf("%s:%s", e.Issuer, e.Identity)
 }
 
-func (e *fulcioVerifier) Verify(msg, sig []byte) error {
+func (e *fulcioVerifier) Verify(msg []byte, signature data.Signature) error {
 	// Check signature verification by extracting public key out of x509 cert
+	certs, err := cryptoutils.LoadCertificatesFromPEM(bytes.NewReader(signature.Certificate))
+	if err != nil {
+		return err
+	}
+	if len(certs) == 0 {
+		return errors.New("tuf: no certs found in pem certificates")
+	}
 
-	// Check certificate identity and issuer matches provided
+	cert := certs[0]
+	pubKey, ok := cert.PublicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return errors.New("tuf: invalid public key type in certificate")
+	}
 
+	var sig ecdsaSignature
+	if _, err := asn1.Unmarshal(signature.Signature, &sig); err != nil {
+		return err
+	}
+
+	hash := sha256.Sum256(msg)
+	if !ecdsa.Verify(pubKey, hash[:], sig.R, sig.S) {
+		return errors.New("tuf: ecdsa signature verification failed")
+	}
+
+	// Check certificate identity and issuer matches the key value.
+	if cert.EmailAddresses == nil || cert.EmailAddresses[0] != e.Identity {
+		return errors.New("tuf: unexpected certificate identity")
+	}
+
+	if certIssuerExtension(cert) != e.Issuer {
+		return errors.New("tuf: unexpected certificate issuer")
+	}
+
+	// TODO: Check certificate chain. Verify certificate against Fulcio Root CA
+
+	// TODO: Check the rekor log.
 	return nil
 }
 
@@ -152,6 +188,15 @@ func issuerFromToken(tok *oauthflow.OIDCIDToken) (string, error) {
 	return claims.FederatedClaims.ConnectorID, nil
 }
 
+func certIssuerExtension(cert *x509.Certificate) string {
+	for _, ext := range cert.Extensions {
+		if ext.Id.String() == "1.3.6.1.4.1.57264.1.1" {
+			return string(ext.Value)
+		}
+	}
+	return ""
+}
+
 func (e *fulcioSigner) SignMessage(message []byte) ([]data.Signature, error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -223,7 +268,7 @@ func (e *fulcioSigner) SignMessage(message []byte) ([]data.Signature, error) {
 		return nil, err
 	}
 
-	// split the cert and the chain
+	// Split the cert and the chain
 	certBlock, _ := pem.Decode([]byte(resp.Payload))
 	certPem := pem.EncodeToMemory(certBlock)
 
@@ -236,6 +281,8 @@ func (e *fulcioSigner) SignMessage(message []byte) ([]data.Signature, error) {
 			Certificate: certPem,
 		})
 	}
+
+	// TODO: Upload (msg, sig, cert) to Rekor for timestamp validation.
 	return sigs, nil
 }
 

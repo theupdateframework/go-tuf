@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -32,20 +33,46 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := repo.AddPrivateKey("root", key); err != nil {
+	ed25519Key, err := keys.GenerateEd25519Key()
+	if err != nil {
 		log.Fatal(err)
 	}
 
-	if err := repo.AddPrivateKey("targets", key); err != nil {
+	fmt.Println("adding root")
+	if err := repo.AddPrivateKey("root", ed25519Key); err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("adding targets")
 
-	if err := repo.AddPrivateKey("snapshot", key); err != nil {
+	if err := repo.AddPrivateKey("targets", ed25519Key); err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("adding snapshot")
+
+	if err := repo.AddPrivateKey("snapshot", ed25519Key); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("adding timestamp")
 
 	if err := repo.AddPrivateKey("timestamp", key); err != nil {
 		log.Fatal(err)
 	}
+	if err := os.WriteFile("staged/targets/README.md", []byte("foo"), 0644); err != nil {
+		log.Fatal(err)
+	}
+	if err := repo.AddTargets([]string{"README.md"}, nil); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("committing")
 
+	if err := repo.Snapshot(); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := repo.Timestamp(); err != nil {
+		log.Fatal(err)
+	}
+	if err := repo.Commit(); err != nil {
+		log.Fatal(err)
+	}
 }

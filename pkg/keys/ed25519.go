@@ -32,8 +32,8 @@ func (e *ed25519Verifier) Public() string {
 	return string(e.PublicKey)
 }
 
-func (e *ed25519Verifier) Verify(msg, sig []byte) error {
-	if !ed25519.Verify([]byte(e.PublicKey), msg, sig) {
+func (e *ed25519Verifier) Verify(msg []byte, sig data.Signature) error {
+	if !ed25519.Verify([]byte(e.PublicKey), msg, sig.Signature) {
 		return errors.New("tuf: ed25519 signature verification failed")
 	}
 	return nil

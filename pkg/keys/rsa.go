@@ -43,10 +43,10 @@ func (p *rsaVerifier) Public() string {
 	return string(r)
 }
 
-func (p *rsaVerifier) Verify(msg, sigBytes []byte) error {
+func (p *rsaVerifier) Verify(msg []byte, sig data.Signature) error {
 	hash := sha256.Sum256(msg)
 
-	return rsa.VerifyPSS(p.rsaKey, crypto.SHA256, hash[:], sigBytes, &rsa.PSSOptions{})
+	return rsa.VerifyPSS(p.rsaKey, crypto.SHA256, hash[:], sig.Signature, &rsa.PSSOptions{})
 }
 
 func (p *rsaVerifier) MarshalPublicKey() *data.PublicKey {

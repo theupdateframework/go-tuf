@@ -35,7 +35,7 @@ type Verifier interface {
 	// Verify takes a message and signature, all as byte slices,
 	// and determines whether the signature is valid for the given
 	// key and message.
-	Verify(msg, sig []byte) error
+	Verify(msg []byte, sig data.Signature) error
 }
 
 type Signer interface {

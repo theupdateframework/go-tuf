@@ -103,7 +103,7 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 			continue
 		}
 
-		if err := verifier.Verify(msg, sig.Signature); err != nil {
+		if err := verifier.Verify(msg, sig); err != nil {
 			return ErrInvalid
 		}
 
