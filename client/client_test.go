@@ -1181,6 +1181,7 @@ func generateRepoFS(c *C, dir string, files map[string][]byte, consistentSnapsho
 
 func (s *ClientSuite) TestVerifyDigest(c *C) {
 	digest := "sha256:bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c"
+	hash := "bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c"
 	size := int64(42)
 
 	c.Assert(s.repo.AddDigestTargets(digest, size, nil, ""), IsNil)
@@ -1193,5 +1194,5 @@ func (s *ClientSuite) TestVerifyDigest(c *C) {
 	_, err := client.Update()
 	c.Assert(err, IsNil)
 
-	c.Assert(client.VerifyDigest(digest, size, ""), IsNil)
+	c.Assert(client.VerifyDigest(hash, "sha256", size, digest), IsNil)
 }

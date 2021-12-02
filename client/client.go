@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"strings"
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/util"
@@ -843,24 +842,17 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 	return nil
 }
 
-func (c *Client) VerifyDigest(digest string, length int64, path string) (err error) {
-	targetName := path
-	if path == "" {
-		targetName = digest
-	}
-	localMeta, _ := c.targets[targetName]
+func (c *Client) VerifyDigest(digest string, digestAlg string, length int64, path string) (err error) {
+	localMeta, _ := c.targets[path]
 
-	hashes := make([]string, 1)
-	hashes[0] = strings.Split(digest, ":")[1]
-
-	actual := data.FileMeta{Length: length, Hashes: make(data.Hashes, len(hashes))}
-	actual.Hashes["sha256"], err = hex.DecodeString(hashes[0])
+	actual := data.FileMeta{Length: length, Hashes: make(data.Hashes, 1)}
+	actual.Hashes[digestAlg], err = hex.DecodeString(digest)
 
 	if err := util.TargetFileMetaEqual(data.TargetFileMeta{actual}, localMeta); err != nil {
 		if e, ok := err.(util.ErrWrongLength); ok {
-			return ErrWrongSize{digest, e.Actual, e.Expected}
+			return ErrWrongSize{path, e.Actual, e.Expected}
 		}
-		return ErrDownloadFailed{digest, err}
+		return ErrDownloadFailed{path, err}
 	}
 
 	return nil
