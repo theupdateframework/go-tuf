@@ -28,21 +28,22 @@ Options:
   --insecure-plaintext  Don't encrypt signing keys
 
 Commands:
-  help          Show usage for a specific command
-  init          Initialize a new repository
-  gen-key       Generate a new signing key for a specific metadata file
-  revoke-key    Revoke a signing key
-  add           Add target file(s)
-  remove        Remove a target file
-  snapshot      Update the snapshot metadata file
-  timestamp     Update the timestamp metadata file
-  sign          Sign a role's metadata file
-  commit        Commit staged files to the repository
-  regenerate    Recreate the targets metadata file [Not supported yet]
-  clean         Remove all staged metadata files
-  root-keys     Output a JSON serialized array of root keys to STDOUT
-  set-threshold Sets the threshold for a role
-  get-threshold Outputs the threshold for a role
+  help               Show usage for a specific command
+  init               Initialize a new repository
+  gen-key            Generate a new signing key for a specific metadata file
+  revoke-key         Revoke a signing key
+  add                Add target file(s)
+  remove             Remove a target file
+  snapshot           Update the snapshot metadata file
+  timestamp          Update the timestamp metadata file
+  sign               Sign a role's metadata file
+  commit             Commit staged files to the repository
+  regenerate         Recreate the targets metadata file [Not supported yet]
+  set-threshold      Sets the threshold for a role
+  get-threshold      Outputs the threshold for a role
+  change-passphrase  Changes the passphrase for given role keys file
+  root-keys          Output a JSON serialized array of root keys to STDOUT
+  clean              Remove all staged metadata files
 
 See "tuf help <command>" for more information on a specific command
 `
@@ -125,11 +126,22 @@ func parseExpires(arg string) (time.Time, error) {
 	return time.Now().AddDate(0, 0, days).UTC(), nil
 }
 
-func getPassphrase(role string, confirm bool) ([]byte, error) {
-	if pass := os.Getenv(fmt.Sprintf("TUF_%s_PASSPHRASE", strings.ToUpper(role))); pass != "" {
+func getPassphrase(role string, confirm bool, change bool) ([]byte, error) {
+	// In case of change we need to prompt explicitly for a new passphrase
+	// and not read it from the environment variable, if present
+	if pass := os.Getenv(fmt.Sprintf("TUF_%s_PASSPHRASE", strings.ToUpper(role))); pass != "" && !change {
 		return []byte(pass), nil
 	}
-
+	// Alter role string if we are prompting for a passphrase change
+	if change {
+		// Check if environment variable for new passphrase exist
+		if new_pass := os.Getenv(fmt.Sprintf("TUF_NEW_%s_PASSPHRASE", strings.ToUpper(role))); new_pass != "" {
+			// If so, just read the new passphrase from it and return
+			return []byte(new_pass), nil
+		}
+		// No environment variable set, so proceed prompting for new passphrase
+		role = fmt.Sprintf("new %s", role)
+	}
 	fmt.Printf("Enter %s keys passphrase: ", role)
 	passphrase, err := terminal.ReadPassword(int(syscall.Stdin))
 	fmt.Println()

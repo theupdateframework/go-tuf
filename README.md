@@ -122,10 +122,17 @@ Sets `role`'s threshold (required number of keys for signing) to
 
 Outputs `role`'s threshold (required number of keys for signing).
 
+#### `tuf change-passphrase <role>`
+
+Changes the passphrase for given role keys file. The CLI supports reading
+both the existing and the new passphrase via the following environment
+variables - `TUF_{{ROLE}}_PASSPHRASE` and respectively `TUF_NEW_{{ROLE}}_PASSPHRASE`
+
 #### Usage of environment variables
 
 The `tuf` CLI supports receiving passphrases via environment variables in
-the form of `TUF_{{ROLE}}_PASSPHRASE`
+the form of `TUF_{{ROLE}}_PASSPHRASE` for existing ones and
+`TUF_NEW_{{ROLE}}_PASSPHRASE` for setting new ones.
 
 For a list of supported commands, run `tuf help` from the command line.
 

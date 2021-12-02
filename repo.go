@@ -55,11 +55,16 @@ type LocalStore interface {
 	// GetSigners return a list of signers for a role.
 	GetSigners(string) ([]keys.Signer, error)
 
-	// SavePrivateKey adds a signer to a role.
+	// SaveSigner adds a signer to a role.
 	SaveSigner(string, keys.Signer) error
 
 	// Clean is used to remove all staged metadata files.
 	Clean() error
+}
+
+type PassphraseChanger interface {
+	// ChangePassphrase changes the passphrase for a role keys file.
+	ChangePassphrase(string) error
 }
 
 type Repo struct {
@@ -311,6 +316,18 @@ func (r *Repo) timestamp() (*data.Timestamp, error) {
 		return nil, err
 	}
 	return timestamp, nil
+}
+
+func (r *Repo) ChangePassphrase(keyRole string) error {
+	if !verify.ValidRole(keyRole) {
+		return ErrInvalidRole{keyRole}
+	}
+
+	if p, ok := r.local.(PassphraseChanger); ok {
+		return p.ChangePassphrase(keyRole)
+	}
+
+	return ErrChangePassphraseNotSupported
 }
 
 func (r *Repo) GenKey(role string) ([]string, error) {

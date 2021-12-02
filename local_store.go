@@ -3,6 +3,7 @@ package tuf
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -331,6 +332,44 @@ func (f *fileSystemStore) GetSigners(role string) ([]keys.Signer, error) {
 	return f.signers[role], nil
 }
 
+// ChangePassphrase changes the passphrase for a role keys file. Implements
+// PassphraseChanger interface.
+func (f *fileSystemStore) ChangePassphrase(role string) error {
+	// No need to proceed if passphrase func is not set
+	if f.passphraseFunc == nil {
+		return ErrPassphraseRequired{role}
+	}
+	// Read the existing keys (if any)
+	// If encrypted, will prompt for existing passphrase
+	keys, _, err := f.loadPrivateKeys(role)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Printf("Failed to change passphrase. Missing keys file for %s role. \n", role)
+		}
+		return err
+	}
+	// Prompt for new passphrase
+	pass, err := f.passphraseFunc(role, true, true)
+	if err != nil {
+		return err
+	}
+	// Proceed saving the keys
+	pk := &persistedKeys{Encrypted: true}
+	pk.Data, err = encrypted.Marshal(keys, pass)
+	if err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(pk, "", "\t")
+	if err != nil {
+		return err
+	}
+	if err := util.AtomicallyWriteFile(f.keysPath(role), append(data, '\n'), 0600); err != nil {
+		return err
+	}
+	fmt.Printf("Successfully changed passphrase for %s keys file\n", role)
+	return nil
+}
+
 func (f *fileSystemStore) SaveSigner(role string, signer keys.Signer) error {
 	if err := f.createDirs(); err != nil {
 		return err
@@ -352,7 +391,7 @@ func (f *fileSystemStore) SaveSigner(role string, signer keys.Signer) error {
 	// be encrypted later (passphraseFunc being nil indicates the keys file
 	// should not be encrypted)
 	if pass == nil && f.passphraseFunc != nil {
-		pass, err = f.passphraseFunc(role, true)
+		pass, err = f.passphraseFunc(role, true, false)
 		if err != nil {
 			return err
 		}
@@ -412,7 +451,7 @@ func (f *fileSystemStore) loadPrivateKeys(role string) ([]*data.PrivateKey, []by
 	// try the empty string as the password first
 	pass := []byte("")
 	if err := encrypted.Unmarshal(pk.Data, &keys, pass); err != nil {
-		pass, err = f.passphraseFunc(role, false)
+		pass, err = f.passphraseFunc(role, false, false)
 		if err != nil {
 			return nil, nil, err
 		}
