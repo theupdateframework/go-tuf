@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	cjson "github.com/tent/canonical-json-go"
+	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/theupdateframework/go-tuf/data"
 )
 
@@ -83,7 +83,7 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 	if err := json.Unmarshal(s.Signed, &decoded); err != nil {
 		return err
 	}
-	msg, err := cjson.Marshal(decoded)
+	msg, err := cjson.EncodeCanonical(decoded)
 	if err != nil {
 		return err
 	}

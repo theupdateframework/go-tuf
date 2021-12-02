@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	cjson "github.com/tent/canonical-json-go"
+	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/internal/signer"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
@@ -502,7 +502,7 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 }
 
 func (r *Repo) jsonMarshal(v interface{}) ([]byte, error) {
-	b, err := cjson.Marshal(v)
+	b, err := cjson.EncodeCanonical(v)
 	if err != nil {
 		return []byte{}, err
 	}

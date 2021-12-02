@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	cjson "github.com/tent/canonical-json-go"
+	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 )
 
 const (
@@ -58,7 +58,7 @@ type PrivateKey struct {
 
 func (k *PublicKey) IDs() []string {
 	k.idOnce.Do(func() {
-		data, err := cjson.Marshal(k)
+		data, err := cjson.EncodeCanonical(k)
 		if err != nil {
 			panic(fmt.Errorf("tuf: error creating key ID: %w", err))
 		}

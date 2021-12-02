@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	cjson "github.com/tent/canonical-json-go"
+	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/encrypted"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
@@ -1293,10 +1293,10 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 
 			numMatches := 0
 			for _, wantKey := range expected {
-				wantCanon, err := cjson.Marshal(wantKey)
+				wantCanon, err := cjson.EncodeCanonical(wantKey)
 				c.Assert(err, IsNil)
 
-				gotCanon, err := cjson.Marshal(gotKey)
+				gotCanon, err := cjson.EncodeCanonical(gotKey)
 				c.Assert(err, IsNil)
 
 				if string(wantCanon) == string(gotCanon) {

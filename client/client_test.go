@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/stretchr/testify/assert"
-	cjson "github.com/tent/canonical-json-go"
 	tuf "github.com/theupdateframework/go-tuf"
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
@@ -1126,7 +1126,7 @@ func (s *ClientSuite) TestUnknownKeyIDs(c *C) {
 	signedRoot, err := sign.Marshal(root.Signed, signingKeys...)
 	c.Assert(err, IsNil)
 
-	rootJSON, err = cjson.Marshal(signedRoot)
+	rootJSON, err = cjson.EncodeCanonical(signedRoot)
 	c.Assert(err, IsNil)
 
 	s.store.SetMeta("root.json", rootJSON)
