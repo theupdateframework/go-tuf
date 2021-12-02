@@ -1398,7 +1398,7 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 	// 6. Try to add a key and implicitly decrypt the keys file using the OLD passphrase - should FAIL
 	newKey, err = keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
-	newPrivateKey, err = newKey.MarshalPrivateKey()
+	_, err = newKey.MarshalPrivateKey()
 	c.Assert(err, IsNil)
 	c.Assert(store.SaveSigner("root", newKey), NotNil)
 
