@@ -263,6 +263,9 @@ func initTestDelegationClient(t *testing.T, dirPrefix string) (*Client, func() e
 		TargetsPath:  "targets",
 	}
 	remote, err := HTTPRemoteStore(fmt.Sprintf("http://%s/", addr), opts, nil)
+	if err != nil {
+		t.Error("error should be nil")
+	}
 
 	c := NewClient(MemoryLocalStore(), remote)
 	rawFile, err := ioutil.ReadFile(initialStateDir + "/" + "root.json")

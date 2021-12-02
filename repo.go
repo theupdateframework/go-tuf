@@ -409,7 +409,7 @@ func (r *Repo) AddVerificationKeyWithExpiration(keyRole string, pk *data.PublicK
 }
 
 func validExpires(expires time.Time) bool {
-	return expires.Sub(time.Now()) > 0
+	return time.Until(expires) > 0
 }
 
 func (r *Repo) RootKeys() ([]*data.PublicKey, error) {

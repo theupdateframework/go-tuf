@@ -22,7 +22,6 @@ import (
 	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
 	"golang.org/x/crypto/ed25519"
-	"gopkg.in/check.v1"
 	. "gopkg.in/check.v1"
 )
 
@@ -1314,7 +1313,7 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 				}
 			}
 
-			c.Assert(numMatches, Equals, expectedNumMatches, check.Commentf("actual: %+v, expected: %+v", actual, expected))
+			c.Assert(numMatches, Equals, expectedNumMatches, Commentf("actual: %+v, expected: %+v", actual, expected))
 		}
 
 		// check GetKeys is correct
@@ -1341,7 +1340,7 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 				}
 			}
 
-			c.Assert(numMatches, Equals, expectedNumMatches, check.Commentf("signers: %+v, expected: %+v", signers, expected))
+			c.Assert(numMatches, Equals, expectedNumMatches, Commentf("signers: %+v, expected: %+v", signers, expected))
 		}
 	}
 
@@ -1554,7 +1553,7 @@ func (rs *RepoSuite) TestUnknownKeyIDs(c *C) {
 
 	var signedRoot struct {
 		Signed     data.Root        `json:"signed"`
-		Signatures []data.Signature `json:signatures"`
+		Signatures []data.Signature `json:"signatures"`
 	}
 	c.Assert(json.Unmarshal(rootJSON, &signedRoot), IsNil)
 	c.Assert(signedRoot.Signed.Version, Equals, 1)
@@ -1565,6 +1564,8 @@ func (rs *RepoSuite) TestUnknownKeyIDs(c *C) {
 
 	// a new root should preserve the unknown key id.
 	root, err = r.root()
+	c.Assert(root, NotNil)
+	c.Assert(err, IsNil)
 
 	genKey(c, r, "timestamp")
 	c.Assert(r.Snapshot(), IsNil)

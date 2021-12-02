@@ -115,11 +115,11 @@ func (UtilSuite) TestSnapshotFileMetaEqual(c *C) {
 
 	fileMeta := func(version int, length int64, hashes map[string]string) data.SnapshotFileMeta {
 		return data.SnapshotFileMeta{
-			data.FileMeta{
+			FileMeta: data.FileMeta{
 				Length: length,
 				Hashes: makeHashes(c, hashes),
 			},
-			version,
+			Version: version,
 		}
 	}
 

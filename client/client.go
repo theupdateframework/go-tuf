@@ -3,7 +3,6 @@ package client
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io"
 	"io/ioutil"
 	"log"
@@ -560,56 +559,6 @@ func (c *Client) downloadMetaUnsafe(name string, maxMetaSize int64) ([]byte, err
 	return ioutil.ReadAll(io.LimitReader(r, maxMetaSize))
 }
 
-// getRootAndLocalVersionsUnsafe decodes the versions stored in the local
-// metadata without verifying signatures to protect against downgrade attacks
-// when the root is replaced and contains new keys. It also sets the local meta
-// cache to only contain the local root metadata.
-func (c *Client) getRootAndLocalVersionsUnsafe() error {
-	type versionData struct {
-		Signed struct {
-			Version int
-		}
-	}
-
-	meta, err := c.local.GetMeta()
-	if err != nil {
-		return err
-	}
-
-	getVersion := func(name string) (int, error) {
-		m, ok := meta[name]
-		if !ok {
-			return 0, nil
-		}
-		var data versionData
-		if err := json.Unmarshal(m, &data); err != nil {
-			return 0, err
-		}
-		return data.Signed.Version, nil
-	}
-
-	c.timestampVer, err = getVersion("timestamp.json")
-	if err != nil {
-		return err
-	}
-	c.snapshotVer, err = getVersion("snapshot.json")
-	if err != nil {
-		return err
-	}
-	c.targetsVer, err = getVersion("targets.json")
-	if err != nil {
-		return err
-	}
-
-	root, ok := meta["root.json"]
-	if !ok {
-		return errors.New("tuf: missing local root after downloading, this should not be possible")
-	}
-	c.localMeta = map[string]json.RawMessage{"root.json": root}
-
-	return nil
-}
-
 // remoteGetFunc is the type of function the download method uses to download
 // remote files
 type remoteGetFunc func(string) (io.ReadCloser, int64, error)
@@ -790,6 +739,7 @@ func (c *Client) localMetaFromSnapshot(name string, m data.SnapshotFileMeta) (js
 }
 
 // hasTargetsMeta checks whether local metadata has the given snapshot meta
+//lint:ignore U1000 unused
 func (c *Client) hasTargetsMeta(m data.SnapshotFileMeta) bool {
 	b, ok := c.localMeta["targets.json"]
 	if !ok {
@@ -804,6 +754,7 @@ func (c *Client) hasTargetsMeta(m data.SnapshotFileMeta) bool {
 }
 
 // hasSnapshotMeta checks whether local metadata has the given meta
+//lint:ignore U1000 unused
 func (c *Client) hasMetaFromTimestamp(name string, m data.TimestampFileMeta) bool {
 	b, ok := c.localMeta[name]
 	if !ok {

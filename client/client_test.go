@@ -84,7 +84,7 @@ func (f *fakeFile) Read(p []byte) (int, error) {
 }
 
 func (f *fakeFile) Close() error {
-	f.buf.Seek(0, os.SEEK_SET)
+	f.buf.Seek(0, io.SeekStart)
 	return nil
 }
 
@@ -905,6 +905,7 @@ func (s *ClientSuite) TestUpdateReplayAttack(c *C) {
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncRemote(c)
 	_, err := client.Update()
+	c.Assert(err, IsNil)
 	c.Assert(client.timestampVer > version, Equals, true)
 
 	// replace remote timestamp.json with the old one
@@ -912,7 +913,13 @@ func (s *ClientSuite) TestUpdateReplayAttack(c *C) {
 
 	// check update returns ErrLowVersion
 	_, err = client.Update()
-	c.Assert(err, DeepEquals, ErrDecodeFailed{"timestamp.json", verify.ErrLowVersion{version, client.timestampVer}})
+	c.Assert(err, DeepEquals, ErrDecodeFailed{
+		File: "timestamp.json",
+		Err: verify.ErrLowVersion{
+			Actual:  version,
+			Current: client.timestampVer,
+		},
+	})
 }
 
 func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
@@ -1109,7 +1116,7 @@ func (s *ClientSuite) TestUnknownKeyIDs(c *C) {
 
 	var root struct {
 		Signed     data.Root        `json:"signed"`
-		Signatures []data.Signature `json:signatures"`
+		Signatures []data.Signature `json:"signatures"`
 	}
 	c.Assert(json.Unmarshal(rootJSON, &root), IsNil)
 
@@ -1137,6 +1144,7 @@ func (s *ClientSuite) TestUnknownKeyIDs(c *C) {
 	// the TUF-0.9 update workflow, where we decide to update the root
 	// metadata when we observe a new root through the snapshot.
 	repo, err := tuf.NewRepo(s.store)
+	c.Assert(err, IsNil)
 	c.Assert(repo.Snapshot(), IsNil)
 	c.Assert(repo.Timestamp(), IsNil)
 	c.Assert(repo.Commit(), IsNil)
