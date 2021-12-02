@@ -707,6 +707,7 @@ func (r *Repo) AddTargets(paths []string, custom json.RawMessage) error {
 func (r *Repo) AddDigestTargets(digest string, length int64, custom json.RawMessage, path string) error {
 	expires := data.DefaultExpires("targets")
 
+	// TODO: support delegated targets
 	t, err := r.targets()
 	if err != nil {
 		return err
