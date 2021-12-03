@@ -847,6 +847,9 @@ func (c *Client) VerifyDigest(digest string, digestAlg string, length int64, pat
 
 	actual := data.FileMeta{Length: length, Hashes: make(data.Hashes, 1)}
 	actual.Hashes[digestAlg], err = hex.DecodeString(digest)
+	if err != nil {
+		return err
+	}
 
 	if err := util.TargetFileMetaEqual(data.TargetFileMeta{actual}, localMeta); err != nil {
 		if e, ok := err.(util.ErrWrongLength); ok {

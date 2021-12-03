@@ -725,7 +725,7 @@ func (r *Repo) AddDigestTargets(digest string, digestAlg string, length int64, c
 		meta.Custom = t.Custom
 	}
 
-	t.Targets[path] = data.TargetFileMeta{meta}
+	t.Targets[path] = data.TargetFileMeta{FileMeta: meta}
 
 	return r.writeTargetWithExpires(t, expires)
 }
