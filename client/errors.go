@@ -49,6 +49,7 @@ func (e ErrMaxDelegations) Error() string {
 	return fmt.Sprintf("tuf: max delegation of %d reached searching for %s with snapshot version %d", e.MaxDelegations, e.Target, e.SnapshotVersion)
 }
 
+//lint:ignore U1000 unused
 func isDecodeFailedWithErrRoleThreshold(err error) bool {
 	e, ok := err.(ErrDecodeFailed)
 	if !ok {

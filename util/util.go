@@ -215,7 +215,10 @@ func GenerateSnapshotFileMeta(r io.Reader, hashAlgorithms ...string) (data.Snaps
 	if err != nil {
 		return data.SnapshotFileMeta{}, err
 	}
-	return data.SnapshotFileMeta{m, v}, nil
+	return data.SnapshotFileMeta{
+		FileMeta: m,
+		Version:  v,
+	}, nil
 }
 
 func GenerateTargetFileMeta(r io.Reader, hashAlgorithms ...string) (data.TargetFileMeta, error) {
@@ -223,7 +226,9 @@ func GenerateTargetFileMeta(r io.Reader, hashAlgorithms ...string) (data.TargetF
 	if err != nil {
 		return data.TargetFileMeta{}, err
 	}
-	return data.TargetFileMeta{m}, nil
+	return data.TargetFileMeta{
+		FileMeta: m,
+	}, nil
 }
 
 func GenerateTimestampFileMeta(r io.Reader, hashAlgorithms ...string) (data.TimestampFileMeta, error) {
@@ -231,7 +236,10 @@ func GenerateTimestampFileMeta(r io.Reader, hashAlgorithms ...string) (data.Time
 	if err != nil {
 		return data.TimestampFileMeta{}, err
 	}
-	return data.TimestampFileMeta{m, v}, nil
+	return data.TimestampFileMeta{
+		FileMeta: m,
+		Version:  v,
+	}, nil
 }
 
 func NormalizeTarget(p string) string {

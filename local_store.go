@@ -301,6 +301,7 @@ func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]in
 			return err
 		}
 		if !info.IsDir() && isTarget(rel) && needsRemoval(rel) {
+			//lint:ignore SA9003 empty branch
 			if err := os.Remove(path); err != nil {
 				// TODO: log / handle error
 			}

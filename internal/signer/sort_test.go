@@ -16,12 +16,10 @@ type mockSigner struct {
 
 func (s *mockSigner) MarshalPrivateKey() (*data.PrivateKey, error) {
 	panic("not implemented")
-	return nil, nil
 }
 
 func (s *mockSigner) UnmarshalPrivateKey(key *data.PrivateKey) error {
 	panic("not implemented")
-	return nil
 }
 
 func (s *mockSigner) PublicData() *data.PublicKey {
@@ -34,7 +32,6 @@ func (s *mockSigner) PublicData() *data.PublicKey {
 }
 func (s *mockSigner) SignMessage(message []byte) ([]byte, error) {
 	panic("not implemented")
-	return nil, nil
 }
 
 func TestSignerSortByIDs(t *testing.T) {

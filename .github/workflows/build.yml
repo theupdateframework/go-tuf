@@ -33,3 +33,9 @@ jobs:
       run: |
         GO111MODULE=off go get github.com/mattn/goveralls
         $(go env GOPATH)/bin/goveralls -coverprofile=profile.cov -service=github
+    - name: Vet
+      run: go vet ./...
+    - name: Install staticcheck
+      run: "go install honnef.co/go/tools/cmd/staticcheck@v0.2.2"
+    - name: Run staticcheck
+      run: staticcheck ./...

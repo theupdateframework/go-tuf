@@ -14,7 +14,7 @@ import (
 	docopt "github.com/flynn/go-docopt"
 	tuf "github.com/theupdateframework/go-tuf"
 	"github.com/theupdateframework/go-tuf/util"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 func main() {
@@ -143,7 +143,7 @@ func getPassphrase(role string, confirm bool, change bool) ([]byte, error) {
 		role = fmt.Sprintf("new %s", role)
 	}
 	fmt.Printf("Enter %s keys passphrase: ", role)
-	passphrase, err := terminal.ReadPassword(int(syscall.Stdin))
+	passphrase, err := term.ReadPassword(int(syscall.Stdin))
 	fmt.Println()
 	if err != nil {
 		return nil, err
@@ -154,14 +154,14 @@ func getPassphrase(role string, confirm bool, change bool) ([]byte, error) {
 	}
 
 	fmt.Printf("Repeat %s keys passphrase: ", role)
-	confirmation, err := terminal.ReadPassword(int(syscall.Stdin))
+	confirmation, err := term.ReadPassword(int(syscall.Stdin))
 	fmt.Println()
 	if err != nil {
 		return nil, err
 	}
 
 	if !bytes.Equal(passphrase, confirmation) {
-		return nil, errors.New("The entered passphrases do not match")
+		return nil, errors.New("the entered passphrases do not match")
 	}
 	return passphrase, nil
 }

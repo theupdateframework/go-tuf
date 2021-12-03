@@ -44,7 +44,7 @@ func cmdGet(args *docopt.Args, client *tuf.Client) error {
 		return err
 	}
 	defer tmp.Delete()
-	if _, err := tmp.Seek(0, os.SEEK_SET); err != nil {
+	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
 	_, err = io.Copy(os.Stdout, file)

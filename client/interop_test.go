@@ -53,6 +53,10 @@ func computeHashes(c *C, dir string) map[string]string {
 	hashes := make(map[string]string)
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
 		if info.IsDir() {
 			return nil
 		}
