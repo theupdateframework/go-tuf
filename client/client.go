@@ -843,7 +843,10 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 }
 
 func (c *Client) VerifyDigest(digest string, digestAlg string, length int64, path string) (err error) {
-	localMeta, _ := c.targets[path]
+	localMeta, ok := c.targets[path]
+	if !ok {
+		return ErrUnknownTarget{Name: path, SnapshotVersion: c.snapshotVer}
+	}
 
 	actual := data.FileMeta{Length: length, Hashes: make(data.Hashes, 1)}
 	actual.Hashes[digestAlg], err = hex.DecodeString(digest)
