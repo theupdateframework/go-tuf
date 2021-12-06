@@ -851,7 +851,7 @@ func (c *Client) VerifyDigest(digest string, digestAlg string, length int64, pat
 		return err
 	}
 
-	if err := util.TargetFileMetaEqual(data.TargetFileMeta{actual}, localMeta); err != nil {
+	if err := util.TargetFileMetaEqual(data.TargetFileMeta{FileMeta: actual}, localMeta); err != nil {
 		if e, ok := err.(util.ErrWrongLength); ok {
 			return ErrWrongSize{path, e.Actual, e.Expected}
 		}
