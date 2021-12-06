@@ -1812,7 +1812,7 @@ func (rs *RepoSuite) TestSignDigest(c *C) {
 	hash := "bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c"
 	size := int64(42)
 
-	c.Assert(r.AddDigestTargets(hash, "sha256", size, nil, digest), IsNil)
+	c.Assert(r.AddTargetsWithDigest(hash, "sha256", size, nil, digest), IsNil)
 	c.Assert(r.Snapshot(), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)

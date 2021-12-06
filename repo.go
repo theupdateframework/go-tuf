@@ -704,7 +704,7 @@ func (r *Repo) AddTargets(paths []string, custom json.RawMessage) error {
 	return r.AddTargetsWithExpires(paths, custom, data.DefaultExpires("targets"))
 }
 
-func (r *Repo) AddDigestTargets(digest string, digestAlg string, length int64, custom json.RawMessage, path string) error {
+func (r *Repo) AddTargetsWithDigest(digest string, digestAlg string, length int64, custom json.RawMessage, path string) error {
 	expires := data.DefaultExpires("targets")
 
 	// TODO: support delegated targets
@@ -719,6 +719,8 @@ func (r *Repo) AddDigestTargets(digest string, digestAlg string, length int64, c
 		return err
 	}
 
+	// If custom is provided, set custom, otherwise maintain existing custom
+	// metadata
 	if len(custom) > 0 {
 		meta.Custom = &custom
 	} else if t, ok := t.Targets[path]; ok {
