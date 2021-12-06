@@ -1184,7 +1184,7 @@ func (s *ClientSuite) TestVerifyDigest(c *C) {
 	hash := "bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c"
 	size := int64(42)
 
-	c.Assert(s.repo.AddDigestTargets(hash, "sha256", size, nil, digest), IsNil)
+	c.Assert(s.repo.AddTargetsWithDigest(hash, "sha256", size, nil, digest), IsNil)
 	c.Assert(s.repo.Snapshot(), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	c.Assert(s.repo.Commit(), IsNil)
