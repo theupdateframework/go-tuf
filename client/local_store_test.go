@@ -8,6 +8,9 @@ import (
 
 func TestDeleteMeta(t *testing.T) {
 	l := MemoryLocalStore()
+	defer func() {
+		assert.Equal(t, nil, l.Close())
+	}()
 	assert.Equal(t, l.SetMeta("root.json", []byte(`
   {
 	  "signed": {},

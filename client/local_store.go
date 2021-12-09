@@ -23,3 +23,7 @@ func (m memoryLocalStore) DeleteMeta(name string) error {
 	delete(m, name)
 	return nil
 }
+
+func (m memoryLocalStore) Close() error {
+	return nil
+}

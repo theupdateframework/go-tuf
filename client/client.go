@@ -24,6 +24,8 @@ const (
 
 // LocalStore is local storage for downloaded top-level metadata.
 type LocalStore interface {
+	io.Closer
+
 	// GetMeta returns top-level metadata from local storage. The keys are
 	// in the form `ROLE.json`, with ROLE being a valid top-level role.
 	GetMeta() (map[string]json.RawMessage, error)

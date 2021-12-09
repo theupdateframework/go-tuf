@@ -20,6 +20,7 @@ func (LocalStoreSuite) TestFileLocalStore(c *C) {
 	path := filepath.Join(tmp, "tuf.db")
 	store, err := FileLocalStore(path)
 	c.Assert(err, IsNil)
+	defer store.Close()
 
 	type meta map[string]json.RawMessage
 
@@ -43,9 +44,12 @@ func (LocalStoreSuite) TestFileLocalStore(c *C) {
 	assertGet(meta{"root.json": rootJSON, "targets.json": targetsJSON})
 
 	// a new store should get the same meta
-	c.Assert(store.(*fileLocalStore).Close(), IsNil)
+	c.Assert(store.Close(), IsNil)
 	store, err = FileLocalStore(path)
 	c.Assert(err, IsNil)
+	defer func() {
+		c.Assert(store.Close(), IsNil)
+	}()
 	assertGet(meta{"root.json": rootJSON, "targets.json": targetsJSON})
 }
 
