@@ -45,12 +45,11 @@ func (f *fileLocalStore) DeleteMeta(name string) error {
 }
 
 func (f *fileLocalStore) Close() error {
-	if err := f.db.Close(); err != nil {
-		return err
+	// Always close both before returning any errors
+	dbCloseErr := f.db.Close()
+	fdCloseErr := f.fd.Close()
+	if dbCloseErr != nil {
+		return dbCloseErr
 	}
-	if err := f.fd.Close(); err != nil {
-		return err
-	}
-
-	return nil
+	return fdCloseErr
 }
