@@ -40,7 +40,7 @@ func NewDBFromDelegations(d *data.Delegations) (*DB, error) {
 			return nil, ErrInvalidDelegatedRole
 		}
 		role := &data.Role{Threshold: r.Threshold, KeyIDs: r.KeyIDs}
-		if err := db.addRole(r.Name, role); err != nil {
+		if err := db.AddRole(r.Name, role); err != nil {
 			return nil, err
 		}
 	}
@@ -65,13 +65,6 @@ func (db *DB) AddKey(id string, k *data.PublicKey) error {
 }
 
 func (db *DB) AddRole(name string, r *data.Role) error {
-	if !roles.IsTopLevelRole(name) {
-		return ErrInvalidRole
-	}
-	return db.addRole(name, r)
-}
-
-func (db *DB) addRole(name string, r *data.Role) error {
 	if r.Threshold < 1 {
 		return ErrInvalidThreshold
 	}
