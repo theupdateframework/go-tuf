@@ -14,20 +14,7 @@ var (
 )
 
 func TestDelegationsIterator(t *testing.T) {
-	topTargetsPubKey := &data.PublicKey{
-		Type:       data.KeyTypeEd25519,
-		Scheme:     data.KeySchemeEd25519,
-		Algorithms: data.HashAlgorithms,
-		Value:      []byte(`{"public":"aaaaec567e5901ba3976c34f7cd5169704292439bf71e6aa19c64b96706f95ef"}`),
-	}
-	delTargetsPubKey := &data.PublicKey{
-		Type:       data.KeyTypeEd25519,
-		Scheme:     data.KeySchemeEd25519,
-		Algorithms: data.HashAlgorithms,
-		Value:      []byte(`{"public":"bbbbec567e5901ba3976c34f7cd5169704292439bf71e6aa19c64b96706f95ef"}`),
-	}
-
-	defaultKeyIDs := delTargetsPubKey.IDs()
+	defaultKeyIDs := []string{"26b878ad73362774b8b69dd4fdeb2cc6a2688e4133ed5ace9e18a06e9d998a6d"}
 	var iteratorTests = []struct {
 		testName    string
 		roles       map[string][]data.DelegatedRole
@@ -201,15 +188,16 @@ func TestDelegationsIterator(t *testing.T) {
 
 	for _, tt := range iteratorTests {
 		t.Run(tt.testName, func(t *testing.T) {
-			topLevelDB := verify.NewDB()
-			topLevelDB.AddKey(topTargetsPubKey.IDs()[0], topTargetsPubKey)
-			topLevelDB.AddRole("targets", &data.Role{
-				KeyIDs:    topTargetsPubKey.IDs(),
-				Threshold: 1,
+			flattened := []data.DelegatedRole{}
+			for _, roles := range tt.roles {
+				flattened = append(flattened, roles...)
+			}
+			db, err := verify.NewDBFromDelegations(&data.Delegations{
+				Roles: flattened,
 			})
 
-			d, err := NewDelegationsIterator(tt.file, topLevelDB)
 			assert.NoError(t, err)
+			d := NewDelegationsIterator(tt.file, db)
 
 			var iterationOrder []string
 			for {
