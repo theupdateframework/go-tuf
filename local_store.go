@@ -221,19 +221,32 @@ func (f *fileSystemStore) stagedDir() string {
 func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 	meta := make(map[string]json.RawMessage)
 	var err error
-	notExists := func(path string) bool {
-		_, err := os.Stat(path)
-		return os.IsNotExist(err)
-	}
-	for _, name := range topLevelMetadata {
-		path := filepath.Join(f.stagedDir(), name)
-		if notExists(path) {
-			path = filepath.Join(f.repoDir(), name)
-			if notExists(path) {
-				continue
-			}
+
+	var metadataFiles []string
+
+	//find metadata in stagedDir
+	err = filepath.Walk(f.stagedDir(), func(path string, info os.FileInfo, err error) error {
+		if filepath.Ext(path) == ".json" {
+			metadataFiles = append(metadataFiles, path)
 		}
-		meta[name], err = ioutil.ReadFile(path)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	//also walk repoDir
+	err = filepath.Walk(f.repoDir(), func(path string, info os.FileInfo, err error) error {
+		if filepath.Ext(path) == ".json" {
+			metadataFiles = append(metadataFiles, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, path := range metadataFiles {
+		meta[filepath.Base(path)], err = ioutil.ReadFile(path)
 		if err != nil {
 			return nil, err
 		}

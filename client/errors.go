@@ -58,6 +58,7 @@ func isDecodeFailedWithErrRoleThreshold(err error) bool {
 	return isErrRoleThreshold(e.Err)
 }
 
+//lint:ignore U1000 unused
 func isErrRoleThreshold(err error) bool {
 	_, ok := err.(verify.ErrRoleThreshold)
 	return ok
