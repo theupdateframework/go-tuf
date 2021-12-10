@@ -2,13 +2,14 @@ package targets
 
 import (
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/internal/sets"
 	"github.com/theupdateframework/go-tuf/verify"
 )
 
 type Delegation struct {
 	Delegator string
-	Verifier  verify.DelegationsVerifier
 	Delegatee data.DelegatedRole
+	DB        *verify.DB
 }
 
 type delegationsIterator struct {
@@ -18,13 +19,23 @@ type delegationsIterator struct {
 }
 
 // NewDelegationsIterator initialises an iterator with a first step
-// on top level targets
-func NewDelegationsIterator(target string) *delegationsIterator {
+// on top level targets.
+func NewDelegationsIterator(target string, topLevelKeysDB *verify.DB) *delegationsIterator {
+	role := topLevelKeysDB.GetRole("targets")
+	keyIDs := []string{}
+	if role != nil {
+		keyIDs = sets.StringSetToSlice(role.KeyIDs)
+	}
+
 	i := &delegationsIterator{
 		target: target,
 		stack: []Delegation{
 			{
-				Delegatee: data.DelegatedRole{Name: "targets"},
+				Delegatee: data.DelegatedRole{
+					Name:   "targets",
+					KeyIDs: keyIDs,
+				},
+				DB: topLevelKeysDB,
 			},
 		},
 		visitedRoles: make(map[string]struct{}),
@@ -57,7 +68,7 @@ func (d *delegationsIterator) Next() (value Delegation, ok bool) {
 	return delegation, true
 }
 
-func (d *delegationsIterator) Add(roles []data.DelegatedRole, delegator string, verifier verify.DelegationsVerifier) error {
+func (d *delegationsIterator) Add(roles []data.DelegatedRole, delegator string, db *verify.DB) error {
 	for i := len(roles) - 1; i >= 0; i-- {
 		// Push the roles onto the stack in reverse so we get an preorder traversal
 		// of the delegations graph.
@@ -70,7 +81,7 @@ func (d *delegationsIterator) Add(roles []data.DelegatedRole, delegator string, 
 			delegation := Delegation{
 				Delegator: delegator,
 				Delegatee: r,
-				Verifier:  verifier,
+				DB:        db,
 			}
 			d.stack = append(d.stack, delegation)
 		}
