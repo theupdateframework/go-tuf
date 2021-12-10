@@ -82,12 +82,13 @@ func DefaultExpires(role string) time.Time {
 	switch role {
 	case "root":
 		t = time.Now().AddDate(1, 0, 0)
-	case "targets":
-		t = time.Now().AddDate(0, 3, 0)
 	case "snapshot":
 		t = time.Now().AddDate(0, 0, 7)
 	case "timestamp":
 		t = time.Now().AddDate(0, 0, 1)
+	default:
+		// targets and delegated targets
+		t = time.Now().AddDate(0, 3, 0)
 	}
 	return t.UTC().Round(time.Second)
 }
