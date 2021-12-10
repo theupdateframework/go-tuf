@@ -20,11 +20,7 @@ func (c *Client) getTargetFileMeta(target string) (data.TargetFileMeta, error) {
 	// - filter delegations with paths or path_hash_prefixes matching searched target
 	// - 5.6.7.1 cycles protection
 	// - 5.6.7.2 terminations
-	delegations, err := targets.NewDelegationsIterator(target, c.db)
-	if err != nil {
-		return data.TargetFileMeta{}, err
-	}
-
+	delegations := targets.NewDelegationsIterator(target, c.db)
 	for i := 0; i < c.MaxDelegations; i++ {
 		d, ok := delegations.Next()
 		if !ok {
