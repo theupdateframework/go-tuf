@@ -12,6 +12,7 @@ import (
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/internal/roles"
 	"github.com/theupdateframework/go-tuf/internal/signer"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/sign"
@@ -199,7 +200,7 @@ func (r *Repo) GetThreshold(keyRole string) (int, error) {
 }
 
 func (r *Repo) SetThreshold(keyRole string, t int) error {
-	if !validMetadata(keyRole + ".json") {
+	if !roles.IsTopLevelRole(keyRole) {
 		// Delegations are not currently supported, so return an error if this is not a
 		// top-level metadata file.
 		return ErrInvalidRole{keyRole}
@@ -319,7 +320,7 @@ func (r *Repo) timestamp() (*data.Timestamp, error) {
 }
 
 func (r *Repo) ChangePassphrase(keyRole string) error {
-	if !verify.ValidRole(keyRole) {
+	if !roles.IsTopLevelRole(keyRole) {
 		return ErrInvalidRole{keyRole}
 	}
 
@@ -352,7 +353,7 @@ func (r *Repo) AddPrivateKey(role string, signer keys.Signer) error {
 }
 
 func (r *Repo) AddPrivateKeyWithExpires(keyRole string, signer keys.Signer, expires time.Time) error {
-	if !verify.ValidRole(keyRole) {
+	if !roles.IsTopLevelRole(keyRole) {
 		return ErrInvalidRole{keyRole}
 	}
 
@@ -451,7 +452,7 @@ func (r *Repo) RevokeKey(role, id string) error {
 }
 
 func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error {
-	if !verify.ValidRole(keyRole) {
+	if !roles.IsTopLevelRole(keyRole) {
 		return ErrInvalidRole{keyRole}
 	}
 
@@ -555,7 +556,7 @@ func (r *Repo) setMeta(roleFilename string, meta interface{}) error {
 
 func (r *Repo) Sign(roleFilename string) error {
 	role := strings.TrimSuffix(roleFilename, ".json")
-	if !verify.ValidRole(role) {
+	if !roles.IsTopLevelRole(role) {
 		return ErrInvalidRole{role}
 	}
 
@@ -591,7 +592,7 @@ func (r *Repo) Sign(roleFilename string) error {
 // The name must be a valid metadata file name, like root.json.
 func (r *Repo) AddOrUpdateSignature(roleFilename string, signature data.Signature) error {
 	role := strings.TrimSuffix(roleFilename, ".json")
-	if !verify.ValidRole(role) {
+	if !roles.IsTopLevelRole(role) {
 		return ErrInvalidRole{role}
 	}
 
