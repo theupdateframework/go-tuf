@@ -696,15 +696,6 @@ func (r *Repo) SignedMeta(roleFilename string) (*data.Signed, error) {
 	return s, nil
 }
 
-func validMetadata(roleFilename string) bool {
-	for _, m := range topLevelMetadata {
-		if m == roleFilename {
-			return true
-		}
-	}
-	return false
-}
-
 func (r *Repo) AddTarget(path string, custom json.RawMessage) error {
 	return r.AddTargets([]string{path}, custom)
 }
