@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	tuf "github.com/theupdateframework/go-tuf"
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/internal/sets"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/sign"
 	"github.com/theupdateframework/go-tuf/util"
@@ -362,7 +363,7 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 		}
 		role := client.db.GetRole(name)
 		c.Assert(role, NotNil)
-		c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(ids))
+		c.Assert(role.KeyIDs, DeepEquals, sets.StringSliceToSet(ids))
 	}
 }
 
@@ -602,7 +603,7 @@ func (s *ClientSuite) TestNewTimestampKey(c *C) {
 	}
 	role := client.db.GetRole("timestamp")
 	c.Assert(role, NotNil)
-	c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(newIDs))
+	c.Assert(role.KeyIDs, DeepEquals, sets.StringSliceToSet(newIDs))
 }
 
 func (s *ClientSuite) TestNewSnapshotKey(c *C) {
@@ -642,7 +643,7 @@ func (s *ClientSuite) TestNewSnapshotKey(c *C) {
 	}
 	role := client.db.GetRole("snapshot")
 	c.Assert(role, NotNil)
-	c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(newIDs))
+	c.Assert(role.KeyIDs, DeepEquals, sets.StringSliceToSet(newIDs))
 }
 
 func (s *ClientSuite) TestNewTargetsKey(c *C) {
@@ -685,7 +686,7 @@ func (s *ClientSuite) TestNewTargetsKey(c *C) {
 	}
 	role := client.db.GetRole("targets")
 	c.Assert(role, NotNil)
-	c.Assert(role.KeyIDs, DeepEquals, util.StringSliceToSet(newIDs))
+	c.Assert(role.KeyIDs, DeepEquals, sets.StringSliceToSet(newIDs))
 }
 
 func (s *ClientSuite) TestLocalExpired(c *C) {
