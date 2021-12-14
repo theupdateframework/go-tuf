@@ -49,27 +49,34 @@ func TestHashBin(t *testing.T) {
 }
 
 func TestHashPrefixLength(t *testing.T) {
-	assert.Equal(t, 1, HashPrefixLength(0))
-	assert.Equal(t, 1, HashPrefixLength(1))
-	assert.Equal(t, 1, HashPrefixLength(2))
-	assert.Equal(t, 1, HashPrefixLength(3))
-	assert.Equal(t, 1, HashPrefixLength(4))
-	assert.Equal(t, 2, HashPrefixLength(5))
-	assert.Equal(t, 2, HashPrefixLength(6))
-	assert.Equal(t, 2, HashPrefixLength(7))
-	assert.Equal(t, 2, HashPrefixLength(8))
-	assert.Equal(t, 3, HashPrefixLength(9))
-	assert.Equal(t, 3, HashPrefixLength(10))
-	assert.Equal(t, 3, HashPrefixLength(11))
-	assert.Equal(t, 3, HashPrefixLength(12))
+	tcs := []struct {
+		bitLen uint8
+		want   int
+	}{
+		{bitLen: 1, want: 1},
+		{bitLen: 2, want: 1},
+		{bitLen: 3, want: 1},
+		{bitLen: 4, want: 1},
+		{bitLen: 5, want: 2},
+		{bitLen: 6, want: 2},
+		{bitLen: 7, want: 2},
+		{bitLen: 8, want: 2},
+		{bitLen: 9, want: 3},
+		{bitLen: 10, want: 3},
+		{bitLen: 11, want: 3},
+		{bitLen: 12, want: 3},
+	}
+
+	for _, tc := range tcs {
+		assert.Equalf(t, tc.want, HashPrefixLen(tc.bitLen), "HashPrefixLen(%v)", tc.bitLen)
+	}
 }
 
 func TestGenerateHashBins(t *testing.T) {
 	tcs := []struct {
-		Log2NumBins uint8
-		BinNames    []string
+		prefixBitLen uint8
+		binNames     []string
 	}{
-		{0, []string{"0-f"}},
 		{1, []string{"0-7", "8-f"}},
 		{2, []string{"0-3", "4-7", "8-b", "c-f"}},
 		{3, []string{"0-1", "2-3", "4-5", "6-7", "8-9", "a-b", "c-d", "e-f"}},
@@ -86,10 +93,16 @@ func TestGenerateHashBins(t *testing.T) {
 	}
 	for _, tc := range tcs {
 		bn := []string{}
-		bins := GenerateHashBins(tc.Log2NumBins)
+		bins, err := GenerateHashBins(tc.prefixBitLen)
+		assert.NoError(t, err)
 		for _, b := range bins {
-			bn = append(bn, b.Name("", HashPrefixLength(tc.Log2NumBins)))
+			bn = append(bn, b.Name("", HashPrefixLen(tc.prefixBitLen)))
 		}
-		assert.Equal(t, tc.BinNames, bn, "GenerateHashBins(%v)", tc.Log2NumBins)
+		assert.Equalf(t, tc.binNames, bn, "GenerateHashBins(%v)", tc.prefixBitLen)
 	}
+
+	_, err := GenerateHashBins(0)
+	assert.Error(t, err)
+	_, err = GenerateHashBins(33)
+	assert.Error(t, err)
 }

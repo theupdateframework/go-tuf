@@ -1,9 +1,13 @@
 package targets
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 )
+
+const MinDelegationHashPrefixBitLen = 1
+const MaxDelegationHashPrefixBitLen = 32
 
 // hexEncode formats x as a hex string, left padded with zeros to padWidth.
 func hexEncode(x uint64, padWidth int) string {
@@ -21,7 +25,7 @@ type HashBin struct {
 	Last  uint64
 }
 
-// Name returns the of the role that signs for the HashBin.
+// Name returns the name of the role that signs for the HashBin.
 func (b HashBin) Name(prefix string, padWidth int) string {
 	if b.First == b.Last {
 		return prefix + hexEncode(b.First, padWidth)
@@ -44,25 +48,25 @@ func (b HashBin) Enumerate(padWidth int) []string {
 	return ret
 }
 
-// HashPrefixLength returns the width of hash prefixes if there are
-// 2^(log2NumBins) hash bins.
-func HashPrefixLength(log2NumBins uint8) int {
-	if log2NumBins == 0 {
-		// Hash prefix of "" is represented equivalently as "0-f".
-		return 1
-	}
+const bitsPerHexDigit = 4
 
-	// ceil(log2NumBins / 4.0)
-	return int((log2NumBins-1)/4) + 1
+// HashPrefixLen returns the width of hash prefixes if there are 2^(bitLen)
+// hash bins.
+func HashPrefixLen(bitLen uint8) int {
+	// ceil(bitLen / bitsPerHexDigit)
+	return int((bitLen-1)/bitsPerHexDigit) + 1
 }
 
-// GenerateHashBins returns a slice of length 2^(log2NumBins) that partitions
-// the space of path hashes into HashBin ranges.
-func GenerateHashBins(log2NumBins uint8) []HashBin {
-	numBins := uint64(1) << log2NumBins
+// GenerateHashBins returns a slice of length 2^(bitLen) that partitions the
+// space of path hashes into HashBin ranges.
+func GenerateHashBins(prefixBitLen uint8) ([]HashBin, error) {
+	if prefixBitLen < MinDelegationHashPrefixBitLen || prefixBitLen > MaxDelegationHashPrefixBitLen {
+		return nil, fmt.Errorf("bitLen is out of bounds, should be between %v and %v inclusive", MinDelegationHashPrefixBitLen, MaxDelegationHashPrefixBitLen)
+	}
 
-	// numPrefixes = 16^(HashPrefixLength(log2NumBins))
-	numPrefixes := uint64(1) << (4 * HashPrefixLength(log2NumBins))
+	numBins := uint64(1) << prefixBitLen
+
+	numPrefixes := uint64(1) << (bitsPerHexDigit * HashPrefixLen(prefixBitLen))
 
 	p := make([]HashBin, numBins)
 
@@ -78,5 +82,5 @@ func GenerateHashBins(log2NumBins uint8) []HashBin {
 		last += interval
 	}
 
-	return p
+	return p, nil
 }
