@@ -581,17 +581,20 @@ func (r *Repo) AddTargetsDelegationWithExpires(delegator string, role data.Deleg
 // AddTargetsDelegationsForPathHashBins is equivalent to
 // AddTargetsDelegationsForPathHashBinsWithExpires, but with a default
 // expiration time.
-func (r *Repo) AddTargetsDelegationsForPathHashBins(delegator string, binRolePrefix string, log2NumBins uint8, keys []*data.PublicKey, threshold int) error {
-	return r.AddTargetsDelegationsForPathHashBinsWithExpires(delegator, binRolePrefix, log2NumBins, keys, threshold, data.DefaultExpires("targets"))
+func (r *Repo) AddTargetsDelegationsForPathHashBins(delegator string, binRolePrefix string, prefixBitLen uint8, keys []*data.PublicKey, threshold int) error {
+	return r.AddTargetsDelegationsForPathHashBinsWithExpires(delegator, binRolePrefix, prefixBitLen, keys, threshold, data.DefaultExpires("targets"))
 }
 
-// AddTargetsDelegationsForPathHashBinsWithExpires adds 2^(log2NumBins)
+// AddTargetsDelegationsForPathHashBinsWithExpires adds 2^(prefixBitLen)
 // delegations to the delegator role, which partition the target path hash
 // space into bins using the PathHashPrefixes delegation mechanism. New
 // metadata is written with the given expiration time.
-func (r *Repo) AddTargetsDelegationsForPathHashBinsWithExpires(delegator string, binRolePrefix string, log2NumBins uint8, keys []*data.PublicKey, threshold int, expires time.Time) error {
-	bins := targets.GenerateHashBins(log2NumBins)
-	padWidth := targets.HashPrefixLength(log2NumBins)
+func (r *Repo) AddTargetsDelegationsForPathHashBinsWithExpires(delegator string, binRolePrefix string, prefixBitLen uint8, keys []*data.PublicKey, threshold int, expires time.Time) error {
+	bins, err := targets.GenerateHashBins(prefixBitLen)
+	if err != nil {
+		return err
+	}
+	padWidth := targets.HashPrefixLen(prefixBitLen)
 
 	keyIDs := []string{}
 	for _, key := range keys {
