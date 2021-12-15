@@ -23,59 +23,68 @@ func BenchmarkHexEncode4(b *testing.B) {
 }
 
 func TestHashBin(t *testing.T) {
-	h := HashBin{
-		First: 0x0,
-		Last:  0xf,
-	}
-	assert.Equal(t, "abc_0-f", h.Name("abc_", 1))
-	assert.Equal(t, "abc_0000-000f", h.Name("abc_", 4))
-	assert.Equal(t, []string{
-		"00", "01", "02", "03", "04", "05", "06", "07",
-		"08", "09", "0a", "0b", "0c", "0d", "0e", "0f",
-	}, h.Enumerate(2))
-
-	h = HashBin{
-		First: 0xcd,
-		Last:  0xce,
-	}
-	assert.Equal(t, "abc_00cd-00ce", h.Name("abc_", 4))
-	assert.Equal(t, []string{"00cd", "00ce"}, h.Enumerate(4))
-
-	h = HashBin{
-		First: 0x0abc,
-		Last:  0xbcde,
-	}
-	assert.Equal(t, "test_0abc-bcde", h.Name("test_", 4))
-}
-
-func TestHashPrefixLength(t *testing.T) {
 	tcs := []struct {
-		bitLen uint8
-		want   int
+		hb           *HashBin
+		roleName     string
+		hashPrefixes []string
 	}{
-		{bitLen: 1, want: 1},
-		{bitLen: 2, want: 1},
-		{bitLen: 3, want: 1},
-		{bitLen: 4, want: 1},
-		{bitLen: 5, want: 2},
-		{bitLen: 6, want: 2},
-		{bitLen: 7, want: 2},
-		{bitLen: 8, want: 2},
-		{bitLen: 9, want: 3},
-		{bitLen: 10, want: 3},
-		{bitLen: 11, want: 3},
-		{bitLen: 12, want: 3},
+		{
+			hb: &HashBin{
+				rolePrefix:  "abc_",
+				hexDigitLen: 1,
+				first:       0x0,
+				last:        0x7,
+			},
+			roleName: "abc_0-7",
+			hashPrefixes: []string{
+				"0", "1", "2", "3", "4", "5", "6", "7",
+			},
+		},
+		{
+			hb: &HashBin{
+				rolePrefix:  "abc_",
+				hexDigitLen: 2,
+				first:       0x0,
+				last:        0xf,
+			},
+			roleName: "abc_00-0f",
+			hashPrefixes: []string{
+				"00", "01", "02", "03", "04", "05", "06", "07",
+				"08", "09", "0a", "0b", "0c", "0d", "0e", "0f",
+			},
+		},
+		{
+			hb: &HashBin{
+				rolePrefix:  "cba_",
+				hexDigitLen: 4,
+				first:       0xcd,
+				last:        0xcf,
+			},
+			roleName:     "cba_00cd-00cf",
+			hashPrefixes: []string{"00cd", "00ce", "00cf"},
+		},
+		{
+			hb: &HashBin{
+				rolePrefix:  "cba_",
+				hexDigitLen: 3,
+				first:       0xc1,
+				last:        0xc1,
+			},
+			roleName:     "cba_0c1",
+			hashPrefixes: []string{"0c1"},
+		},
 	}
 
-	for _, tc := range tcs {
-		assert.Equalf(t, tc.want, HashPrefixLen(tc.bitLen), "HashPrefixLen(%v)", tc.bitLen)
+	for i, tc := range tcs {
+		assert.Equalf(t, tc.roleName, tc.hb.RoleName(), "test case %v: RoleName()", i)
+		assert.Equalf(t, tc.hashPrefixes, tc.hb.HashPrefixes(), "test case %v: HashPrefixes()", i)
 	}
 }
 
-func TestGenerateHashBins(t *testing.T) {
+func TestHashBinsIterator(t *testing.T) {
 	tcs := []struct {
-		prefixBitLen uint8
-		binNames     []string
+		bitLen    int
+		roleNames []string
 	}{
 		{1, []string{"0-7", "8-f"}},
 		{2, []string{"0-3", "4-7", "8-b", "c-f"}},
@@ -91,18 +100,19 @@ func TestGenerateHashBins(t *testing.T) {
 			"c0-c7", "c8-cf", "d0-d7", "d8-df", "e0-e7", "e8-ef", "f0-f7", "f8-ff",
 		}},
 	}
-	for _, tc := range tcs {
-		bn := []string{}
-		bins, err := GenerateHashBins(tc.prefixBitLen)
+	for i, tc := range tcs {
+		got := []string{}
+		it, err := NewHashBins("", tc.bitLen)
 		assert.NoError(t, err)
-		for _, b := range bins {
-			bn = append(bn, b.Name("", HashPrefixLen(tc.prefixBitLen)))
+		for it.HasNext() {
+			hb := it.Next()
+			got = append(got, hb.RoleName())
 		}
-		assert.Equalf(t, tc.binNames, bn, "GenerateHashBins(%v)", tc.prefixBitLen)
+		assert.Equalf(t, tc.roleNames, got, "test case %v", i)
 	}
 
-	_, err := GenerateHashBins(0)
+	_, err := NewHashBins("", 0)
 	assert.Error(t, err)
-	_, err = GenerateHashBins(33)
+	_, err = NewHashBins("", 33)
 	assert.Error(t, err)
 }
