@@ -29,20 +29,19 @@ func numHexDigits(numBits int) int {
 	return ((numBits - 1) / bitsPerHexDigit) + 1
 }
 
+// HashBins represents an ordered list of hash bin target roles, which together
+// partition the space of target path hashes equal-sized buckets based on path
+// has prefix.
 type HashBins struct {
-	rolePrefix string
-	bitLen     int
+	rolePrefix  string
+	bitLen      int
+	hexDigitLen int
 
 	numBins           uint64
 	numPrefixesPerBin uint64
-
-	currIndex uint64
-	curr      *HashBin
 }
 
-// NewHashBins creates an iterator over hash bin targets roles, which together
-// partition the space of target path hashes into 2^bitLen buckets, based on
-// path hash prefix.
+// NewHashBins creates a HashBins partitioning with 2^bitLen buckets.
 func NewHashBins(rolePrefix string, bitLen int) (*HashBins, error) {
 	if bitLen < MinDelegationHashPrefixBitLen || bitLen > MaxDelegationHashPrefixBitLen {
 		return nil, fmt.Errorf("bitLen is out of bounds, should be between %v and %v inclusive", MinDelegationHashPrefixBitLen, MaxDelegationHashPrefixBitLen)
@@ -57,34 +56,29 @@ func NewHashBins(rolePrefix string, bitLen int) (*HashBins, error) {
 	return &HashBins{
 		rolePrefix:        rolePrefix,
 		bitLen:            bitLen,
+		hexDigitLen:       hexDigitLen,
 		numBins:           numBins,
 		numPrefixesPerBin: numPrefixesPerBin,
-		currIndex:         0,
-		curr: &HashBin{
-			rolePrefix:  rolePrefix,
-			hexDigitLen: hexDigitLen,
-			first:       0,
-			last:        numPrefixesPerBin - 1,
-		},
 	}, nil
 }
 
-func (hb *HashBins) HasNext() bool {
-	return hb.currIndex < hb.numBins
+// NumBins returns the number of hash bin partitions.
+func (hb *HashBins) NumBins() uint64 {
+	return hb.numBins
 }
 
-func (hb *HashBins) Next() *HashBin {
-	if !hb.HasNext() {
+// GetBin returns the HashBin at index i, or nil if i is out of bounds.
+func (hb *HashBins) GetBin(i uint64) *HashBin {
+	if i >= hb.numBins {
 		return nil
 	}
 
-	if hb.currIndex > 0 {
-		hb.curr.first += hb.numPrefixesPerBin
-		hb.curr.last += hb.numPrefixesPerBin
+	return &HashBin{
+		rolePrefix:  hb.rolePrefix,
+		hexDigitLen: hb.hexDigitLen,
+		first:       i * hb.numPrefixesPerBin,
+		last:        ((i + 1) * hb.numPrefixesPerBin) - 1,
 	}
-	hb.currIndex += 1
-
-	return hb.curr
 }
 
 // HashBin represents a hex prefix range. First should be less than Last.

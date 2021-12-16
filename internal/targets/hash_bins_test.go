@@ -81,7 +81,7 @@ func TestHashBin(t *testing.T) {
 	}
 }
 
-func TestHashBinsIterator(t *testing.T) {
+func TestHashBins(t *testing.T) {
 	tcs := []struct {
 		bitLen    int
 		roleNames []string
@@ -102,10 +102,11 @@ func TestHashBinsIterator(t *testing.T) {
 	}
 	for i, tc := range tcs {
 		got := []string{}
-		it, err := NewHashBins("", tc.bitLen)
+		hbs, err := NewHashBins("", tc.bitLen)
 		assert.NoError(t, err)
-		for it.HasNext() {
-			hb := it.Next()
+		n := hbs.NumBins()
+		for i := uint64(0); i < n; i += 1 {
+			hb := hbs.GetBin(i)
 			got = append(got, hb.RoleName())
 		}
 		assert.Equalf(t, tc.roleNames, got, "test case %v", i)
