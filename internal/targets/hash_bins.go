@@ -22,8 +22,8 @@ func hexEncode(x uint64, padWidth int) string {
 
 const bitsPerHexDigit = 4
 
-// numHexDigits returns is the number of hex digits required to encode
-// the given number of bits.
+// numHexDigits returns the number of hex digits required to encode the given
+// number of bits.
 func numHexDigits(numBits int) int {
 	// ceil(numBits / bitsPerHexDigit)
 	return ((numBits - 1) / bitsPerHexDigit) + 1
