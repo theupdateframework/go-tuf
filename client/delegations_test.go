@@ -1,6 +1,7 @@
 package client
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,7 +27,13 @@ func TestGetTargetMeta(t *testing.T) {
 
 	f, err := c.getTargetFileMeta("f.txt")
 	assert.Nil(t, err)
-	assert.Equal(t, int64(15), f.Length)
+	hash := sha256.Sum256([]byte("Contents: f.txt"))
+	assert.Equal(t, data.HexBytes(hash[:]), f.Hashes["sha256"])
+
+	f, err = c.getTargetFileMeta("targets.txt")
+	assert.Nil(t, err)
+	hash = sha256.Sum256([]byte("Contents: targets.txt"))
+	assert.Equal(t, data.HexBytes(hash[:]), f.Hashes["sha256"])
 }
 
 func TestMaxDelegations(t *testing.T) {
