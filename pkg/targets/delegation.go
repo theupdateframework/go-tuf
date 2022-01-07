@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/theupdateframework/go-tuf/data"
-	"github.com/theupdateframework/go-tuf/internal/sets"
 	"github.com/theupdateframework/go-tuf/verify"
 )
 
@@ -25,11 +24,12 @@ var ErrTopLevelTargetsRoleMissing = errors.New("tuf: top level targets role miss
 // NewDelegationsIterator initialises an iterator with a first step
 // on top level targets.
 func NewDelegationsIterator(target string, topLevelKeysDB *verify.DB) *delegationsIterator {
-	role := topLevelKeysDB.GetRole("targets")
+	// role := topLevelKeysDB.GetRole("targets")
 	keyIDs := []string{}
-	if role != nil {
-		keyIDs = sets.StringSetToSlice(role.KeyIDs)
-	}
+
+	// if role != nil {
+	// 	keyIDs = sets.StringSetToSlice(role.KeyIDs)
+	// }
 
 	i := &delegationsIterator{
 		target: target,
