@@ -49,7 +49,15 @@ type LocalStore interface {
 	// If paths is empty, all staged target files will be walked.
 	WalkStagedTargets(paths []string, targetsFn TargetsWalkFunc) error
 
+	// IsStaged determines if a metadata file is currently staged, to avoid incrementing
+	// version numbers repeatedly while staged.
+	IsStaged(string) bool
+
 	// Commit is used to publish staged files to the repository
+	//
+	// This will also reset the staged meta to signal incrementing version numbers.
+	// TUF 1.0 requires that the root metadata version numbers in the repository does not
+	// gaps. To avoid this, we will only increment the number once until we commit.
 	Commit(bool, map[string]int, map[string]data.Hashes) error
 
 	// GetSigners return a list of signers for a role.
@@ -73,11 +81,6 @@ type Repo struct {
 	meta           map[string]json.RawMessage
 	prefix         string
 	indent         string
-
-	// TUF 1.0 requires that the root metadata version numbers in the
-	// repository does not have any gaps. To avoid this, we will only
-	// increment the number once until we commit.
-	versionUpdated map[string]struct{}
 }
 
 func NewRepo(local LocalStore, hashAlgorithms ...string) (*Repo, error) {
@@ -90,7 +93,6 @@ func NewRepoIndent(local LocalStore, prefix string, indent string, hashAlgorithm
 		hashAlgorithms: hashAlgorithms,
 		prefix:         prefix,
 		indent:         indent,
-		versionUpdated: make(map[string]struct{}),
 	}
 
 	var err error
@@ -217,9 +219,8 @@ func (r *Repo) SetThreshold(keyRole string, t int) error {
 		return nil
 	}
 	role.Threshold = t
-	if _, ok := r.versionUpdated["root.json"]; !ok {
+	if !r.local.IsStaged("root.json") {
 		root.Version++
-		r.versionUpdated["root.json"] = struct{}{}
 	}
 	return r.setMeta("root.json", root)
 }
@@ -255,7 +256,6 @@ func (r *Repo) SetTimestampVersion(v int) error {
 		return err
 	}
 	ts.Version = v
-	r.versionUpdated["timestamp.json"] = struct{}{}
 	return r.setMeta("timestamp.json", ts)
 }
 
@@ -274,7 +274,6 @@ func (r *Repo) SetSnapshotVersion(v int) error {
 	}
 
 	s.Version = v
-	r.versionUpdated["snapshot.json"] = struct{}{}
 	return r.setMeta("snapshot.json", s)
 }
 
@@ -400,9 +399,8 @@ func (r *Repo) AddVerificationKeyWithExpiration(keyRole string, pk *data.PublicK
 	}
 
 	root.Expires = expires.Round(time.Second)
-	if _, ok := r.versionUpdated["root.json"]; !ok {
+	if !r.local.IsStaged("root.json") {
 		root.Version++
-		r.versionUpdated["root.json"] = struct{}{}
 	}
 
 	return r.setMeta("root.json", root)
@@ -506,9 +504,8 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 		}
 	}
 	root.Expires = expires.Round(time.Second)
-	if _, ok := r.versionUpdated["root.json"]; !ok {
+	if !r.local.IsStaged("root.json") {
 		root.Version++
-		r.versionUpdated["root.json"] = struct{}{}
 	}
 
 	err = r.setMeta("root.json", root)
@@ -752,9 +749,8 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom json.RawMessage, exp
 		return err
 	}
 	t.Expires = expires.Round(time.Second)
-	if _, ok := r.versionUpdated["targets.json"]; !ok {
+	if !r.local.IsStaged("targets.json") {
 		t.Version++
-		r.versionUpdated["targets.json"] = struct{}{}
 	}
 
 	err = r.setMeta("targets.json", t)
@@ -814,9 +810,8 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 		}
 	}
 	t.Expires = expires.Round(time.Second)
-	if _, ok := r.versionUpdated["targets.json"]; !ok {
+	if !r.local.IsStaged("targets.json") {
 		t.Version++
-		r.versionUpdated["targets.json"] = struct{}{}
 	}
 
 	err = r.setMeta("targets.json", t)
@@ -866,9 +861,8 @@ func (r *Repo) SnapshotWithExpires(expires time.Time) error {
 		}
 	}
 	snapshot.Expires = expires.Round(time.Second)
-	if _, ok := r.versionUpdated["snapshot.json"]; !ok {
+	if !r.local.IsStaged("snapshot.json") {
 		snapshot.Version++
-		r.versionUpdated["snapshot.json"] = struct{}{}
 	}
 	err = r.setMeta("snapshot.json", snapshot)
 	if err == nil {
@@ -902,9 +896,8 @@ func (r *Repo) TimestampWithExpires(expires time.Time) error {
 		return err
 	}
 	timestamp.Expires = expires.Round(time.Second)
-	if _, ok := r.versionUpdated["timestamp.json"]; !ok {
+	if !r.local.IsStaged("timestamp.json") {
 		timestamp.Version++
-		r.versionUpdated["timestamp.json"] = struct{}{}
 	}
 
 	err = r.setMeta("timestamp.json", timestamp)
@@ -1036,9 +1029,6 @@ func (r *Repo) Commit() error {
 
 	err = r.local.Commit(root.ConsistentSnapshot, versions, hashes)
 	if err == nil {
-		// We can start incrementing version numbers again now that we've
-		// successfully committed the metadata to the local store.
-		r.versionUpdated = make(map[string]struct{})
 		fmt.Println("Committed successfully")
 	}
 	return err

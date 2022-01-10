@@ -499,7 +499,7 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 	newRoot, err := r.root()
 	c.Assert(err, IsNil)
 	c.Assert(oldRoot, DeepEquals, newRoot)
-	if _, ok := r.versionUpdated["root.json"]; ok {
+	if r.local.IsStaged("root.json") {
 		c.Fatal("root should not be marked dirty")
 	}
 }
