@@ -1,8 +1,8 @@
 {
 	"signatures": [
 		{
-			"keyid": "ce72db3f938914205461a415c9b7b91267a2079df991fd6283aa8461988c1add",
-			"sig": "35250d4c0e9a88d3a47cc8a36dc33d10c813b84754f2c15d328749eb6b043886c1ad6cbda5e1e4dd80fd892e3dabbde1591c1b4779d1e81e34d0f17b817ad30c"
+			"keyid": "b2403f96ae9b1089d8cbc15bbc35e9acbacd7984571f951b43aab56aedcfa84f",
+			"sig": "475436056dca79fd151ae830ad2f4dbc7ecc5b146a79319c20a1167d4f214047d8f3847d1cda4ccd32a48acb13acbea55ba7e8254cffaa07e3de9ecdd0c13d03"
 		}
 	],
 	"signed": {
@@ -21,17 +21,6 @@
 				},
 				"scheme": "ed25519"
 			},
-			"808aa256a8172bb0cb961767c6768e55ccf732c99afccc6145752d7a328b7937": {
-				"keyid_hash_algorithms": [
-					"sha256",
-					"sha512"
-				],
-				"keytype": "ed25519",
-				"keyval": {
-					"public": "62f71f99c788f16bcdc8bb252455e3a690350e4ddea5a6aab1f9a3aaabcf369a"
-				},
-				"scheme": "ed25519"
-			},
 			"aa3255b4e8e17e566d2bdbea0e5842978f9fa1d2fa9ec76ae76b146164acbfc8": {
 				"keyid_hash_algorithms": [
 					"sha256",
@@ -43,14 +32,25 @@
 				},
 				"scheme": "ed25519"
 			},
-			"ce72db3f938914205461a415c9b7b91267a2079df991fd6283aa8461988c1add": {
+			"b2403f96ae9b1089d8cbc15bbc35e9acbacd7984571f951b43aab56aedcfa84f": {
 				"keyid_hash_algorithms": [
 					"sha256",
 					"sha512"
 				],
 				"keytype": "ed25519",
 				"keyval": {
-					"public": "bca152214dbfd3e7a1b7a7b3e2cc179fb00520fd7212c8a60ba99f14dfc0e1ca"
+					"public": "153986a7370e002f377dd68797e7466c421180c1571e233de2f8ab41c8af4f54"
+				},
+				"scheme": "ed25519"
+			},
+			"bc8f087663855564b358ddf314d5932ab920af17bd1df2f58b397afd82d76dc1": {
+				"keyid_hash_algorithms": [
+					"sha256",
+					"sha512"
+				],
+				"keytype": "ed25519",
+				"keyval": {
+					"public": "aee574e56780ea1709a8b56e02d4ffdd9a3a1deaed61e2eb0701f376a4422e42"
 				},
 				"scheme": "ed25519"
 			}
@@ -58,7 +58,7 @@
 		"roles": {
 			"root": {
 				"keyids": [
-					"ce72db3f938914205461a415c9b7b91267a2079df991fd6283aa8461988c1add"
+					"b2403f96ae9b1089d8cbc15bbc35e9acbacd7984571f951b43aab56aedcfa84f"
 				],
 				"threshold": 1
 			},
@@ -70,7 +70,7 @@
 			},
 			"targets": {
 				"keyids": [
-					"808aa256a8172bb0cb961767c6768e55ccf732c99afccc6145752d7a328b7937"
+					"bc8f087663855564b358ddf314d5932ab920af17bd1df2f58b397afd82d76dc1"
 				],
 				"threshold": 1
 			},
@@ -82,6 +82,6 @@
 			}
 		},
 		"spec_version": "1.0",
-		"version": 0
+		"version": 3
 	}
 }
