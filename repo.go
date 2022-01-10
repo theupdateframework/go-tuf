@@ -113,6 +113,8 @@ func (r *Repo) Init(consistentSnapshot bool) error {
 	}
 	root := data.NewRoot()
 	root.ConsistentSnapshot = consistentSnapshot
+	// Start a new root at version 1.
+	root.Version++
 	err = r.setMeta("root.json", root)
 	if err == nil {
 		fmt.Println("Repository initialized")
