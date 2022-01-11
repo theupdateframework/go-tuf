@@ -332,7 +332,7 @@ func (r *Repo) ChangePassphrase(keyRole string) error {
 }
 
 func (r *Repo) GenKey(role string) ([]string, error) {
-	return r.GenKeyWithExpires(role, data.DefaultExpires("root"))
+	return r.GenKeyWithExpires(role, data.DefaultExpires(role))
 }
 
 func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (keyids []string, err error) {
