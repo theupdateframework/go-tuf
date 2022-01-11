@@ -49,9 +49,9 @@ type LocalStore interface {
 	// If paths is empty, all staged target files will be walked.
 	WalkStagedTargets(paths []string, targetsFn TargetsWalkFunc) error
 
-	// IsStaged determines if a metadata file is currently staged, to avoid incrementing
+	// FileIsStaged determines if a metadata file is currently staged, to avoid incrementing
 	// version numbers repeatedly while staged.
-	IsStaged(string) bool
+	FileIsStaged(filename string) bool
 
 	// Commit is used to publish staged files to the repository
 	//
@@ -113,8 +113,8 @@ func (r *Repo) Init(consistentSnapshot bool) error {
 	}
 	root := data.NewRoot()
 	root.ConsistentSnapshot = consistentSnapshot
-	// Start a new root at version 1.
-	root.Version++
+	// Set root version to 1 for a new root.
+	root.Version = 1
 	err = r.setMeta("root.json", root)
 	if err == nil {
 		fmt.Println("Repository initialized")
@@ -221,7 +221,7 @@ func (r *Repo) SetThreshold(keyRole string, t int) error {
 		return nil
 	}
 	role.Threshold = t
-	if !r.local.IsStaged("root.json") {
+	if !r.local.FileIsStaged("root.json") {
 		root.Version++
 	}
 	return r.setMeta("root.json", root)
@@ -401,7 +401,7 @@ func (r *Repo) AddVerificationKeyWithExpiration(keyRole string, pk *data.PublicK
 	}
 
 	root.Expires = expires.Round(time.Second)
-	if !r.local.IsStaged("root.json") {
+	if !r.local.FileIsStaged("root.json") {
 		root.Version++
 	}
 
@@ -506,7 +506,7 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 		}
 	}
 	root.Expires = expires.Round(time.Second)
-	if !r.local.IsStaged("root.json") {
+	if !r.local.FileIsStaged("root.json") {
 		root.Version++
 	}
 
@@ -751,7 +751,7 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom json.RawMessage, exp
 		return err
 	}
 	t.Expires = expires.Round(time.Second)
-	if !r.local.IsStaged("targets.json") {
+	if !r.local.FileIsStaged("targets.json") {
 		t.Version++
 	}
 
@@ -812,7 +812,7 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 		}
 	}
 	t.Expires = expires.Round(time.Second)
-	if !r.local.IsStaged("targets.json") {
+	if !r.local.FileIsStaged("targets.json") {
 		t.Version++
 	}
 
@@ -863,7 +863,7 @@ func (r *Repo) SnapshotWithExpires(expires time.Time) error {
 		}
 	}
 	snapshot.Expires = expires.Round(time.Second)
-	if !r.local.IsStaged("snapshot.json") {
+	if !r.local.FileIsStaged("snapshot.json") {
 		snapshot.Version++
 	}
 	err = r.setMeta("snapshot.json", snapshot)
@@ -898,7 +898,7 @@ func (r *Repo) TimestampWithExpires(expires time.Time) error {
 		return err
 	}
 	timestamp.Expires = expires.Round(time.Second)
-	if !r.local.IsStaged("timestamp.json") {
+	if !r.local.FileIsStaged("timestamp.json") {
 		timestamp.Version++
 	}
 

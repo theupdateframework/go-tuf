@@ -63,7 +63,7 @@ func (m *memoryStore) SetMeta(name string, meta json.RawMessage) error {
 	return nil
 }
 
-func (m *memoryStore) IsStaged(name string) bool {
+func (m *memoryStore) FileIsStaged(name string) bool {
 	_, ok := m.stagedMeta[name]
 	return ok
 }
@@ -179,7 +179,7 @@ func (f *fileSystemStore) SetMeta(name string, meta json.RawMessage) error {
 	return nil
 }
 
-func (f *fileSystemStore) IsStaged(name string) bool {
+func (f *fileSystemStore) FileIsStaged(name string) bool {
 	_, err := os.Stat(filepath.Join(f.stagedDir(), name))
 	return err == nil
 }
