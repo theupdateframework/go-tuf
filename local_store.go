@@ -63,6 +63,11 @@ func (m *memoryStore) SetMeta(name string, meta json.RawMessage) error {
 	return nil
 }
 
+func (m *memoryStore) FileIsStaged(name string) bool {
+	_, ok := m.stagedMeta[name]
+	return ok
+}
+
 func (m *memoryStore) WalkStagedTargets(paths []string, targetsFn TargetsWalkFunc) error {
 	if len(paths) == 0 {
 		for path, data := range m.files {
@@ -91,6 +96,10 @@ func (m *memoryStore) Commit(consistentSnapshot bool, versions map[string]int, h
 		for _, path := range paths {
 			m.meta[path] = meta
 		}
+		// Remove from staged metadata.
+		// This will prompt incrementing version numbers again now that we've
+		// successfully committed the metadata to the local store.
+		delete(m.stagedMeta, name)
 	}
 	return nil
 }
@@ -168,6 +177,11 @@ func (f *fileSystemStore) SetMeta(name string, meta json.RawMessage) error {
 		return err
 	}
 	return nil
+}
+
+func (f *fileSystemStore) FileIsStaged(name string) bool {
+	_, err := os.Stat(filepath.Join(f.stagedDir(), name))
+	return err == nil
 }
 
 func (f *fileSystemStore) createDirs() error {
