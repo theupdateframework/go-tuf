@@ -1185,8 +1185,6 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(snapshot.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
 	c.Assert(snapshot.Version, Equals, 6)
 
-	root, err = r.root()
-	c.Assert(err, IsNil)
 	_, snapshotHasRoot := snapshot.Meta["root.json"]
 	c.Assert(snapshotHasRoot, Equals, false)
 	c.Assert(snapshot.Meta["targets.json"].Version, Equals, targets.Version)
