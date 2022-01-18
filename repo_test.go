@@ -713,7 +713,7 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	// commit with an invalid root hash in snapshot.json due to new key creation
 	genKey(c, r, "targets")
 	c.Assert(r.Sign("targets.json"), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid root.json in snapshot.json: wrong length, expected 1740 got 2046"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 511 got 725"))
 
 	// commit with an invalid targets hash in snapshot.json
 	c.Assert(r.Snapshot(), IsNil)
@@ -849,7 +849,6 @@ func (t *tmpDir) assertHashedFilesExist(path string, hashes data.Hashes) {
 }
 
 func (t *tmpDir) assertHashedFilesNotExist(path string, hashes data.Hashes) {
-	t.c.Assert(len(hashes) > 0, Equals, true)
 	for _, path := range util.HashedPaths(path, hashes) {
 		t.assertNotExist(path)
 	}
@@ -1037,6 +1036,9 @@ func (rs *RepoSuite) TestConsistentSnapshot(c *C) {
 	// root.json, targets.json and snapshot.json should exist at both versioned and unversioned paths
 	for _, path := range []string{"root.json", "targets.json", "snapshot.json"} {
 		repoPath := filepath.Join("repository", path)
+		if path != "root.json" {
+			c.Assert(len(hashes[path]) > 0, Equals, true)
+		}
 		tmp.assertHashedFilesNotExist(repoPath, hashes[path])
 		tmp.assertVersionedFileExist(repoPath, versions[path])
 		tmp.assertExists(repoPath)
@@ -1074,6 +1076,9 @@ func (rs *RepoSuite) TestConsistentSnapshot(c *C) {
 	// root.json, targets.json and snapshot.json should exist at both versioned and unversioned paths
 	for _, path := range []string{"root.json", "targets.json", "snapshot.json"} {
 		repoPath := filepath.Join("repository", path)
+		if path != "root.json" {
+			c.Assert(len(hashes[path]) > 0, Equals, true)
+		}
 		tmp.assertHashedFilesNotExist(repoPath, hashes[path])
 		tmp.assertVersionedFileExist(repoPath, versions[path])
 		tmp.assertExists(repoPath)
@@ -1182,7 +1187,8 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 
 	root, err = r.root()
 	c.Assert(err, IsNil)
-	c.Assert(snapshot.Meta["root.json"].Version, Equals, root.Version)
+	_, snapshotHasRoot := snapshot.Meta["root.json"]
+	c.Assert(snapshotHasRoot, Equals, false)
 	c.Assert(snapshot.Meta["targets.json"].Version, Equals, targets.Version)
 
 	c.Assert(r.Snapshot(), IsNil)
@@ -1242,7 +1248,6 @@ func (rs *RepoSuite) TestHashAlgorithm(c *C) {
 		c.Assert(err, IsNil)
 		for name, file := range map[string]data.FileMeta{
 			"foo.txt":       targets.Targets["foo.txt"].FileMeta,
-			"root.json":     snapshot.Meta["root.json"].FileMeta,
 			"targets.json":  snapshot.Meta["targets.json"].FileMeta,
 			"snapshot.json": timestamp.Meta["snapshot.json"].FileMeta,
 		} {

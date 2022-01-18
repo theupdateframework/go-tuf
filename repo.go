@@ -828,7 +828,7 @@ func (r *Repo) Snapshot() error {
 func (r *Repo) snapshotManifests() []string {
 	// Note: root pinning is not supported in Spec 1.0.19.
 	// root.json might need to be removed.
-	return []string{"root.json", "targets.json"}
+	return []string{"targets.json"}
 }
 
 func (r *Repo) SnapshotWithExpires(expires time.Time) error {
@@ -931,9 +931,6 @@ func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 	snapshot, err := r.snapshot()
 	if err != nil {
 		return nil, err
-	}
-	if m, ok := snapshot.Meta["root.json"]; ok {
-		hashes["root.json"] = m.Hashes
 	}
 	if m, ok := snapshot.Meta["targets.json"]; ok {
 		hashes["targets.json"] = m.Hashes

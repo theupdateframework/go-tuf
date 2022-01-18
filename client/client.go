@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
-	"log"
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/util"
@@ -190,10 +189,6 @@ func (c *Client) Update() (data.TargetFiles, error) {
 	// Save the snapshot.json
 	if err := c.local.SetMeta("snapshot.json", snapshotJSON); err != nil {
 		return nil, err
-	}
-
-	if _, ok := snapshotMetas["root.json"]; ok {
-		log.Println("root pinning is not supported in Spec 1.0.19")
 	}
 
 	// If we don't have the targets.json, download it, determine updated
