@@ -825,9 +825,7 @@ func (r *Repo) Snapshot() error {
 	return r.SnapshotWithExpires(data.DefaultExpires("snapshot"))
 }
 
-func (r *Repo) snapshotManifests() []string {
-	// Note: root pinning is not supported in Spec 1.0.19.
-	// root.json might need to be removed.
+func (r *Repo) snapshotMetadata() []string {
 	return []string{"targets.json"}
 }
 
@@ -845,7 +843,7 @@ func (r *Repo) SnapshotWithExpires(expires time.Time) error {
 		return err
 	}
 
-	for _, manifestName := range r.snapshotManifests() {
+	for _, manifestName := range r.snapshotMetadata() {
 		if err := r.verifySignature(manifestName, db); err != nil {
 			return err
 		}
@@ -972,7 +970,7 @@ func (r *Repo) Commit() error {
 	if err != nil {
 		return err
 	}
-	for _, name := range r.snapshotManifests() {
+	for _, name := range r.snapshotMetadata() {
 		expected, ok := snapshot.Meta[name]
 		if !ok {
 			return fmt.Errorf("tuf: snapshot.json missing hash for %s", name)
