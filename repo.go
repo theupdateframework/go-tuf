@@ -704,7 +704,7 @@ func (r *Repo) AddTargets(paths []string, custom json.RawMessage) error {
 	return r.AddTargetsWithExpires(paths, custom, data.DefaultExpires("targets"))
 }
 
-func (r *Repo) AddTargetsWithDigest(digest string, digestAlg string, length int64, custom json.RawMessage, path string) error {
+func (r *Repo) AddTargetsWithDigest(digest string, digestAlg string, length int64, path string, custom json.RawMessage) error {
 	expires := data.DefaultExpires("targets")
 
 	// TODO: support delegated targets

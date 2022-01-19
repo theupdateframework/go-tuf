@@ -842,7 +842,7 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 	return nil
 }
 
-func (c *Client) VerifyDigest(digest string, digestAlg string, length int64, path string) (err error) {
+func (c *Client) VerifyDigest(digest string, digestAlg string, length int64, path string) error {
 	localMeta, ok := c.targets[path]
 	if !ok {
 		return ErrUnknownTarget{Name: path, SnapshotVersion: c.snapshotVer}
