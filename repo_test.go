@@ -1821,7 +1821,7 @@ func (rs *RepoSuite) TestSignDigest(c *C) {
 	hex_digest_bytes := data.HexBytes(digest_bytes)
 	c.Assert(err, IsNil)
 
-	targets, err := r.targets()
+	targets, err := r.topLevelTargets()
 	c.Assert(err, IsNil)
 	c.Assert(targets.Targets["sha256:bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c"].FileMeta.Length, Equals, size)
 	c.Assert(targets.Targets["sha256:bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c"].FileMeta.Hashes["sha256"], DeepEquals, hex_digest_bytes)

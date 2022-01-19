@@ -708,7 +708,7 @@ func (r *Repo) AddTargetsWithDigest(digest string, digestAlg string, length int6
 	expires := data.DefaultExpires("targets")
 
 	// TODO: support delegated targets
-	t, err := r.targets()
+	t, err := r.topLevelTargets()
 	if err != nil {
 		return err
 	}
@@ -780,7 +780,7 @@ func (r *Repo) writeTargetWithExpires(t *data.Targets, expires time.Time) error 
 		t.Version++
 	}
 
-	err = r.setTopLevelMeta("targets.json", t)
+	err := r.setTopLevelMeta("targets.json", t)
 	if err == nil {
 		fmt.Println("Added/staged targets:")
 		for k := range t.Targets {
