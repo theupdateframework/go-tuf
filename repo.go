@@ -2,6 +2,7 @@ package tuf
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -703,6 +704,34 @@ func (r *Repo) AddTargets(paths []string, custom json.RawMessage) error {
 	return r.AddTargetsWithExpires(paths, custom, data.DefaultExpires("targets"))
 }
 
+func (r *Repo) AddTargetsWithDigest(digest string, digestAlg string, length int64, path string, custom json.RawMessage) error {
+	expires := data.DefaultExpires("targets")
+
+	// TODO: support delegated targets
+	t, err := r.topLevelTargets()
+	if err != nil {
+		return err
+	}
+
+	meta := data.FileMeta{Length: length, Hashes: make(data.Hashes, 1)}
+	meta.Hashes[digestAlg], err = hex.DecodeString(digest)
+	if err != nil {
+		return err
+	}
+
+	// If custom is provided, set custom, otherwise maintain existing custom
+	// metadata
+	if len(custom) > 0 {
+		meta.Custom = &custom
+	} else if t, ok := t.Targets[path]; ok {
+		meta.Custom = t.Custom
+	}
+
+	t.Targets[path] = data.TargetFileMeta{FileMeta: meta}
+
+	return r.writeTargetWithExpires(t, expires)
+}
+
 func (r *Repo) AddTargetWithExpires(path string, custom json.RawMessage, expires time.Time) error {
 	return r.AddTargetsWithExpires([]string{path}, custom, expires)
 }
@@ -742,12 +771,16 @@ func (r *Repo) AddTargetsWithExpires(paths []string, custom json.RawMessage, exp
 	}); err != nil {
 		return err
 	}
+	return r.writeTargetWithExpires(t, expires)
+}
+
+func (r *Repo) writeTargetWithExpires(t *data.Targets, expires time.Time) error {
 	t.Expires = expires.Round(time.Second)
 	if !r.local.FileIsStaged("targets.json") {
 		t.Version++
 	}
 
-	err = r.setTopLevelMeta("targets.json", t)
+	err := r.setTopLevelMeta("targets.json", t)
 	if err == nil {
 		fmt.Println("Added/staged targets:")
 		for k := range t.Targets {

@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -836,6 +837,29 @@ func (c *Client) Download(name string, dest Destination) (err error) {
 			return ErrWrongSize{name, e.Actual, e.Expected}
 		}
 		return ErrDownloadFailed{name, err}
+	}
+
+	return nil
+}
+
+func (c *Client) VerifyDigest(digest string, digestAlg string, length int64, path string) error {
+	localMeta, ok := c.targets[path]
+	if !ok {
+		return ErrUnknownTarget{Name: path, SnapshotVersion: c.snapshotVer}
+	}
+
+	actual := data.FileMeta{Length: length, Hashes: make(data.Hashes, 1)}
+	var err error
+	actual.Hashes[digestAlg], err = hex.DecodeString(digest)
+	if err != nil {
+		return err
+	}
+
+	if err := util.TargetFileMetaEqual(data.TargetFileMeta{FileMeta: actual}, localMeta); err != nil {
+		if e, ok := err.(util.ErrWrongLength); ok {
+			return ErrWrongSize{path, e.Actual, e.Expected}
+		}
+		return ErrDownloadFailed{path, err}
 	}
 
 	return nil
