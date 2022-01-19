@@ -843,12 +843,12 @@ func (r *Repo) SnapshotWithExpires(expires time.Time) error {
 		return err
 	}
 
-	for _, manifestName := range r.snapshotMetadata() {
-		if err := r.verifySignature(manifestName, db); err != nil {
+	for _, metaName := range r.snapshotMetadata() {
+		if err := r.verifySignature(metaName, db); err != nil {
 			return err
 		}
 		var err error
-		snapshot.Meta[manifestName], err = r.snapshotFileMeta(manifestName)
+		snapshot.Meta[metaName], err = r.snapshotFileMeta(metaName)
 		if err != nil {
 			return err
 		}
