@@ -29,11 +29,6 @@ var topLevelMetadata = []string{
 	"timestamp.json",
 }
 
-var snapshotMetadata = []string{
-	"root.json",
-	"targets.json",
-}
-
 // TargetsWalkFunc is a function of a target path name and a target payload used to
 // execute some function on each staged target file. For example, it may normalize path
 // names and generate target file metadata with additional custom metadata.
@@ -863,6 +858,10 @@ func (r *Repo) Snapshot() error {
 	return r.SnapshotWithExpires(data.DefaultExpires("snapshot"))
 }
 
+func (r *Repo) snapshotMetadata() []string {
+	return []string{"targets.json"}
+}
+
 func (r *Repo) SnapshotWithExpires(expires time.Time) error {
 	if !validExpires(expires) {
 		return ErrInvalidExpires{expires}
@@ -877,12 +876,12 @@ func (r *Repo) SnapshotWithExpires(expires time.Time) error {
 		return err
 	}
 
-	for _, name := range snapshotMetadata {
-		if err := r.verifySignature(name, db); err != nil {
+	for _, metaName := range r.snapshotMetadata() {
+		if err := r.verifySignature(metaName, db); err != nil {
 			return err
 		}
 		var err error
-		snapshot.Meta[name], err = r.snapshotFileMeta(name)
+		snapshot.Meta[metaName], err = r.snapshotFileMeta(metaName)
 		if err != nil {
 			return err
 		}
@@ -964,9 +963,6 @@ func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 	if err != nil {
 		return nil, err
 	}
-	if m, ok := snapshot.Meta["root.json"]; ok {
-		hashes["root.json"] = m.Hashes
-	}
 	if m, ok := snapshot.Meta["targets.json"]; ok {
 		hashes["targets.json"] = m.Hashes
 	}
@@ -1007,7 +1003,7 @@ func (r *Repo) Commit() error {
 	if err != nil {
 		return err
 	}
-	for _, name := range snapshotMetadata {
+	for _, name := range r.snapshotMetadata() {
 		expected, ok := snapshot.Meta[name]
 		if !ok {
 			return fmt.Errorf("tuf: snapshot.json missing hash for %s", name)
