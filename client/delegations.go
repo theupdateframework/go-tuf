@@ -2,7 +2,7 @@ package client
 
 import (
 	"github.com/theupdateframework/go-tuf/data"
-	"github.com/theupdateframework/go-tuf/internal/targets"
+	"github.com/theupdateframework/go-tuf/pkg/targets"
 	"github.com/theupdateframework/go-tuf/verify"
 )
 
