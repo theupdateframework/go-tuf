@@ -32,6 +32,8 @@ The directories contain the following files:
 
 ### Install
 
+`go-tuf` is tested on Go versions 1.16 and 1.17.
+
 ```bash
 go get github.com/theupdateframework/go-tuf/cmd/tuf
 ```
@@ -540,3 +542,13 @@ $ tree .
 For the client package, see https://godoc.org/github.com/theupdateframework/go-tuf/client.
 
 For the client CLI, see https://github.com/theupdateframework/go-tuf/tree/master/cmd/tuf-client.
+
+## Development
+
+For local development, `go-tuf` requires Go version 1.16 or 1.17.
+
+The [Python interoperability tests](client/python_interop/) require Python 3
+(available as `python` on the `$PATH`) and the [`python-tuf`
+package](https://github.com/theupdateframework/python-tuf) installed (`pip
+install tuf`). To update the data for these tests requires Docker and make (see
+test data [README.md](client/python_interop/testdata/README.md) for details).
