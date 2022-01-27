@@ -83,7 +83,7 @@ func GenerateEd25519Key() (*ed25519Signer, error) {
 	}, nil
 }
 
-func Ed25519Key(keyValue Ed25519PrivateKeyValue) *ed25519Signer {
+func NewEd25519Signer(keyValue Ed25519PrivateKeyValue) *ed25519Signer {
 	return &ed25519Signer{
 		PrivateKey:    ed25519.PrivateKey(data.HexBytes(keyValue.Private)),
 		keyType:       data.KeyTypeEd25519,
