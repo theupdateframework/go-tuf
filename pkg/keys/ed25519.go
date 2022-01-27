@@ -54,7 +54,7 @@ func (e *ed25519Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
 	return nil
 }
 
-type ed25519PrivateKeyValue struct {
+type Ed25519PrivateKeyValue struct {
 	Public  data.HexBytes `json:"public"`
 	Private data.HexBytes `json:"private"`
 }
@@ -83,12 +83,21 @@ func GenerateEd25519Key() (*ed25519Signer, error) {
 	}, nil
 }
 
+func NewEd25519Signer(keyValue Ed25519PrivateKeyValue) *ed25519Signer {
+	return &ed25519Signer{
+		PrivateKey:    ed25519.PrivateKey(data.HexBytes(keyValue.Private)),
+		keyType:       data.KeyTypeEd25519,
+		keyScheme:     data.KeySchemeEd25519,
+		keyAlgorithms: data.HashAlgorithms,
+	}
+}
+
 func (e *ed25519Signer) SignMessage(message []byte) ([]byte, error) {
 	return e.Sign(rand.Reader, message, crypto.Hash(0))
 }
 
 func (e *ed25519Signer) MarshalPrivateKey() (*data.PrivateKey, error) {
-	valueBytes, err := json.Marshal(ed25519PrivateKeyValue{
+	valueBytes, err := json.Marshal(Ed25519PrivateKeyValue{
 		Public:  data.HexBytes([]byte(e.PrivateKey.Public().(ed25519.PublicKey))),
 		Private: data.HexBytes(e.PrivateKey),
 	})
@@ -104,7 +113,7 @@ func (e *ed25519Signer) MarshalPrivateKey() (*data.PrivateKey, error) {
 }
 
 func (e *ed25519Signer) UnmarshalPrivateKey(key *data.PrivateKey) error {
-	keyValue := &ed25519PrivateKeyValue{}
+	keyValue := &Ed25519PrivateKeyValue{}
 	if err := json.Unmarshal(key.Value, keyValue); err != nil {
 		return err
 	}
