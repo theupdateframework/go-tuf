@@ -581,7 +581,7 @@ func (r *Repo) AddTargetsDelegationWithExpires(delegator string, role data.Deleg
 // AddTargetsDelegationsForPathHashBins is equivalent to
 // AddTargetsDelegationsForPathHashBinsWithExpires, but with a default
 // expiration time.
-func (r *Repo) AddTargetsDelegationsForPathHashBins(delegator string, binRolePrefix string, prefixBitLen uint8, keys []*data.PublicKey, threshold int) error {
+func (r *Repo) AddTargetsDelegationsForPathHashBins(delegator string, binRolePrefix string, prefixBitLen int, keys []*data.PublicKey, threshold int) error {
 	return r.AddTargetsDelegationsForPathHashBinsWithExpires(delegator, binRolePrefix, prefixBitLen, keys, threshold, data.DefaultExpires("targets"))
 }
 
@@ -589,24 +589,26 @@ func (r *Repo) AddTargetsDelegationsForPathHashBins(delegator string, binRolePre
 // delegations to the delegator role, which partition the target path hash
 // space into bins using the PathHashPrefixes delegation mechanism. New
 // metadata is written with the given expiration time.
-func (r *Repo) AddTargetsDelegationsForPathHashBinsWithExpires(delegator string, binRolePrefix string, prefixBitLen uint8, keys []*data.PublicKey, threshold int, expires time.Time) error {
-	bins, err := targets.GenerateHashBins(prefixBitLen)
+func (r *Repo) AddTargetsDelegationsForPathHashBinsWithExpires(delegator string, binRolePrefix string, prefixBitLen int, keys []*data.PublicKey, threshold int, expires time.Time) error {
+	bins, err := targets.NewHashBins(binRolePrefix, prefixBitLen)
 	if err != nil {
 		return err
 	}
-	padWidth := targets.HashPrefixLen(prefixBitLen)
+	// padWidth := targets.HashPrefixLen(prefixBitLen)
 
 	keyIDs := []string{}
 	for _, key := range keys {
 		keyIDs = append(keyIDs, key.IDs()...)
 	}
 
-	for _, bin := range bins {
-		name := bin.Name(binRolePrefix, padWidth)
+	n := bins.NumBins()
+	for i := uint64(0); i < n; i += 1 {
+		bin := bins.GetBin(i)
+		name := bin.RoleName()
 		err := r.AddTargetsDelegationWithExpires(delegator, data.DelegatedRole{
 			Name:             name,
 			KeyIDs:           keyIDs,
-			PathHashPrefixes: bin.Enumerate(padWidth),
+			PathHashPrefixes: bin.HashPrefixes(),
 			Threshold:        threshold,
 		}, keys, expires)
 		if err != nil {
@@ -1215,7 +1217,7 @@ func (r *Repo) SnapshotWithExpires(expires time.Time) error {
 	}
 
 	for _, metaName := range r.snapshotMetadata() {
-		if err := r.verifySignature(metaName, db); err != nil {
+		if err := r.verifySignatures(metaName); err != nil {
 			return err
 		}
 		var err error
