@@ -1885,8 +1885,8 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 
 	snapshot, err := r.snapshot()
 	c.Assert(err, IsNil)
-	// root, targests, role1
-	c.Assert(snapshot.Meta, HasLen, 3)
+	// Snapshots has targets, role1
+	c.Assert(snapshot.Meta, HasLen, 2)
 	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 1)
 
 	//add target to delegations
