@@ -2544,3 +2544,34 @@ func (rs *RepoSuite) TestAddOrUpdateSignatureWithDelegations(c *C) {
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
 }
+
+func (rs *RepoSuite) TestPayload(c *C) {
+	signer, err := keys.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+
+	meta := make(map[string]json.RawMessage)
+	local := MemoryStore(meta, nil)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+	c.Assert(r.Init(false), IsNil)
+
+	err = r.AddVerificationKey("root", signer.PublicData())
+	c.Assert(err, IsNil)
+
+	_, err = r.Payload("badrole.json")
+	c.Assert(err, NotNil)
+
+	payload, err := r.Payload("root.json")
+	c.Assert(err, IsNil)
+	rawSig, err := signer.SignMessage(payload)
+	keyID := signer.PublicData().IDs()[0]
+	sig := data.Signature{
+		KeyID:     keyID,
+		Signature: rawSig,
+	}
+	c.Assert(err, IsNil)
+
+	// This method checks that the signature verifies!
+	err = r.AddOrUpdateSignature("root.json", sig)
+	c.Assert(err, IsNil)
+}

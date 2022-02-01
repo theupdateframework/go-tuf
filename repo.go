@@ -1527,3 +1527,18 @@ func (r *Repo) timestampFileMeta(roleFilename string) (data.TimestampFileMeta, e
 	}
 	return util.GenerateTimestampFileMeta(bytes.NewReader(b), r.hashAlgorithms...)
 }
+
+func (r *Repo) Payload(roleFilename string) ([]byte, error) {
+	role := strings.TrimSuffix(roleFilename, ".json")
+	if !roles.IsTopLevelRole(role) {
+		// TODO: handle payloads with delegated roles
+		return nil, ErrInvalidRole{role, "Payload() only supports top-level roles"}
+	}
+
+	s, err := r.SignedMeta(roleFilename)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.Signed, nil
+}
