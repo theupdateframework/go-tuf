@@ -268,19 +268,7 @@ func initTestDelegationClient(t *testing.T, dirPrefix string) (*Client, func() e
 	c := NewClient(MemoryLocalStore(), remote)
 	rawFile, err := ioutil.ReadFile(initialStateDir + "/" + "root.json")
 	assert.Nil(t, err)
-	s := &data.Signed{}
-	root := &data.Root{}
-	assert.Nil(t, json.Unmarshal(rawFile, s))
-	assert.Nil(t, json.Unmarshal(s.Signed, root))
-	var keys []*data.PublicKey
-	for _, sig := range s.Signatures {
-		k, ok := root.Keys[sig.KeyID]
-		if ok {
-			keys = append(keys, k)
-		}
-	}
-
-	assert.Nil(t, c.Init(keys, 1))
+	assert.Nil(t, c.InitLocal(rawFile))
 	files, err := ioutil.ReadDir(initialStateDir)
 	assert.Nil(t, err)
 

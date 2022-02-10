@@ -2,8 +2,8 @@ package client
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/util"
 	. "gopkg.in/check.v1"
 
@@ -150,9 +149,12 @@ func (t *testCase) runStep(c *C, stepName string) {
 	c.Assert(err, IsNil)
 
 	client := NewClient(t.local, remote)
-	// initiate a client with the root keys
-	keys := getKeys(c, remote)
-	c.Assert(client.Init(keys, 1), IsNil)
+	// initiate a client with the root metadata
+	ioReader, _, err := remote.GetMeta("root.json")
+	c.Assert(err, IsNil)
+	rootJsonBytes, err := io.ReadAll(ioReader)
+	c.Assert(err, IsNil)
+	c.Assert(client.InitLocal(rootJsonBytes), IsNil)
 
 	// check update returns the correct updated targets
 	files, err := client.Update()
@@ -190,32 +192,4 @@ func startFileServer(c *C, dir string) (string, func() error) {
 	addr := l.Addr().String()
 	go http.Serve(l, http.FileServer(http.Dir(dir)))
 	return addr, l.Close
-}
-
-func getKeys(c *C, remote RemoteStore) []*data.PublicKey {
-	r, _, err := remote.GetMeta("root.json")
-	c.Assert(err, IsNil)
-
-	type SignedRoot struct {
-		Signed data.Root
-	}
-	root := &SignedRoot{}
-	err = json.NewDecoder(r).Decode(&root)
-	c.Assert(err, IsNil)
-
-	rootRole, exists := root.Signed.Roles["root"]
-	c.Assert(exists, Equals, true)
-
-	rootKeys := []*data.PublicKey{}
-
-	for _, keyID := range rootRole.KeyIDs {
-		key, exists := root.Signed.Keys[keyID]
-		c.Assert(exists, Equals, true)
-
-		rootKeys = append(rootKeys, key)
-	}
-
-	c.Assert(rootKeys, Not(HasLen), 0)
-
-	return rootKeys
 }

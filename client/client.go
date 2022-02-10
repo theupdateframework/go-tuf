@@ -111,6 +111,8 @@ func NewClient(local LocalStore, remote RemoteStore) *Client {
 // The latest root.json is fetched from remote storage, verified using rootKeys
 // and threshold, and then saved in local storage. It is expected that rootKeys
 // were securely distributed with the software being updated.
+//
+// Deprecated: Use c.InitLocal and c.Update to initialize a local repository.
 func (c *Client) Init(rootKeys []*data.PublicKey, threshold int) error {
 	if len(rootKeys) < threshold {
 		return ErrInsufficientKeys
@@ -144,6 +146,20 @@ func (c *Client) Init(rootKeys []*data.PublicKey, threshold int) error {
 		return err
 	}
 
+	return c.local.SetMeta("root.json", rootJSON)
+}
+
+// InitLocal initializes a local repository from root metadata.
+//
+// The root's keys are extracted from the root and saved in local storage.
+// Root expiration is not checked.
+// It is expected that rootJSON was securely distributed with the software
+// being updated.
+func (c *Client) InitLocal(rootJSON []byte) error {
+	err := c.loadAndVerifyRootMeta(rootJSON, true /*ignoreExpiredCheck*/)
+	if err != nil {
+		return err
+	}
 	return c.local.SetMeta("root.json", rootJSON)
 }
 
@@ -430,6 +446,12 @@ func (c *Client) loadAndVerifyLocalRootMeta(ignoreExpiredCheck bool) error {
 	if !ok {
 		return ErrNoRootKeys
 	}
+	return c.loadAndVerifyRootMeta(rootJSON, ignoreExpiredCheck)
+}
+
+// loadAndVerifyRootMeta decodes and verifies root metadata and loads the top-level keys.
+// This method first clears the DB for top-level keys and then loads the new keys.
+func (c *Client) loadAndVerifyRootMeta(rootJSON []byte, ignoreExpiredCheck bool) error {
 	// unmarshal root.json without verifying as we need the root
 	// keys first
 	s := &data.Signed{}
