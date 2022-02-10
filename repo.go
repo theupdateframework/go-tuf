@@ -647,6 +647,25 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 	return r.setMeta("targets.json", t)
 }
 
+func (r *Repo) Root() error {
+	return r.RootWithExpires(data.DefaultExpires("root"))
+}
+
+func (r *Repo) RootWithExpires(expires time.Time) error {
+	if !validExpires(expires) {
+		return ErrInvalidExpires{expires}
+	}
+
+	root, err := r.root()
+	if err != nil {
+		return err
+	}
+
+	root.Expires = expires
+
+	return r.setMeta("root.json", root)
+}
+
 func (r *Repo) Snapshot(t CompressionType) error {
 	return r.SnapshotWithExpires(t, data.DefaultExpires("snapshot"))
 }
