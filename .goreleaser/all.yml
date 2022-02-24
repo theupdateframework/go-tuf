@@ -15,15 +15,5 @@ builds:
     goarch:
       - amd64
     main: ./cmd/tuf/
-sboms:
-  - artifacts: archive
-  - id: source
-    artifacts: source
 source:
   enabled: true
-signs:
-  - cmd: cosign
-    signature: "${artifact}.sig"
-    certificate: "${artifact}.pem"
-    args: ["sign-blob", "--output-signature=${signature}", "--output-certificate=${certificate}", "${artifact}"]
-    artifacts: all
