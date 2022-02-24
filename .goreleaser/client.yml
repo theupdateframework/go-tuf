@@ -15,11 +15,3 @@ builds:
     goarch:
       - amd64
     main: ./cmd/tuf-client/
-sboms:
-  - artifacts: archive
-signs:
-  - cmd: cosign
-    signature: "${artifact}.sig"
-    certificate: "${artifact}.pem"
-    args: ["sign-blob", "--output-signature=${signature}", "--output-certificate=${certificate}", "${artifact}"]
-    artifacts: all
