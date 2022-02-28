@@ -165,8 +165,11 @@ func (rs *RepoSuite) TestInit(c *C) {
 		c.Assert(root.ConsistentSnapshot, Equals, v)
 	}
 
-	// Init() fails if targets have been added
+	// Add a target.
+	generateAndAddPrivateKey(c, r, "targets")
 	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+
+	// Init() fails if targets have been added
 	c.Assert(r.Init(true), Equals, ErrInitNotAllowed)
 }
 
@@ -1492,6 +1495,8 @@ func (rs *RepoSuite) TestCustomTargetMetadata(c *C) {
 	local := MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
+
+	generateAndAddPrivateKey(c, r, "targets")
 
 	custom := json.RawMessage(`{"foo":"bar"}`)
 	assertCustomMeta := func(file string, custom *json.RawMessage) {

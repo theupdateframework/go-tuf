@@ -863,7 +863,10 @@ func (r *Repo) targetDelegationForPath(path string, preferredRole string) (*data
 		return nil, nil, err
 	}
 
-	iterator := targets.NewDelegationsIterator(path, topLevelKeysDB)
+	iterator, err := targets.NewDelegationsIterator(path, topLevelKeysDB)
+	if err != nil {
+		return nil, nil, err
+	}
 	d, ok := iterator.Next()
 	if !ok {
 		return nil, nil, ErrNoDelegatedTarget{Path: path}
