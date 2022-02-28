@@ -14,7 +14,20 @@ var (
 )
 
 func TestDelegationsIterator(t *testing.T) {
-	defaultKeyIDs := []string{"26b878ad73362774b8b69dd4fdeb2cc6a2688e4133ed5ace9e18a06e9d998a6d"}
+	topTargetsPubKey := &data.PublicKey{
+		Type:       data.KeyTypeEd25519,
+		Scheme:     data.KeySchemeEd25519,
+		Algorithms: data.HashAlgorithms,
+		Value:      []byte(`{"public":"aaaaec567e5901ba3976c34f7cd5169704292439bf71e6aa19c64b96706f95ef"}`),
+	}
+	delTargetsPubKey := &data.PublicKey{
+		Type:       data.KeyTypeEd25519,
+		Scheme:     data.KeySchemeEd25519,
+		Algorithms: data.HashAlgorithms,
+		Value:      []byte(`{"public":"bbbbec567e5901ba3976c34f7cd5169704292439bf71e6aa19c64b96706f95ef"}`),
+	}
+
+	defaultKeyIDs := delTargetsPubKey.IDs()
 	var iteratorTests = []struct {
 		testName    string
 		roles       map[string][]data.DelegatedRole
@@ -22,6 +35,14 @@ func TestDelegationsIterator(t *testing.T) {
 		resultOrder []string
 		err         error
 	}{
+		{
+			testName: "no delegation",
+			roles: map[string][]data.DelegatedRole{
+				"targets": {},
+			},
+			file:        "test.txt",
+			resultOrder: []string{"targets"},
+		},
 		{
 			testName: "no termination",
 			roles: map[string][]data.DelegatedRole{
@@ -180,16 +201,15 @@ func TestDelegationsIterator(t *testing.T) {
 
 	for _, tt := range iteratorTests {
 		t.Run(tt.testName, func(t *testing.T) {
-			flattened := []data.DelegatedRole{}
-			for _, roles := range tt.roles {
-				flattened = append(flattened, roles...)
-			}
-			db, err := verify.NewDBFromDelegations(&data.Delegations{
-				Roles: flattened,
+			topLevelDB := verify.NewDB()
+			topLevelDB.AddKey(topTargetsPubKey.IDs()[0], topTargetsPubKey)
+			topLevelDB.AddRole("targets", &data.Role{
+				KeyIDs:    topTargetsPubKey.IDs(),
+				Threshold: 1,
 			})
 
+			d, err := NewDelegationsIterator(tt.file, topLevelDB)
 			assert.NoError(t, err)
-			d := NewDelegationsIterator(tt.file, db)
 
 			var iterationOrder []string
 			for {
@@ -197,6 +217,12 @@ func TestDelegationsIterator(t *testing.T) {
 				if !ok {
 					break
 				}
+
+				// A delegation should have associated keys. Testing the exact keys
+				// isn't useful in this module since the keys are supplied by the
+				// caller in the arguments to Add().
+				assert.Greater(t, len(r.Delegatee.KeyIDs), 0)
+
 				iterationOrder = append(iterationOrder, r.Delegatee.Name)
 				delegations, ok := tt.roles[r.Delegatee.Name]
 				if !ok {
@@ -214,4 +240,13 @@ func TestDelegationsIterator(t *testing.T) {
 			assert.Equal(t, tt.resultOrder, iterationOrder)
 		})
 	}
+}
+
+func TestNewDelegationsIteratorError(t *testing.T) {
+	// Empty DB. It is supposed to have at least the top-level targets role and
+	// keys.
+	tldb := verify.NewDB()
+
+	_, err := NewDelegationsIterator("targets", tldb)
+	assert.ErrorIs(t, err, ErrTopLevelTargetsRoleMissing)
 }

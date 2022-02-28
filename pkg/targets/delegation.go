@@ -1,7 +1,10 @@
 package targets
 
 import (
+	"errors"
+
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/internal/sets"
 	"github.com/theupdateframework/go-tuf/verify"
 )
 
@@ -17,30 +20,31 @@ type delegationsIterator struct {
 	visitedRoles map[string]struct{}
 }
 
+var ErrTopLevelTargetsRoleMissing = errors.New("tuf: top level targets role missing from top level keys DB")
+
 // NewDelegationsIterator initialises an iterator with a first step
 // on top level targets.
-func NewDelegationsIterator(target string, topLevelKeysDB *verify.DB) *delegationsIterator {
-	// role := topLevelKeysDB.GetRole("targets")
-	keyIDs := []string{}
-
-	// if role != nil {
-	// 	keyIDs = sets.StringSetToSlice(role.KeyIDs)
-	// }
+func NewDelegationsIterator(target string, topLevelKeysDB *verify.DB) (*delegationsIterator, error) {
+	targetsRole := topLevelKeysDB.GetRole("targets")
+	if targetsRole == nil {
+		return nil, ErrTopLevelTargetsRoleMissing
+	}
 
 	i := &delegationsIterator{
 		target: target,
 		stack: []Delegation{
 			{
 				Delegatee: data.DelegatedRole{
-					Name:   "targets",
-					KeyIDs: keyIDs,
+					Name:      "targets",
+					KeyIDs:    sets.StringSetToSlice(targetsRole.KeyIDs),
+					Threshold: targetsRole.Threshold,
 				},
 				DB: topLevelKeysDB,
 			},
 		},
 		visitedRoles: make(map[string]struct{}),
 	}
-	return i
+	return i, nil
 }
 
 func (d *delegationsIterator) Next() (value Delegation, ok bool) {
