@@ -63,7 +63,6 @@ func TestLocalStoreSigners(t *testing.T) {
 
 			assert.Equal(t, []keys.Signer{aSigner1}, store.SignersForKeyIDs(a1KeyIDs))
 			assert.Equal(t, []keys.Signer{aSigner2}, store.SignersForKeyIDs(a2KeyIDs))
-			assert.ElementsMatch(t, []keys.Signer{aSigner1, aSigner2}, store.SignersForKeyIDs(append(a1KeyIDs, a2KeyIDs...)))
 			assert.Equal(t, []keys.Signer{bSigner}, store.SignersForKeyIDs(bKeyIDs))
 		})
 	}
