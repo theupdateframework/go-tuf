@@ -1,7 +1,7 @@
 Please fill in the fields below to submit a pull request.  The more information that is provided, the better.
 
-Fixes #Issue:
-Release Notes:
+Fixes #<Issue>
+Release Notes: <!-- What comments/remarks should we include in the release notes for this change? -->
 
 **Types of changes**:
 <!--- What types of changes does your code introduce? Put an `x` in all the boxes that apply: -->
