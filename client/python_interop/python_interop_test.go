@@ -2,7 +2,6 @@ package client
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -14,10 +13,7 @@ import (
 
 	tuf "github.com/theupdateframework/go-tuf"
 	client "github.com/theupdateframework/go-tuf/client"
-	"github.com/theupdateframework/go-tuf/data"
-	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/util"
-	"golang.org/x/crypto/ed25519"
 	. "gopkg.in/check.v1"
 )
 
@@ -59,17 +55,11 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 		)
 		c.Assert(err, IsNil)
 
-		// initiate a client with the root keys
-		f, err := os.Open(filepath.Join(testDataDir, dir, "keystore", "root_key.pub"))
-		c.Assert(err, IsNil)
-		key := &data.PublicKey{}
-		c.Assert(json.NewDecoder(f).Decode(key), IsNil)
-		c.Assert(key.Type, Equals, "ed25519")
-		pk, err := keys.GetVerifier(key)
-		c.Assert(err, IsNil)
-		c.Assert(pk.Public(), HasLen, ed25519.PublicKeySize)
+		// initiate a client with the root metadata
 		client := client.NewClient(client.MemoryLocalStore(), remote)
-		c.Assert(client.Init([]*data.PublicKey{key}, 1), IsNil)
+		rootJSON, err := ioutil.ReadFile(filepath.Join(testDataDir, dir, "repository", "metadata", "root.json"))
+		c.Assert(err, IsNil)
+		c.Assert(client.InitLocal(rootJSON), IsNil)
 
 		// check update returns the correct updated targets
 		files, err := client.Update()

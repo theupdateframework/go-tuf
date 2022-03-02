@@ -1,28 +1,26 @@
 package main
 
 import (
-	"encoding/json"
 	"io"
 	"os"
 
 	"github.com/flynn/go-docopt"
 	tuf "github.com/theupdateframework/go-tuf/client"
-	"github.com/theupdateframework/go-tuf/data"
 )
 
 func init() {
 	register("init", cmdInit, `
-usage: tuf-client init [-s|--store=<path>] <url> [<root-keys-file>]
+usage: tuf-client init [-s|--store=<path>] <url> [<root-metadata-file>]
 
 Options:
   -s <path>    The path to the local file store [default: tuf.db]
 
-Initialize the local file store with root keys.
+Initialize the local file store with root metadata.
   `)
 }
 
 func cmdInit(args *docopt.Args, client *tuf.Client) error {
-	file := args.String["<root-keys-file>"]
+	file := args.String["<root-metadata-file>"]
 	var in io.Reader
 	if file == "" || file == "-" {
 		in = os.Stdin
@@ -33,9 +31,9 @@ func cmdInit(args *docopt.Args, client *tuf.Client) error {
 			return err
 		}
 	}
-	var rootKeys []*data.PublicKey
-	if err := json.NewDecoder(in).Decode(&rootKeys); err != nil {
+	bytes, err := io.ReadAll(in)
+	if err != nil {
 		return err
 	}
-	return client.Init(rootKeys, len(rootKeys))
+	return client.InitLocal(bytes)
 }
