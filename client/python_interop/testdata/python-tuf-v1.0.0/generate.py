@@ -9,6 +9,7 @@
 
 import datetime
 import optparse
+import shutil
 
 from pathlib import Path
 from typing import Dict
@@ -37,13 +38,16 @@ EXPIRY = datetime.datetime(2030, 1, 1, 0, 0)  # Far enough in the future
 ROLES = set(("targets", "snapshot", "timestamp", "root"))
 
 
-def make_targets(target_dir: Path) -> Dict[str, TargetFile]:
+def make_targets(target_dir: Path, consistent_snapshot: bool) -> Dict[str, TargetFile]:
     targets = {}
     for target in (Path("file1.txt"), Path("dir/file2.txt")):
         target_fspath = target_dir / target
         target_fspath.parent.mkdir(parents=True, exist_ok=True)
         target_fspath.write_text(target.name)  # file contents are the file name
         target_file_info = TargetFile.from_file(str(target), str(target_fspath))
+        if consistent_snapshot:
+            digest = next(iter(target_file_info.hashes.values()))
+            shutil.move(target_fspath, target_fspath.parent / f"{digest}.{target.name}")
         targets[str(target)] = target_file_info
     return targets
 
@@ -60,7 +64,7 @@ def make_test_repo(repo_dir: Path, consistent_snapshot: bool):
     targets: Dict[str, TargetFile] = {}
     target_dir = repo_dir / "targets"
     target_dir.mkdir()
-    targets = make_targets(target_dir)
+    targets = make_targets(target_dir, consistent_snapshot)
     target_metadata = Targets(
         version=1, spec_version=SPEC_VERSION, expires=EXPIRY, targets=targets
     )
@@ -105,7 +109,7 @@ def make_test_repo(repo_dir: Path, consistent_snapshot: bool):
         signer = SSlibSigner(key)
         role.sign(signer)
 
-        if consistent_snapshot and name != "timestamp":
+        if name == "root" or (consistent_snapshot and name != "timestamp"):
             filename = f"{role.signed.version}.{name}.json"
         else:
             filename = f"{name}.json"
@@ -131,11 +135,6 @@ def main():
         default=False,
     )
     (options, args) = parser.parse_args()
-
-    # TODO: add consistent snapshot support when python-tuf supports it:
-    # https://github.com/theupdateframework/python-tuf/blob/develop/docs/adr/0010-repository-library-design.md
-    if options.consistent_snapshot:
-        raise NotImplementedError("Pending python-tuf consistent snapshot support.")
 
     repo_dir = Path("repository")
     repo_dir.mkdir()

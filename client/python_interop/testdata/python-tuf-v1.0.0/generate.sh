@@ -11,8 +11,7 @@ main() {
   trap "rm -rf ${dir}" EXIT
 
   pushd "${dir}" >/dev/null
-  # TODO: add when python-tuf supports it
-  # generate_consistent
+  generate_consistent
   generate_non_consistent
   list_files >&2
   tar c .

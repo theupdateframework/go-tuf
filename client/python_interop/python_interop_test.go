@@ -48,8 +48,7 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 	addr, cleanup := startFileServer(c, testDataDir)
 	defer cleanup()
 
-	// TODO: add with-consistent-snapshot when python-tuf supports it
-	for _, dir := range []string{"without-consistent-snapshot"} {
+	for _, dir := range []string{"without-consistent-snapshot", "with-consistent-snapshot"} {
 		remote, err := client.HTTPRemoteStore(
 			fmt.Sprintf("http://%s/%s/repository", addr, dir),
 			&client.HTTPRemoteOptions{MetadataPath: "metadata", TargetsPath: "targets"},
@@ -59,7 +58,7 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 
 		// initiate a client with the root metadata
 		client := client.NewClient(client.MemoryLocalStore(), remote)
-		rootJSON, err := ioutil.ReadFile(filepath.Join(testDataDir, dir, "repository", "metadata", "root.json"))
+		rootJSON, err := ioutil.ReadFile(filepath.Join(testDataDir, dir, "repository", "metadata", "1.root.json"))
 		c.Assert(err, IsNil)
 		c.Assert(client.Init(rootJSON), IsNil)
 
