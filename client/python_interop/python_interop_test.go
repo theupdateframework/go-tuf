@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -43,11 +44,12 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 	// start file server
 	cwd, err := os.Getwd()
 	c.Assert(err, IsNil)
-	testDataDir := filepath.Join(cwd, "testdata", "python-tuf-v0.11.1")
+	testDataDir := filepath.Join(cwd, "testdata", "python-tuf-v1.0.0")
 	addr, cleanup := startFileServer(c, testDataDir)
 	defer cleanup()
 
-	for _, dir := range []string{"with-consistent-snapshot", "without-consistent-snapshot"} {
+	// TODO: add with-consistent-snapshot when python-tuf supports it
+	for _, dir := range []string{"without-consistent-snapshot"} {
 		remote, err := client.HTTPRemoteStore(
 			fmt.Sprintf("http://%s/%s/repository", addr, dir),
 			&client.HTTPRemoteOptions{MetadataPath: "metadata", TargetsPath: "targets"},
@@ -112,18 +114,17 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 	cwd, err := os.Getwd()
 	c.Assert(err, IsNil)
 
-	tmp := c.MkDir()
 	files := map[string][]byte{
 		"foo.txt":     []byte("foo"),
 		"bar/baz.txt": []byte("baz"),
 	}
 
-	// start file server
-	addr, cleanup := startFileServer(c, tmp)
-	defer cleanup()
-
 	for _, consistentSnapshot := range []bool{false, true} {
 		// generate repository
+		tmp := c.MkDir()
+		// start file server
+		addr, cleanup := startFileServer(c, tmp)
+		defer cleanup()
 		name := fmt.Sprintf("consistent-snapshot-%t", consistentSnapshot)
 		dir := filepath.Join(tmp, name)
 		generateRepoFS(c, dir, files, consistentSnapshot)
@@ -134,14 +135,13 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 		prevDir := filepath.Join(clientDir, "tufrepo", "metadata", "previous")
 		c.Assert(os.MkdirAll(currDir, 0755), IsNil)
 		c.Assert(os.MkdirAll(prevDir, 0755), IsNil)
-		rootJSON, err := ioutil.ReadFile(filepath.Join(dir, "repository", "root.json"))
+		rootJSON, err := ioutil.ReadFile(filepath.Join(dir, "repository", "1.root.json"))
 		c.Assert(err, IsNil)
 		c.Assert(ioutil.WriteFile(filepath.Join(currDir, "root.json"), rootJSON, 0644), IsNil)
 
 		args := []string{
-			filepath.Join(cwd, "testdata", "python-tuf-v0.11.1", "client.py"),
+			filepath.Join(cwd, "testdata", "python-tuf-v1.0.0", "client.py"),
 			"--repo=http://" + addr + "/" + name,
-			"--verbose=5",
 		}
 		for path := range files {
 			args = append(args, path)
@@ -156,7 +156,7 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 
 		// check the target files got downloaded
 		for path, expected := range files {
-			actual, err := ioutil.ReadFile(filepath.Join(clientDir, "tuftargets", path))
+			actual, err := ioutil.ReadFile(filepath.Join(clientDir, "tuftargets", url.QueryEscape(path)))
 			c.Assert(err, IsNil)
 			c.Assert(actual, DeepEquals, expected)
 		}
