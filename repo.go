@@ -331,11 +331,11 @@ func (r *Repo) AddPrivateKey(role string, signer keys.Signer) error {
 func (r *Repo) AddPrivateKeyWithExpires(keyRole string, signer keys.Signer, expires time.Time) error {
 	// Not compatible with delegated roles.
 
-	if err := r.local.SaveSigner(keyRole, signer); err != nil {
+	if err := r.AddVerificationKeyWithExpiration(keyRole, signer.PublicData(), expires); err != nil {
 		return err
 	}
 
-	if err := r.AddVerificationKeyWithExpiration(keyRole, signer.PublicData(), expires); err != nil {
+	if err := r.local.SaveSigner(keyRole, signer); err != nil {
 		return err
 	}
 
