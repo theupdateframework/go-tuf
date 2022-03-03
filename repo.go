@@ -290,6 +290,8 @@ func (r *Repo) timestamp() (*data.Timestamp, error) {
 }
 
 func (r *Repo) ChangePassphrase(keyRole string) error {
+	// Not compatible with delegated roles.
+
 	if !roles.IsTopLevelRole(keyRole) {
 		return ErrInvalidRole{keyRole}
 	}
