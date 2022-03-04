@@ -332,12 +332,21 @@ func (r *Repo) AddPrivateKey(role string, signer keys.Signer) error {
 
 func (r *Repo) AddPrivateKeyWithExpires(keyRole string, signer keys.Signer, expires time.Time) error {
 	// Not compatible with delegated roles.
+	if !roles.IsTopLevelRole(keyRole) {
+		return ErrInvalidRole{keyRole}
+	}
 
-	if err := r.AddVerificationKeyWithExpiration(keyRole, signer.PublicData(), expires); err != nil {
+	if !validExpires(expires) {
+		return ErrInvalidExpires{expires}
+	}
+
+	// Must add signer before adding verification key, so
+	// root.json can be signed when a new root key is added.
+	if err := r.local.SaveSigner(keyRole, signer); err != nil {
 		return err
 	}
 
-	if err := r.local.SaveSigner(keyRole, signer); err != nil {
+	if err := r.AddVerificationKeyWithExpiration(keyRole, signer.PublicData(), expires); err != nil {
 		return err
 	}
 
