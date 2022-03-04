@@ -22,7 +22,7 @@ type persistedKeys struct {
 	Data      []*data.PrivateKey `json:"data"`
 }
 
-func assertNotNil(err error) {
+func assertNoError(err error) {
 	if err != nil {
 		panic(fmt.Sprintf("assertion failed: %s", err))
 	}
@@ -30,29 +30,29 @@ func assertNotNil(err error) {
 
 func copyRepo(src string, dst string) {
 	cmd := exec.Command("cp", "-r", src, dst)
-	assertNotNil(cmd.Run())
+	assertNoError(cmd.Run())
 }
 
 func newRepo(dir string) *tuf.Repo {
 	repo, err := tuf.NewRepoIndent(tuf.FileSystemStore(dir, nil), "", "\t")
-	assertNotNil(err)
+	assertNoError(err)
 
 	return repo
 }
 
 func commit(dir string, repo *tuf.Repo) {
-	assertNotNil(repo.SnapshotWithExpires(expirationDate))
-	assertNotNil(repo.TimestampWithExpires(expirationDate))
-	assertNotNil(repo.Commit())
+	assertNoError(repo.SnapshotWithExpires(expirationDate))
+	assertNoError(repo.TimestampWithExpires(expirationDate))
+	assertNoError(repo.Commit())
 
 	// Remove the keys directory to make sure we don't accidentally use a key.
-	assertNotNil(os.RemoveAll(filepath.Join(dir, "keys")))
+	assertNoError(os.RemoveAll(filepath.Join(dir, "keys")))
 }
 
 func addKeys(repo *tuf.Repo, roleKeys map[string][]*data.PrivateKey) {
 	for role, keys := range roleKeys {
 		for _, key := range keys {
-			assertNotNil(repo.AddPrivateKeyWithExpires(role, key, expirationDate))
+			assertNoError(repo.AddPrivateKeyWithExpires(role, key, expirationDate))
 		}
 	}
 }
@@ -61,27 +61,27 @@ func addTargets(repo *tuf.Repo, dir string, files map[string][]byte) {
 	paths := []string{}
 	for file, data := range files {
 		path := filepath.Join(dir, "staged", "targets", file)
-		assertNotNil(os.MkdirAll(filepath.Dir(path), 0755))
-		assertNotNil(ioutil.WriteFile(path, data, 0644))
+		assertNoError(os.MkdirAll(filepath.Dir(path), 0755))
+		assertNoError(ioutil.WriteFile(path, data, 0644))
 		paths = append(paths, file)
 	}
-	assertNotNil(repo.AddTargetsWithExpires(paths, nil, expirationDate))
+	assertNoError(repo.AddTargetsWithExpires(paths, nil, expirationDate))
 }
 
 func revokeKeys(repo *tuf.Repo, role string, keyList []*data.PrivateKey) {
 	for _, key := range keyList {
 		signer, err := keys.GetSigner(key)
-		assertNotNil(err)
-		assertNotNil(repo.RevokeKeyWithExpires(role, signer.PublicData().IDs()[0], expirationDate))
+		assertNoError(err)
+		assertNoError(repo.RevokeKeyWithExpires(role, signer.PublicData().IDs()[0], expirationDate))
 	}
 }
 
 func generateRepos(dir string, consistentSnapshot bool) {
 	f, err := os.Open("../keys.json")
-	assertNotNil(err)
+	assertNoError(err)
 
 	var roleKeys map[string][][]*data.PrivateKey
-	assertNotNil(json.NewDecoder(f).Decode(&roleKeys))
+	assertNoError(json.NewDecoder(f).Decode(&roleKeys))
 
 	// Collect all the initial keys we'll use when creating repositories.
 	// We'll modify this to reflect rotated keys.
@@ -138,7 +138,7 @@ func generateRepos(dir string, consistentSnapshot bool) {
 
 func main() {
 	cwd, err := os.Getwd()
-	assertNotNil(err)
+	assertNoError(err)
 
 	for _, consistentSnapshot := range []bool{false, true} {
 		name := fmt.Sprintf("consistent-snapshot-%t", consistentSnapshot)

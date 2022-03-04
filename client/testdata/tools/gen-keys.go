@@ -30,7 +30,7 @@ func main() {
 
 		for i := 0; i < 2; i++ {
 			signer, err := keys.GenerateEd25519Key()
-			assertNotNil(err)
+			assertNoError(err)
 			keys = append(keys, []*data.PrivateKey{signer})
 		}
 
@@ -38,12 +38,12 @@ func main() {
 	}
 
 	s, err := json.MarshalIndent(&roles, "", "    ")
-	assertNotNil(err)
+	assertNoError(err)
 
 	ioutil.WriteFile("keys.json", []byte(s), 0644)
 }
 
-func assertNotNil(err error) {
+func assertNoError(err error) {
 	if err != nil {
 		panic(fmt.Sprintf("assertion failed: %s", err))
 	}
