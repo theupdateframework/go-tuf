@@ -597,7 +597,6 @@ func (r *Repo) AddTargetsDelegationsForPathHashBinsWithExpires(delegator string,
 	if err != nil {
 		return err
 	}
-	// padWidth := targets.HashPrefixLen(prefixBitLen)
 
 	keyIDs := []string{}
 	for _, key := range keys {
