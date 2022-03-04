@@ -221,8 +221,7 @@ func (f *fileSystemStore) stagedDir() string {
 }
 
 func isMetaFile(e os.DirEntry) (bool, error) {
-	name := e.Name()
-	if e.IsDir() || !(filepath.Ext(name) == ".json" && roles.IsTopLevelManifest(name)) {
+	if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
 		return false, nil
 	}
 
