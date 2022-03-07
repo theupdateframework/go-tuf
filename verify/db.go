@@ -28,37 +28,28 @@ func NewDB() *DB {
 	}
 }
 
-type DelegationsVerifier struct {
-	DB *DB
-}
-
-func (d *DelegationsVerifier) Unmarshal(b []byte, v interface{}, role string, minVersion int) error {
-	return d.DB.Unmarshal(b, v, role, minVersion)
-}
-
-// NewDelegationsVerifier returns a DelegationsVerifier that verifies delegations
-// of a given Targets. It reuses the DB struct to leverage verified keys, roles
-// unmarshals.
-func NewDelegationsVerifier(d *data.Delegations) (DelegationsVerifier, error) {
+// NewDBFromDelegations returns a DB that verifies delegations
+// of a given Targets.
+func NewDBFromDelegations(d *data.Delegations) (*DB, error) {
 	db := &DB{
 		roles:     make(map[string]*Role, len(d.Roles)),
 		verifiers: make(map[string]keys.Verifier, len(d.Keys)),
 	}
 	for _, r := range d.Roles {
 		if _, ok := roles.TopLevelRoles[r.Name]; ok {
-			return DelegationsVerifier{}, ErrInvalidDelegatedRole
+			return nil, ErrInvalidDelegatedRole
 		}
 		role := &data.Role{Threshold: r.Threshold, KeyIDs: r.KeyIDs}
 		if err := db.addRole(r.Name, role); err != nil {
-			return DelegationsVerifier{}, err
+			return nil, err
 		}
 	}
 	for id, k := range d.Keys {
 		if err := db.AddKey(id, k); err != nil {
-			return DelegationsVerifier{}, err
+			return nil, err
 		}
 	}
-	return DelegationsVerifier{db}, nil
+	return db, nil
 }
 
 func (db *DB) AddKey(id string, k *data.PublicKey) error {
