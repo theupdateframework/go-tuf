@@ -32,7 +32,7 @@ func (c *Client) getTargetFileMeta(target string) (data.TargetFileMeta, error) {
 		}
 
 		// covers 5.6.{1,2,3,4,5,6}
-		targets, err := c.loadDelegatedTargets(snapshot, d)
+		targets, err := c.loadDelegatedTargets(snapshot, d.Delegatee.Name, d.DB)
 		if err != nil {
 			return data.TargetFileMeta{}, err
 		}
@@ -79,9 +79,7 @@ func (c *Client) loadLocalSnapshot() (*data.Snapshot, error) {
 }
 
 // loadDelegatedTargets downloads, decodes, verifies and stores targets
-func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, delegation targets.Delegation) (*data.Targets, error) {
-	role := delegation.Delegatee.Name
-
+func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, role string, db *verify.DB) (*data.Targets, error) {
 	var err error
 	fileName := role + ".json"
 	fileMeta, ok := snapshot.Meta[fileName]
@@ -104,7 +102,7 @@ func (c *Client) loadDelegatedTargets(snapshot *data.Snapshot, delegation target
 	// 5.6.3 verify signature with parent public keys
 	// 5.6.5 verify that the targets is not expired
 	// role "targets" is a top role verified by root keys loaded in the client db
-	err = delegation.DB.Unmarshal(raw, targets, role, fileMeta.Version)
+	err = db.Unmarshal(raw, targets, role, fileMeta.Version)
 	if err != nil {
 		return nil, ErrDecodeFailed{fileName, err}
 	}
