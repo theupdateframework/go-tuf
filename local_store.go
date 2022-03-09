@@ -592,8 +592,9 @@ func (f *fileSystemStore) SaveSigner(role string, signer keys.Signer) error {
 		return err
 	}
 
-	innerKeyIdsForRole := f.keyIDsForRole[role]
-
+	// Merge privKeys into f.keyIDsForRole and register signers with
+	// f.signerForKeyID.
+	keyIDsForRole := f.keyIDsForRole[role]
 	for _, key := range privKeys {
 		signer, err := keys.GetSigner(key)
 		if err != nil {
@@ -606,10 +607,10 @@ func (f *fileSystemStore) SaveSigner(role string, signer keys.Signer) error {
 			f.signerForKeyID[keyID] = signer
 		}
 
-		innerKeyIdsForRole = append(innerKeyIdsForRole, keyIDs...)
+		keyIDsForRole = append(keyIDsForRole, keyIDs...)
 	}
 
-	f.keyIDsForRole[role] = sets.DeduplicateStrings(innerKeyIdsForRole)
+	f.keyIDsForRole[role] = sets.DeduplicateStrings(keyIDsForRole)
 
 	return nil
 }

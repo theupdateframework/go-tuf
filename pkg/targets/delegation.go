@@ -24,11 +24,10 @@ var ErrTopLevelTargetsRoleMissing = errors.New("tuf: top level targets role miss
 
 // NewDelegationsIterator initialises an iterator with a first step
 // on top level targets.
-func NewDelegationsIterator(target string, topLevelKeysDB *verify.DB) *delegationsIterator {
-	role := topLevelKeysDB.GetRole("targets")
-	keyIDs := []string{}
-	if role != nil {
-		keyIDs = sets.StringSetToSlice(role.KeyIDs)
+func NewDelegationsIterator(target string, topLevelKeysDB *verify.DB) (*delegationsIterator, error) {
+	targetsRole := topLevelKeysDB.GetRole("targets")
+	if targetsRole == nil {
+		return nil, ErrTopLevelTargetsRoleMissing
 	}
 
 	i := &delegationsIterator{
@@ -36,8 +35,9 @@ func NewDelegationsIterator(target string, topLevelKeysDB *verify.DB) *delegatio
 		stack: []Delegation{
 			{
 				Delegatee: data.DelegatedRole{
-					Name:   "targets",
-					KeyIDs: keyIDs,
+					Name:      "targets",
+					KeyIDs:    sets.StringSetToSlice(targetsRole.KeyIDs),
+					Threshold: targetsRole.Threshold,
 				},
 				DB: topLevelKeysDB,
 			},
