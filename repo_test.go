@@ -165,8 +165,11 @@ func (rs *RepoSuite) TestInit(c *C) {
 		c.Assert(root.ConsistentSnapshot, Equals, v)
 	}
 
-	// Init() fails if targets have been added
+	// Add a target.
+	generateAndAddPrivateKey(c, r, "targets")
 	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+
+	// Init() fails if targets have been added
 	c.Assert(r.Init(true), Equals, ErrInitNotAllowed)
 }
 
@@ -1506,6 +1509,8 @@ func (rs *RepoSuite) TestCustomTargetMetadata(c *C) {
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
 
+	generateAndAddPrivateKey(c, r, "targets")
+
 	custom := json.RawMessage(`{"foo":"bar"}`)
 	assertCustomMeta := func(file string, custom *json.RawMessage) {
 		t, err := r.topLevelTargets()
@@ -1865,5 +1870,176 @@ func (rs *RepoSuite) TestSignDigest(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(targets.Targets["sha256:bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c"].FileMeta.Length, Equals, size)
 	c.Assert(targets.Targets["sha256:bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c"].FileMeta.Hashes["sha256"], DeepEquals, hex_digest_bytes)
+}
 
+func (rs *RepoSuite) TestDelegations(c *C) {
+	tmp := newTmpDir(c)
+	tmp.writeStagedTarget("foo.txt", "foo")
+	local := FileSystemStore(tmp.path, nil)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// Add one key to each role
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	// commit the metadata to the store.
+	c.Assert(r.AddTargets([]string{}, nil), IsNil)
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	delegatedKey, err := keys.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+
+	err = local.SaveSigner("role1", delegatedKey)
+	c.Assert(err, IsNil)
+
+	paths := []string{}
+	paths = append(paths, "test/*")
+
+	delegatee := data.DelegatedRole{
+		Name:      "role1",
+		KeyIDs:    delegatedKey.PublicData().IDs(),
+		Paths:     paths,
+		Threshold: 1,
+	}
+	publicKeys := []*data.PublicKey{}
+	publicKeys = append(publicKeys, delegatedKey.PublicData())
+
+	err = r.AddTargetsDelegation("targets", delegatee, publicKeys)
+	c.Assert(err, IsNil)
+
+	//test duplicate delegation
+	err = r.AddTargetsDelegation("targets", delegatee, publicKeys)
+	c.Assert(err, NotNil)
+
+	targets, err := r.topLevelTargets()
+	c.Assert(err, IsNil)
+	c.Assert(targets.Delegations.Roles, HasLen, 1)
+	c.Assert(targets.Delegations.Keys, HasLen, 1)
+
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	snapshot, err := r.snapshot()
+	c.Assert(err, IsNil)
+	// Snapshots has targets, role1
+	c.Assert(snapshot.Meta, HasLen, 2)
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 1)
+
+	//add target to delegations
+	tmp.writeStagedTarget("test/bar.txt", "bar")
+	c.Assert(r.AddTarget("test/bar.txt", nil), IsNil)
+	targets, err = r.targets("role1")
+	c.Assert(err, IsNil)
+	c.Assert(targets.Targets, HasLen, 1)
+	// 3 characters in the file
+	c.Assert(targets.Targets["test/bar.txt"].Length, Equals, int64(3))
+
+	// add target to the top-level targets
+	tmp.writeStagedTarget("baz.txt", "baz")
+	c.Assert(r.AddTarget("baz.txt", nil), IsNil)
+	targets, err = r.targets("targets")
+	c.Assert(err, IsNil)
+	c.Assert(targets.Targets, HasLen, 2)
+
+	// test AddTargetToPreferredRole
+	err = r.AddTargetToPreferredRole("test/bar.txt", nil, "targets")
+	c.Assert(err, IsNil)
+	targets, err = r.targets("targets")
+	c.Assert(err, IsNil)
+	c.Assert(targets.Targets, HasLen, 3)
+
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	metas, err := local.GetMeta()
+	c.Assert(err, IsNil)
+
+	for k, meta := range metas {
+		s := &data.Signed{}
+		err = json.Unmarshal(meta, s)
+		c.Assert(err, IsNil, Commentf("meta: %v", k))
+		c.Assert(len(s.Signatures) > 0, Equals, true, Commentf("meta: %v", k))
+	}
+}
+
+func (rs *RepoSuite) TestHashedBinDelegations(c *C) {
+	tmp := newTmpDir(c)
+	local := FileSystemStore(tmp.path, nil)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// Add one key to each role
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	// keys for the hashed bins
+	binsKey, err := keys.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	err = local.SaveSigner("bins", binsKey)
+	c.Assert(err, IsNil)
+
+	leafKey, err := keys.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	err = local.SaveSigner("bins_0-1", leafKey)
+	c.Assert(err, IsNil)
+	err = local.SaveSigner("bins_2-3", leafKey)
+	c.Assert(err, IsNil)
+	err = local.SaveSigner("bins_4-5", leafKey)
+	c.Assert(err, IsNil)
+	err = local.SaveSigner("bins_6-7", leafKey)
+	c.Assert(err, IsNil)
+	err = local.SaveSigner("bins_8-9", leafKey)
+	c.Assert(err, IsNil)
+	err = local.SaveSigner("bins_a-b", leafKey)
+	c.Assert(err, IsNil)
+	err = local.SaveSigner("bins_c-d", leafKey)
+	c.Assert(err, IsNil)
+	err = local.SaveSigner("bins_e-f", leafKey)
+	c.Assert(err, IsNil)
+
+	err = r.AddTargetsDelegation("targets", data.DelegatedRole{
+		Name:      "bins",
+		KeyIDs:    binsKey.PublicData().IDs(),
+		Paths:     []string{"*.txt"},
+		Threshold: 1,
+	}, []*data.PublicKey{
+		binsKey.PublicData(),
+	})
+	c.Assert(err, IsNil)
+
+	err = r.AddTargetsDelegationsForPathHashBins("bins", "bins_", 3, []*data.PublicKey{leafKey.PublicData()}, 1)
+	c.Assert(err, IsNil)
+	targets, err := r.targets("bins")
+	c.Assert(err, IsNil)
+	c.Assert(targets.Delegations.Roles, HasLen, 8)
+
+	tmp.writeStagedTarget("foo.txt", "foo")
+	err = r.AddTarget("foo.txt", nil)
+	c.Assert(err, IsNil)
+	targets, err = r.targets("bins_c-d")
+	c.Assert(err, IsNil)
+	c.Assert(targets.Targets, HasLen, 1)
+
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	metas, err := local.GetMeta()
+	c.Assert(err, IsNil)
+
+	for k, meta := range metas {
+		s := &data.Signed{}
+		err = json.Unmarshal(meta, s)
+		c.Assert(err, IsNil, Commentf("meta: %v", k))
+		c.Assert(len(s.Signatures) > 0, Equals, true, Commentf("meta: %v", k))
+	}
 }

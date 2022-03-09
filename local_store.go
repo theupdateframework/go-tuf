@@ -14,7 +14,6 @@ import (
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/encrypted"
-	"github.com/theupdateframework/go-tuf/internal/roles"
 	"github.com/theupdateframework/go-tuf/internal/sets"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/util"
@@ -222,8 +221,7 @@ func (f *fileSystemStore) stagedDir() string {
 }
 
 func isMetaFile(e os.DirEntry) (bool, error) {
-	name := e.Name()
-	if e.IsDir() || !(filepath.Ext(name) == ".json" && roles.IsTopLevelManifest(name)) {
+	if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
 		return false, nil
 	}
 
