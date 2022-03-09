@@ -1,0 +1,17 @@
+project_name: tuf-client
+builds:
+  - ldflags:
+      - "-s -w"
+      - "-extldflags=-zrelro"
+      - "-extldflags=-znow"
+    env:
+      - "CGO_ENABLED=0"
+      - "GO111MODULE=on"
+      - "GOFLAGS=-mod=readonly -trimpath"
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+    main: ./cmd/tuf-client/
