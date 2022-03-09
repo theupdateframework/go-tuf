@@ -3,8 +3,10 @@ package tuf
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/encrypted"
+	"github.com/theupdateframework/go-tuf/internal/roles"
 	"github.com/theupdateframework/go-tuf/internal/sets"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/util"
@@ -218,25 +221,66 @@ func (f *fileSystemStore) stagedDir() string {
 	return filepath.Join(f.dir, "staged")
 }
 
-func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
-	meta := make(map[string]json.RawMessage)
-	var err error
-	notExists := func(path string) bool {
-		_, err := os.Stat(path)
-		return os.IsNotExist(err)
+func isMetaFile(e os.DirEntry) (bool, error) {
+	name := e.Name()
+	if e.IsDir() || !(filepath.Ext(name) == ".json" && roles.IsTopLevelManifest(name)) {
+		return false, nil
 	}
-	for _, name := range topLevelMetadata {
-		path := filepath.Join(f.stagedDir(), name)
-		if notExists(path) {
-			path = filepath.Join(f.repoDir(), name)
-			if notExists(path) {
-				continue
-			}
-		}
-		meta[name], err = ioutil.ReadFile(path)
+
+	info, err := e.Info()
+	if err != nil {
+		return false, err
+	}
+
+	return info.Mode().IsRegular(), nil
+}
+
+func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
+	// Build a map of metadata names (e.g. root.json) to their full paths
+	// (whether in the committed repo dir, or in the staged repo dir).
+	metaPaths := map[string]string{}
+
+	rd := f.repoDir()
+	committed, err := os.ReadDir(f.repoDir())
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("could not list repo dir: %w", err)
+	}
+
+	for _, e := range committed {
+		imf, err := isMetaFile(e)
 		if err != nil {
 			return nil, err
 		}
+		if imf {
+			name := e.Name()
+			metaPaths[name] = filepath.Join(rd, name)
+		}
+	}
+
+	sd := f.stagedDir()
+	staged, err := os.ReadDir(sd)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("could not list staged dir: %w", err)
+	}
+
+	for _, e := range staged {
+		imf, err := isMetaFile(e)
+		if err != nil {
+			return nil, err
+		}
+		if imf {
+			name := e.Name()
+			metaPaths[name] = filepath.Join(sd, name)
+		}
+	}
+
+	meta := make(map[string]json.RawMessage)
+	for name, path := range metaPaths {
+		f, err := ioutil.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		meta[name] = f
 	}
 	return meta, nil
 }
