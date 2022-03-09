@@ -1126,7 +1126,6 @@ func (r *Repo) writeTopLevelTargetWithExpires(t *data.Targets, expires time.Time
 			fmt.Println("*", k)
 		}
 	}
-
 	return err
 }
 
