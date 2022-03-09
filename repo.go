@@ -1127,7 +1127,7 @@ func (r *Repo) writeTopLevelTargetWithExpires(t *data.Targets, expires time.Time
 		}
 	}
 
-	return nil
+	return err
 }
 
 func (r *Repo) RemoveTarget(path string) error {
