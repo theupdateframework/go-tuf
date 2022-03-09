@@ -8,38 +8,38 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-    - name: Install Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: ${{ matrix.go-version }}
-    - name: Setup Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: 3.6
-    - name: Checkout code
-      uses: actions/checkout@v2
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade iso8601 requests securesystemslib six tuf
-    - name: Format Unix
-      if: runner.os == 'Linux'
-      run: test -z $(go fmt ./...)
-    - name: Test
-      run: go test -race -covermode atomic -coverprofile='profile.cov' ./...
-    - name: Send coverage
-      if: runner.os == 'Linux'
-      env:
-        COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        GO111MODULE=off go get github.com/mattn/goveralls
-        $(go env GOPATH)/bin/goveralls -coverprofile=profile.cov -service=github
-    - name: Vet
-      run: go vet ./...
-    - name: Install staticcheck
-      run: "go install honnef.co/go/tools/cmd/staticcheck@v0.2.2"
-    - name: Run staticcheck
-      run: staticcheck ./...
-  release-all:
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.6
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade iso8601 requests securesystemslib six tuf
+      - name: Format Unix
+        if: runner.os == 'Linux'
+        run: test -z $(go fmt ./...)
+      - name: Test
+        run: go test -race -covermode atomic -coverprofile='profile.cov' ./...
+      - name: Send coverage
+        if: runner.os == 'Linux'
+        env:
+          COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          GO111MODULE=off go get github.com/mattn/goveralls
+          $(go env GOPATH)/bin/goveralls -coverprofile=profile.cov -service=github
+      - name: Vet
+        run: go vet ./...
+      - name: Install staticcheck
+        run: "go install honnef.co/go/tools/cmd/staticcheck@v0.2.2"
+      - name: Run staticcheck
+        run: staticcheck ./...
+  release-tuf:
     permissions:
       id-token: write
       contents: write
@@ -59,11 +59,11 @@ jobs:
         uses: goreleaser/goreleaser-action@v2
         with:
           distribution: goreleaser
-          version: 'v1.2.5'
-          args: release --config ./.goreleaser/all.yml --rm-dist
+          version: "v1.2.5"
+          args: release --config ./.goreleaser/tuf-cli.yml --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  release-client:
+  release-tuf-client:
     permissions:
       id-token: write
       contents: write
@@ -83,7 +83,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v2
         with:
           distribution: goreleaser
-          version: 'v1.2.5'
-          args: release --config ./.goreleaser/client.yml --rm-dist
+          version: "v1.2.5"
+          args: release --config ./.goreleaser/tuf-client-cli.yml --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
