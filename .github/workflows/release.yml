@@ -2,6 +2,11 @@ on:
   push:
     tags:
       - "v*"
+  workflow_run:
+    workflows: ["Test"]
+    branches: [master]
+    types:
+      - completed
 name: Release
 jobs:
   # test:
