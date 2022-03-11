@@ -1,0 +1,27 @@
+on:
+  workflow_call:
+name: Reusable workflow release - tuf
+jobs:
+  release:
+    permissions:
+      id-token: write
+      contents: write
+    runs-on: ubuntu-latest
+    # if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v2
+        with:
+          distribution: goreleaser
+          version: "v1.2.5"
+          args: release --config ./.goreleaser/tuf-cli-release-cfg.yml --rm-dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

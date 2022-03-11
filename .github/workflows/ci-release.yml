@@ -11,51 +11,9 @@ name: Release
 jobs:
   tests:
     uses: ./.github/workflows/workflow-tests.yml
-  release-tuf:
-    permissions:
-      id-token: write
-      contents: write
-    runs-on: ubuntu-latest
+  tuf:
+    uses: ./.github/workflows/workflow-rel-tuf.yml
     needs: tests
-    # if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.17
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
-        with:
-          distribution: goreleaser
-          version: "v1.2.5"
-          args: release --config ./.goreleaser/tuf-cli-release-cfg.yml --rm-dist
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  release-tuf-client:
-    permissions:
-      id-token: write
-      contents: write
-    runs-on: ubuntu-latest
+  tuf-client:
+    uses: ./.github/workflows/workflow-rel-tuf-client.yml
     needs: tests
-    # if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.17
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
-        with:
-          distribution: goreleaser
-          version: "v1.2.5"
-          args: release --config ./.goreleaser/tuf-client-cli-release-cfg.yml --rm-dist
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
