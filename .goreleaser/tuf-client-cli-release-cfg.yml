@@ -15,3 +15,8 @@ builds:
     goarch:
       - amd64
     main: ./cmd/tuf-client/
+source:
+  enabled: true
+  name_template: `{{ .ProjectName }}-{{ .Version }}`_source_code
+changelog:
+  use: github
