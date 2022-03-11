@@ -1,0 +1,33 @@
+project_name: tuf-client
+builds:
+  - ldflags:
+      - "-s -w"
+      - "-extldflags=-zrelro"
+      - "-extldflags=-znow"
+    env:
+      - "CGO_ENABLED=0"
+      - "GO111MODULE=on"
+      - "GOFLAGS=-mod=readonly -trimpath"
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+    main: ./cmd/tuf-client/
+source:
+  enabled: true
+changelog:
+  use: github
+  groups:
+    - title: "Breaking changes"
+      regexp: "^.*breaking[(\\w)]*:+.*$"
+      order: 0
+    - title: Features
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 1
+    - title: "Bug fixes"
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 2
+    - title: Others
+      order: 999
