@@ -1,10 +1,6 @@
 on:
   push:
-    branches:
-      - "master"
   pull_request:
-    branches:
-      - "master"
 name: Run tests
 jobs:
   tests:

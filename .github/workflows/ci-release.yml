@@ -1,12 +1,9 @@
 on:
   push:
+    branches:
+      - "master"
     tags:
       - "v*"
-  # workflow_run:
-  #   workflows: ["Run tests"]
-  #   branches: [master]
-  #   types:
-  #     - completed
 name: Release
 jobs:
   tests:
