@@ -18,6 +18,7 @@ builds:
 source:
   enabled: true
 changelog:
+  use: github
   groups:
     - title: "Breaking changes"
       regexp: "^.*breaking[(\\w)]*:+.*$"
