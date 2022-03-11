@@ -1,0 +1,19 @@
+on:
+  pull_request:
+  push:
+    branches:
+      - "master"
+    tags:
+      - "v*"
+name: CI
+jobs:
+  tests:
+    uses: ./.github/workflows/workflow-tests.yml
+  tuf:
+    needs: tests
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    uses: ./.github/workflows/workflow-rel-tuf.yml
+  tuf-client:
+    needs: tests
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    uses: ./.github/workflows/workflow-rel-tuf-client.yml
