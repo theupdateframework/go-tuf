@@ -1,0 +1,9 @@
+on:
+  push:
+  pull_request:
+
+name: Build and run tests
+
+jobs:
+  run-tests:
+    uses: ./.github/workflows/workflow-tests.yml
