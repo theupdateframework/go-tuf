@@ -1,6 +1,6 @@
 on:
   workflow_call:
-name: Reusable workflow release - tuf
+name: Reusable workflow - Release tuf
 jobs:
   release:
     permissions:

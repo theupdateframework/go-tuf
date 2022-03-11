@@ -17,6 +17,5 @@ builds:
     main: ./cmd/tuf/
 source:
   enabled: true
-  name_template: `{{ .ProjectName }}-{{ .Version }}`_source_code
 changelog:
   use: github
