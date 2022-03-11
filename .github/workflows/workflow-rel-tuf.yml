@@ -4,7 +4,7 @@ on:
       cli-name:
         required: true
         type: string
-name: Reusable workflow - Release tuf
+name: Release
 jobs:
   release:
     permissions:

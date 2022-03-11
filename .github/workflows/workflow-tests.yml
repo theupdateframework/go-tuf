@@ -1,6 +1,6 @@
 on:
   workflow_call:
-name: Reusable workflow - Run tests
+name: Tests
 jobs:
   run:
     strategy:

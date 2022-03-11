@@ -18,4 +18,15 @@ builds:
 source:
   enabled: true
 changelog:
-  use: github
+  groups:
+    - title: "Breaking changes"
+      regexp: "^.*breaking[(\\w)]*:+.*$"
+      order: 0
+    - title: Features
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 1
+    - title: "Bug fixes"
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 2
+    - title: Others
+      order: 999
