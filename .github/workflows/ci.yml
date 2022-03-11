@@ -13,7 +13,11 @@ jobs:
     needs: tests
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     uses: ./.github/workflows/workflow-rel-tuf.yml
+    with:
+      cli-name: tuf
   tuf-client:
     needs: tests
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-    uses: ./.github/workflows/workflow-rel-tuf-client.yml
+    uses: ./.github/workflows/workflow-rel-tuf.yml
+    with:
+      cli-name: tuf-client
