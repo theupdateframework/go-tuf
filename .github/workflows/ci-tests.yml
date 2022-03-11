@@ -1,8 +1,9 @@
 on:
   push:
+    branches:
+      - "master"
   pull_request:
 name: Run tests
 jobs:
   tests:
     uses: ./.github/workflows/workflow-tests.yml
-    if: github.event_name == 'push' && !contains(github.ref, 'refs/tags/')
