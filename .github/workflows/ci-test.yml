@@ -1,9 +1,0 @@
-on:
-  pull_request:
-  push:
-    tags:
-      - "!*"
-name: CI - Tests
-jobs:
-  tests:
-    uses: ./.github/workflows/tests.yml
