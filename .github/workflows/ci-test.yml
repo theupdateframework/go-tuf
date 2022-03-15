@@ -1,5 +1,8 @@
 on:
   pull_request:
+  push:
+    tags:
+      - "!*"
 name: CI - Tests
 jobs:
   tests:
