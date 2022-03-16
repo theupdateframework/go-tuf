@@ -22,9 +22,6 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade iso8601 requests securesystemslib six tuf
-      - name: Format Unix
-        if: runner.os == 'Linux'
-        run: test -z $(go fmt ./...)
       - name: Test
         run: go test -race -covermode atomic -coverprofile='profile.cov' ./...
       - name: Send coverage
@@ -34,9 +31,17 @@ jobs:
         run: |
           GO111MODULE=off go get github.com/mattn/goveralls
           $(go env GOPATH)/bin/goveralls -coverprofile=profile.cov -service=github
-      - name: Vet
-        run: go vet ./...
-      - name: Install staticcheck
-        run: "go install honnef.co/go/tools/cmd/staticcheck@v0.2.2"
-      - name: Run staticcheck
-        run: staticcheck ./...
+  golangci:
+    strategy:
+      matrix:
+        go-version: [1.16.x, 1.17.x]
+        os: [ubuntu-latest, macos-latest]
+    name: lint
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/setup-go@v2
+      - uses: actions/checkout@v2
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: v1.44
