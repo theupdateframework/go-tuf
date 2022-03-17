@@ -7,7 +7,9 @@ builds:
     env:
       - "CGO_ENABLED=0"
       - "GO111MODULE=on"
-      - "GOFLAGS=-mod=readonly -trimpath"
+    flags:
+      - -mod=readonly
+      - -trimpath
     goos:
       - linux
       - darwin
