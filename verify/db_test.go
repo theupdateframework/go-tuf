@@ -36,7 +36,7 @@ func TestDelegationsVerifier(t *testing.T) {
 		{
 			testName: "invalid keys",
 			delegations: &data.Delegations{Keys: map[string]*data.PublicKey{
-				"a": {Type: data.KeySchemeEd25519},
+				"a": &data.PublicKey{Type: data.KeySchemeEd25519},
 			}},
 			initErr: ErrWrongID{},
 		},
