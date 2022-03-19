@@ -112,11 +112,14 @@ func (r *Repo) Init(consistentSnapshot bool) error {
 	root.ConsistentSnapshot = consistentSnapshot
 	// Set root version to 1 for a new root.
 	root.Version = 1
-	err = r.setTopLevelMeta("root.json", root)
-	if err == nil {
-		fmt.Println("Repository initialized")
+	if err = r.setTopLevelMeta("root.json", root); err != nil {
+		return err
 	}
-	return err
+	if err = r.writeTargetWithExpires(t, data.DefaultExpires("targets")); err != nil {
+		return err
+	}
+	fmt.Println("Repository initialized")
+	return nil
 }
 
 func (r *Repo) topLevelKeysDB() (*verify.DB, error) {
@@ -776,7 +779,7 @@ func (r *Repo) writeTargetWithExpires(t *data.Targets, expires time.Time) error 
 	}
 
 	err := r.setTopLevelMeta("targets.json", t)
-	if err == nil {
+	if err == nil && len(t.Targets) > 0 {
 		fmt.Println("Added/staged targets:")
 		for k := range t.Targets {
 			fmt.Println("*", k)
