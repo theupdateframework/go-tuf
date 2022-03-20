@@ -187,13 +187,18 @@ func (r *Repo) RootVersion() (int, error) {
 }
 
 func (r *Repo) GetThreshold(keyRole string) (int, error) {
+	if !roles.IsTopLevelRole(keyRole) {
+		// Delegations are not currently supported, so return an error if this is not a
+		// top-level metadata file.
+		return -1, ErrInvalidRole{keyRole, "only thresholds for top-level roles supported"}
+	}
 	root, err := r.root()
 	if err != nil {
 		return -1, err
 	}
 	role, ok := root.Roles[keyRole]
 	if !ok {
-		return -1, ErrInvalidRole{keyRole}
+		return -1, ErrInvalidRole{keyRole, "role missing from root metadata"}
 	}
 
 	return role.Threshold, nil
@@ -203,7 +208,7 @@ func (r *Repo) SetThreshold(keyRole string, t int) error {
 	if !roles.IsTopLevelRole(keyRole) {
 		// Delegations are not currently supported, so return an error if this is not a
 		// top-level metadata file.
-		return ErrInvalidRole{keyRole}
+		return ErrInvalidRole{keyRole, "only thresholds for top-level roles supported"}
 	}
 	root, err := r.root()
 	if err != nil {
@@ -211,7 +216,7 @@ func (r *Repo) SetThreshold(keyRole string, t int) error {
 	}
 	role, ok := root.Roles[keyRole]
 	if !ok {
-		return ErrInvalidRole{keyRole}
+		return ErrInvalidRole{keyRole, "role missing from root metadata"}
 	}
 	if role.Threshold == t {
 		// Change was a no-op.
@@ -318,7 +323,7 @@ func (r *Repo) timestamp() (*data.Timestamp, error) {
 
 func (r *Repo) ChangePassphrase(keyRole string) error {
 	if !roles.IsTopLevelRole(keyRole) {
-		return ErrInvalidRole{keyRole}
+		return ErrInvalidRole{keyRole, "only support passphrases for top-level roles"}
 	}
 
 	if p, ok := r.local.(PassphraseChanger); ok {
@@ -351,7 +356,7 @@ func (r *Repo) AddPrivateKey(role string, signer keys.Signer) error {
 
 func (r *Repo) AddPrivateKeyWithExpires(keyRole string, signer keys.Signer, expires time.Time) error {
 	if !roles.IsTopLevelRole(keyRole) {
-		return ErrInvalidRole{keyRole}
+		return ErrInvalidRole{keyRole, "only support adding keys for top-level roles"}
 	}
 
 	if !validExpires(expires) {
@@ -449,7 +454,7 @@ func (r *Repo) RevokeKey(role, id string) error {
 
 func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error {
 	if !roles.IsTopLevelRole(keyRole) {
-		return ErrInvalidRole{keyRole}
+		return ErrInvalidRole{keyRole, "only revocations for top-level roles supported"}
 	}
 
 	if !validExpires(expires) {
@@ -552,7 +557,7 @@ func (r *Repo) setTopLevelMeta(roleFilename string, meta interface{}) error {
 func (r *Repo) Sign(roleFilename string) error {
 	role := strings.TrimSuffix(roleFilename, ".json")
 	if !roles.IsTopLevelRole(role) {
-		return ErrInvalidRole{role}
+		return ErrInvalidRole{role, "only signing top-level metadata supported"}
 	}
 
 	s, err := r.SignedMeta(roleFilename)
@@ -588,7 +593,7 @@ func (r *Repo) Sign(roleFilename string) error {
 func (r *Repo) AddOrUpdateSignature(roleFilename string, signature data.Signature) error {
 	role := strings.TrimSuffix(roleFilename, ".json")
 	if !roles.IsTopLevelRole(role) {
-		return ErrInvalidRole{role}
+		return ErrInvalidRole{role, "only signing top-level metadata supported"}
 	}
 
 	// Check key ID is in valid for the role.
@@ -598,7 +603,7 @@ func (r *Repo) AddOrUpdateSignature(roleFilename string, signature data.Signatur
 	}
 	roleData := db.GetRole(role)
 	if roleData == nil {
-		return ErrInvalidRole{role}
+		return ErrInvalidRole{role, "role missing from top-level keys"}
 	}
 	if !roleData.ValidKey(signature.KeyID) {
 		return verify.ErrInvalidKey
