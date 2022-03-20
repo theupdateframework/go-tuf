@@ -1784,6 +1784,13 @@ func (rs *RepoSuite) TestBadAddOrUpdateSignatures(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(r.AddVerificationKey("timestamp", timestampKey.PublicData()), IsNil)
 
+	// attempt to sign `root`, rather than `root.json`
+	for _, id := range rootKey.PublicData().IDs() {
+		c.Assert(r.AddOrUpdateSignature("root", data.Signature{
+			KeyID:     id,
+			Signature: nil}), Equals, ErrMissingMetadata{"root"})
+	}
+
 	// add a signature with a bad role
 	rootMeta, err := r.SignedMeta("root.json")
 	c.Assert(err, IsNil)
@@ -2559,7 +2566,10 @@ func (rs *RepoSuite) TestPayload(c *C) {
 	c.Assert(err, IsNil)
 
 	_, err = r.Payload("badrole.json")
-	c.Assert(err, NotNil)
+	c.Assert(err, Equals, ErrInvalidRole{"badrole", "Payload() only supports top-level roles"})
+
+	_, err = r.Payload("root")
+	c.Assert(err, Equals, ErrMissingMetadata{"root"})
 
 	payload, err := r.Payload("root.json")
 	c.Assert(err, IsNil)

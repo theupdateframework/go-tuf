@@ -17,7 +17,7 @@ type ErrMissingMetadata struct {
 }
 
 func (e ErrMissingMetadata) Error() string {
-	return fmt.Sprintf("tuf: missing metadata %s", e.Name)
+	return fmt.Sprintf("tuf: missing metadata file %s", e.Name)
 }
 
 type ErrFileNotFound struct {

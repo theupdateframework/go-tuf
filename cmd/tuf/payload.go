@@ -9,16 +9,16 @@ import (
 
 func init() {
 	register("payload", cmdPayload, `
-usage: tuf payload <role>
+usage: tuf payload <metadata>
 
-Output a role's metadata in a ready-to-sign format.
+Output the metadata file for a role in a ready-to-sign format.
 
 The output is canonicalized.
 `)
 }
 
 func cmdPayload(args *docopt.Args, repo *tuf.Repo) error {
-	p, err := repo.Payload(args.String["<role>"])
+	p, err := repo.Payload(args.String["<metadata>"])
 	if err != nil {
 		return err
 	}
