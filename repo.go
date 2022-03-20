@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -734,33 +735,49 @@ func (r *Repo) setMeta(roleFilename string, meta interface{}) error {
 	return r.local.SetMeta(roleFilename, b)
 }
 
-func (r *Repo) Sign(roleFilename string) error {
-	role := strings.TrimSuffix(roleFilename, ".json")
-
-	s, err := r.SignedMeta(roleFilename)
-	if err != nil {
-		return err
+// Use the keys associated with role to sign the payload in signed.
+func (r *Repo) SignPayload(role string, signed *data.Signed) (int, error) {
+	if !roles.IsTopLevelRole(role) {
+		return -1, ErrInvalidRole{role, "only signing top-level metadata supported"}
 	}
 
 	keys, err := r.signersForRole(role)
 	if err != nil {
-		return err
+		return -1, err
 	}
 	if len(keys) == 0 {
-		return ErrInsufficientKeys{roleFilename}
+		return 0, ErrInsufficientKeys{role}
 	}
 	for _, k := range keys {
-		sign.Sign(s, k)
+		if err = sign.Sign(signed, k); err != nil {
+			return -1, err
+		}
+	}
+	return len(keys), nil
+}
+
+func (r *Repo) Sign(roleFilename string) error {
+	signed, err := r.SignedMeta(roleFilename)
+	if err != nil {
+		return err
 	}
 
-	b, err := r.jsonMarshal(s)
+	role := strings.TrimSuffix(roleFilename, ".json")
+	numKeys, err := r.SignPayload(role, signed)
+	if errors.Is(err, ErrInsufficientKeys{role}) {
+		return ErrInsufficientKeys{roleFilename}
+	} else if err != nil {
+		return err
+	}
+
+	b, err := r.jsonMarshal(signed)
 	if err != nil {
 		return err
 	}
 	r.meta[roleFilename] = b
 	err = r.local.SetMeta(roleFilename, b)
 	if err == nil {
-		fmt.Println("Signed", roleFilename, "with", len(keys), "key(s)")
+		fmt.Println("Signed", roleFilename, "with", numKeys, "key(s)")
 	}
 	return err
 }
@@ -1532,7 +1549,7 @@ func (r *Repo) Payload(roleFilename string) ([]byte, error) {
 	role := strings.TrimSuffix(roleFilename, ".json")
 	if !roles.IsTopLevelRole(role) {
 		// TODO: handle payloads with delegated roles
-		return nil, ErrInvalidRole{role, "Payload() only supports top-level roles"}
+		return nil, ErrInvalidRole{role, "only signing top-level metadata supported"}
 	}
 
 	s, err := r.SignedMeta(roleFilename)

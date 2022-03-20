@@ -2552,36 +2552,39 @@ func (rs *RepoSuite) TestAddOrUpdateSignatureWithDelegations(c *C) {
 	c.Assert(r.Commit(), IsNil)
 }
 
-func (rs *RepoSuite) TestPayload(c *C) {
-	signer, err := keys.GenerateEd25519Key()
-	c.Assert(err, IsNil)
-
+// Test the offline signature flow: Payload -> SignPayload -> AddSignature
+func (rs *RepoSuite) TestOfflineFlow(c *C) {
+	// Set up repo.
 	meta := make(map[string]json.RawMessage)
 	local := MemoryStore(meta, nil)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
 	c.Assert(r.Init(false), IsNil)
-
-	err = r.AddVerificationKey("root", signer.PublicData())
+	_, err = r.GenKey("root")
 	c.Assert(err, IsNil)
 
+	// Get the payload to sign
 	_, err = r.Payload("badrole.json")
-	c.Assert(err, Equals, ErrInvalidRole{"badrole", "Payload() only supports top-level roles"})
-
+	c.Assert(err, Equals, ErrInvalidRole{"badrole", "only signing top-level metadata supported"})
 	_, err = r.Payload("root")
 	c.Assert(err, Equals, ErrMissingMetadata{"root"})
-
 	payload, err := r.Payload("root.json")
 	c.Assert(err, IsNil)
-	rawSig, err := signer.SignMessage(payload)
-	keyID := signer.PublicData().IDs()[0]
-	sig := data.Signature{
-		KeyID:     keyID,
-		Signature: rawSig,
-	}
-	c.Assert(err, IsNil)
 
-	// This method checks that the signature verifies!
-	err = r.AddOrUpdateSignature("root.json", sig)
+	// Sign the payload
+	signed := data.Signed{Signed: payload}
+	_, err = r.SignPayload("badrole", &signed)
+	c.Assert(err, Equals, ErrInvalidRole{"badrole", "only signing top-level metadata supported"})
+	_, err = r.SignPayload("targets", &signed)
+	c.Assert(err, Equals, ErrInsufficientKeys{"targets"})
+	numKeys, err := r.SignPayload("root", &signed)
 	c.Assert(err, IsNil)
+	c.Assert(numKeys, Equals, 1)
+
+	// Add the payload signatures back
+	for _, sig := range signed.Signatures {
+		// This method checks that the signature verifies!
+		err = r.AddOrUpdateSignature("root.json", sig)
+		c.Assert(err, IsNil)
+	}
 }
