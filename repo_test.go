@@ -687,13 +687,15 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	// commit without root.json
 	c.Assert(r.Commit(), DeepEquals, ErrMissingMetadata{"root.json"})
 
-	// commit without targets.json
+	// Init should create targets.json, but not signed yet
+	r.Init(false)
+	c.Assert(r.Commit(), DeepEquals, ErrMissingMetadata{"snapshot.json"})
+
 	genKey(c, r, "root")
-	c.Assert(r.Commit(), DeepEquals, ErrMissingMetadata{"targets.json"})
 
 	// commit without snapshot.json
 	genKey(c, r, "targets")
-	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+	c.Assert(r.Sign("targets.json"), IsNil)
 	c.Assert(r.Commit(), DeepEquals, ErrMissingMetadata{"snapshot.json"})
 
 	// commit without timestamp.json
@@ -714,12 +716,12 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	// commit with an invalid root hash in snapshot.json due to new key creation
 	genKey(c, r, "targets")
 	c.Assert(r.Sign("targets.json"), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 511 got 725"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 338 got 552"))
 
 	// commit with an invalid targets hash in snapshot.json
 	c.Assert(r.Snapshot(), IsNil)
 	c.Assert(r.AddTarget("bar.txt", nil), IsNil)
-	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 725 got 899"))
+	c.Assert(r.Commit(), DeepEquals, errors.New("tuf: invalid targets.json in snapshot.json: wrong length, expected 552 got 725"))
 
 	// commit with an invalid timestamp
 	c.Assert(r.Snapshot(), IsNil)
