@@ -46,11 +46,12 @@ func (e ErrInsufficientSignatures) Error() string {
 }
 
 type ErrInvalidRole struct {
-	Role string
+	Role   string
+	Reason string
 }
 
 func (e ErrInvalidRole) Error() string {
-	return fmt.Sprintf("tuf: invalid role %s", e.Role)
+	return fmt.Sprintf("tuf: invalid role %s: %s", e.Role, e.Reason)
 }
 
 type ErrInvalidExpires struct {
