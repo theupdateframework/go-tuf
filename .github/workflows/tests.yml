@@ -14,6 +14,9 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
 
+      - name: Checkout code
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
+
       - name: Setup - Python
         uses: actions/setup-python@7f80679172b057fc5e90d70d197929d454754a5a
         with:
@@ -24,9 +27,6 @@ jobs:
       - name: Install Python dependencies
         run: |
           python3 -m pip install --upgrade pip
-
-      - name: Checkout code
-        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
 
       - name: Run tests
         run: go test -race -covermode atomic -coverprofile='profile.cov' ./...
