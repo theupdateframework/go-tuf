@@ -1,7 +1,17 @@
 version: 2
 updates:
-- package-ecosystem: "gomod"
-  directory: "/"
-  schedule:
-    interval: "daily"
-  open-pull-requests-limit: 10
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "10:00"
+    open-pull-requests-limit: 10
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "10:00"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    open-pull-requests-limit: 10
