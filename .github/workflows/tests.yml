@@ -9,7 +9,7 @@ jobs:
       matrix: ${{ steps.versions.outputs.matrix }}
     steps:
       - uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
-      - uses: arnested/go-version-action@v1
+      - uses: arnested/go-version-action@d44f8fbecf1ac5ea61d81603e99dfec9833f592f
         id: versions
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
