@@ -10,17 +10,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Setup - Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492
         with:
           go-version: ${{ matrix.go-version }}
 
       - name: Setup - Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@7f80679172b057fc5e90d70d197929d454754a5a
         with:
           python-version: 3.6
 
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
 
       - name: Install Python dependencies
         run: |
@@ -30,7 +30,7 @@ jobs:
         run: go test -race -covermode atomic -coverprofile='profile.cov' ./...
 
       - name: Send coverage
-        uses: shogo82148/actions-goveralls@v1
+        uses: shogo82148/actions-goveralls@31ee804b8576ae49f6dc3caa22591bc5080e7920
         with:
           path-to-profile: profile.cov
           flag-name: Go-${{ matrix.go-version }}
@@ -43,10 +43,10 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/setup-go@v2
-      - uses: actions/checkout@v2
+      - uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492
+      - uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
+        uses: golangci/golangci-lint-action@5c56cd6c9dc07901af25baab6f2b0d9f3b7c3018
         with:
           version: v1.44
 
@@ -54,8 +54,8 @@ jobs:
     runs-on: "ubuntu-latest"
     steps:
       - name: Checkout code
-        uses: "actions/checkout@v2"
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
         with:
           fetch-depth: 0
       - name: Commitsar Action
-        uses: aevea/commitsar@v0.18.0
+        uses: aevea/commitsar@159cec82966ca402a09ae3c185524a5256affa22
