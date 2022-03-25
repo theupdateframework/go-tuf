@@ -14,7 +14,6 @@ import (
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/internal/roles"
 	"github.com/theupdateframework/go-tuf/internal/signer"
-	itargets "github.com/theupdateframework/go-tuf/internal/targets" // FIXME
 	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/pkg/targets"
 	"github.com/theupdateframework/go-tuf/sign"
@@ -609,7 +608,7 @@ func (r *Repo) AddTargetsDelegationsForPathHashBins(delegator string, binRolePre
 // space into bins using the PathHashPrefixes delegation mechanism. New
 // metadata is written with the given expiration time.
 func (r *Repo) AddTargetsDelegationsForPathHashBinsWithExpires(delegator string, binRolePrefix string, prefixBitLen int, keys []*data.PublicKey, threshold int, expires time.Time) error {
-	bins, err := itargets.NewHashBins(binRolePrefix, prefixBitLen)
+	bins, err := targets.NewHashBins(binRolePrefix, prefixBitLen)
 	if err != nil {
 		return err
 	}
