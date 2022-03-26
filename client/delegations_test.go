@@ -129,7 +129,7 @@ func TestPersistedMeta(t *testing.T) {
 
 	type expectedTargets struct {
 		name    string
-		version int
+		version int64
 	}
 	var persistedTests = []struct {
 		file          string
@@ -241,7 +241,7 @@ func TestPersistedMeta(t *testing.T) {
 	}
 }
 
-func versionOfStoredTargets(name string, store map[string]json.RawMessage) (int, error) {
+func versionOfStoredTargets(name string, store map[string]json.RawMessage) (int64, error) {
 	rawTargets, ok := store[name]
 	if !ok {
 		return 0, nil

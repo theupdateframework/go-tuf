@@ -68,7 +68,7 @@ func (VerifySuite) Test(c *C) {
 		keys  []*data.PublicKey
 		roles map[string]*data.Role
 		s     *data.Signed
-		ver   int
+		ver   int64
 		exp   *time.Time
 		typ   string
 		role  string
@@ -77,7 +77,7 @@ func (VerifySuite) Test(c *C) {
 	}
 
 	expiredTime := time.Now().Add(-time.Hour)
-	minVer := 10
+	minVer := int64(10)
 	tests := []test{
 		{
 			name: "no signatures",
@@ -255,7 +255,7 @@ func (VerifySuite) Test(c *C) {
 }
 
 func (VerifySuite) TestVerifyIgnoreExpired(c *C) {
-	minVer := 10
+	minVer := int64(10)
 	role := "root"
 	k, _ := keys.GenerateEd25519Key()
 	s, _ := sign.Marshal(&signedMeta{Type: role, Version: minVer, Expires: time.Now().Add(-time.Hour)}, k)

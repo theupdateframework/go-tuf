@@ -456,39 +456,39 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 	var tests = []struct {
 		fixturePath      string
 		expectedError    error
-		expectedVersions map[string]int
+		expectedVersions map[string]int64
 	}{
 		// Succeeds when there is no root update.
-		{"testdata/Published1Time", nil, map[string]int{"root": 1, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		{"testdata/Published1Time", nil, map[string]int64{"root": 1, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// Succeeds when client only has root.json
-		{"testdata/Published1Time_client_root_only", nil, map[string]int{"root": 1, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		{"testdata/Published1Time_client_root_only", nil, map[string]int64{"root": 1, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// Succeeds updating root from version 1 to version 2.
-		{"testdata/Published2Times_keyrotated", nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		{"testdata/Published2Times_keyrotated", nil, map[string]int64{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// Succeeds updating root from version 1 to version 2 when the client's initial root version is expired.
-		{"testdata/Published2Times_keyrotated_initialrootexpired", nil, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		{"testdata/Published2Times_keyrotated_initialrootexpired", nil, map[string]int64{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// Succeeds updating root from version 1 to version 3 when versions 1 and 2 are expired.
-		{"testdata/Published3Times_keyrotated_initialrootsexpired", nil, map[string]int{"root": 3, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		{"testdata/Published3Times_keyrotated_initialrootsexpired", nil, map[string]int64{"root": 3, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// Succeeds updating root from version 2 to version 3.
-		{"testdata/Published3Times_keyrotated_initialrootsexpired_clientversionis2", nil, map[string]int{"root": 3, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		{"testdata/Published3Times_keyrotated_initialrootsexpired_clientversionis2", nil, map[string]int64{"root": 3, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// Fails updating root from version 1 to version 3 when versions 1 and 3 are expired but version 2 is not expired.
-		{"testdata/Published3Times_keyrotated_latestrootexpired", ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
+		{"testdata/Published3Times_keyrotated_latestrootexpired", ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int64{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// Fails updating root from version 1 to version 2 when old root 1 did not sign off on it (nth root didn't sign off n+1).
-		{"testdata/Published2Times_keyrotated_invalidOldRootSignature", errors.New("tuf: signature verification failed"), map[string]int{}},
+		{"testdata/Published2Times_keyrotated_invalidOldRootSignature", errors.New("tuf: signature verification failed"), map[string]int64{}},
 		// Fails updating root from version 1 to version 2 when the new root 2 did not sign itself (n+1th root didn't sign off n+1)
-		{"testdata/Published2Times_keyrotated_invalidNewRootSignature", errors.New("tuf: signature verification failed"), map[string]int{}},
+		{"testdata/Published2Times_keyrotated_invalidNewRootSignature", errors.New("tuf: signature verification failed"), map[string]int64{}},
 		// Fails updating root to 2.root.json when the value of the version field inside it is 1 (rollback attack prevention).
-		{"testdata/Published1Time_backwardRootVersion", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), map[string]int{}},
+		{"testdata/Published1Time_backwardRootVersion", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), map[string]int64{}},
 		// Fails updating root to 2.root.json when the value of the version field inside it is 3 (rollforward attack prevention).
-		{"testdata/Published3Times_keyrotated_forwardRootVersion", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), map[string]int{}},
+		{"testdata/Published3Times_keyrotated_forwardRootVersion", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 3, Expected: 2}), map[string]int64{}},
 		// Fails updating when there is no local trusted root.
-		{"testdata/Published1Time_client_no_root", errors.New("tuf: no root keys found in local meta store"), map[string]int{}},
+		{"testdata/Published1Time_client_no_root", errors.New("tuf: no root keys found in local meta store"), map[string]int64{}},
 
 		// snapshot role key rotation increase the snapshot and timestamp.
-		{"testdata/Published2Times_snapshot_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 1}},
+		{"testdata/Published2Times_snapshot_keyrotated", nil, map[string]int64{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 1}},
 		// targets role key rotation increase the snapshot, timestamp, and targets.
-		{"testdata/Published2Times_targets_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 2}},
+		{"testdata/Published2Times_targets_keyrotated", nil, map[string]int64{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 2}},
 		// timestamp role key rotation increase the timestamp.
-		{"testdata/Published2Times_timestamp_keyrotated", nil, map[string]int{"root": 2, "timestamp": 2, "snapshot": 1, "targets": 1}},
+		{"testdata/Published2Times_timestamp_keyrotated", nil, map[string]int64{"root": 2, "timestamp": 2, "snapshot": 1, "targets": 1}},
 	}
 
 	for _, test := range tests {
@@ -498,7 +498,7 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 			c.Assert(err, IsNil)
 			// Check if the root.json is being saved in non-volatile storage.
 			tufClient.getLocalMeta()
-			versionMethods := map[string]int{"root": tufClient.rootVer,
+			versionMethods := map[string]int64{"root": tufClient.rootVer,
 				"timestamp": tufClient.timestampVer,
 				"snapshot":  tufClient.snapshotVer,
 				"targets":   tufClient.targetsVer}
@@ -800,7 +800,7 @@ func (s *ClientSuite) TestUpdateLocalRootExpired(c *C) {
 	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 
-	const expectedRootVersion = 3
+	const expectedRootVersion = int64(3)
 
 	// check the update downloads the non expired remote root.json and
 	// restarts itself, thus successfully updating

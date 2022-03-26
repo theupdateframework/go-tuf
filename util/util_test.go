@@ -113,7 +113,7 @@ func (UtilSuite) TestSnapshotFileMetaEqual(c *C) {
 		err      func(test) error
 	}
 
-	fileMeta := func(version int, length int64, hashes map[string]string) data.SnapshotFileMeta {
+	fileMeta := func(version int64, length int64, hashes map[string]string) data.SnapshotFileMeta {
 		return data.SnapshotFileMeta{
 			FileMeta: data.FileMeta{
 				Length: length,

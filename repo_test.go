@@ -123,28 +123,28 @@ func testNewRepo(c *C, newRepo func(local LocalStore, hashAlgorithms ...string) 
 	root, err := r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Type, Equals, "root")
-	c.Assert(root.Version, Equals, 1)
+	c.Assert(root.Version, Equals, int64(1))
 	c.Assert(root.Keys, NotNil)
 	c.Assert(root.Keys, HasLen, 0)
 
 	targets, err := r.topLevelTargets()
 	c.Assert(err, IsNil)
 	c.Assert(targets.Type, Equals, "targets")
-	c.Assert(targets.Version, Equals, 1)
+	c.Assert(targets.Version, Equals, int64(1))
 	c.Assert(targets.Targets, NotNil)
 	c.Assert(targets.Targets, HasLen, 0)
 
 	snapshot, err := r.snapshot()
 	c.Assert(err, IsNil)
 	c.Assert(snapshot.Type, Equals, "snapshot")
-	c.Assert(snapshot.Version, Equals, 1)
+	c.Assert(snapshot.Version, Equals, int64(1))
 	c.Assert(snapshot.Meta, NotNil)
 	c.Assert(snapshot.Meta, HasLen, 0)
 
 	timestamp, err := r.timestamp()
 	c.Assert(err, IsNil)
 	c.Assert(timestamp.Type, Equals, "timestamp")
-	c.Assert(timestamp.Version, Equals, 1)
+	c.Assert(timestamp.Version, Equals, int64(1))
 	c.Assert(timestamp.Meta, NotNil)
 	c.Assert(timestamp.Meta, HasLen, 0)
 }
@@ -354,7 +354,7 @@ func (rs *RepoSuite) TestAddPrivateKey(c *C) {
 	// check root metadata is correct
 	root, err := r.root()
 	c.Assert(err, IsNil)
-	c.Assert(root.Version, Equals, 1)
+	c.Assert(root.Version, Equals, int64(1))
 	c.Assert(root.Roles, NotNil)
 	c.Assert(root.Roles, HasLen, 1)
 	rs.assertNumUniqueKeys(c, root, "root", 1)
@@ -768,19 +768,19 @@ func (rs *RepoSuite) TestCommitVersions(c *C) {
 	// on initial commit everything should be at version 1.
 	rootVersion, err := r.RootVersion()
 	c.Assert(err, IsNil)
-	c.Assert(rootVersion, Equals, 1)
+	c.Assert(rootVersion, Equals, int64(1))
 
 	targetsVersion, err := r.TargetsVersion()
 	c.Assert(err, IsNil)
-	c.Assert(targetsVersion, Equals, 1)
+	c.Assert(targetsVersion, Equals, int64(1))
 
 	snapshotVersion, err := r.SnapshotVersion()
 	c.Assert(err, IsNil)
-	c.Assert(snapshotVersion, Equals, 1)
+	c.Assert(snapshotVersion, Equals, int64(1))
 
 	timestampVersion, err := r.SnapshotVersion()
 	c.Assert(err, IsNil)
-	c.Assert(timestampVersion, Equals, 1)
+	c.Assert(timestampVersion, Equals, int64(1))
 
 	// taking a snapshot should only increment snapshot and timestamp.
 	c.Assert(r.Snapshot(), IsNil)
@@ -789,19 +789,19 @@ func (rs *RepoSuite) TestCommitVersions(c *C) {
 
 	rootVersion, err = r.RootVersion()
 	c.Assert(err, IsNil)
-	c.Assert(rootVersion, Equals, 1)
+	c.Assert(rootVersion, Equals, int64(1))
 
 	targetsVersion, err = r.TargetsVersion()
 	c.Assert(err, IsNil)
-	c.Assert(targetsVersion, Equals, 1)
+	c.Assert(targetsVersion, Equals, int64(1))
 
 	snapshotVersion, err = r.SnapshotVersion()
 	c.Assert(err, IsNil)
-	c.Assert(snapshotVersion, Equals, 2)
+	c.Assert(snapshotVersion, Equals, int64(2))
 
 	timestampVersion, err = r.SnapshotVersion()
 	c.Assert(err, IsNil)
-	c.Assert(timestampVersion, Equals, 2)
+	c.Assert(timestampVersion, Equals, int64(2))
 
 	// rotating multiple keys should increment the root once.
 	genKey(c, r, "targets")
@@ -813,19 +813,19 @@ func (rs *RepoSuite) TestCommitVersions(c *C) {
 
 	rootVersion, err = r.RootVersion()
 	c.Assert(err, IsNil)
-	c.Assert(rootVersion, Equals, 2)
+	c.Assert(rootVersion, Equals, int64(2))
 
 	targetsVersion, err = r.TargetsVersion()
 	c.Assert(err, IsNil)
-	c.Assert(targetsVersion, Equals, 1)
+	c.Assert(targetsVersion, Equals, int64(1))
 
 	snapshotVersion, err = r.SnapshotVersion()
 	c.Assert(err, IsNil)
-	c.Assert(snapshotVersion, Equals, 3)
+	c.Assert(snapshotVersion, Equals, int64(3))
 
 	timestampVersion, err = r.TimestampVersion()
 	c.Assert(err, IsNil)
-	c.Assert(timestampVersion, Equals, 3)
+	c.Assert(timestampVersion, Equals, int64(3))
 }
 
 type tmpDir struct {
@@ -862,11 +862,11 @@ func (t *tmpDir) assertHashedFilesNotExist(path string, hashes data.Hashes) {
 	}
 }
 
-func (t *tmpDir) assertVersionedFileExist(path string, version int) {
+func (t *tmpDir) assertVersionedFileExist(path string, version int64) {
 	t.assertExists(util.VersionedPath(path, version))
 }
 
-func (t *tmpDir) assertVersionedFileNotExist(path string, version int) {
+func (t *tmpDir) assertVersionedFileNotExist(path string, version int64) {
 	t.assertNotExist(util.VersionedPath(path, version))
 }
 
@@ -1034,9 +1034,9 @@ func (rs *RepoSuite) TestConsistentSnapshot(c *C) {
 
 	versions, err := r.fileVersions()
 	c.Assert(err, IsNil)
-	c.Assert(versions["root.json"], Equals, 1)
-	c.Assert(versions["targets.json"], Equals, 1)
-	c.Assert(versions["snapshot.json"], Equals, 1)
+	c.Assert(versions["root.json"], Equals, int64(1))
+	c.Assert(versions["targets.json"], Equals, int64(1))
+	c.Assert(versions["snapshot.json"], Equals, int64(1))
 
 	hashes, err := r.fileHashes()
 	c.Assert(err, IsNil)
@@ -1072,9 +1072,9 @@ func (rs *RepoSuite) TestConsistentSnapshot(c *C) {
 
 	versions, err = r.fileVersions()
 	c.Assert(err, IsNil)
-	c.Assert(versions["root.json"], Equals, 1)
-	c.Assert(versions["targets.json"], Equals, 2)
-	c.Assert(versions["snapshot.json"], Equals, 2)
+	c.Assert(versions["root.json"], Equals, int64(1))
+	c.Assert(versions["targets.json"], Equals, int64(2))
+	c.Assert(versions["snapshot.json"], Equals, int64(2))
 
 	// Save the old hashes for foo.txt to make sure we can assert it doesn't exist later.
 	fooHashes := hashes["targets/foo.txt"]
@@ -1136,7 +1136,7 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 
 	root, err := r.root()
 	c.Assert(err, IsNil)
-	c.Assert(root.Version, Equals, 1)
+	c.Assert(root.Version, Equals, int64(1))
 
 	expires := time.Now().Add(24 * time.Hour)
 	_, err = r.GenKeyWithExpires("root", expires)
@@ -1147,7 +1147,7 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 	root, err = r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Expires.Unix(), DeepEquals, expires.Round(time.Second).Unix())
-	c.Assert(root.Version, Equals, 2)
+	c.Assert(root.Version, Equals, int64(2))
 
 	expires = time.Now().Add(12 * time.Hour)
 	role, ok := root.Roles["root"]
@@ -1162,7 +1162,7 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 	root, err = r.root()
 	c.Assert(err, IsNil)
 	c.Assert(root.Expires.Unix(), DeepEquals, expires.Round(time.Second).Unix())
-	c.Assert(root.Version, Equals, 3)
+	c.Assert(root.Version, Equals, int64(3))
 
 	expires = time.Now().Add(6 * time.Hour)
 	c.Assert(r.AddTargetWithExpires("foo.txt", nil, expires), IsNil)
@@ -1172,7 +1172,7 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 	targets, err := r.topLevelTargets()
 	c.Assert(err, IsNil)
 	c.Assert(targets.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
-	c.Assert(targets.Version, Equals, 2)
+	c.Assert(targets.Version, Equals, int64(2))
 
 	expires = time.Now().Add(2 * time.Hour)
 	c.Assert(r.RemoveTargetWithExpires("foo.txt", expires), IsNil)
@@ -1182,7 +1182,7 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 	targets, err = r.topLevelTargets()
 	c.Assert(err, IsNil)
 	c.Assert(targets.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
-	c.Assert(targets.Version, Equals, 3)
+	c.Assert(targets.Version, Equals, int64(3))
 
 	expires = time.Now().Add(time.Hour)
 	c.Assert(r.SnapshotWithExpires(expires), IsNil)
@@ -1191,7 +1191,7 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 	snapshot, err := r.snapshot()
 	c.Assert(err, IsNil)
 	c.Assert(snapshot.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
-	c.Assert(snapshot.Version, Equals, 6)
+	c.Assert(snapshot.Version, Equals, int64(6))
 
 	_, snapshotHasRoot := snapshot.Meta["root.json"]
 	c.Assert(snapshotHasRoot, Equals, false)
@@ -1202,7 +1202,7 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 	c.Assert(r.Commit(), IsNil)
 	snapshot, err = r.snapshot()
 	c.Assert(err, IsNil)
-	c.Assert(snapshot.Version, Equals, 7)
+	c.Assert(snapshot.Version, Equals, int64(7))
 
 	expires = time.Now().Add(10 * time.Minute)
 	c.Assert(r.TimestampWithExpires(expires), IsNil)
@@ -1210,13 +1210,13 @@ func (rs *RepoSuite) TestExpiresAndVersion(c *C) {
 	timestamp, err := r.timestamp()
 	c.Assert(err, IsNil)
 	c.Assert(timestamp.Expires.Unix(), Equals, expires.Round(time.Second).Unix())
-	c.Assert(timestamp.Version, Equals, 8)
+	c.Assert(timestamp.Version, Equals, int64(8))
 
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
 	timestamp, err = r.timestamp()
 	c.Assert(err, IsNil)
-	c.Assert(timestamp.Version, Equals, 9)
+	c.Assert(timestamp.Version, Equals, int64(9))
 	c.Assert(timestamp.Meta["snapshot.json"].Version, Equals, snapshot.Version)
 }
 
@@ -1550,7 +1550,7 @@ func (rs *RepoSuite) TestUnknownKeyIDs(c *C) {
 
 	root, err := r.root()
 	c.Assert(err, IsNil)
-	c.Assert(root.Version, Equals, 1)
+	c.Assert(root.Version, Equals, int64(1))
 
 	root.Keys["unknown-key-id"] = signer.PublicData()
 	r.setTopLevelMeta("root.json", root)
@@ -1574,7 +1574,7 @@ func (rs *RepoSuite) TestUnknownKeyIDs(c *C) {
 		Signatures []data.Signature `json:"signatures"`
 	}
 	c.Assert(json.Unmarshal(rootJSON, &signedRoot), IsNil)
-	c.Assert(signedRoot.Signed.Version, Equals, 1)
+	c.Assert(signedRoot.Signed.Version, Equals, int64(1))
 
 	unknownKey, ok := signedRoot.Signed.Keys["unknown-key-id"]
 	c.Assert(ok, Equals, true)
@@ -1597,7 +1597,7 @@ func (rs *RepoSuite) TestUnknownKeyIDs(c *C) {
 	c.Assert(ok, Equals, true)
 
 	c.Assert(json.Unmarshal(rootJSON, &signedRoot), IsNil)
-	c.Assert(signedRoot.Signed.Version, Equals, 2)
+	c.Assert(signedRoot.Signed.Version, Equals, int64(2))
 
 	unknownKey, ok = signedRoot.Signed.Keys["unknown-key-id"]
 	c.Assert(ok, Equals, true)
@@ -1651,19 +1651,19 @@ func (rs *RepoSuite) TestThreshold(c *C) {
 	// Check versions updated
 	rootVersion, err := r.RootVersion()
 	c.Assert(err, IsNil)
-	c.Assert(rootVersion, Equals, 2)
+	c.Assert(rootVersion, Equals, int64(2))
 
 	targetsVersion, err := r.TargetsVersion()
 	c.Assert(err, IsNil)
-	c.Assert(targetsVersion, Equals, 1)
+	c.Assert(targetsVersion, Equals, int64(1))
 
 	snapshotVersion, err := r.SnapshotVersion()
 	c.Assert(err, IsNil)
-	c.Assert(snapshotVersion, Equals, 2)
+	c.Assert(snapshotVersion, Equals, int64(2))
 
 	timestampVersion, err := r.TimestampVersion()
 	c.Assert(err, IsNil)
-	c.Assert(timestampVersion, Equals, 2)
+	c.Assert(timestampVersion, Equals, int64(2))
 }
 
 func (rs *RepoSuite) TestAddOrUpdateSignatures(c *C) {

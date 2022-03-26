@@ -69,10 +69,10 @@ type Client struct {
 
 	// The following four fields represent the versions of metatdata either
 	// from local storage or from recently downloaded metadata
-	rootVer      int
-	targetsVer   int
-	snapshotVer  int
-	timestampVer int
+	rootVer      int64
+	targetsVer   int64
+	snapshotVer  int64
+	timestampVer int64
 
 	// targets is the list of available targets, either from local storage
 	// or from recently downloaded targets metadata
@@ -612,7 +612,7 @@ func (c *Client) downloadTarget(file string, get remoteGetFunc, hashes data.Hash
 
 // downloadVersionedMeta downloads top-level metadata from remote storage and
 // verifies it using the given file metadata.
-func (c *Client) downloadMeta(name string, version int, m data.FileMeta) ([]byte, error) {
+func (c *Client) downloadMeta(name string, version int64, m data.FileMeta) ([]byte, error) {
 	r, size, err := func() (io.ReadCloser, int64, error) {
 		if c.consistentSnapshot {
 			path := util.VersionedPath(name, version)

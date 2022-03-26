@@ -143,7 +143,7 @@ func (r *Repo) snapshot() (*data.Snapshot, error) {
 	return snapshot, nil
 }
 
-func (r *Repo) RootVersion() (int, error) {
+func (r *Repo) RootVersion() (int64, error) {
 	root, err := r.root()
 	if err != nil {
 		return -1, err
@@ -202,7 +202,7 @@ func (r *Repo) Targets() (data.TargetFiles, error) {
 	return targets.Targets, nil
 }
 
-func (r *Repo) SetTargetsVersion(v int) error {
+func (r *Repo) SetTargetsVersion(v int64) error {
 	t, err := r.topLevelTargets()
 	if err != nil {
 		return err
@@ -211,7 +211,7 @@ func (r *Repo) SetTargetsVersion(v int) error {
 	return r.setTopLevelMeta("targets.json", t)
 }
 
-func (r *Repo) TargetsVersion() (int, error) {
+func (r *Repo) TargetsVersion() (int64, error) {
 	t, err := r.topLevelTargets()
 	if err != nil {
 		return -1, err
@@ -219,7 +219,7 @@ func (r *Repo) TargetsVersion() (int, error) {
 	return t.Version, nil
 }
 
-func (r *Repo) SetTimestampVersion(v int) error {
+func (r *Repo) SetTimestampVersion(v int64) error {
 	ts, err := r.timestamp()
 	if err != nil {
 		return err
@@ -228,7 +228,7 @@ func (r *Repo) SetTimestampVersion(v int) error {
 	return r.setTopLevelMeta("timestamp.json", ts)
 }
 
-func (r *Repo) TimestampVersion() (int, error) {
+func (r *Repo) TimestampVersion() (int64, error) {
 	ts, err := r.timestamp()
 	if err != nil {
 		return -1, err
@@ -236,7 +236,7 @@ func (r *Repo) TimestampVersion() (int, error) {
 	return ts.Version, nil
 }
 
-func (r *Repo) SetSnapshotVersion(v int) error {
+func (r *Repo) SetSnapshotVersion(v int64) error {
 	s, err := r.snapshot()
 	if err != nil {
 		return err
@@ -246,7 +246,7 @@ func (r *Repo) SetSnapshotVersion(v int) error {
 	return r.setTopLevelMeta("snapshot.json", s)
 }
 
-func (r *Repo) SnapshotVersion() (int, error) {
+func (r *Repo) SnapshotVersion() (int64, error) {
 	s, err := r.snapshot()
 	if err != nil {
 		return -1, err
@@ -903,7 +903,7 @@ func (r *Repo) TimestampWithExpires(expires time.Time) error {
 	return err
 }
 
-func (r *Repo) fileVersions() (map[string]int, error) {
+func (r *Repo) fileVersions() (map[string]int64, error) {
 	root, err := r.root()
 	if err != nil {
 		return nil, err
@@ -916,7 +916,7 @@ func (r *Repo) fileVersions() (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	versions := make(map[string]int)
+	versions := make(map[string]int64)
 	versions["root.json"] = root.Version
 	versions["targets.json"] = targets.Version
 	versions["snapshot.json"] = snapshot.Version

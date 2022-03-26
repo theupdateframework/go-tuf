@@ -42,7 +42,7 @@ func (e ErrDecodeFailed) Error() string {
 type ErrMaxDelegations struct {
 	Target          string
 	MaxDelegations  int
-	SnapshotVersion int
+	SnapshotVersion int64
 }
 
 func (e ErrMaxDelegations) Error() string {
@@ -87,7 +87,7 @@ func (e ErrWrongSize) Error() string {
 }
 
 type ErrLatestSnapshot struct {
-	Version int
+	Version int64
 }
 
 func (e ErrLatestSnapshot) Error() string {
@@ -101,7 +101,7 @@ func IsLatestSnapshot(err error) bool {
 
 type ErrUnknownTarget struct {
 	Name            string
-	SnapshotVersion int
+	SnapshotVersion int64
 }
 
 func (e ErrUnknownTarget) Error() string {
@@ -128,7 +128,7 @@ func (e ErrInvalidURL) Error() string {
 
 type ErrRoleNotInSnapshot struct {
 	Role            string
-	SnapshotVersion int
+	SnapshotVersion int64
 }
 
 func (e ErrRoleNotInSnapshot) Error() string {
