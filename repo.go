@@ -1516,15 +1516,3 @@ func (r *Repo) timestampFileMeta(roleFilename string) (data.TimestampFileMeta, e
 	}
 	return util.GenerateTimestampFileMeta(bytes.NewReader(b), r.hashAlgorithms...)
 }
-
-func (r *Repo) GetPublicKeys(role string) ([]*data.PublicKey, error) {
-	signers, err := r.local.GetSigners(role)
-	if err != nil {
-		return nil, err
-	}
-	pubkeys := []*data.PublicKey{}
-	for _, signer := range signers {
-		pubkeys = append(pubkeys, signer.PublicData())
-	}
-	return pubkeys, nil
-}
