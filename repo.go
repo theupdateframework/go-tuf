@@ -82,7 +82,7 @@ func (r *Repo) Init(consistentSnapshot bool) error {
 	if err = r.setTopLevelMeta("root.json", root); err != nil {
 		return err
 	}
-	if err = r.writeTargetWithExpires(t, data.DefaultExpires("targets")); err != nil {
+	if err = r.writeTopLevelTargetWithExpires(t, data.DefaultExpires("targets")); err != nil {
 		return err
 	}
 	fmt.Println("Repository initialized")
@@ -369,7 +369,10 @@ func (r *Repo) AddVerificationKeyWithExpiration(keyRole string, pk *data.PublicK
 	// Not compatible with delegated roles.
 
 	if !roles.IsTopLevelRole(keyRole) {
-		return ErrInvalidRole{keyRole}
+		return ErrInvalidRole{
+			Role:   keyRole,
+			Reason: "only top level targets roles are suppoerted",
+		}
 	}
 
 	if !validExpires(expires) {
