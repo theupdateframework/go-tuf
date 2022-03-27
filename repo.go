@@ -1518,18 +1518,21 @@ func (r *Repo) verifySignatures(metaFilename string) error {
 		if err := db.Verify(s, role, 0); err != nil {
 			return ErrInsufficientSignatures{metaFilename, err}
 		}
-	} else {
-		dbs, err := r.delegatorDBs(role)
-		if err != nil {
-			return err
-		}
+		return nil
+	}
 
-		for delegator, db := range dbs {
-			if err := db.Verify(s, role, 0); err != nil {
-				return ErrInsufficientSignatures{delegator, err}
+	dbs, err := r.delegatorDBs(role)
+	if err != nil {
+		return err
+	}
+
+	for delegator, db := range dbs {
+		if err := db.Verify(s, role, 0); err != nil {
+			return ErrInsufficientSignatures{
+				Name: metaFilename,
+				Err:  fmt.Errorf("delegator %q unable to verify metadata: %w", delegator, err),
 			}
 		}
-
 	}
 
 	return nil
