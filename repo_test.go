@@ -21,6 +21,7 @@ import (
 	"github.com/theupdateframework/go-tuf/encrypted"
 	"github.com/theupdateframework/go-tuf/internal/sets"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
+	"github.com/theupdateframework/go-tuf/pkg/targets"
 	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
 	"golang.org/x/crypto/ed25519"
@@ -1989,22 +1990,19 @@ func (rs *RepoSuite) TestHashedBinDelegations(c *C) {
 
 	leafKey, err := keys.GenerateEd25519Key()
 	c.Assert(err, IsNil)
-	err = local.SaveSigner("bins_0-1", leafKey)
-	c.Assert(err, IsNil)
-	err = local.SaveSigner("bins_2-3", leafKey)
-	c.Assert(err, IsNil)
-	err = local.SaveSigner("bins_4-5", leafKey)
-	c.Assert(err, IsNil)
-	err = local.SaveSigner("bins_6-7", leafKey)
-	c.Assert(err, IsNil)
-	err = local.SaveSigner("bins_8-9", leafKey)
-	c.Assert(err, IsNil)
-	err = local.SaveSigner("bins_a-b", leafKey)
-	c.Assert(err, IsNil)
-	err = local.SaveSigner("bins_c-d", leafKey)
-	c.Assert(err, IsNil)
-	err = local.SaveSigner("bins_e-f", leafKey)
-	c.Assert(err, IsNil)
+
+	hb, err := targets.NewHashBins("bins_", 3)
+	if err != nil {
+		c.Assert(err, IsNil)
+	}
+
+	for i := uint64(0); i < hb.NumBins(); i++ {
+		b := hb.GetBin(i)
+		err = local.SaveSigner(b.RoleName(), leafKey)
+		if err != nil {
+			c.Assert(err, IsNil)
+		}
+	}
 
 	err = r.AddTargetsDelegation("targets", data.DelegatedRole{
 		Name:      "bins",
@@ -2016,7 +2014,7 @@ func (rs *RepoSuite) TestHashedBinDelegations(c *C) {
 	})
 	c.Assert(err, IsNil)
 
-	err = r.AddTargetsDelegationsForPathHashBins("bins", "bins_", 3, []*data.PublicKey{leafKey.PublicData()}, 1)
+	err = r.AddTargetsDelegationsForPathHashBins("bins", hb, []*data.PublicKey{leafKey.PublicData()}, 1)
 	c.Assert(err, IsNil)
 	targets, err := r.targets("bins")
 	c.Assert(err, IsNil)
