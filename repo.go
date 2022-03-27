@@ -374,7 +374,7 @@ func (r *Repo) AddVerificationKeyWithExpiration(keyRole string, pk *data.PublicK
 	if !roles.IsTopLevelRole(keyRole) {
 		return ErrInvalidRole{
 			Role:   keyRole,
-			Reason: "only top level targets roles are suppoerted",
+			Reason: "only top level targets roles are supported",
 		}
 	}
 
