@@ -1390,16 +1390,20 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 	c.Assert(insecureStore.SaveSigner("targets", signer), IsNil)
 	assertKeys("targets", false, []*data.PrivateKey{privateKey})
 
+	c.Assert(insecureStore.SaveSigner("foo", signer), IsNil)
+	assertKeys("foo", false, []*data.PrivateKey{privateKey})
+
 	// Test changing the passphrase
 	// 1. Create a secure store with a passphrase (create new object and temp folder so we discard any previous state)
 	tmp = newTmpDir(c)
 	store = FileSystemStore(tmp.path, testPassphraseFunc)
 
-	// 1.5. Changing passphrase only works for top-level roles.
+	// 1.5. Changing passphrase works for top-level and delegated roles.
 	r, err := NewRepo(store)
 	c.Assert(err, IsNil)
 
-	c.Assert(r.ChangePassphrase("foo"), DeepEquals, ErrInvalidRole{"foo", "only support passphrases for top-level roles"})
+	c.Assert(r.ChangePassphrase("targets"), NotNil)
+	c.Assert(r.ChangePassphrase("foo"), NotNil)
 
 	// 2. Test changing the passphrase when the keys file does not exist - should FAIL
 	c.Assert(store.(PassphraseChanger).ChangePassphrase("root"), NotNil)
