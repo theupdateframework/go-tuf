@@ -640,6 +640,42 @@ func (r *Repo) AddTargetsDelegationsForPathHashBinsWithExpires(delegator string,
 	return nil
 }
 
+// ResetTargetsDelegation is equivalent to ResetTargetsDelegationsWithExpires
+// with a default expiry time.
+func (r *Repo) ResetTargetsDelegations(delegator string) error {
+	return r.ResetTargetsDelegationsWithExpires(delegator, data.DefaultExpires("targets"))
+}
+
+// ResetTargetsDelegationsWithExpires removes all targets delegations from the
+// given delegator role, and updates the delegator role's expiration time.
+func (r *Repo) ResetTargetsDelegationsWithExpires(delegator string, expires time.Time) error {
+	t, err := r.targets(delegator)
+	if err != nil {
+		return fmt.Errorf("error getting delegator (%q) metadata: %w", delegator, err)
+	}
+
+	t.Delegations = &data.Delegations{}
+	t.Delegations.Keys = make(map[string]*data.PublicKey)
+
+	t.Expires = expires.Round(time.Second)
+
+	delegatorFile := delegator + ".json"
+	if !r.local.FileIsStaged(delegatorFile) {
+		t.Version++
+	}
+
+	delegatorSigners, err := r.local.GetSigners(delegator)
+	if err != nil {
+		return fmt.Errorf("error getting signers for delegator %v: %w", delegator, err)
+	}
+	err = r.setMetaWithSigners(delegatorFile, t, delegatorSigners)
+	if err != nil {
+		return fmt.Errorf("error setting metadata for %q: %w", delegatorFile, err)
+	}
+
+	return nil
+}
+
 func (r *Repo) jsonMarshal(v interface{}) ([]byte, error) {
 	if r.prefix == "" && r.indent == "" {
 		return json.Marshal(v)
