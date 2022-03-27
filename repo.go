@@ -82,9 +82,12 @@ func (r *Repo) Init(consistentSnapshot bool) error {
 	if err = r.setTopLevelMeta("root.json", root); err != nil {
 		return err
 	}
-	if err = r.writeTopLevelTargetWithExpires(t, data.DefaultExpires("targets")); err != nil {
+
+	t.Version = 1
+	if err = r.setTopLevelMeta("targets.json", t); err != nil {
 		return err
 	}
+
 	fmt.Println("Repository initialized")
 	return nil
 }
@@ -938,11 +941,22 @@ func (r *Repo) AddTargetsToPreferredRole(paths []string, custom json.RawMessage,
 }
 
 func (r *Repo) AddTargetsWithDigest(digest string, digestAlg string, length int64, path string, custom json.RawMessage) error {
-	expires := data.DefaultExpires("targets")
+	// TODO: Rename this to AddTargetWithDigest
+	// https://github.com/theupdateframework/go-tuf/issues/242
 
-	// TODO: support delegated targets
-	// FIXME in this PR
-	t, err := r.topLevelTargets()
+	expires := data.DefaultExpires("targets")
+	path = util.NormalizeTarget(path)
+
+	targetsMeta, delegation, err := r.targetDelegationForPath(path, "")
+	if err != nil {
+		return err
+	}
+	// This is the targets role that needs to sign the target file.
+	targetsRoleName := delegation.Delegatee.Name
+
+	// FIXME: get a complete set of signers, not just the set from the delegation
+	// traversal.
+	signers, err := r.getSignersInDB(targetsRoleName, delegation.DB)
 	if err != nil {
 		return err
 	}
@@ -957,13 +971,25 @@ func (r *Repo) AddTargetsWithDigest(digest string, digestAlg string, length int6
 	// metadata
 	if len(custom) > 0 {
 		meta.Custom = &custom
-	} else if t, ok := t.Targets[path]; ok {
+	} else if t, ok := targetsMeta.Targets[path]; ok {
 		meta.Custom = t.Custom
 	}
 
-	t.Targets[path] = data.TargetFileMeta{FileMeta: meta}
+	// What does G2 mean? Copying and pasting this comment along with the
+	// delete line.
+	//
+	// G2 -> we no longer desire any readers to ever observe non-prefix targets.
+	delete(targetsMeta.Targets, "/"+path)
+	targetsMeta.Targets[path] = data.TargetFileMeta{FileMeta: meta}
 
-	return r.writeTopLevelTargetWithExpires(t, expires)
+	targetsMeta.Expires = expires.Round(time.Second)
+
+	manifestName := targetsRoleName + ".json"
+	if !r.local.FileIsStaged(manifestName) {
+		targetsMeta.Version++
+	}
+
+	return r.setMetaWithSigners(manifestName, targetsMeta, signers)
 }
 
 func (r *Repo) AddTargetWithExpires(path string, custom json.RawMessage, expires time.Time) error {
@@ -983,10 +1009,11 @@ type targetsMetaWithSigners struct {
 	signers []keys.Signer
 }
 
-// AddTargetsWithExpiresToPreferredRole signs the staged targets at `paths`. If
-// preferredRole is not nil, the target is added to the given role's manifest
-// if delegations allow it. If delegations do not allow the preferredRole to
-// sign the given path, an error is returned.
+// AddTargetsWithExpiresToPreferredRole signs the staged targets at `paths`.
+//
+// If preferredRole is not the empty string, the target is added to the given
+// role's manifest if delegations allow it. If delegations do not allow the
+// preferredRole to sign the given path, an error is returned.
 func (r *Repo) AddTargetsWithExpiresToPreferredRole(paths []string, custom json.RawMessage, expires time.Time, preferredRole string) error {
 	if !validExpires(expires) {
 		return ErrInvalidExpires{expires}
@@ -1014,12 +1041,15 @@ func (r *Repo) AddTargetsWithExpiresToPreferredRole(paths []string, custom json.
 			return err
 		}
 
+		// FIXME: get a complete set of all possible signers, not just the ones
+		// along the delegation path used to reach the preferredRole.
+
 		// The delegations determine the keys that need to be used to sign each
 		// target file. If a particular target role is reachable in the delegation
 		// graph through multiple paths, it may be the case that the targets
-		// manifest needs signatures from multiple sets of keys.  Therefore, we
+		// manifest needs signatures from multiple sets of keys. Therefore, we
 		// merge the keys specified by the current delegation with keys specified
-		// bypreviously seen delegations.
+		// by previously seen delegations.
 		if prevMetaWithSigners, ok := targetsMetaToWrite[targetsRoleName]; ok {
 			// Start with meta staged in targetsMetaToWrite instead of the committed meta.
 			targetsMeta = prevMetaWithSigners.meta
@@ -1048,7 +1078,6 @@ func (r *Repo) AddTargetsWithExpiresToPreferredRole(paths []string, custom json.
 		if err != nil {
 			return err
 		}
-		path = util.NormalizeTarget(path)
 
 		// if we have custom metadata, set it, otherwise maintain
 		// existing metadata if present
@@ -1113,22 +1142,6 @@ func (r *Repo) AddTargetsWithExpiresToPreferredRole(paths []string, custom json.
 	}
 
 	return nil
-}
-
-func (r *Repo) writeTopLevelTargetWithExpires(t *data.Targets, expires time.Time) error {
-	t.Expires = expires.Round(time.Second)
-	if !r.local.FileIsStaged("targets.json") {
-		t.Version++
-	}
-
-	err := r.setTopLevelMeta("targets.json", t)
-	if err == nil && len(t.Targets) > 0 {
-		fmt.Println("Added/staged targets:")
-		for k := range t.Targets {
-			fmt.Println("*", k)
-		}
-	}
-	return err
 }
 
 func (r *Repo) RemoveTarget(path string) error {
