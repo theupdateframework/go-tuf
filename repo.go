@@ -307,13 +307,15 @@ func (r *Repo) ChangePassphrase(keyRole string) error {
 }
 
 func (r *Repo) GenKey(role string) ([]string, error) {
-	// Not compatible with delegated roles.
+	// Not compatible with delegated targets roles, since delegated targets keys
+	// are associated with a delegation (edge), not a role (node).
 
 	return r.GenKeyWithExpires(role, data.DefaultExpires(role))
 }
 
 func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (keyids []string, err error) {
-	// Not compatible with delegated roles.
+	// Not compatible with delegated targets roles, since delegated targets keys
+	// are associated with a delegation (edge), not a role (node).
 
 	signer, err := keys.GenerateEd25519Key()
 	if err != nil {
@@ -328,13 +330,16 @@ func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (keyids []st
 }
 
 func (r *Repo) AddPrivateKey(role string, signer keys.Signer) error {
-	// Not compatible with delegated roles.
+	// Not compatible with delegated targets roles, since delegated targets keys
+	// are associated with a delegation (edge), not a role (node).
 
 	return r.AddPrivateKeyWithExpires(role, signer, data.DefaultExpires(role))
 }
 
 func (r *Repo) AddPrivateKeyWithExpires(keyRole string, signer keys.Signer, expires time.Time) error {
-	// Not compatible with delegated roles.
+	// Not compatible with delegated targets roles, since delegated targets keys
+	// are associated with a delegation (edge), not a role (node).
+
 	if !roles.IsTopLevelRole(keyRole) {
 		return ErrInvalidRole{keyRole, "only support adding keys for top-level roles"}
 	}
@@ -357,13 +362,15 @@ func (r *Repo) AddPrivateKeyWithExpires(keyRole string, signer keys.Signer, expi
 }
 
 func (r *Repo) AddVerificationKey(keyRole string, pk *data.PublicKey) error {
-	// Not compatible with delegated roles.
+	// Not compatible with delegated targets roles, since delegated targets keys
+	// are associated with a delegation (edge), not a role (node).
 
 	return r.AddVerificationKeyWithExpiration(keyRole, pk, data.DefaultExpires(keyRole))
 }
 
 func (r *Repo) AddVerificationKeyWithExpiration(keyRole string, pk *data.PublicKey, expires time.Time) error {
-	// Not compatible with delegated roles.
+	// Not compatible with delegated targets roles, since delegated targets keys
+	// are associated with a delegation (edge), not a role (node).
 
 	if !roles.IsTopLevelRole(keyRole) {
 		return ErrInvalidRole{
@@ -446,13 +453,15 @@ func (r *Repo) RootKeys() ([]*data.PublicKey, error) {
 }
 
 func (r *Repo) RevokeKey(role, id string) error {
-	// Not compatible with delegated roles.
+	// Not compatible with delegated targets roles, since delegated targets keys
+	// are associated with a delegation (edge), not a role (node).
 
 	return r.RevokeKeyWithExpires(role, id, data.DefaultExpires("root"))
 }
 
 func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error {
-	// Not compatible with delegated roles.
+	// Not compatible with delegated targets roles, since delegated targets keys
+	// are associated with a delegation (edge), not a role (node).
 
 	if !roles.IsTopLevelRole(keyRole) {
 		return ErrInvalidRole{keyRole, "only revocations for top-level roles supported"}
