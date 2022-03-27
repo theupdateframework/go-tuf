@@ -612,10 +612,9 @@ func (r *Repo) AddTargetsDelegationsForPathHashBins(delegator string, bins *targ
 	return r.AddTargetsDelegationsForPathHashBinsWithExpires(delegator, bins, keys, threshold, data.DefaultExpires("targets"))
 }
 
-// AddTargetsDelegationsForPathHashBinsWithExpires adds 2^(prefixBitLen)
-// delegations to the delegator role, which partition the target path hash
-// space into bins using the PathHashPrefixes delegation mechanism. New
-// metadata is written with the given expiration time.
+// AddTargetsDelegationsForPathHashBinsWithExpires adds delegations to the
+// delegator role for the given hash bins configuration. New metadata is
+// written with the given expiration time.
 func (r *Repo) AddTargetsDelegationsForPathHashBinsWithExpires(delegator string, bins *targets.HashBins, keys []*data.PublicKey, threshold int, expires time.Time) error {
 	keyIDs := []string{}
 	for _, key := range keys {
@@ -647,7 +646,8 @@ func (r *Repo) ResetTargetsDelegations(delegator string) error {
 }
 
 // ResetTargetsDelegationsWithExpires removes all targets delegations from the
-// given delegator role, and updates the delegator role's expiration time.
+// given delegator role. New metadata is written with the given expiration
+// time.
 func (r *Repo) ResetTargetsDelegationsWithExpires(delegator string, expires time.Time) error {
 	t, err := r.targets(delegator)
 	if err != nil {
