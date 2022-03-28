@@ -42,6 +42,8 @@ type LocalStore interface {
 	Commit(bool, map[string]int64, map[string]data.Hashes) error
 
 	// GetSigners return a list of signers for a role.
+	// This may include revoked keys, so the signers should not
+	// be used without filtering.
 	GetSigners(role string) ([]keys.Signer, error)
 
 	// SaveSigner adds a signer to a role.
