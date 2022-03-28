@@ -1045,8 +1045,8 @@ func (r *Repo) AddTargetWithExpiresToPreferredRole(path string, custom json.RawM
 }
 
 type targetsMetaWithSigners struct {
-	meta    *data.Targets
-	signers []keys.Signer
+	meta *data.Targets
+	// signers []keys.Signer
 }
 
 // AddTargetsWithExpiresToPreferredRole signs the staged targets at `paths`.
@@ -1064,54 +1064,23 @@ func (r *Repo) AddTargetsWithExpiresToPreferredRole(paths []string, custom json.
 		normalizedPaths[i] = util.NormalizeTarget(path)
 	}
 
-	// As we iterate through staged files, we accumulate changes to their
-	// corresponding targets manifests.
-	targetsMetaToWrite := map[string]*targetsMetaWithSigners{}
+	// As we through staged targets files, we accumulate changes to their
+	// corresponding targets metadata.
+	updatedTargetsMeta := map[string]*data.Targets{}
 
 	if err := r.local.WalkStagedTargets(normalizedPaths, func(path string, target io.Reader) (err error) {
-		targetsMeta, delegation, err := r.targetDelegationForPath(path, preferredRole)
+		originalMeta, delegation, err := r.targetDelegationForPath(path, preferredRole)
 		if err != nil {
 			return err
 		}
+
 		// This is the targets role that needs to sign the target file.
 		targetsRoleName := delegation.Delegatee.Name
 
-		signers, err := r.getSignersInDB(targetsRoleName, delegation.DB)
-		if err != nil {
-			return err
-		}
-
-		// FIXME: get a complete set of all possible signers, not just the ones
-		// along the delegation path used to reach the preferredRole.
-
-		// The delegations determine the keys that need to be used to sign each
-		// target file. If a particular target role is reachable in the delegation
-		// graph through multiple paths, it may be the case that the targets
-		// manifest needs signatures from multiple sets of keys. Therefore, we
-		// merge the keys specified by the current delegation with keys specified
-		// by previously seen delegations.
-		if prevMetaWithSigners, ok := targetsMetaToWrite[targetsRoleName]; ok {
-			// Start with meta staged in targetsMetaToWrite instead of the committed meta.
-			targetsMeta = prevMetaWithSigners.meta
-
-			mergedKeyIDs := map[string]struct{}{}
-			for _, signer := range signers {
-				for _, keyID := range signer.PublicData().IDs() {
-					mergedKeyIDs[keyID] = struct{}{}
-				}
-			}
-
-			// Merge prevMetaWithSigners.signers with signers.
-			for _, prevSigner := range prevMetaWithSigners.signers {
-			keyIDLoop:
-				for _, keyID := range prevSigner.PublicData().IDs() {
-					if _, seen := mergedKeyIDs[keyID]; !seen {
-						signers = append(signers, prevSigner)
-						mergedKeyIDs[keyID] = struct{}{}
-						break keyIDLoop
-					}
-				}
-			}
+		targetsMeta := originalMeta
+		if tm, ok := updatedTargetsMeta[targetsRoleName]; ok {
+			// Metadata in updatedTargetsMeta overrides staged/commited metadata.
+			targetsMeta = tm
 		}
 
 		fileMeta, err := util.GenerateTargetFileMeta(target, r.hashAlgorithms...)
@@ -1119,7 +1088,7 @@ func (r *Repo) AddTargetsWithExpiresToPreferredRole(paths []string, custom json.
 			return err
 		}
 
-		// if we have custom metadata, set it, otherwise maintain
+		// If we have custom metadata, set it, otherwise maintain
 		// existing metadata if present
 		if len(custom) > 0 {
 			fileMeta.Custom = &custom
@@ -1131,50 +1100,34 @@ func (r *Repo) AddTargetsWithExpiresToPreferredRole(paths []string, custom json.
 		delete(targetsMeta.Targets, "/"+path)
 		targetsMeta.Targets[path] = fileMeta
 
-		targetsMetaToWrite[targetsRoleName] = &targetsMetaWithSigners{
-			meta:    targetsMeta,
-			signers: signers,
-		}
+		updatedTargetsMeta[targetsRoleName] = targetsMeta
 
 		return nil
 	}); err != nil {
 		return err
 	}
 
-	if len(targetsMetaToWrite) == 0 {
+	if len(updatedTargetsMeta) == 0 {
+		// This is potentially unexpected behavior kept for backwards compatibility.
+		// See https://github.com/theupdateframework/go-tuf/issues/243
 		t, err := r.topLevelTargets()
 		if err != nil {
 			return err
 		}
 
-		db, err := r.topLevelKeysDB()
-		if err != nil {
-			return err
-		}
-
-		signers, err := r.getSignersInDB("targets", db)
-		if err != nil {
-			return err
-		}
-
-		targetsMetaToWrite["targets"] = &targetsMetaWithSigners{
-			meta:    t,
-			signers: signers,
-		}
+		updatedTargetsMeta["targets"] = t
 	}
 
 	exp := expires.Round(time.Second)
-	for roleName, tm := range targetsMetaToWrite {
-		meta := tm.meta
-
-		meta.Expires = exp
+	for roleName, targetsMeta := range updatedTargetsMeta {
+		targetsMeta.Expires = exp
 
 		manifestName := roleName + ".json"
 		if !r.local.FileIsStaged(manifestName) {
-			meta.Version++
+			targetsMeta.Version++
 		}
 
-		err := r.setMeta(manifestName, meta)
+		err := r.setMeta(manifestName, targetsMeta)
 		if err != nil {
 			return fmt.Errorf("error setting metadata for %q: %w", manifestName, err)
 		}
