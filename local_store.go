@@ -107,7 +107,6 @@ func (m *memoryStore) FileIsStaged(name string) bool {
 func (m *memoryStore) WalkStagedTargets(paths []string, targetsFn TargetsWalkFunc) error {
 	if len(paths) == 0 {
 		for path, data := range m.files {
-			fmt.Println("pd", path, data)
 			if err := targetsFn(path, bytes.NewReader(data)); err != nil {
 				return err
 			}
