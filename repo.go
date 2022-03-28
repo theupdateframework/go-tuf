@@ -1059,7 +1059,7 @@ func (r *Repo) AddTargetsWithExpiresToPreferredRole(paths []string, custom json.
 		normalizedPaths[i] = util.NormalizeTarget(path)
 	}
 
-	// As we through staged targets files, we accumulate changes to their
+	// As we iterate through staged targets files, we accumulate changes to their
 	// corresponding targets metadata.
 	updatedTargetsMeta := map[string]*data.Targets{}
 
