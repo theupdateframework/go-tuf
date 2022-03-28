@@ -837,7 +837,7 @@ func (r *Repo) getSignersInDB(roleName string, db *verify.DB) ([]keys.Signer, er
 		return nil, nil
 	}
 
-	signersInDB := make([]keys.Signer, 0, len(role.KeyIDs))
+	signersInDB := []keys.Signer{}
 	for _, s := range signers {
 		for _, id := range s.PublicData().IDs() {
 			if _, ok := role.KeyIDs[id]; ok {
