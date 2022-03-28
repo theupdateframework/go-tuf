@@ -80,12 +80,12 @@ func (r *Repo) Init(consistentSnapshot bool) error {
 	root.ConsistentSnapshot = consistentSnapshot
 	// Set root version to 1 for a new root.
 	root.Version = 1
-	if err = r.setTopLevelMeta("root.json", root); err != nil {
+	if err = r.setMeta("root.json", root); err != nil {
 		return err
 	}
 
 	t.Version = 1
-	if err = r.setTopLevelMeta("targets.json", t); err != nil {
+	if err = r.setMeta("targets.json", t); err != nil {
 		return err
 	}
 
@@ -200,7 +200,7 @@ func (r *Repo) SetThreshold(keyRole string, t int) error {
 	if !r.local.FileIsStaged("root.json") {
 		root.Version++
 	}
-	return r.setTopLevelMeta("root.json", root)
+	return r.setMeta("root.json", root)
 }
 
 func (r *Repo) Targets() (data.TargetFiles, error) {
@@ -217,7 +217,7 @@ func (r *Repo) SetTargetsVersion(v int64) error {
 		return err
 	}
 	t.Version = v
-	return r.setTopLevelMeta("targets.json", t)
+	return r.setMeta("targets.json", t)
 }
 
 func (r *Repo) TargetsVersion() (int64, error) {
@@ -234,7 +234,7 @@ func (r *Repo) SetTimestampVersion(v int64) error {
 		return err
 	}
 	ts.Version = v
-	return r.setTopLevelMeta("timestamp.json", ts)
+	return r.setMeta("timestamp.json", ts)
 }
 
 func (r *Repo) TimestampVersion() (int64, error) {
@@ -252,7 +252,7 @@ func (r *Repo) SetSnapshotVersion(v int64) error {
 	}
 
 	s.Version = v
-	return r.setTopLevelMeta("snapshot.json", s)
+	return r.setMeta("snapshot.json", s)
 }
 
 func (r *Repo) SnapshotVersion() (int64, error) {
@@ -412,7 +412,7 @@ func (r *Repo) AddVerificationKeyWithExpiration(keyRole string, pk *data.PublicK
 		root.Version++
 	}
 
-	return r.setTopLevelMeta("root.json", root)
+	return r.setMeta("root.json", root)
 }
 
 func validExpires(expires time.Time) bool {
@@ -523,7 +523,7 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 		root.Version++
 	}
 
-	err = r.setTopLevelMeta("root.json", root)
+	err = r.setMeta("root.json", root)
 	if err == nil {
 		fmt.Println("Revoked", keyRole, "key with ID", id, "in root metadata")
 	}
@@ -541,6 +541,8 @@ func (r *Repo) AddTargetsDelegation(delegator string, role data.DelegatedRole, k
 // should have corresponding Key entries in the keys argument. New metadata is
 // written with the given expiration time.
 func (r *Repo) AddTargetsDelegationWithExpires(delegator string, role data.DelegatedRole, keys []*data.PublicKey, expires time.Time) error {
+	expires = expires.Round(time.Second)
+
 	t, err := r.targets(delegator)
 	if err != nil {
 		return fmt.Errorf("error getting delegator (%q) metadata: %w", delegator, err)
@@ -567,18 +569,14 @@ func (r *Repo) AddTargetsDelegationWithExpires(delegator string, role data.Deleg
 		}
 	}
 	t.Delegations.Roles = append(t.Delegations.Roles, role)
-	t.Expires = expires.Round(time.Second)
+	t.Expires = expires
 
 	delegatorFile := delegator + ".json"
 	if !r.local.FileIsStaged(delegatorFile) {
 		t.Version++
 	}
 
-	delegatorSigners, err := r.local.GetSigners(delegator)
-	if err != nil {
-		return fmt.Errorf("error getting signers for delegator %v: %w", delegator, err)
-	}
-	err = r.setMetaWithSigners(delegatorFile, t, delegatorSigners)
+	err = r.setMeta(delegatorFile, t)
 	if err != nil {
 		return fmt.Errorf("error setting metadata for %q: %w", delegatorFile, err)
 	}
@@ -588,17 +586,14 @@ func (r *Repo) AddTargetsDelegationWithExpires(delegator string, role data.Deleg
 	if err != nil {
 		return fmt.Errorf("error getting delegatee (%q) metadata: %w", delegatee, err)
 	}
+	dt.Expires = expires
 
 	delegateeFile := delegatee + ".json"
 	if !r.local.FileIsStaged(delegateeFile) {
 		dt.Version++
 	}
 
-	delegateeSigners, err := r.local.GetSigners(delegatee)
-	if err != nil {
-		return fmt.Errorf("error getting signers for delegatee %v: %w", delegatee, err)
-	}
-	err = r.setMetaWithSigners(delegateeFile, dt, delegateeSigners)
+	err = r.setMeta(delegateeFile, dt)
 	if err != nil {
 		return fmt.Errorf("error setting metadata for %q: %w", delegateeFile, err)
 	}
@@ -665,11 +660,7 @@ func (r *Repo) ResetTargetsDelegationsWithExpires(delegator string, expires time
 		t.Version++
 	}
 
-	delegatorSigners, err := r.local.GetSigners(delegator)
-	if err != nil {
-		return fmt.Errorf("error getting signers for delegator %v: %w", delegator, err)
-	}
-	err = r.setMetaWithSigners(delegatorFile, t, delegatorSigners)
+	err = r.setMeta(delegatorFile, t)
 	if err != nil {
 		return fmt.Errorf("error setting metadata for %q: %w", delegatorFile, err)
 	}
@@ -684,15 +675,37 @@ func (r *Repo) jsonMarshal(v interface{}) ([]byte, error) {
 	return json.MarshalIndent(v, r.prefix, r.indent)
 }
 
-func (r *Repo) setTopLevelMeta(roleFilename string, meta interface{}) error {
-	db, err := r.topLevelKeysDB()
-	if err != nil {
-		return err
+func (r *Repo) setMeta(roleFilename string, meta interface{}) error {
+	role := strings.TrimSuffix(roleFilename, ".json")
+
+	dbs := []*verify.DB{}
+	if roles.IsTopLevelRole(role) {
+		db, err := r.topLevelKeysDB()
+		if err != nil {
+			return err
+		}
+		dbs = append(dbs, db)
+	} else {
+		dbm, err := r.delegatorDBs(role)
+		if err != nil {
+			return err
+		}
+
+		for _, db := range dbm {
+			dbs = append(dbs, db)
+		}
 	}
-	signers, err := r.getSignersInDB(strings.TrimSuffix(roleFilename, ".json"), db)
-	if err != nil {
-		return err
+
+	signers := []keys.Signer{}
+	for _, db := range dbs {
+		ss, err := r.getSignersInDB(role, db)
+		if err != nil {
+			return err
+		}
+
+		signers = append(signers, ss...)
 	}
+
 	return r.setMetaWithSigners(roleFilename, meta, signers)
 }
 
@@ -1010,9 +1023,7 @@ func (r *Repo) AddTargetsWithDigest(digest string, digestAlg string, length int6
 		meta.Custom = t.Custom
 	}
 
-	// What does G2 mean? Copying and pasting this comment along with the
-	// delete line.
-	//
+	// What does G2 mean? Copying and pasting this comment from elsewhere in this file.
 	// G2 -> we no longer desire any readers to ever observe non-prefix targets.
 	delete(targetsMeta.Targets, "/"+path)
 	targetsMeta.Targets[path] = data.TargetFileMeta{FileMeta: meta}
@@ -1230,7 +1241,7 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 		t.Version++
 	}
 
-	err = r.setTopLevelMeta("targets.json", t)
+	err = r.setMeta("targets.json", t)
 	if err == nil {
 		fmt.Println("Removed targets:")
 		for _, v := range removed_targets {
@@ -1289,7 +1300,7 @@ func (r *Repo) SnapshotWithExpires(expires time.Time) error {
 	if !r.local.FileIsStaged("snapshot.json") {
 		snapshot.Version++
 	}
-	err = r.setTopLevelMeta("snapshot.json", snapshot)
+	err = r.setMeta("snapshot.json", snapshot)
 	if err == nil {
 		fmt.Println("Staged snapshot.json metadata with expiration date:", snapshot.Expires)
 	}
@@ -1321,7 +1332,7 @@ func (r *Repo) TimestampWithExpires(expires time.Time) error {
 		timestamp.Version++
 	}
 
-	err = r.setTopLevelMeta("timestamp.json", timestamp)
+	err = r.setMeta("timestamp.json", timestamp)
 	if err == nil {
 		fmt.Println("Staged timestamp.json metadata with expiration date:", timestamp.Expires)
 	}

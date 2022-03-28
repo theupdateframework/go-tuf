@@ -1563,7 +1563,7 @@ func (rs *RepoSuite) TestUnknownKeyIDs(c *C) {
 	c.Assert(root.Version, Equals, int64(1))
 
 	root.Keys["unknown-key-id"] = signer.PublicData()
-	r.setTopLevelMeta("root.json", root)
+	r.setMeta("root.json", root)
 
 	// commit the metadata to the store.
 	c.Assert(r.AddTargets([]string{}, nil), IsNil)
