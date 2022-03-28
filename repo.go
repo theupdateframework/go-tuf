@@ -1044,11 +1044,6 @@ func (r *Repo) AddTargetWithExpiresToPreferredRole(path string, custom json.RawM
 	return r.AddTargetsWithExpiresToPreferredRole([]string{path}, custom, expires, preferredRole)
 }
 
-type targetsMetaWithSigners struct {
-	meta *data.Targets
-	// signers []keys.Signer
-}
-
 // AddTargetsWithExpiresToPreferredRole signs the staged targets at `paths`.
 //
 // If preferredRole is not the empty string, the target is added to the given
