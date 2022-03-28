@@ -13,6 +13,7 @@ import (
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/internal/roles"
+	"github.com/theupdateframework/go-tuf/internal/sets"
 	"github.com/theupdateframework/go-tuf/internal/signer"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/pkg/targets"
@@ -627,7 +628,7 @@ func (r *Repo) AddTargetsDelegationsForPathHashBinsWithExpires(delegator string,
 		name := bin.RoleName()
 		err := r.AddTargetsDelegationWithExpires(delegator, data.DelegatedRole{
 			Name:             name,
-			KeyIDs:           keyIDs,
+			KeyIDs:           sets.DeduplicateStrings(keyIDs),
 			PathHashPrefixes: bin.HashPrefixes(),
 			Threshold:        threshold,
 		}, keys, expires)
