@@ -706,10 +706,6 @@ func (r *Repo) setMeta(roleFilename string, meta interface{}) error {
 		signers = append(signers, ss...)
 	}
 
-	return r.setMetaWithSigners(roleFilename, meta, signers)
-}
-
-func (r *Repo) setMetaWithSigners(roleFilename string, meta interface{}, signers []keys.Signer) error {
 	s, err := sign.Marshal(meta, signers...)
 	if err != nil {
 		return err
@@ -1002,13 +998,6 @@ func (r *Repo) AddTargetsWithDigest(digest string, digestAlg string, length int6
 	// This is the targets role that needs to sign the target file.
 	targetsRoleName := delegation.Delegatee.Name
 
-	// FIXME: get a complete set of signers, not just the set from the delegation
-	// traversal.
-	signers, err := r.getSignersInDB(targetsRoleName, delegation.DB)
-	if err != nil {
-		return err
-	}
-
 	meta := data.FileMeta{Length: length, Hashes: make(data.Hashes, 1)}
 	meta.Hashes[digestAlg], err = hex.DecodeString(digest)
 	if err != nil {
@@ -1035,7 +1024,12 @@ func (r *Repo) AddTargetsWithDigest(digest string, digestAlg string, length int6
 		targetsMeta.Version++
 	}
 
-	return r.setMetaWithSigners(manifestName, targetsMeta, signers)
+	err = r.setMeta(manifestName, targetsMeta)
+	if err != nil {
+		return fmt.Errorf("error setting metadata for %q: %w", manifestName, err)
+	}
+
+	return nil
 }
 
 func (r *Repo) AddTargetWithExpires(path string, custom json.RawMessage, expires time.Time) error {
@@ -1172,7 +1166,6 @@ func (r *Repo) AddTargetsWithExpiresToPreferredRole(paths []string, custom json.
 	exp := expires.Round(time.Second)
 	for roleName, tm := range targetsMetaToWrite {
 		meta := tm.meta
-		signers := tm.signers
 
 		meta.Expires = exp
 
@@ -1181,9 +1174,9 @@ func (r *Repo) AddTargetsWithExpiresToPreferredRole(paths []string, custom json.
 			meta.Version++
 		}
 
-		err := r.setMetaWithSigners(manifestName, meta, signers)
+		err := r.setMeta(manifestName, meta)
 		if err != nil {
-			return err
+			return fmt.Errorf("error setting metadata for %q: %w", manifestName, err)
 		}
 	}
 
