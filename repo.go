@@ -687,14 +687,12 @@ func (r *Repo) setMeta(roleFilename string, meta interface{}) error {
 		}
 		dbs = append(dbs, db)
 	} else {
-		dbm, err := r.delegatorDBs(role)
+		ddbs, err := r.delegatorDBs(role)
 		if err != nil {
 			return err
 		}
 
-		for _, db := range dbm {
-			dbs = append(dbs, db)
-		}
+		dbs = append(dbs, ddbs...)
 	}
 
 	signers := []keys.Signer{}
@@ -864,8 +862,9 @@ func (r *Repo) SignedMeta(roleFilename string) (*data.Signed, error) {
 	return s, nil
 }
 
-func (r *Repo) delegatorDBs(delegateeRole string) (map[string]*verify.DB, error) {
-	delegatorDBs := map[string]*verify.DB{}
+// delegatorDBs returns a list of key DBs for all incoming delegations.
+func (r *Repo) delegatorDBs(delegateeRole string) ([]*verify.DB, error) {
+	delegatorDBs := []*verify.DB{}
 	for metaName := range r.meta {
 		if roles.IsTopLevelManifest(metaName) && metaName != "targets.json" {
 			continue
@@ -897,7 +896,7 @@ func (r *Repo) delegatorDBs(delegateeRole string) (map[string]*verify.DB, error)
 			return nil, err
 		}
 
-		delegatorDBs[roleName] = db
+		delegatorDBs = append(delegatorDBs, db)
 	}
 
 	return delegatorDBs, nil
@@ -1516,28 +1515,23 @@ func (r *Repo) verifySignatures(metaFilename string) error {
 
 	role := strings.TrimSuffix(metaFilename, ".json")
 
+	dbs := []*verify.DB{}
 	if roles.IsTopLevelRole(role) {
 		db, err := r.topLevelKeysDB()
 		if err != nil {
 			return err
 		}
+		dbs = append(dbs, db)
+	} else {
+		dbs, err = r.delegatorDBs(role)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, db := range dbs {
 		if err := db.Verify(s, role, 0); err != nil {
 			return ErrInsufficientSignatures{metaFilename, err}
-		}
-		return nil
-	}
-
-	dbs, err := r.delegatorDBs(role)
-	if err != nil {
-		return err
-	}
-
-	for delegator, db := range dbs {
-		if err := db.Verify(s, role, 0); err != nil {
-			return ErrInsufficientSignatures{
-				Name: metaFilename,
-				Err:  fmt.Errorf("delegator %q unable to verify metadata: %w", delegator, err),
-			}
 		}
 	}
 
