@@ -1354,9 +1354,8 @@ func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 				hashes[fileName] = m.Hashes
 			}
 
-			// FIXME: Loading all targets into memory is not scalable if
-			// there are many targets. This is used to Commit, so we should
-			// only need new targets here.
+			// Scalability issue: Commit/fileHashes loads all targets metadata into memory
+			// https://github.com/theupdateframework/go-tuf/issues/245
 			if roleName != "root" {
 				t, err := r.targets(roleName)
 				if err != nil {
