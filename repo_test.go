@@ -2145,7 +2145,7 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 	checkTargets("role1", "A/apple.txt", "B/banana.txt", "A/allium.txt")
 	checkTargets("role2", "C/clementine.txt", "D/durian.txt")
 
-	// Remove all delegation from role1 to role2.
+	// Remove the delegation from role1 to role2.
 	c.Assert(r.ResetTargetsDelegations("role1"), IsNil)
 	checkDelegations("targets", role1AB, role2CD)
 	checkDelegations("role1")
