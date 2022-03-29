@@ -1143,11 +1143,27 @@ func (r *Repo) RemoveTargetWithExpires(path string, expires time.Time) error {
 
 // If paths is empty, all targets will be removed.
 func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error {
+	for metaName := range r.meta {
+		if metaName != "targets.json" && !roles.IsDelegatedTargetsManifest(metaName) {
+			continue
+		}
+
+		err := r.removeTargetsWithExpiresFromMeta(metaName, paths, expires)
+		if err != nil {
+			return fmt.Errorf("could not remove %v from %v: %w", paths, metaName, err)
+		}
+	}
+
+	return nil
+}
+
+func (r *Repo) removeTargetsWithExpiresFromMeta(metaName string, paths []string, expires time.Time) error {
 	if !validExpires(expires) {
 		return ErrInvalidExpires{expires}
 	}
 
-	t, err := r.topLevelTargets()
+	roleName := strings.TrimSuffix(metaName, ".json")
+	t, err := r.targets(roleName)
 	if err != nil {
 		return err
 	}
@@ -1162,7 +1178,7 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 		for _, path := range paths {
 			path = util.NormalizeTarget(path)
 			if _, ok := t.Targets[path]; !ok {
-				fmt.Println("The following target is not present:", path)
+				fmt.Printf("[%v] The following target is not present: %v\n", metaName, path)
 				continue
 			}
 			removed = true
@@ -1176,23 +1192,23 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 		}
 	}
 	t.Expires = expires.Round(time.Second)
-	if !r.local.FileIsStaged("targets.json") {
+	if !r.local.FileIsStaged(metaName) {
 		t.Version++
 	}
 
-	err = r.setMeta("targets.json", t)
+	err = r.setMeta(metaName, t)
 	if err == nil {
-		fmt.Println("Removed targets:")
+		fmt.Printf("[%v] Removed targets:\n", metaName)
 		for _, v := range removed_targets {
 			fmt.Println("*", v)
 		}
 		if len(t.Targets) != 0 {
-			fmt.Println("Added/staged targets:")
+			fmt.Printf("[%v] Added/staged targets:\n", metaName)
 			for k := range t.Targets {
 				fmt.Println("*", k)
 			}
 		} else {
-			fmt.Println("There are no added/staged targets")
+			fmt.Printf("[%v] There are no added/staged targets\n", metaName)
 		}
 	}
 	return err
