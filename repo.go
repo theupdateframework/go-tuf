@@ -532,15 +532,15 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 
 // AddTargetsDelegation is equivalent to AddTargetsDelegationWithExpires, but
 // with a default expiration time.
-func (r *Repo) AddTargetsDelegation(delegator string, role data.DelegatedRole, keys []*data.PublicKey) error {
-	return r.AddTargetsDelegationWithExpires(delegator, role, keys, data.DefaultExpires("targets"))
+func (r *Repo) AddTargetsDelegation(delegator string, delegatedRole data.DelegatedRole, keys []*data.PublicKey) error {
+	return r.AddTargetsDelegationWithExpires(delegator, delegatedRole, keys, data.DefaultExpires("targets"))
 }
 
 // AddTargetsDelegationWithExpires adds a delegation from the delegator to the
 // role specified in the role argument. Key IDs referenced in role.KeyIDs
 // should have corresponding Key entries in the keys argument. New metadata is
 // written with the given expiration time.
-func (r *Repo) AddTargetsDelegationWithExpires(delegator string, role data.DelegatedRole, keys []*data.PublicKey, expires time.Time) error {
+func (r *Repo) AddTargetsDelegationWithExpires(delegator string, delegatedRole data.DelegatedRole, keys []*data.PublicKey, expires time.Time) error {
 	expires = expires.Round(time.Second)
 
 	t, err := r.targets(delegator)
@@ -553,7 +553,7 @@ func (r *Repo) AddTargetsDelegationWithExpires(delegator string, role data.Deleg
 		t.Delegations.Keys = make(map[string]*data.PublicKey)
 	}
 
-	for _, keyID := range role.KeyIDs {
+	for _, keyID := range delegatedRole.KeyIDs {
 		for _, key := range keys {
 			if key.ContainsID(keyID) {
 				t.Delegations.Keys[keyID] = key
@@ -563,11 +563,11 @@ func (r *Repo) AddTargetsDelegationWithExpires(delegator string, role data.Deleg
 	}
 
 	for _, r := range t.Delegations.Roles {
-		if r.Name == role.Name {
-			return fmt.Errorf("role: %s is already delegated to by %s", role.Name, r.Name)
+		if r.Name == delegatedRole.Name {
+			return fmt.Errorf("role: %s is already delegated to by %s", delegatedRole.Name, r.Name)
 		}
 	}
-	t.Delegations.Roles = append(t.Delegations.Roles, role)
+	t.Delegations.Roles = append(t.Delegations.Roles, delegatedRole)
 	t.Expires = expires
 
 	delegatorFile := delegator + ".json"
@@ -580,7 +580,7 @@ func (r *Repo) AddTargetsDelegationWithExpires(delegator string, role data.Deleg
 		return fmt.Errorf("error setting metadata for %q: %w", delegatorFile, err)
 	}
 
-	delegatee := role.Name
+	delegatee := delegatedRole.Name
 	dt, err := r.targets(delegatee)
 	if err != nil {
 		return fmt.Errorf("error getting delegatee (%q) metadata: %w", delegatee, err)
