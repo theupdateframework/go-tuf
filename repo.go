@@ -1143,6 +1143,10 @@ func (r *Repo) RemoveTargetWithExpires(path string, expires time.Time) error {
 
 // If paths is empty, all targets will be removed.
 func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error {
+	if !validExpires(expires) {
+		return ErrInvalidExpires{expires}
+	}
+
 	for metaName := range r.meta {
 		if metaName != "targets.json" && !roles.IsDelegatedTargetsManifest(metaName) {
 			continue
@@ -1158,10 +1162,6 @@ func (r *Repo) RemoveTargetsWithExpires(paths []string, expires time.Time) error
 }
 
 func (r *Repo) removeTargetsWithExpiresFromMeta(metaName string, paths []string, expires time.Time) error {
-	if !validExpires(expires) {
-		return ErrInvalidExpires{expires}
-	}
-
 	roleName := strings.TrimSuffix(metaName, ".json")
 	t, err := r.targets(roleName)
 	if err != nil {
