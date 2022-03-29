@@ -431,10 +431,7 @@ func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]in
 		}
 		defer f.Close()
 		_, err = f.Readdirnames(1)
-		if err == io.EOF {
-			return true
-		}
-		return false
+		return err == io.EOF
 	}
 	removeFile := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
