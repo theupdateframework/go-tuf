@@ -1354,9 +1354,9 @@ func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 				hashes[fileName] = m.Hashes
 			}
 
-			// Scalability issue: Commit/fileHashes loads all targets metadata into memory
-			// https://github.com/theupdateframework/go-tuf/issues/245
 			if roleName != "root" {
+				// Scalability issue: Commit/fileHashes loads all targets metadata into memory
+				// https://github.com/theupdateframework/go-tuf/issues/245
 				t, err := r.targets(roleName)
 				if err != nil {
 					return nil, err
