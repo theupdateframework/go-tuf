@@ -1877,16 +1877,45 @@ func (rs *RepoSuite) TestSignDigest(c *C) {
 	c.Assert(targets.Targets["sha256:bc11b176a293bb341a0f2d0d226f52e7fcebd186a7c4dfca5fc64f305f06b94c"].FileMeta.Hashes["sha256"], DeepEquals, hex_digest_bytes)
 }
 
+func concat(ss ...[]string) []string {
+	ret := []string{}
+	for _, s := range ss {
+		ret = append(ret, s...)
+	}
+	return ret
+}
+
+func checkSigKeyIDs(c *C, local LocalStore, fileToKeyIDs map[string][]string) {
+	metas, err := local.GetMeta()
+	c.Assert(err, IsNil)
+
+	for f, keyIDs := range fileToKeyIDs {
+		meta := metas[f]
+
+		s := &data.Signed{}
+		err = json.Unmarshal(meta, s)
+
+		gotKeyIDs := []string{}
+		for _, sig := range s.Signatures {
+			gotKeyIDs = append(gotKeyIDs, sig.KeyID)
+		}
+		gotKeyIDs = sets.DeduplicateStrings(gotKeyIDs)
+		sort.Strings(gotKeyIDs)
+
+		sort.Strings(keyIDs)
+		c.Assert(gotKeyIDs, DeepEquals, keyIDs)
+	}
+}
+
 func (rs *RepoSuite) TestDelegations(c *C) {
 	tmp := newTmpDir(c)
-	tmp.writeStagedTarget("foo.txt", "foo")
 	local := FileSystemStore(tmp.path, nil)
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
 
 	// Add one key to each role
 	genKey(c, r, "root")
-	genKey(c, r, "targets")
+	targetsKeyIDs := genKey(c, r, "targets")
 	genKey(c, r, "snapshot")
 	genKey(c, r, "timestamp")
 
@@ -1895,6 +1924,15 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 	c.Assert(r.Snapshot(), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
+
+	snapshot, err := r.snapshot()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Meta, HasLen, 1)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 1)
+
+	checkSigKeyIDs(c, local, map[string][]string{
+		"1.targets.json": targetsKeyIDs,
+	})
 
 	saveNewKey := func(role string) keys.Signer {
 		key, err := keys.GenerateEd25519Key()
@@ -1931,10 +1969,11 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 	role2CDKey3 := saveNewKey("role2")
 	role2CD := data.DelegatedRole{
 		Name: "role2",
-		KeyIDs: append(
-			append(role2CDKey1.PublicData().IDs(),
-				role2CDKey2.PublicData().IDs()...),
-			role2CDKey3.PublicData().IDs()...),
+		KeyIDs: concat(
+			role2CDKey1.PublicData().IDs(),
+			role2CDKey2.PublicData().IDs(),
+			role2CDKey3.PublicData().IDs(),
+		),
 		Paths:     []string{"C/*", "D/*"},
 		Threshold: 2,
 	}
@@ -1945,12 +1984,12 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 	})
 	c.Assert(err, IsNil)
 
-	// Delegate from role1 -> role2 for D/disco.txt with one key, threshold 1.
+	// Delegate from role1 -> role2 for A/allium.txt with one key, threshold 1.
 	role1To2Key := saveNewKey("role2")
 	role1To2 := data.DelegatedRole{
 		Name:        "role2",
 		KeyIDs:      role1To2Key.PublicData().IDs(),
-		Paths:       []string{"D/disco.txt"},
+		Paths:       []string{"A/allium.txt"},
 		Threshold:   1,
 		Terminating: true,
 	}
@@ -1991,51 +2030,198 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
 
-	//snapshot, err := r.snapshot()
-	//c.Assert(err, IsNil)
-	//// Snapshots has targets, role1
-	//c.Assert(snapshot.Meta, HasLen, 2)
-	//c.Assert(snapshot.Meta["role1.json"].Version, Equals, 1)
+	snapshot, err = r.snapshot()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Meta, HasLen, 3)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 2)
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 1)
+	c.Assert(snapshot.Meta["role2.json"].Version, Equals, 1)
 
-	////add target to delegations
-	//tmp.writeStagedTarget("test/bar.txt", "bar")
-	//c.Assert(r.AddTarget("test/bar.txt", nil), IsNil)
-	//targets, err = r.targets("role1")
-	//c.Assert(err, IsNil)
-	//c.Assert(targets.Targets, HasLen, 1)
-	//// 3 characters in the file
-	//c.Assert(targets.Targets["test/bar.txt"].Length, Equals, int64(3))
+	checkSigKeyIDs(c, local, map[string][]string{
+		"2.targets.json": targetsKeyIDs,
+		"1.role1.json":   role1ABKey.PublicData().IDs(),
+		"1.role2.json": concat(
+			role2CDKey1.PublicData().IDs(),
+			role2CDKey2.PublicData().IDs(),
+			role2CDKey3.PublicData().IDs(),
+			role1To2Key.PublicData().IDs(),
+		),
+	})
 
-	//// add target to the top-level targets
-	//tmp.writeStagedTarget("baz.txt", "baz")
-	//c.Assert(r.AddTarget("baz.txt", nil), IsNil)
-	//targets, err = r.targets("targets")
-	//c.Assert(err, IsNil)
-	//c.Assert(targets.Targets, HasLen, 2)
+	// Add a variety of targets.
+	files := map[string]string{
+		// targets.json
+		"potato.txt": "potatoes can be starchy or waxy",
+		// role1.json
+		"A/apple.txt":  "apples are sometimes red",
+		"B/banana.txt": "bananas are yellow and sometimes brown",
+		// role2.json
+		"C/clementine.txt": "clementines are a citrus fruit",
+		"D/durian.txt":     "durians are spiky",
+		"A/allium.txt":     "alliums include garlic and leeks",
+	}
+	for name, content := range files {
+		tmp.writeStagedTarget(name, content)
+		c.Assert(r.AddTarget(name, nil), IsNil)
+	}
 
-	//// test AddTargetToPreferredRole
-	//err = r.AddTargetToPreferredRole("test/bar.txt", nil, "targets")
-	//c.Assert(err, IsNil)
-	//targets, err = r.targets("targets")
-	//c.Assert(err, IsNil)
-	//c.Assert(targets.Targets, HasLen, 3)
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
 
-	//c.Assert(r.Snapshot(), IsNil)
-	//c.Assert(r.Timestamp(), IsNil)
-	//c.Assert(r.Commit(), IsNil)
+	snapshot, err = r.snapshot()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Meta, HasLen, 3)
+	// All roles should have new targets.
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 3)
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 2)
+	c.Assert(snapshot.Meta["role2.json"].Version, Equals, 2)
 
-	//metas, err := local.GetMeta()
-	//c.Assert(err, IsNil)
+	checkSigKeyIDs(c, local, map[string][]string{
+		"3.targets.json": targetsKeyIDs,
+		"2.role1.json":   role1ABKey.PublicData().IDs(),
+		"2.role2.json": concat(
+			role2CDKey1.PublicData().IDs(),
+			role2CDKey2.PublicData().IDs(),
+			role2CDKey3.PublicData().IDs(),
+			role1To2Key.PublicData().IDs(),
+		),
+	})
 
-	//for k, meta := range metas {
-	//	s := &data.Signed{}
-	//	err = json.Unmarshal(meta, s)
-	//	c.Assert(err, IsNil, Commentf("meta: %v", k))
-	//	c.Assert(len(s.Signatures) > 0, Equals, true, Commentf("meta: %v", k))
-	//}
+	// Check that the given targets role has signed for the given filenames, with
+	// the correct file metadata.
+	checkTargets := func(role string, filenames ...string) {
+		t, err := r.targets(role)
+		c.Assert(err, IsNil)
+		c.Assert(t.Targets, HasLen, len(filenames))
+
+		for _, fn := range filenames {
+			content := files[fn]
+
+			fm, err := util.GenerateTargetFileMeta(strings.NewReader(content))
+			c.Assert(err, IsNil)
+
+			c.Assert(util.TargetFileMetaEqual(t.Targets[fn], fm), IsNil)
+		}
+	}
+
+	checkTargets("targets", "potato.txt")
+	checkTargets("role1", "A/apple.txt", "B/banana.txt")
+	checkTargets("role2", "C/clementine.txt", "D/durian.txt", "A/allium.txt")
+
+	// Test AddTargetToPreferredRole.
+	// role2 is the default signer for A/allium.txt, but role1 is also eligible
+	// for A/*.txt according to the delegation from the top-level targets role.
+	c.Assert(r.RemoveTarget("A/allium.txt"), IsNil)
+	tmp.writeStagedTarget("A/allium.txt", files["A/allium.txt"])
+	c.Assert(r.AddTargetToPreferredRole("A/allium.txt", nil, "role1"), IsNil)
+
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	snapshot, err = r.snapshot()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Meta, HasLen, 3)
+	// Only role1 and role2 should have bumped versions.
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 3)
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 3)
+	c.Assert(snapshot.Meta["role2.json"].Version, Equals, 3)
+
+	checkSigKeyIDs(c, local, map[string][]string{
+		"3.targets.json": targetsKeyIDs,
+		"3.role1.json":   role1ABKey.PublicData().IDs(),
+		"3.role2.json": concat(
+			role2CDKey1.PublicData().IDs(),
+			role2CDKey2.PublicData().IDs(),
+			role2CDKey3.PublicData().IDs(),
+			role1To2Key.PublicData().IDs(),
+		),
+	})
+
+	// role1 now signs A/allium.txt.
+	checkTargets("targets", "potato.txt")
+	checkTargets("role1", "A/apple.txt", "B/banana.txt", "A/allium.txt")
+	checkTargets("role2", "C/clementine.txt", "D/durian.txt")
+
+	// Remove all delegation from role1 to role2.
+	c.Assert(r.ResetTargetsDelegations("role1"), IsNil)
+	checkDelegations("targets", role1AB, role2CD)
+	checkDelegations("role1")
+
+	// Try to sign A/allium.txt with role2.
+	// It should fail since we removed the role1 -> role2 delegation.
+	c.Assert(r.RemoveTarget("A/allium.txt"), IsNil)
+	tmp.writeStagedTarget("A/allium.txt", files["A/allium.txt"])
+	c.Assert(r.AddTargetToPreferredRole("A/allium.txt", nil, "role2"), Equals, ErrNoDelegatedTarget{Path: "A/allium.txt"})
+
+	// Try to sign A/allium.txt with the default role (role1).
+	c.Assert(r.AddTarget("A/allium.txt", nil), IsNil)
+
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	snapshot, err = r.snapshot()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Meta, HasLen, 3)
+	// Only role1 should have a bumped version.
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 3)
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 4)
+	c.Assert(snapshot.Meta["role2.json"].Version, Equals, 3)
+
+	checkSigKeyIDs(c, local, map[string][]string{
+		"3.targets.json": targetsKeyIDs,
+		"4.role1.json":   role1ABKey.PublicData().IDs(),
+		"3.role2.json": concat(
+			// Metadata (and therefore signers) for role2.json shouldn't have
+			// changed, even though we revoked role1To2Key. Clients verify the
+			// signature using keys specified by 4.role1.json, so role1To2Key
+			// shouldn't contribute to the threshold.
+			role2CDKey1.PublicData().IDs(),
+			role2CDKey2.PublicData().IDs(),
+			role2CDKey3.PublicData().IDs(),
+			role1To2Key.PublicData().IDs(),
+		),
+	})
+
+	// Re-sign target signed by role2 to test that role1To2Key is not used going
+	// forward.
+	c.Assert(r.RemoveTarget("C/clementine.txt"), IsNil)
+	tmp.writeStagedTarget("C/clementine.txt", files["C/clementine.txt"])
+	c.Assert(r.AddTarget("C/clementine.txt", nil), IsNil)
+
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	snapshot, err = r.snapshot()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Meta, HasLen, 3)
+	// Only role2 should have a bumped version.
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 3)
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 4)
+	c.Assert(snapshot.Meta["role2.json"].Version, Equals, 4)
+
+	checkSigKeyIDs(c, local, map[string][]string{
+		"3.targets.json": targetsKeyIDs,
+		"4.role1.json":   role1ABKey.PublicData().IDs(),
+		"4.role2.json": concat(
+			role2CDKey1.PublicData().IDs(),
+			role2CDKey2.PublicData().IDs(),
+			role2CDKey3.PublicData().IDs(),
+			// Note that role1To2Key no longer signs since the role1 -> role2
+			// delegation was removed.
+		),
+	})
+
+	// Targets should still be signed by the same roles.
+	checkTargets("targets", "potato.txt")
+	checkTargets("role1", "A/apple.txt", "B/banana.txt", "A/allium.txt")
+	checkTargets("role2", "C/clementine.txt", "D/durian.txt")
 }
 
-func (rs *RepoSuite) TestHashedBinDelegations(c *C) {
+func (rs *RepoSuite) TestHashBinDelegations(c *C) {
 	tmp := newTmpDir(c)
 	local := FileSystemStore(tmp.path, nil)
 	r, err := NewRepo(local)
@@ -2043,24 +2229,24 @@ func (rs *RepoSuite) TestHashedBinDelegations(c *C) {
 
 	// Add one key to each role
 	genKey(c, r, "root")
-	genKey(c, r, "targets")
+	targetsKeyIDs := genKey(c, r, "targets")
 	genKey(c, r, "snapshot")
 	genKey(c, r, "timestamp")
-
-	// keys for the hashed bins
-	binsKey, err := keys.GenerateEd25519Key()
-	c.Assert(err, IsNil)
-	err = local.SaveSigner("bins", binsKey)
-	c.Assert(err, IsNil)
-
-	leafKey, err := keys.GenerateEd25519Key()
-	c.Assert(err, IsNil)
 
 	hb, err := targets.NewHashBins("bins_", 3)
 	if err != nil {
 		c.Assert(err, IsNil)
 	}
 
+	// Generate key for the intermediate bins role.
+	binsKey, err := keys.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	err = local.SaveSigner("bins", binsKey)
+	c.Assert(err, IsNil)
+
+	// Generate key for the leaf bins role.
+	leafKey, err := keys.GenerateEd25519Key()
+	c.Assert(err, IsNil)
 	for i := uint64(0); i < hb.NumBins(); i++ {
 		b := hb.GetBin(i)
 		err = local.SaveSigner(b.RoleName(), leafKey)
@@ -2085,24 +2271,48 @@ func (rs *RepoSuite) TestHashedBinDelegations(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(targets.Delegations.Roles, HasLen, 8)
 
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
 	tmp.writeStagedTarget("foo.txt", "foo")
 	err = r.AddTarget("foo.txt", nil)
 	c.Assert(err, IsNil)
-	targets, err = r.targets("bins_c-d")
-	c.Assert(err, IsNil)
-	c.Assert(targets.Targets, HasLen, 1)
 
 	c.Assert(r.Snapshot(), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
 
-	metas, err := local.GetMeta()
-	c.Assert(err, IsNil)
+	snapshot, err := r.snapshot()
+	fmt.Println(len(snapshot.Meta))
+	// 1 targets.json, 1 bins.json, 8 bins_*.json.
+	c.Assert(snapshot.Meta, HasLen, 10)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 1)
+	c.Assert(snapshot.Meta["bins.json"].Version, Equals, 1)
+	c.Assert(snapshot.Meta["bins_0-1.json"].Version, Equals, 1)
+	c.Assert(snapshot.Meta["bins_2-3.json"].Version, Equals, 1)
+	c.Assert(snapshot.Meta["bins_4-5.json"].Version, Equals, 1)
+	c.Assert(snapshot.Meta["bins_6-7.json"].Version, Equals, 1)
+	c.Assert(snapshot.Meta["bins_8-9.json"].Version, Equals, 1)
+	c.Assert(snapshot.Meta["bins_a-b.json"].Version, Equals, 1)
+	c.Assert(snapshot.Meta["bins_c-d.json"].Version, Equals, 2)
+	c.Assert(snapshot.Meta["bins_e-f.json"].Version, Equals, 1)
 
-	for k, meta := range metas {
-		s := &data.Signed{}
-		err = json.Unmarshal(meta, s)
-		c.Assert(err, IsNil, Commentf("meta: %v", k))
-		c.Assert(len(s.Signatures) > 0, Equals, true, Commentf("meta: %v", k))
-	}
+	targets, err = r.targets("bins_c-d")
+	c.Assert(err, IsNil)
+	c.Assert(targets.Targets, HasLen, 1)
+
+	checkSigKeyIDs(c, local, map[string][]string{
+		"targets.json":    targetsKeyIDs,
+		"1.bins.json":     binsKey.PublicData().IDs(),
+		"1.bins_0-1.json": leafKey.PublicData().IDs(),
+		"1.bins_2-3.json": leafKey.PublicData().IDs(),
+		"1.bins_4-5.json": leafKey.PublicData().IDs(),
+		"1.bins_6-7.json": leafKey.PublicData().IDs(),
+		"1.bins_8-9.json": leafKey.PublicData().IDs(),
+		"1.bins_a-b.json": leafKey.PublicData().IDs(),
+		"1.bins_c-d.json": leafKey.PublicData().IDs(),
+		"2.bins_c-d.json": leafKey.PublicData().IDs(),
+		"1.bins_e-f.json": leafKey.PublicData().IDs(),
+	})
 }
