@@ -1894,6 +1894,7 @@ func checkSigKeyIDs(c *C, local LocalStore, fileToKeyIDs map[string][]string) {
 
 		s := &data.Signed{}
 		err = json.Unmarshal(meta, s)
+		c.Assert(err, IsNil)
 
 		gotKeyIDs := []string{}
 		for _, sig := range s.Signatures {
@@ -2284,7 +2285,7 @@ func (rs *RepoSuite) TestHashBinDelegations(c *C) {
 	c.Assert(r.Commit(), IsNil)
 
 	snapshot, err := r.snapshot()
-	fmt.Println(len(snapshot.Meta))
+	c.Assert(err, IsNil)
 	// 1 targets.json, 1 bins.json, 8 bins_*.json.
 	c.Assert(snapshot.Meta, HasLen, 10)
 	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 1)
