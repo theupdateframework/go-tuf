@@ -342,8 +342,6 @@ func (r *Repo) AddPrivateKeyWithExpires(keyRole string, signer keys.Signer, expi
 	// are associated with a delegation (edge), not a role (node).
 
 	if roles.IsDelegatedTargetsRole(keyRole) {
-		// The signature threshold for a delegated targets role
-		// depends on the incoming delegation edge.
 		return ErrInvalidRole{keyRole, "only support adding keys for top-level roles"}
 	}
 
