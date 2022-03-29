@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/internal/roles"
 	"github.com/theupdateframework/go-tuf/internal/signer"
@@ -485,21 +484,10 @@ func (r *Repo) RevokeKeyWithExpires(keyRole, id string, expires time.Time) error
 }
 
 func (r *Repo) jsonMarshal(v interface{}) ([]byte, error) {
-	b, err := cjson.EncodeCanonical(v)
-	if err != nil {
-		return []byte{}, err
-	}
-
 	if r.prefix == "" && r.indent == "" {
-		return b, nil
+		return json.Marshal(v)
 	}
-
-	var out bytes.Buffer
-	if err := json.Indent(&out, b, r.prefix, r.indent); err != nil {
-		return []byte{}, err
-	}
-
-	return out.Bytes(), nil
+	return json.MarshalIndent(v, r.prefix, r.indent)
 }
 
 func (r *Repo) setTopLevelMeta(roleFilename string, meta interface{}) error {
