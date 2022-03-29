@@ -1477,7 +1477,7 @@ func (rs *RepoSuite) TestManageMultipleTargets(c *C) {
 	c.Assert(r.Snapshot(), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
-	tmp.assertEmpty("repository/targets")
+	tmp.assertNotExist("repository/targets")
 	t, err := r.topLevelTargets()
 	c.Assert(err, IsNil)
 	c.Assert(t.Targets, HasLen, 0)
