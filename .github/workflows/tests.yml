@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
 
       - name: Setup - Go ${{ matrix.go-version }}
-        uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492
+        uses: actions/setup-go@f6164bd8c8acb4a71fb2791a8b6c4024ff038dab
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -60,7 +60,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: get-go-versions
     steps:
-      - uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492
+      - uses: actions/setup-go@f6164bd8c8acb4a71fb2791a8b6c4024ff038dab
       - uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
       - name: golangci-lint
         uses: golangci/golangci-lint-action@5c56cd6c9dc07901af25baab6f2b0d9f3b7c3018
