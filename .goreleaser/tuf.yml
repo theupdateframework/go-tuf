@@ -1,0 +1,39 @@
+project_name: tuf
+builds:
+  - ldflags:
+      - "-s -w"
+      - "-extldflags=-zrelro"
+      - "-extldflags=-znow"
+    env:
+      - "CGO_ENABLED=0"
+      - "GO111MODULE=on"
+    flags:
+      - -mod=readonly
+      - -trimpath
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+    main: ./cmd/tuf/
+source:
+  enabled: true
+changelog:
+  use: github
+  groups:
+    - title: "Breaking changes"
+      regexp: "^.*BREAKING CHANGE[(\\w)]*:+.*$"
+      order: 0
+    - title: Features
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 1
+    - title: "Bug fixes"
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 2
+    - title: Others
+      order: 999
+release:
+  # If set to auto, will mark the release as not ready for production
+  # in case there is an indicator for this in the tag e.g. v1.0.0-rc1
+  prerelease: auto
