@@ -31,6 +31,7 @@ Commands:
   help               Show usage for a specific command
   init               Initialize a new repository
   gen-key            Generate a new signing key for a specific metadata file
+  import-key         Import an existing key into repository
   revoke-key         Revoke a signing key
   add                Add target file(s)
   remove             Remove a target file
