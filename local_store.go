@@ -410,6 +410,7 @@ func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]in
 		}
 		return nil
 	}
+	// Checks if target file should be deleted
 	needsRemoval := func(path string) bool {
 		if consistentSnapshot {
 			// strip out the hash
@@ -422,6 +423,16 @@ func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]in
 		_, ok := hashes[path]
 		return !ok
 	}
+	// Checks if folder is empty
+	folderNeedsRemoval := func(path string) bool {
+		f, err := os.Open(path)
+		if err != nil {
+			return false
+		}
+		defer f.Close()
+		_, err = f.Readdirnames(1)
+		return err == io.EOF
+	}
 	removeFile := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -431,11 +442,17 @@ func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]in
 			return err
 		}
 		if !info.IsDir() && isTarget(rel) && needsRemoval(rel) {
-			//lint:ignore SA9003 empty branch
+			// Delete the target file
 			if err := os.Remove(path); err != nil {
-				// TODO: log / handle error
+				return err
 			}
-			// TODO: remove empty directory
+			// Delete the target folder too if it's empty
+			targetFolder := filepath.Dir(path)
+			if folderNeedsRemoval(targetFolder) {
+				if err := os.Remove(targetFolder); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	}
