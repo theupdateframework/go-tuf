@@ -14,9 +14,9 @@ func init() {
 	register("sign-payload", cmdSignPayload, `
 usage: tuf sign-payload --role=<role> <path>
 
-Sign a file (not necessarily in the TUF repo) using keys for the given role.
+Sign a file (outside of the TUF repo) using keys for the given role (from the TUF repo).
 
-Typically, this will be the output of "tuf payload".
+Typically, path will be the output of "tuf payload".
 `)
 }
 

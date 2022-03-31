@@ -130,6 +130,27 @@ Changes the passphrase for given role keys file. The CLI supports reading
 both the existing and the new passphrase via the following environment
 variables - `TUF_{{ROLE}}_PASSPHRASE` and respectively `TUF_NEW_{{ROLE}}_PASSPHRASE`
 
+#### `tuf payload <metadata>`
+
+Outputs the metadata file for a role in a ready-to-sign (canonicalized) format.
+
+See also `tuf sign-payload` and `tuf add-signatures`.
+
+#### `tuf sign-payload --role=<role> <path>`
+
+Sign a file (outside of the TUF repo) using keys for the given `role` (from the TUF repo).
+
+Typically, `path` will be the output of `tuf payload`.
+
+See also `tuf add-signatures`.
+
+#### `tuf add-signatures --signatures <sig_file> <metadata>`
+
+
+Adds signatures (the output of `tuf sign-payload`) to the given role metadata file.
+
+If the signature does not verify, it will not be added.
+
 #### Usage of environment variables
 
 The `tuf` CLI supports receiving passphrases via environment variables in
@@ -228,6 +249,46 @@ Enter root keys passphrase:
 
 The staged `root.json` can now be copied back to the repo box ready to be
 committed alongside other metadata files.
+
+#### Alternate signing flow
+
+Instead of manually copying `root.json` into the TUF repository on the root box,
+you can use the `tuf payload`, `tuf sign-payload`, `tuf add-signatures` flow.
+
+On the repo box, get the `root.json` payload in a canonical format:
+
+``` bash
+$ tuf payload root.json > root.json.payload
+```
+
+Copy `root.json.payload` to the root box and sign it:
+
+
+``` bash
+$ tuf sign-payload --role=root root.json.payload > root.json.sigs
+Enter root keys passphrase:
+```
+
+Copy `root.json.sigs` back to the repo box and import the signatures:
+
+``` bash
+$ tuf add-signatures --signatures=root.json.sigs root.json
+```
+
+This achieves the same state as the above flow for the repo box:
+
+```bash
+$ tree .
+.
+├── keys
+│   ├── snapshot.json
+│   ├── targets.json
+│   └── timestamp.json
+├── repository
+└── staged
+    ├── root.json
+    └── targets
+```
 
 #### Add a target file
 

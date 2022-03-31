@@ -11,9 +11,7 @@ func init() {
 	register("payload", cmdPayload, `
 usage: tuf payload <metadata>
 
-Output the metadata file for a role in a ready-to-sign format.
-
-The output is canonicalized.
+Outputs the metadata file for a role in a ready-to-sign (canonicalized) format.
 `)
 }
 

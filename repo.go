@@ -735,7 +735,11 @@ func (r *Repo) setMeta(roleFilename string, meta interface{}) error {
 	return r.local.SetMeta(roleFilename, b)
 }
 
-// Use the keys associated with role to sign the payload in signed.
+// SignPayload signs the payload in signed to sign the keys associated with role.
+//
+// It returns the total number of keys used for signing, 0 (along with
+// ErrInsufficientKeys) if no keys were found, or -1 (along with an error) in
+// error cases.
 func (r *Repo) SignPayload(role string, signed *data.Signed) (int, error) {
 	if !roles.IsTopLevelRole(role) {
 		return -1, ErrInvalidRole{role, "only signing top-level metadata supported"}
