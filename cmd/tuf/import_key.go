@@ -14,15 +14,16 @@ import (
 
 func init() {
 	register("import-key", cmdImportKey, `
-usage: tuf import-key [--expires=<days>] <role> <file>
+usage: tuf import-key [--expires=<days>] --role=<role> <file>
 
 Import an existing signing key for the given role.
 
-The key will be imported from the file and added to the "keys" directory with
-filename pattern "ROLE-KEYID.json". The root metadata file will also be staged
-with the addition of the key's ID to the role's list of key IDs.
+The private key will be read from the file and added key store.
+The root metadata file will also be staged with the addition of the key's ID to
+the role's list of key IDs.
 
 Options:
+  --role=<role>      The role to import the key for (required).
   --expires=<days>   Set the root metadata file to expire <days> days from now.
 `)
 }
@@ -31,6 +32,10 @@ func cmdImportKey(args *docopt.Args, repo *tuf.Repo) error {
 	role := args.String["<role>"]
 	file := args.String["<file>"]
 	var err error
+
+	if role == "" {
+		return fmt.Errorf("role is required")
+	}
 
 	var privateKey data.PrivateKey
 	data, err := os.ReadFile(file)
