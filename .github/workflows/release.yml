@@ -16,7 +16,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Get Go version
-        uses: arnested/go-version-action@d44f8fbecf1ac5ea61d81603e99dfec9833f592f
+        uses: arnested/go-version-action@75e53ba83545379e9f189ecb73b53b8b3e126c7f
         id: go-version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
