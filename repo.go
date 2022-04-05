@@ -674,33 +674,52 @@ func (r *Repo) jsonMarshal(v interface{}) ([]byte, error) {
 	return json.MarshalIndent(v, r.prefix, r.indent)
 }
 
-func (r *Repo) setMeta(roleFilename string, meta interface{}) error {
-	role := strings.TrimSuffix(roleFilename, ".json")
-
+func (r *Repo) dbsForRole(role string) ([]*verify.DB, error) {
 	dbs := []*verify.DB{}
+
 	if roles.IsTopLevelRole(role) {
 		db, err := r.topLevelKeysDB()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		dbs = append(dbs, db)
 	} else {
 		ddbs, err := r.delegatorDBs(role)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		dbs = append(dbs, ddbs...)
+	}
+
+	return dbs, nil
+}
+
+func (r *Repo) signersForRole(role string) ([]keys.Signer, error) {
+	dbs, err := r.dbsForRole(role)
+	if err != nil {
+		return nil, err
 	}
 
 	signers := []keys.Signer{}
 	for _, db := range dbs {
 		ss, err := r.getSignersInDB(role, db)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		signers = append(signers, ss...)
+	}
+
+	return signers, nil
+}
+
+func (r *Repo) setMeta(roleFilename string, meta interface{}) error {
+	role := strings.TrimSuffix(roleFilename, ".json")
+
+	signers, err := r.signersForRole(role)
+	if err != nil {
+		return err
 	}
 
 	s, err := sign.Marshal(meta, signers...)
@@ -717,20 +736,13 @@ func (r *Repo) setMeta(roleFilename string, meta interface{}) error {
 
 func (r *Repo) Sign(roleFilename string) error {
 	role := strings.TrimSuffix(roleFilename, ".json")
-	if !roles.IsTopLevelRole(role) {
-		return ErrInvalidRole{role, "only signing top-level metadata supported"}
-	}
 
 	s, err := r.SignedMeta(roleFilename)
 	if err != nil {
 		return err
 	}
 
-	db, err := r.topLevelKeysDB()
-	if err != nil {
-		return err
-	}
-	keys, err := r.getSignersInDB(role, db)
+	keys, err := r.signersForRole(role)
 	if err != nil {
 		return err
 	}
@@ -757,20 +769,28 @@ func (r *Repo) Sign(roleFilename string) error {
 // The name must be a valid metadata file name, like root.json.
 func (r *Repo) AddOrUpdateSignature(roleFilename string, signature data.Signature) error {
 	role := strings.TrimSuffix(roleFilename, ".json")
-	if !roles.IsTopLevelRole(role) {
-		return ErrInvalidRole{role, "only signing top-level metadata supported"}
-	}
 
 	// Check key ID is in valid for the role.
-	db, err := r.topLevelKeysDB()
+	dbs, err := r.dbsForRole(role)
 	if err != nil {
 		return err
 	}
-	roleData := db.GetRole(role)
-	if roleData == nil {
-		return ErrInvalidRole{role, "role missing from top-level keys"}
+
+	if len(dbs) == 0 {
+		return ErrInvalidRole{role, "no trusted keys for role"}
 	}
-	if !roleData.ValidKey(signature.KeyID) {
+
+	keyInDB := false
+	for _, db := range dbs {
+		roleData := db.GetRole(role)
+		if roleData == nil {
+			return ErrInvalidRole{role, "role is not in verifier DB"}
+		}
+		if roleData.ValidKey(signature.KeyID) {
+			keyInDB = true
+		}
+	}
+	if !keyInDB {
 		return verify.ErrInvalidKey
 	}
 
@@ -791,9 +811,11 @@ func (r *Repo) AddOrUpdateSignature(roleFilename string, signature data.Signatur
 
 	// Check signature on signed meta. Ignore threshold errors as this may not be fully
 	// signed.
-	if err := db.VerifySignatures(s, role); err != nil {
-		if _, ok := err.(verify.ErrRoleThreshold); !ok {
-			return err
+	for _, db := range dbs {
+		if err := db.VerifySignatures(s, role); err != nil {
+			if _, ok := err.(verify.ErrRoleThreshold); !ok {
+				return err
+			}
 		}
 	}
 
@@ -1476,18 +1498,9 @@ func (r *Repo) verifySignatures(metaFilename string) error {
 
 	role := strings.TrimSuffix(metaFilename, ".json")
 
-	dbs := []*verify.DB{}
-	if roles.IsTopLevelRole(role) {
-		db, err := r.topLevelKeysDB()
-		if err != nil {
-			return err
-		}
-		dbs = append(dbs, db)
-	} else {
-		dbs, err = r.delegatorDBs(role)
-		if err != nil {
-			return err
-		}
+	dbs, err := r.dbsForRole(role)
+	if err != nil {
+		return err
 	}
 
 	for _, db := range dbs {

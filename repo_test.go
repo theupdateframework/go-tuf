@@ -636,7 +636,7 @@ func (rs *RepoSuite) TestSign(c *C) {
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
 
-	c.Assert(r.Sign("foo.json"), Equals, ErrInvalidRole{"foo", "only signing top-level metadata supported"})
+	c.Assert(r.Sign("foo.json"), Equals, ErrMissingMetadata{"foo.json"})
 
 	// signing with no keys returns ErrInsufficientKeys
 	c.Assert(r.Sign("root.json"), Equals, ErrInsufficientKeys{"root.json"})
@@ -1768,7 +1768,7 @@ func (rs *RepoSuite) TestBadAddOrUpdateSignatures(c *C) {
 
 	c.Assert(r.AddOrUpdateSignature("targets.json", data.Signature{
 		KeyID:     "foo",
-		Signature: nil}), Equals, ErrInvalidRole{"targets", "role missing from top-level keys"})
+		Signature: nil}), Equals, ErrInvalidRole{"targets", "role is not in verifier DB"})
 
 	// generate root key offline and add as a verification key
 	rootKey, err := keys.GenerateEd25519Key()
@@ -1794,7 +1794,7 @@ func (rs *RepoSuite) TestBadAddOrUpdateSignatures(c *C) {
 	for _, id := range rootKey.PublicData().IDs() {
 		c.Assert(r.AddOrUpdateSignature("invalid_root.json", data.Signature{
 			KeyID:     id,
-			Signature: rootSig}), Equals, ErrInvalidRole{"invalid_root", "only signing top-level metadata supported"})
+			Signature: rootSig}), Equals, ErrInvalidRole{"invalid_root", "no trusted keys for role"})
 	}
 
 	// add a root signature with an key ID that is for the targets role
@@ -1890,7 +1890,8 @@ func checkSigKeyIDs(c *C, local LocalStore, fileToKeyIDs map[string][]string) {
 	c.Assert(err, IsNil)
 
 	for f, keyIDs := range fileToKeyIDs {
-		meta := metas[f]
+		meta, ok := metas[f]
+		c.Assert(ok, Equals, true, Commentf("meta file: %v", f))
 
 		s := &data.Signed{}
 		err = json.Unmarshal(meta, s)
@@ -2220,6 +2221,9 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 	checkTargets("targets", "potato.txt")
 	checkTargets("role1", "A/apple.txt", "B/banana.txt", "A/allium.txt")
 	checkTargets("role2", "C/clementine.txt", "D/durian.txt")
+
+	// Check compatibility with Sign and	j
+	// r.Sign("4.)
 }
 
 func (rs *RepoSuite) TestHashBinDelegations(c *C) {
