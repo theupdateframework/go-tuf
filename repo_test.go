@@ -2321,3 +2321,84 @@ func (rs *RepoSuite) TestHashBinDelegations(c *C) {
 		"1.bins_e-f.json": leafKey.PublicData().IDs(),
 	})
 }
+
+func (rs *RepoSuite) TestResetTargetsDelegationsWithExpires(c *C) {
+	tmp := newTmpDir(c)
+	local := FileSystemStore(tmp.path, nil)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// Add one key to each role
+	genKey(c, r, "root")
+	targetsKeyIDs := genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	// commit the metadata to the store.
+	c.Assert(r.AddTargets([]string{}, nil), IsNil)
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	snapshot, err := r.snapshot()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Meta, HasLen, 1)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 1)
+
+	checkSigKeyIDs(c, local, map[string][]string{
+		"1.targets.json": targetsKeyIDs,
+	})
+
+	role1Key, err := keys.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+
+	err = local.SaveSigner("role1", role1Key)
+	c.Assert(err, IsNil)
+
+	// Delegate from targets -> role1 for A/*, B/* with one key, threshold 1.
+	role1 := data.DelegatedRole{
+		Name:      "role1",
+		KeyIDs:    role1Key.PublicData().IDs(),
+		Paths:     []string{"A/*", "B/*"},
+		Threshold: 1,
+	}
+	err = r.AddTargetsDelegation("targets", role1, []*data.PublicKey{
+		role1Key.PublicData(),
+	})
+	c.Assert(err, IsNil)
+
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	snapshot, err = r.snapshot()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Meta, HasLen, 2)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 2)
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 1)
+
+	checkSigKeyIDs(c, local, map[string][]string{
+		"1.targets.json": targetsKeyIDs,
+		"targets.json":   targetsKeyIDs,
+		"1.role1.json":   role1Key.PublicData().IDs(),
+		"role1.json":     role1Key.PublicData().IDs(),
+	})
+
+	c.Assert(r.ResetTargetsDelegations("targets"), IsNil)
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	snapshot, err = r.snapshot()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Meta, HasLen, 2)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 3)
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 1)
+
+	checkSigKeyIDs(c, local, map[string][]string{
+		"2.targets.json": targetsKeyIDs,
+		"targets.json":   targetsKeyIDs,
+		"1.role1.json":   role1Key.PublicData().IDs(),
+		"role1.json":     role1Key.PublicData().IDs(),
+	})
+}
