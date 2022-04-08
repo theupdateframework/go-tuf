@@ -1954,13 +1954,13 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 		Paths:     []string{"A/*", "B/*"},
 		Threshold: 1,
 	}
-	err = r.AddTargetsDelegation("targets", role1AB, []*data.PublicKey{
+	err = r.AddDelegatedRole("targets", role1AB, []*data.PublicKey{
 		role1ABKey.PublicData(),
 	})
 	c.Assert(err, IsNil)
 
 	// Adding duplicate delegation should return an error.
-	err = r.AddTargetsDelegation("targets", role1AB, []*data.PublicKey{
+	err = r.AddDelegatedRole("targets", role1AB, []*data.PublicKey{
 		role1ABKey.PublicData(),
 	})
 	c.Assert(err, NotNil)
@@ -1979,7 +1979,7 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 		Paths:     []string{"C/*", "D/*"},
 		Threshold: 2,
 	}
-	err = r.AddTargetsDelegation("targets", role2CD, []*data.PublicKey{
+	err = r.AddDelegatedRole("targets", role2CD, []*data.PublicKey{
 		role2CDKey1.PublicData(),
 		role2CDKey2.PublicData(),
 		role2CDKey3.PublicData(),
@@ -1995,7 +1995,7 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 		Threshold:   1,
 		Terminating: true,
 	}
-	err = r.AddTargetsDelegation("role1", role1To2, []*data.PublicKey{
+	err = r.AddDelegatedRole("role1", role1To2, []*data.PublicKey{
 		role1To2Key.PublicData(),
 	})
 	c.Assert(err, IsNil)
@@ -2260,7 +2260,7 @@ func (rs *RepoSuite) TestHashBinDelegations(c *C) {
 		}
 	}
 
-	err = r.AddTargetsDelegation("targets", data.DelegatedRole{
+	err = r.AddDelegatedRole("targets", data.DelegatedRole{
 		Name:      "bins",
 		KeyIDs:    binsKey.PublicData().IDs(),
 		Paths:     []string{"*.txt"},
@@ -2270,7 +2270,7 @@ func (rs *RepoSuite) TestHashBinDelegations(c *C) {
 	})
 	c.Assert(err, IsNil)
 
-	err = r.AddTargetsDelegationsForPathHashBins("bins", hb, []*data.PublicKey{leafKey.PublicData()}, 1)
+	err = r.AddDelegatedRolesForPathHashBins("bins", hb, []*data.PublicKey{leafKey.PublicData()}, 1)
 	c.Assert(err, IsNil)
 	targets, err := r.targets("bins")
 	c.Assert(err, IsNil)
@@ -2362,7 +2362,7 @@ func (rs *RepoSuite) TestResetTargetsDelegationsWithExpires(c *C) {
 		Paths:     []string{"A/*", "B/*"},
 		Threshold: 1,
 	}
-	err = r.AddTargetsDelegation("targets", role1, []*data.PublicKey{
+	err = r.AddDelegatedRole("targets", role1, []*data.PublicKey{
 		role1Key.PublicData(),
 	})
 	c.Assert(err, IsNil)
