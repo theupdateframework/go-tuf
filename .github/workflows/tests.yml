@@ -66,13 +66,3 @@ jobs:
         uses: golangci/golangci-lint-action@5c56cd6c9dc07901af25baab6f2b0d9f3b7c3018
         with:
           version: v1.45.2
-
-  conventional-commits-lint-check:
-    runs-on: "ubuntu-latest"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
-        with:
-          fetch-depth: 0
-      - name: Commitsar Action
-        uses: aevea/commitsar@159cec82966ca402a09ae3c185524a5256affa22
