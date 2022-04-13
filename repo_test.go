@@ -1930,7 +1930,7 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 	snapshot, err := r.snapshot()
 	c.Assert(err, IsNil)
 	c.Assert(snapshot.Meta, HasLen, 1)
-	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 1)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, int64(1))
 
 	checkSigKeyIDs(c, local, map[string][]string{
 		"1.targets.json": targetsKeyIDs,
@@ -2035,9 +2035,9 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 	snapshot, err = r.snapshot()
 	c.Assert(err, IsNil)
 	c.Assert(snapshot.Meta, HasLen, 3)
-	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 2)
-	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 1)
-	c.Assert(snapshot.Meta["role2.json"].Version, Equals, 1)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, int64(2))
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, int64(1))
+	c.Assert(snapshot.Meta["role2.json"].Version, Equals, int64(1))
 
 	checkSigKeyIDs(c, local, map[string][]string{
 		"2.targets.json": targetsKeyIDs,
@@ -2075,9 +2075,9 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(snapshot.Meta, HasLen, 3)
 	// All roles should have new targets.
-	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 3)
-	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 2)
-	c.Assert(snapshot.Meta["role2.json"].Version, Equals, 2)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, int64(3))
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, int64(2))
+	c.Assert(snapshot.Meta["role2.json"].Version, Equals, int64(2))
 
 	checkSigKeyIDs(c, local, map[string][]string{
 		"3.targets.json": targetsKeyIDs,
@@ -2126,9 +2126,9 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(snapshot.Meta, HasLen, 3)
 	// Only role1 and role2 should have bumped versions.
-	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 3)
-	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 3)
-	c.Assert(snapshot.Meta["role2.json"].Version, Equals, 3)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, int64(3))
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, int64(3))
+	c.Assert(snapshot.Meta["role2.json"].Version, Equals, int64(3))
 
 	checkSigKeyIDs(c, local, map[string][]string{
 		"3.targets.json": targetsKeyIDs,
@@ -2168,9 +2168,9 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(snapshot.Meta, HasLen, 3)
 	// Only role1 should have a bumped version.
-	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 3)
-	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 4)
-	c.Assert(snapshot.Meta["role2.json"].Version, Equals, 3)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, int64(3))
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, int64(4))
+	c.Assert(snapshot.Meta["role2.json"].Version, Equals, int64(3))
 
 	checkSigKeyIDs(c, local, map[string][]string{
 		"3.targets.json": targetsKeyIDs,
@@ -2201,9 +2201,9 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(snapshot.Meta, HasLen, 3)
 	// Only role2 should have a bumped version.
-	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 3)
-	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 4)
-	c.Assert(snapshot.Meta["role2.json"].Version, Equals, 4)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, int64(3))
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, int64(4))
+	c.Assert(snapshot.Meta["role2.json"].Version, Equals, int64(4))
 
 	checkSigKeyIDs(c, local, map[string][]string{
 		"3.targets.json": targetsKeyIDs,
@@ -2292,16 +2292,16 @@ func (rs *RepoSuite) TestHashBinDelegations(c *C) {
 	c.Assert(err, IsNil)
 	// 1 targets.json, 1 bins.json, 8 bins_*.json.
 	c.Assert(snapshot.Meta, HasLen, 10)
-	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 1)
-	c.Assert(snapshot.Meta["bins.json"].Version, Equals, 1)
-	c.Assert(snapshot.Meta["bins_0-1.json"].Version, Equals, 1)
-	c.Assert(snapshot.Meta["bins_2-3.json"].Version, Equals, 1)
-	c.Assert(snapshot.Meta["bins_4-5.json"].Version, Equals, 1)
-	c.Assert(snapshot.Meta["bins_6-7.json"].Version, Equals, 1)
-	c.Assert(snapshot.Meta["bins_8-9.json"].Version, Equals, 1)
-	c.Assert(snapshot.Meta["bins_a-b.json"].Version, Equals, 1)
-	c.Assert(snapshot.Meta["bins_c-d.json"].Version, Equals, 2)
-	c.Assert(snapshot.Meta["bins_e-f.json"].Version, Equals, 1)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, int64(1))
+	c.Assert(snapshot.Meta["bins.json"].Version, Equals, int64(1))
+	c.Assert(snapshot.Meta["bins_0-1.json"].Version, Equals, int64(1))
+	c.Assert(snapshot.Meta["bins_2-3.json"].Version, Equals, int64(1))
+	c.Assert(snapshot.Meta["bins_4-5.json"].Version, Equals, int64(1))
+	c.Assert(snapshot.Meta["bins_6-7.json"].Version, Equals, int64(1))
+	c.Assert(snapshot.Meta["bins_8-9.json"].Version, Equals, int64(1))
+	c.Assert(snapshot.Meta["bins_a-b.json"].Version, Equals, int64(1))
+	c.Assert(snapshot.Meta["bins_c-d.json"].Version, Equals, int64(2))
+	c.Assert(snapshot.Meta["bins_e-f.json"].Version, Equals, int64(1))
 
 	targets, err = r.targets("bins_c-d")
 	c.Assert(err, IsNil)
@@ -2343,7 +2343,7 @@ func (rs *RepoSuite) TestResetTargetsDelegationsWithExpires(c *C) {
 	snapshot, err := r.snapshot()
 	c.Assert(err, IsNil)
 	c.Assert(snapshot.Meta, HasLen, 1)
-	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 1)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, int64(1))
 
 	checkSigKeyIDs(c, local, map[string][]string{
 		"1.targets.json": targetsKeyIDs,
@@ -2374,8 +2374,8 @@ func (rs *RepoSuite) TestResetTargetsDelegationsWithExpires(c *C) {
 	snapshot, err = r.snapshot()
 	c.Assert(err, IsNil)
 	c.Assert(snapshot.Meta, HasLen, 2)
-	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 2)
-	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 1)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, int64(2))
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, int64(1))
 
 	checkSigKeyIDs(c, local, map[string][]string{
 		"1.targets.json": targetsKeyIDs,
@@ -2392,8 +2392,8 @@ func (rs *RepoSuite) TestResetTargetsDelegationsWithExpires(c *C) {
 	snapshot, err = r.snapshot()
 	c.Assert(err, IsNil)
 	c.Assert(snapshot.Meta, HasLen, 2)
-	c.Assert(snapshot.Meta["targets.json"].Version, Equals, 3)
-	c.Assert(snapshot.Meta["role1.json"].Version, Equals, 1)
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, int64(3))
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, int64(1))
 
 	checkSigKeyIDs(c, local, map[string][]string{
 		"2.targets.json": targetsKeyIDs,
