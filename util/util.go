@@ -30,8 +30,8 @@ func (e ErrWrongLength) Error() string {
 }
 
 type ErrWrongVersion struct {
-	Expected int
-	Actual   int
+	Expected int64
+	Actual   int64
 }
 
 func (e ErrWrongVersion) Error() string {
@@ -102,7 +102,7 @@ func hashEqual(actual data.Hashes, expected data.Hashes) error {
 	return nil
 }
 
-func versionEqual(actual int, expected int) error {
+func versionEqual(actual int64, expected int64) error {
 	if actual != expected {
 		return ErrWrongVersion{expected, actual}
 	}
@@ -183,10 +183,10 @@ func GenerateFileMeta(r io.Reader, hashAlgorithms ...string) (data.FileMeta, err
 }
 
 type versionedMeta struct {
-	Version int `json:"version"`
+	Version int64 `json:"version"`
 }
 
-func generateVersionedFileMeta(r io.Reader, hashAlgorithms ...string) (data.FileMeta, int, error) {
+func generateVersionedFileMeta(r io.Reader, hashAlgorithms ...string) (data.FileMeta, int64, error) {
 	b, err := ioutil.ReadAll(r)
 	if err != nil {
 		return data.FileMeta{}, 0, err
@@ -253,8 +253,8 @@ func NormalizeTarget(p string) string {
 	return strings.TrimPrefix(path.Join("/", p), "/")
 }
 
-func VersionedPath(p string, version int) string {
-	return path.Join(path.Dir(p), strconv.Itoa(version)+"."+path.Base(p))
+func VersionedPath(p string, version int64) string {
+	return path.Join(path.Dir(p), strconv.FormatInt(version, 10)+"."+path.Base(p))
 }
 
 func HashedPaths(p string, hashes data.Hashes) []string {

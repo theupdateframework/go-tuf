@@ -96,7 +96,7 @@ func DefaultExpires(role string) time.Time {
 type Root struct {
 	Type        string                `json:"_type"`
 	SpecVersion string                `json:"spec_version"`
-	Version     int                   `json:"version"`
+	Version     int64                 `json:"version"`
 	Expires     time.Time             `json:"expires"`
 	Keys        map[string]*PublicKey `json:"keys"`
 	Roles       map[string]*Role      `json:"roles"`
@@ -167,7 +167,7 @@ func (f FileMeta) HashAlgorithms() []string {
 
 type SnapshotFileMeta struct {
 	FileMeta
-	Version int `json:"version"`
+	Version int64 `json:"version"`
 }
 
 type SnapshotFiles map[string]SnapshotFileMeta
@@ -175,7 +175,7 @@ type SnapshotFiles map[string]SnapshotFileMeta
 type Snapshot struct {
 	Type        string           `json:"_type"`
 	SpecVersion string           `json:"spec_version"`
-	Version     int              `json:"version"`
+	Version     int64            `json:"version"`
 	Expires     time.Time        `json:"expires"`
 	Meta        SnapshotFiles    `json:"meta"`
 	Custom      *json.RawMessage `json:"custom,omitempty"`
@@ -203,7 +203,7 @@ func (f TargetFileMeta) HashAlgorithms() []string {
 type Targets struct {
 	Type        string           `json:"_type"`
 	SpecVersion string           `json:"spec_version"`
-	Version     int              `json:"version"`
+	Version     int64            `json:"version"`
 	Expires     time.Time        `json:"expires"`
 	Targets     TargetFiles      `json:"targets"`
 	Delegations *Delegations     `json:"delegations,omitempty"`
@@ -302,7 +302,7 @@ func NewTargets() *Targets {
 
 type TimestampFileMeta struct {
 	FileMeta
-	Version int `json:"version"`
+	Version int64 `json:"version"`
 }
 
 type TimestampFiles map[string]TimestampFileMeta
@@ -310,7 +310,7 @@ type TimestampFiles map[string]TimestampFileMeta
 type Timestamp struct {
 	Type        string           `json:"_type"`
 	SpecVersion string           `json:"spec_version"`
-	Version     int              `json:"version"`
+	Version     int64            `json:"version"`
 	Expires     time.Time        `json:"expires"`
 	Meta        TimestampFiles   `json:"meta"`
 	Custom      *json.RawMessage `json:"custom,omitempty"`
