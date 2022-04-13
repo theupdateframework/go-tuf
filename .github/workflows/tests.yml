@@ -31,7 +31,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - name: Setup - Python
-        uses: actions/setup-python@7f80679172b057fc5e90d70d197929d454754a5a
+        uses: actions/setup-python@98f2ad02fd48d057ee3b4d4f66525b231c3e52b6
         with:
           python-version: 3.6
           cache: "pip"
