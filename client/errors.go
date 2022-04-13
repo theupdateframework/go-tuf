@@ -3,8 +3,6 @@ package client
 import (
 	"errors"
 	"fmt"
-
-	"github.com/theupdateframework/go-tuf/verify"
 )
 
 var (
@@ -47,21 +45,6 @@ type ErrMaxDelegations struct {
 
 func (e ErrMaxDelegations) Error() string {
 	return fmt.Sprintf("tuf: max delegation of %d reached searching for %s with snapshot version %d", e.MaxDelegations, e.Target, e.SnapshotVersion)
-}
-
-//lint:ignore U1000 unused
-func isDecodeFailedWithErrRoleThreshold(err error) bool {
-	e, ok := err.(ErrDecodeFailed)
-	if !ok {
-		return false
-	}
-	return isErrRoleThreshold(e.Err)
-}
-
-//lint:ignore U1000 unused
-func isErrRoleThreshold(err error) bool {
-	_, ok := err.(verify.ErrRoleThreshold)
-	return ok
 }
 
 type ErrNotFound struct {
