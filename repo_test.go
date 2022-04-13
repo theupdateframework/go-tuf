@@ -2402,3 +2402,122 @@ func (rs *RepoSuite) TestResetTargetsDelegationsWithExpires(c *C) {
 		"role1.json":     role1Key.PublicData().IDs(),
 	})
 }
+
+func (rs *RepoSuite) TestSignWithDelegations(c *C) {
+	tmp := newTmpDir(c)
+	local := FileSystemStore(tmp.path, nil)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// Add one key to each role
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	role1Key, err := keys.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+
+	role1 := data.DelegatedRole{
+		Name:      "role1",
+		KeyIDs:    role1Key.PublicData().IDs(),
+		Paths:     []string{"A/*", "B/*"},
+		Threshold: 1,
+	}
+	err = r.AddDelegatedRole("targets", role1, []*data.PublicKey{
+		role1Key.PublicData(),
+	})
+	c.Assert(err, IsNil)
+
+	// targets.json should be signed, but role1.json is not signed because there
+	// is no key in the local store.
+	m, err := local.GetMeta()
+	c.Assert(err, IsNil)
+	targetsMeta := &data.Signed{}
+	c.Assert(json.Unmarshal(m["targets.json"], targetsMeta), IsNil)
+	c.Assert(len(targetsMeta.Signatures), Equals, 1)
+	role1Meta := &data.Signed{}
+	c.Assert(json.Unmarshal(m["role1.json"], role1Meta), IsNil)
+	c.Assert(len(role1Meta.Signatures), Equals, 0)
+
+	c.Assert(r.Snapshot(), DeepEquals, ErrInsufficientSignatures{"role1.json", verify.ErrNoSignatures})
+
+	// Sign role1.json.
+	c.Assert(local.SaveSigner("role1", role1Key), IsNil)
+	c.Assert(r.Sign("role1.json"), IsNil)
+
+	m, err = local.GetMeta()
+	c.Assert(err, IsNil)
+	targetsMeta = &data.Signed{}
+	c.Assert(json.Unmarshal(m["targets.json"], targetsMeta), IsNil)
+	c.Assert(len(targetsMeta.Signatures), Equals, 1)
+	role1Meta = &data.Signed{}
+	c.Assert(json.Unmarshal(m["role1.json"], role1Meta), IsNil)
+	c.Assert(len(role1Meta.Signatures), Equals, 1)
+
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+}
+
+func (rs *RepoSuite) TestAddOrUpdateSignatureWithDelegations(c *C) {
+	tmp := newTmpDir(c)
+	local := FileSystemStore(tmp.path, nil)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// Add one key to each role
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	role1Key, err := keys.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+
+	role1 := data.DelegatedRole{
+		Name:      "role1",
+		KeyIDs:    role1Key.PublicData().IDs(),
+		Paths:     []string{"A/*", "B/*"},
+		Threshold: 1,
+	}
+	err = r.AddDelegatedRole("targets", role1, []*data.PublicKey{
+		role1Key.PublicData(),
+	})
+	c.Assert(err, IsNil)
+
+	// targets.json should be signed, but role1.json is not signed because there
+	// is no key in the local store.
+	m, err := local.GetMeta()
+	c.Assert(err, IsNil)
+	targetsMeta := &data.Signed{}
+	c.Assert(json.Unmarshal(m["targets.json"], targetsMeta), IsNil)
+	c.Assert(len(targetsMeta.Signatures), Equals, 1)
+	role1Meta := &data.Signed{}
+	c.Assert(json.Unmarshal(m["role1.json"], role1Meta), IsNil)
+	c.Assert(len(role1Meta.Signatures), Equals, 0)
+
+	c.Assert(r.Snapshot(), DeepEquals, ErrInsufficientSignatures{"role1.json", verify.ErrNoSignatures})
+
+	// Sign role1.json.
+	sig, err := role1Key.SignMessage(role1Meta.Signed)
+	c.Assert(err, IsNil)
+	err = r.AddOrUpdateSignature("role1.json", data.Signature{
+		KeyID:     role1Key.PublicData().IDs()[0],
+		Signature: sig,
+	})
+	c.Assert(err, IsNil)
+
+	m, err = local.GetMeta()
+	c.Assert(err, IsNil)
+	targetsMeta = &data.Signed{}
+	c.Assert(json.Unmarshal(m["targets.json"], targetsMeta), IsNil)
+	c.Assert(len(targetsMeta.Signatures), Equals, 1)
+	role1Meta = &data.Signed{}
+	c.Assert(json.Unmarshal(m["role1.json"], role1Meta), IsNil)
+	c.Assert(len(role1Meta.Signatures), Equals, 1)
+
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+}
