@@ -2221,9 +2221,6 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 	checkTargets("targets", "potato.txt")
 	checkTargets("role1", "A/apple.txt", "B/banana.txt", "A/allium.txt")
 	checkTargets("role2", "C/clementine.txt", "D/durian.txt")
-
-	// Check compatibility with Sign and	j
-	// r.Sign("4.)
 }
 
 func (rs *RepoSuite) TestHashBinDelegations(c *C) {
