@@ -2521,7 +2521,9 @@ func (rs *RepoSuite) TestAddOrUpdateSignatureWithDelegations(c *C) {
 	c.Assert(r.Snapshot(), DeepEquals, ErrInsufficientSignatures{"role1.json", verify.ErrNoSignatures})
 
 	// Sign role1.json.
-	sig, err := role1Key.SignMessage(role1Meta.Signed)
+	canonical, err := cjson.EncodeCanonical(role1Meta.Signed)
+	c.Assert(err, IsNil)
+	sig, err := role1Key.SignMessage(canonical)
 	c.Assert(err, IsNil)
 	err = r.AddOrUpdateSignature("role1.json", data.Signature{
 		KeyID:     role1Key.PublicData().IDs()[0],
