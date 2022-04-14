@@ -1,6 +1,8 @@
 package sign
 
 import (
+	"encoding/json"
+
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
@@ -22,7 +24,12 @@ func Sign(s *data.Signed, k keys.Signer) error {
 		}
 	}
 
-	sig, err := k.SignMessage(s.Signed)
+	canonical, err := cjson.EncodeCanonical(s.Signed)
+	if err != nil {
+		return err
+	}
+
+	sig, err := k.SignMessage(canonical)
 	if err != nil {
 		return err
 	}
@@ -39,7 +46,7 @@ func Sign(s *data.Signed, k keys.Signer) error {
 }
 
 func Marshal(v interface{}, keys ...keys.Signer) (*data.Signed, error) {
-	b, err := cjson.EncodeCanonical(v)
+	b, err := json.Marshal(v)
 	if err != nil {
 		return nil, err
 	}

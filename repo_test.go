@@ -1692,7 +1692,9 @@ func (rs *RepoSuite) TestAddOrUpdateSignatures(c *C) {
 	// generate signatures externally and append
 	rootMeta, err := r.SignedMeta("root.json")
 	c.Assert(err, IsNil)
-	rootSig, err := rootKey.SignMessage(rootMeta.Signed)
+	rootCanonical, err := cjson.EncodeCanonical(rootMeta.Signed)
+	c.Assert(err, IsNil)
+	rootSig, err := rootKey.SignMessage(rootCanonical)
 	c.Assert(err, IsNil)
 	for _, id := range rootKey.PublicData().IDs() {
 		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
@@ -1704,7 +1706,9 @@ func (rs *RepoSuite) TestAddOrUpdateSignatures(c *C) {
 	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
 	targetsMeta, err := r.SignedMeta("targets.json")
 	c.Assert(err, IsNil)
-	targetsSig, err := targetsKey.SignMessage(targetsMeta.Signed)
+	targetsCanonical, err := cjson.EncodeCanonical(targetsMeta.Signed)
+	c.Assert(err, IsNil)
+	targetsSig, err := targetsKey.SignMessage(targetsCanonical)
 	c.Assert(err, IsNil)
 	for _, id := range targetsKey.PublicData().IDs() {
 		r.AddOrUpdateSignature("targets.json", data.Signature{
@@ -1716,7 +1720,9 @@ func (rs *RepoSuite) TestAddOrUpdateSignatures(c *C) {
 	c.Assert(r.Snapshot(), IsNil)
 	snapshotMeta, err := r.SignedMeta("snapshot.json")
 	c.Assert(err, IsNil)
-	snapshotSig, err := snapshotKey.SignMessage(snapshotMeta.Signed)
+	snapshotCanonical, err := cjson.EncodeCanonical(snapshotMeta.Signed)
+	c.Assert(err, IsNil)
+	snapshotSig, err := snapshotKey.SignMessage(snapshotCanonical)
 	c.Assert(err, IsNil)
 	for _, id := range snapshotKey.PublicData().IDs() {
 		r.AddOrUpdateSignature("snapshot.json", data.Signature{
@@ -1727,7 +1733,9 @@ func (rs *RepoSuite) TestAddOrUpdateSignatures(c *C) {
 	c.Assert(r.Timestamp(), IsNil)
 	timestampMeta, err := r.SignedMeta("timestamp.json")
 	c.Assert(err, IsNil)
-	timestampSig, err := timestampKey.SignMessage(timestampMeta.Signed)
+	timestampCanonical, err := cjson.EncodeCanonical(timestampMeta.Signed)
+	c.Assert(err, IsNil)
+	timestampSig, err := timestampKey.SignMessage(timestampCanonical)
 	c.Assert(err, IsNil)
 	for _, id := range timestampKey.PublicData().IDs() {
 		r.AddOrUpdateSignature("timestamp.json", data.Signature{
@@ -1769,7 +1777,9 @@ func (rs *RepoSuite) TestBadAddOrUpdateSignatures(c *C) {
 	// add a signature with a bad role
 	rootMeta, err := r.SignedMeta("root.json")
 	c.Assert(err, IsNil)
-	rootSig, err := rootKey.Sign(rand.Reader, rootMeta.Signed, crypto.Hash(0))
+	rootCanonical, err := cjson.EncodeCanonical(rootMeta.Signed)
+	c.Assert(err, IsNil)
+	rootSig, err := rootKey.Sign(rand.Reader, rootCanonical, crypto.Hash(0))
 	c.Assert(err, IsNil)
 	for _, id := range rootKey.PublicData().IDs() {
 		c.Assert(r.AddOrUpdateSignature("invalid_root.json", data.Signature{
