@@ -2221,6 +2221,30 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 	checkTargets("targets", "potato.txt")
 	checkTargets("role1", "A/apple.txt", "B/banana.txt", "A/allium.txt")
 	checkTargets("role2", "C/clementine.txt", "D/durian.txt")
+
+	// Add back the role1 -> role2 delegation, and verify that it doesn't change
+	// existing targets in role2.json.
+	err = r.AddDelegatedRole("role1", role1To2, []*data.PublicKey{
+		role1To2Key.PublicData(),
+	})
+	c.Assert(err, IsNil)
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	snapshot, err = r.snapshot()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Meta, HasLen, 3)
+	// Both role1 and role2 should have a bumped version.
+	// role1 is bumped because the delegations changed.
+	// role2 is only bumped because its expiration is bumped.
+	c.Assert(snapshot.Meta["targets.json"].Version, Equals, int64(3))
+	c.Assert(snapshot.Meta["role1.json"].Version, Equals, int64(5))
+	c.Assert(snapshot.Meta["role2.json"].Version, Equals, int64(5))
+
+	checkTargets("targets", "potato.txt")
+	checkTargets("role1", "A/apple.txt", "B/banana.txt", "A/allium.txt")
+	checkTargets("role2", "C/clementine.txt", "D/durian.txt")
 }
 
 func (rs *RepoSuite) TestHashBinDelegations(c *C) {
