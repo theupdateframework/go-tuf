@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -302,16 +303,30 @@ func (r *Repo) GenKey(role string) ([]string, error) {
 }
 
 func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (keyids []string, err error) {
-	signer, err := keys.GenerateEd25519Key()
+	return r.GenKeyWithTypeAndExpires(keyRole, expires, data.KeyTypeEd25519)
+}
+
+func (r *Repo) GenKeyWithTypeAndExpires(role string, expires time.Time, keyType data.KeyType) ([]string, error) {
+	var signer keys.Signer
+	var err error
+	switch keyType {
+	case data.KeyTypeEd25519:
+		signer, err = keys.GenerateEd25519Key()
+	case data.KeyTypeECDSA_SHA2_P256:
+		signer, err = keys.GenerateEcdsaKey()
+	case data.KeyTypeRSASSA_PSS_SHA256:
+		signer, err = keys.GenerateRsaKey()
+	default:
+		return nil, errors.New("unknown key type")
+	}
 	if err != nil {
-		return []string{}, err
+		return nil, err
 	}
 
-	if err = r.AddPrivateKeyWithExpires(keyRole, signer, expires); err != nil {
-		return []string{}, err
+	if err := r.AddPrivateKeyWithExpires(role, signer, expires); err != nil {
+		return nil, err
 	}
-	keyids = signer.PublicData().IDs()
-	return
+	return signer.PublicData().IDs(), nil
 }
 
 func (r *Repo) AddPrivateKey(role string, signer keys.Signer) error {

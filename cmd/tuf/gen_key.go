@@ -1,16 +1,18 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/flynn/go-docopt"
 	"github.com/theupdateframework/go-tuf"
+	"github.com/theupdateframework/go-tuf/data"
 )
 
 func init() {
 	register("gen-key", cmdGenKey, `
-usage: tuf gen-key [--expires=<days>] <role>
+usage: tuf gen-key [--expires=<days>] [--type=<type>] <role>
 
 Generate a new signing key for the given role.
 
@@ -23,23 +25,35 @@ form of TUF_{{ROLE}}_PASSPHRASE
 
 Options:
   --expires=<days>   Set the root metadata file to expire <days> days from now.
+  --type=<type>      Set the type of key to generate [default: ed25519].
 `)
 }
 
 func cmdGenKey(args *docopt.Args, repo *tuf.Repo) error {
 	role := args.String["<role>"]
 	var keyids []string
-	var err error
+
+	var keyType data.KeyType
+	switch t := args.String["--type"]; t {
+	case string(data.KeyTypeEd25519),
+		string(data.KeyTypeECDSA_SHA2_P256),
+		string(data.KeyTypeRSASSA_PSS_SHA256):
+		keyType = data.KeyType(t)
+	default:
+		return errors.New("invalid key type")
+	}
+
+	var expires time.Time
 	if arg := args.String["--expires"]; arg != "" {
-		var expires time.Time
-		expires, err = parseExpires(arg)
+		exp, err := parseExpires(arg)
 		if err != nil {
 			return err
 		}
-		keyids, err = repo.GenKeyWithExpires(role, expires)
+		expires = exp
 	} else {
-		keyids, err = repo.GenKey(role)
+		expires = data.DefaultExpires(role)
 	}
+	keyids, err := repo.GenKeyWithTypeAndExpires(role, expires, data.KeyType(keyType))
 	if err != nil {
 		return err
 	}
