@@ -36,7 +36,7 @@ func TestDelegationsDB(t *testing.T) {
 		{
 			testName: "invalid keys",
 			delegations: &data.Delegations{Keys: map[string]*data.PublicKey{
-				"a": {Type: data.KeySchemeEd25519},
+				"a": {Type: data.KeyTypeEd25519},
 			}},
 			initErr: ErrWrongID{},
 		},

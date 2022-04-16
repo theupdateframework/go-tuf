@@ -14,18 +14,29 @@ import (
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 )
 
+type KeyType string
+
+type KeyScheme string
+
+type HashAlgorithm string
+
 const (
-	KeyIDLength                = sha256.Size * 2
-	KeyTypeEd25519             = "ed25519"
-	KeyTypeECDSA_SHA2_P256     = "ecdsa-sha2-nistp256"
-	KeySchemeEd25519           = "ed25519"
-	KeySchemeECDSA_SHA2_P256   = "ecdsa-sha2-nistp256"
-	KeyTypeRSASSA_PSS_SHA256   = "rsa"
-	KeySchemeRSASSA_PSS_SHA256 = "rsassa-pss-sha256"
+	KeyIDLength = sha256.Size * 2
+
+	KeyTypeEd25519           KeyType = "ed25519"
+	KeyTypeECDSA_SHA2_P256   KeyType = "ecdsa-sha2-nistp256"
+	KeyTypeRSASSA_PSS_SHA256 KeyType = "rsa"
+
+	KeySchemeEd25519           KeyScheme = "ed25519"
+	KeySchemeECDSA_SHA2_P256   KeyScheme = "ecdsa-sha2-nistp256"
+	KeySchemeRSASSA_PSS_SHA256 KeyScheme = "rsassa-pss-sha256"
+
+	HashAlgorithmSHA256 HashAlgorithm = "sha256"
+	HashAlgorithmSHA512 HashAlgorithm = "sha512"
 )
 
 var (
-	HashAlgorithms           = []string{"sha256", "sha512"}
+	HashAlgorithms           = []HashAlgorithm{HashAlgorithmSHA256, HashAlgorithmSHA512}
 	ErrPathsAndPathHashesSet = errors.New("tuf: failed validation of delegated target: paths and path_hash_prefixes are both set")
 )
 
@@ -40,9 +51,9 @@ type Signature struct {
 }
 
 type PublicKey struct {
-	Type       string          `json:"keytype"`
-	Scheme     string          `json:"scheme"`
-	Algorithms []string        `json:"keyid_hash_algorithms,omitempty"`
+	Type       KeyType         `json:"keytype"`
+	Scheme     KeyScheme       `json:"scheme"`
+	Algorithms []HashAlgorithm `json:"keyid_hash_algorithms,omitempty"`
 	Value      json.RawMessage `json:"keyval"`
 
 	ids    []string
@@ -50,9 +61,9 @@ type PublicKey struct {
 }
 
 type PrivateKey struct {
-	Type       string          `json:"keytype"`
-	Scheme     string          `json:"scheme,omitempty"`
-	Algorithms []string        `json:"keyid_hash_algorithms,omitempty"`
+	Type       KeyType         `json:"keytype"`
+	Scheme     KeyScheme       `json:"scheme,omitempty"`
+	Algorithms []HashAlgorithm `json:"keyid_hash_algorithms,omitempty"`
 	Value      json.RawMessage `json:"keyval"`
 }
 

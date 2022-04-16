@@ -61,10 +61,6 @@ type Ed25519PrivateKeyValue struct {
 
 type ed25519Signer struct {
 	ed25519.PrivateKey
-
-	keyType       string
-	keyScheme     string
-	keyAlgorithms []string
 }
 
 func GenerateEd25519Key() (*ed25519Signer, error) {
@@ -76,19 +72,13 @@ func GenerateEd25519Key() (*ed25519Signer, error) {
 		return nil, err
 	}
 	return &ed25519Signer{
-		PrivateKey:    ed25519.PrivateKey(data.HexBytes(private)),
-		keyType:       data.KeyTypeEd25519,
-		keyScheme:     data.KeySchemeEd25519,
-		keyAlgorithms: data.HashAlgorithms,
+		PrivateKey: ed25519.PrivateKey(data.HexBytes(private)),
 	}, nil
 }
 
 func NewEd25519Signer(keyValue Ed25519PrivateKeyValue) *ed25519Signer {
 	return &ed25519Signer{
-		PrivateKey:    ed25519.PrivateKey(data.HexBytes(keyValue.Private)),
-		keyType:       data.KeyTypeEd25519,
-		keyScheme:     data.KeySchemeEd25519,
-		keyAlgorithms: data.HashAlgorithms,
+		PrivateKey: ed25519.PrivateKey(data.HexBytes(keyValue.Private)),
 	}
 }
 
@@ -105,9 +95,9 @@ func (e *ed25519Signer) MarshalPrivateKey() (*data.PrivateKey, error) {
 		return nil, err
 	}
 	return &data.PrivateKey{
-		Type:       e.keyType,
-		Scheme:     e.keyScheme,
-		Algorithms: e.keyAlgorithms,
+		Type:       data.KeyTypeEd25519,
+		Scheme:     data.KeySchemeEd25519,
+		Algorithms: data.HashAlgorithms,
 		Value:      valueBytes,
 	}, nil
 }
@@ -118,10 +108,7 @@ func (e *ed25519Signer) UnmarshalPrivateKey(key *data.PrivateKey) error {
 		return err
 	}
 	*e = ed25519Signer{
-		PrivateKey:    ed25519.PrivateKey(data.HexBytes(keyValue.Private)),
-		keyType:       key.Type,
-		keyScheme:     key.Scheme,
-		keyAlgorithms: key.Algorithms,
+		PrivateKey: ed25519.PrivateKey(data.HexBytes(keyValue.Private)),
 	}
 	return nil
 }
@@ -129,9 +116,9 @@ func (e *ed25519Signer) UnmarshalPrivateKey(key *data.PrivateKey) error {
 func (e *ed25519Signer) PublicData() *data.PublicKey {
 	keyValBytes, _ := json.Marshal(ed25519Verifier{PublicKey: []byte(e.PrivateKey.Public().(ed25519.PublicKey))})
 	return &data.PublicKey{
-		Type:       e.keyType,
-		Scheme:     e.keyScheme,
-		Algorithms: e.keyAlgorithms,
+		Type:       data.KeyTypeEd25519,
+		Scheme:     data.KeySchemeEd25519,
+		Algorithms: data.HashAlgorithms,
 		Value:      keyValBytes,
 	}
 }
