@@ -19,7 +19,7 @@ func (Ed25519Suite) TestUnmarshalEd25519(c *C) {
 		Algorithms: data.HashAlgorithms,
 		Value:      badKeyValue,
 	}
-	verifier := NewP256Verifier()
+	verifier := newEd25519Verifier()
 	c.Assert(verifier.UnmarshalPublicKey(badKey), ErrorMatches, "json: cannot unmarshal.*")
 }
 

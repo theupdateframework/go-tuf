@@ -11,15 +11,15 @@ import (
 )
 
 func init() {
-	SignerMap.Store(data.KeySchemeEd25519, NewP256Signer)
-	VerifierMap.Store(data.KeySchemeEd25519, NewP256Verifier)
+	SignerMap.Store(data.KeyTypeEd25519, newEd25519Signer)
+	VerifierMap.Store(data.KeyTypeEd25519, newEd25519Verifier)
 }
 
-func NewP256Signer() Signer {
+func newEd25519Signer() Signer {
 	return &ed25519Signer{}
 }
 
-func NewP256Verifier() Verifier {
+func newEd25519Verifier() Verifier {
 	return &ed25519Verifier{}
 }
 

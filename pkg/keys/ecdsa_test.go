@@ -5,12 +5,12 @@ import (
 	. "gopkg.in/check.v1"
 )
 
-type RsaSuite struct{}
+type EcdsaSuite struct{}
 
-var _ = Suite(&RsaSuite{})
+var _ = Suite(EcdsaSuite{})
 
-func (RsaSuite) TestSignVerify(c *C) {
-	signer, err := GenerateRsaKey()
+func (EcdsaSuite) TestSignVerify(c *C) {
+	signer, err := GenerateEcdsaKey()
 	c.Assert(err, IsNil)
 	msg := []byte("foo")
 	sig, err := signer.SignMessage(msg)
@@ -21,8 +21,8 @@ func (RsaSuite) TestSignVerify(c *C) {
 	c.Assert(pubKey.Verify(msg, sig), IsNil)
 }
 
-func (RsaSuite) TestMarshalUnmarshal(c *C) {
-	signer, err := GenerateRsaKey()
+func (EcdsaSuite) TestMarshalUnmarshalPublicKey(c *C) {
+	signer, err := GenerateEcdsaKey()
 	c.Assert(err, IsNil)
 	publicData := signer.PublicData()
 	pubKey, err := GetVerifier(publicData)
@@ -30,13 +30,13 @@ func (RsaSuite) TestMarshalUnmarshal(c *C) {
 	c.Assert(pubKey.MarshalPublicKey(), DeepEquals, publicData)
 }
 
-func (RsaSuite) TestMarshalUnmarshalPrivateKey(c *C) {
-	signer, err := GenerateRsaKey()
+func (EcdsaSuite) TestMarshalUnmarshalPrivateKey(c *C) {
+	signer, err := GenerateEcdsaKey()
 	c.Assert(err, IsNil)
 	privateData, err := signer.MarshalPrivateKey()
 	c.Assert(err, IsNil)
-	c.Assert(privateData.Type, Equals, data.KeyTypeRSASSA_PSS_SHA256)
-	c.Assert(privateData.Scheme, Equals, data.KeySchemeRSASSA_PSS_SHA256)
+	c.Assert(privateData.Type, Equals, data.KeyTypeECDSA_SHA2_P256)
+	c.Assert(privateData.Scheme, Equals, data.KeySchemeECDSA_SHA2_P256)
 	c.Assert(privateData.Algorithms, DeepEquals, data.HashAlgorithms)
 	s, err := GetSigner(privateData)
 	c.Assert(err, IsNil)
