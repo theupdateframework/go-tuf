@@ -31,12 +31,11 @@ type ecdsaSigner struct {
 }
 
 type ecdsaPublic struct {
-	PublicKey data.HexBytes `json:"public"`
+	PublicKey *data.PKIXPublicKey `json:"public"`
 }
 
 func (s ecdsaSigner) PublicData() *data.PublicKey {
-	pub := s.Public().(*ecdsa.PublicKey)
-	keyValBytes, _ := json.Marshal(ecdsaPublic{PublicKey: elliptic.Marshal(pub.Curve, pub.X, pub.Y)})
+	keyValBytes, _ := json.Marshal(ecdsaPublic{PublicKey: &data.PKIXPublicKey{PublicKey: s.Public()}})
 	return &data.PublicKey{
 		Type:       data.KeyTypeECDSA_SHA2_P256,
 		Scheme:     data.KeySchemeECDSA_SHA2_P256,
