@@ -1,6 +1,7 @@
 package tuf
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/rand"
 	"encoding/hex"
@@ -2570,6 +2571,14 @@ func (rs *RepoSuite) TestOfflineFlow(c *C) {
 	c.Assert(err, Equals, ErrMissingMetadata{"root"})
 	payload, err := r.Payload("root.json")
 	c.Assert(err, IsNil)
+
+	root, err := r.SignedMeta("root.json")
+	c.Assert(err, IsNil)
+	rootCanonical, err := cjson.EncodeCanonical(root.Signed)
+	c.Assert(err, IsNil)
+	if !bytes.Equal(payload, rootCanonical) {
+		c.Fatalf("Payload(): not canonical.\n%s\n%s", string(payload), string(rootCanonical))
+	}
 
 	// Sign the payload
 	signed := data.Signed{Signed: payload}

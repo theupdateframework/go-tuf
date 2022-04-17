@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/internal/roles"
 	"github.com/theupdateframework/go-tuf/internal/sets"
@@ -735,12 +736,12 @@ func (r *Repo) setMeta(roleFilename string, meta interface{}) error {
 	return r.local.SetMeta(roleFilename, b)
 }
 
-// SignPayload signs the payload in signed to sign the keys associated with role.
+// SignPayload signs the given payload using the key(s) associated with role.
 //
 // It returns the total number of keys used for signing, 0 (along with
 // ErrInsufficientKeys) if no keys were found, or -1 (along with an error) in
 // error cases.
-func (r *Repo) SignPayload(role string, signed *data.Signed) (int, error) {
+func (r *Repo) SignPayload(role string, payload *data.Signed) (int, error) {
 	if !roles.IsTopLevelRole(role) {
 		return -1, ErrInvalidRole{role, "only signing top-level metadata supported"}
 	}
@@ -753,7 +754,7 @@ func (r *Repo) SignPayload(role string, signed *data.Signed) (int, error) {
 		return 0, ErrInsufficientKeys{role}
 	}
 	for _, k := range keys {
-		if err = sign.Sign(signed, k); err != nil {
+		if err = sign.Sign(payload, k); err != nil {
 			return -1, err
 		}
 	}
@@ -1561,5 +1562,10 @@ func (r *Repo) Payload(roleFilename string) ([]byte, error) {
 		return nil, err
 	}
 
-	return s.Signed, nil
+	p, err := cjson.EncodeCanonical(s.Signed)
+	if err != nil {
+		return nil, err
+	}
+
+	return p, nil
 }
