@@ -639,8 +639,8 @@ func (rs *RepoSuite) TestSign(c *C) {
 
 	c.Assert(r.Sign("foo.json"), Equals, ErrMissingMetadata{"foo.json"})
 
-	// signing with no keys returns ErrInsufficientKeys
-	c.Assert(r.Sign("root.json"), Equals, ErrInsufficientKeys{"root.json"})
+	// signing with no keys returns ErrNoKeys
+	c.Assert(r.Sign("root.json"), Equals, ErrNoKeys{"root.json"})
 
 	checkSigIDs := func(keyIDs ...string) {
 		meta, err := local.GetMeta()
@@ -2585,7 +2585,7 @@ func (rs *RepoSuite) TestOfflineFlow(c *C) {
 	_, err = r.SignPayload("badrole", &signed)
 	c.Assert(err, Equals, ErrInvalidRole{"badrole", "only signing top-level metadata supported"})
 	_, err = r.SignPayload("targets", &signed)
-	c.Assert(err, Equals, ErrInsufficientKeys{"targets"})
+	c.Assert(err, Equals, ErrNoKeys{"targets"})
 	numKeys, err := r.SignPayload("root", &signed)
 	c.Assert(err, IsNil)
 	c.Assert(numKeys, Equals, 1)
