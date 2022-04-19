@@ -141,7 +141,7 @@ See also `tuf sign-payload` and `tuf add-signatures`.
 Sign a file (outside of the TUF repo) using keys (in the TUF keys database,
 typically produced by `tuf gen-key`) for the given `role` (from the TUF repo).
 
-Typically, `path` will be the output of `tuf payload`.
+Typically, `path` will be a file containing the output of `tuf payload`.
 
 See also `tuf add-signatures`.
 
