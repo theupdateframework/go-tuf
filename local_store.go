@@ -14,7 +14,6 @@ import (
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/encrypted"
-	"github.com/theupdateframework/go-tuf/internal/roles"
 	"github.com/theupdateframework/go-tuf/internal/sets"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/util"
@@ -43,6 +42,8 @@ type LocalStore interface {
 	Commit(bool, map[string]int64, map[string]data.Hashes) error
 
 	// GetSigners return a list of signers for a role.
+	// This may include revoked keys, so the signers should not
+	// be used without filtering.
 	GetSigners(role string) ([]keys.Signer, error)
 
 	// SaveSigner adds a signer to a role.
@@ -222,8 +223,7 @@ func (f *fileSystemStore) stagedDir() string {
 }
 
 func isMetaFile(e os.DirEntry) (bool, error) {
-	name := e.Name()
-	if e.IsDir() || !(filepath.Ext(name) == ".json" && roles.IsTopLevelManifest(name)) {
+	if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
 		return false, nil
 	}
 
