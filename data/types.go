@@ -1,6 +1,7 @@
 package data
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -284,7 +285,12 @@ func (d *DelegatedRole) MarshalJSON() ([]byte, error) {
 func (d *DelegatedRole) UnmarshalJSON(b []byte) error {
 	type delegatedRoleAlias DelegatedRole
 
-	if err := json.Unmarshal(b, (*delegatedRoleAlias)(d)); err != nil {
+	// Prepare decoder
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+
+	// Unmarshal delegated role
+	if err := dec.Decode((*delegatedRoleAlias)(d)); err != nil {
 		return err
 	}
 

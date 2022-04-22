@@ -8,6 +8,7 @@ import (
 	"encoding/asn1"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 
@@ -67,14 +68,27 @@ func (p *p256Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
 
 	// Unmarshal key value
 	if err := dec.Decode(p); err != nil {
+		switch {
+		case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+			return fmt.Errorf("tuf: the public key is truncated or too large: %w", err)
+		default:
+		}
 		return err
 	}
 
+	curve := elliptic.P256()
+
 	// Parse as uncompressed marshalled point.
-	x, _ := elliptic.Unmarshal(elliptic.P256(), p.PublicKey)
+	x, y := elliptic.Unmarshal(curve, p.PublicKey)
 	if x == nil {
 		return errors.New("tuf: invalid ecdsa public key point")
 	}
+
+	// Check point
+	if !curve.IsOnCurve(x, y) {
+		return errors.New("tuf: ecdsa public key point is not on the associated curve")
+	}
+
 	p.key = key
 	return nil
 }

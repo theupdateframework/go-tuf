@@ -5,8 +5,10 @@ import (
 	"crypto"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/theupdateframework/go-tuf/data"
@@ -54,6 +56,11 @@ func (e *ed25519Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
 
 	// Unmarshal key value
 	if err := dec.Decode(e); err != nil {
+		switch {
+		case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+			return fmt.Errorf("tuf: the public key is truncated or too large: %w", err)
+		default:
+		}
 		return err
 	}
 	if len(e.PublicKey) != ed25519.PublicKeySize {
@@ -122,9 +129,36 @@ func (e *ed25519Signer) MarshalPrivateKey() (*data.PrivateKey, error) {
 
 func (e *ed25519Signer) UnmarshalPrivateKey(key *data.PrivateKey) error {
 	keyValue := &Ed25519PrivateKeyValue{}
-	if err := json.Unmarshal(key.Value, keyValue); err != nil {
-		return err
+
+	// Prepare decoder limited to 512Kb
+	dec := json.NewDecoder(io.LimitReader(bytes.NewReader(key.Value), 512*1024))
+	dec.DisallowUnknownFields()
+
+	if err := dec.Decode(keyValue); err != nil {
+		switch {
+		case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+			return fmt.Errorf("tuf: the private key is truncated or too large: %w", err)
+		default:
+		}
 	}
+
+	// Check private key length
+	if len(keyValue.Private) != ed25519.PrivateKeySize {
+		return errors.New("tuf: invalid ed25519 private key length")
+	}
+
+	// Generate public key from private key
+	pub, _, err := ed25519.GenerateKey(bytes.NewReader(keyValue.Private))
+	if err != nil {
+		return fmt.Errorf("tuf: unable to derive public key from private key: %w", err)
+	}
+
+	// Compare keys
+	if subtle.ConstantTimeCompare(keyValue.Public, pub) != 1 {
+		return errors.New("tuf: public and private keys doesn't match")
+	}
+
+	// Prepare signer
 	*e = ed25519Signer{
 		PrivateKey:    ed25519.PrivateKey(data.HexBytes(keyValue.Private)),
 		keyType:       key.Type,
