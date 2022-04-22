@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"strings"
 
@@ -18,11 +19,14 @@ type Ed25519Suite struct{}
 var _ = Suite(&Ed25519Suite{})
 
 func (Ed25519Suite) TestUnmarshalEd25519(c *C) {
-	pub, _, _ := ed25519.GenerateKey(strings.NewReader("00001-deterministic-buffer-for-key-generation"))
+	pub, _, err := ed25519.GenerateKey(strings.NewReader("00001-deterministic-buffer-for-key-generation"))
+	c.Assert(err, IsNil)
 
-	publicKey, _ := json.Marshal(map[string]string{
+	publicKey, err := json.Marshal(map[string]string{
 		"public": hex.EncodeToString(pub),
 	})
+	c.Assert(err, IsNil)
+
 	badKey := &data.PublicKey{
 		Type:       data.KeyTypeEd25519,
 		Scheme:     data.KeySchemeEd25519,
@@ -34,7 +38,8 @@ func (Ed25519Suite) TestUnmarshalEd25519(c *C) {
 }
 
 func (Ed25519Suite) TestUnmarshalEd25519_Invalid(c *C) {
-	badKeyValue, _ := json.Marshal(true)
+	badKeyValue, err := json.Marshal(true)
+	c.Assert(err, IsNil)
 	badKey := &data.PublicKey{
 		Type:       data.KeyTypeEd25519,
 		Scheme:     data.KeySchemeEd25519,
@@ -60,13 +65,15 @@ func (Ed25519Suite) TestUnmarshalEd25519_FastFuzz(c *C) {
 
 func (Ed25519Suite) TestUnmarshalEd25519_TooLongContent(c *C) {
 	randomSeed := make(json.RawMessage, 1024*1024)
-	io.ReadFull(rand.Reader, randomSeed)
+	_, err := io.ReadFull(rand.Reader, randomSeed)
+	c.Assert(err, IsNil)
 
-	tooLongPayload, _ := json.Marshal(
+	tooLongPayload, err := json.Marshal(
 		&ed25519Verifier{
 			PublicKey: data.HexBytes(randomSeed),
 		},
 	)
+	c.Assert(err, IsNil)
 
 	badKey := &data.PublicKey{
 		Type:       data.KeyTypeEd25519,
@@ -75,7 +82,8 @@ func (Ed25519Suite) TestUnmarshalEd25519_TooLongContent(c *C) {
 		Value:      tooLongPayload,
 	}
 	verifier := NewEd25519Verifier()
-	c.Assert(verifier.UnmarshalPublicKey(badKey), ErrorMatches, ".*: unexpected EOF")
+	err = verifier.UnmarshalPublicKey(badKey)
+	c.Assert(errors.Is(err, io.ErrUnexpectedEOF), Equals, true)
 }
 
 func (Ed25519Suite) TestSignVerify(c *C) {

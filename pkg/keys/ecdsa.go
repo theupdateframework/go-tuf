@@ -63,7 +63,7 @@ func (p *p256Verifier) MarshalPublicKey() *data.PublicKey {
 
 func (p *p256Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
 	// Prepare decoder limited to 512Kb
-	dec := json.NewDecoder(io.LimitReader(bytes.NewReader(key.Value), 512*1024))
+	dec := json.NewDecoder(io.LimitReader(bytes.NewReader(key.Value), MaxJSONKeySize))
 	dec.DisallowUnknownFields()
 
 	// Unmarshal key value

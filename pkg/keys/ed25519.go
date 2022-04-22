@@ -51,7 +51,7 @@ func (e *ed25519Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
 	e.key = key
 
 	// Prepare decoder limited to 512Kb
-	dec := json.NewDecoder(io.LimitReader(bytes.NewReader(key.Value), 512*1024))
+	dec := json.NewDecoder(io.LimitReader(bytes.NewReader(key.Value), MaxJSONKeySize))
 	dec.DisallowUnknownFields()
 
 	// Unmarshal key value
@@ -131,7 +131,7 @@ func (e *ed25519Signer) UnmarshalPrivateKey(key *data.PrivateKey) error {
 	keyValue := &Ed25519PrivateKeyValue{}
 
 	// Prepare decoder limited to 512Kb
-	dec := json.NewDecoder(io.LimitReader(bytes.NewReader(key.Value), 512*1024))
+	dec := json.NewDecoder(io.LimitReader(bytes.NewReader(key.Value), MaxJSONKeySize))
 	dec.DisallowUnknownFields()
 
 	if err := dec.Decode(keyValue); err != nil {
@@ -143,8 +143,8 @@ func (e *ed25519Signer) UnmarshalPrivateKey(key *data.PrivateKey) error {
 	}
 
 	// Check private key length
-	if len(keyValue.Private) != ed25519.PrivateKeySize {
-		return errors.New("tuf: invalid ed25519 private key length")
+	if n := len(keyValue.Private); n != ed25519.PrivateKeySize {
+		return fmt.Errorf("tuf: invalid ed25519 private key length, expected %d, got %d", ed25519.PrivateKeySize, n)
 	}
 
 	// Generate public key from private key
@@ -155,7 +155,7 @@ func (e *ed25519Signer) UnmarshalPrivateKey(key *data.PrivateKey) error {
 
 	// Compare keys
 	if subtle.ConstantTimeCompare(keyValue.Public, pub) != 1 {
-		return errors.New("tuf: public and private keys doesn't match")
+		return errors.New("tuf: public and private keys don't match")
 	}
 
 	// Prepare signer
