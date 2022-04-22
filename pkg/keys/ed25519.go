@@ -1,25 +1,27 @@
 package keys
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"io"
 
 	"github.com/theupdateframework/go-tuf/data"
 )
 
 func init() {
-	SignerMap.Store(data.KeySchemeEd25519, NewP256Signer)
-	VerifierMap.Store(data.KeySchemeEd25519, NewP256Verifier)
+	SignerMap.Store(data.KeySchemeEd25519, NewEd25519Signer)
+	VerifierMap.Store(data.KeySchemeEd25519, NewEd25519Verifier)
 }
 
-func NewP256Signer() Signer {
+func NewEd25519Signer() Signer {
 	return &ed25519Signer{}
 }
 
-func NewP256Verifier() Verifier {
+func NewEd25519Verifier() Verifier {
 	return &ed25519Verifier{}
 }
 
@@ -45,7 +47,13 @@ func (e *ed25519Verifier) MarshalPublicKey() *data.PublicKey {
 
 func (e *ed25519Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
 	e.key = key
-	if err := json.Unmarshal(key.Value, e); err != nil {
+
+	// Prepare decoder limited to 512Kb
+	dec := json.NewDecoder(io.LimitReader(bytes.NewReader(key.Value), 512*1024))
+	dec.DisallowUnknownFields()
+
+	// Unmarshal key value
+	if err := dec.Decode(e); err != nil {
 		return err
 	}
 	if len(e.PublicKey) != ed25519.PublicKeySize {
@@ -83,7 +91,7 @@ func GenerateEd25519Key() (*ed25519Signer, error) {
 	}, nil
 }
 
-func NewEd25519Signer(keyValue Ed25519PrivateKeyValue) *ed25519Signer {
+func NewEd25519SignerFromKey(keyValue Ed25519PrivateKeyValue) *ed25519Signer {
 	return &ed25519Signer{
 		PrivateKey:    ed25519.PrivateKey(data.HexBytes(keyValue.Private)),
 		keyType:       data.KeyTypeEd25519,
