@@ -79,14 +79,9 @@ func (p *p256Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
 	curve := elliptic.P256()
 
 	// Parse as uncompressed marshalled point.
-	x, y := elliptic.Unmarshal(curve, p.PublicKey)
+	x, _ := elliptic.Unmarshal(curve, p.PublicKey)
 	if x == nil {
 		return errors.New("tuf: invalid ecdsa public key point")
-	}
-
-	// Check point
-	if !curve.IsOnCurve(x, y) {
-		return errors.New("tuf: ecdsa public key point is not on the associated curve")
 	}
 
 	p.key = key
