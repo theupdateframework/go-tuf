@@ -64,13 +64,13 @@ func (Ed25519Suite) TestUnmarshalEd25519_FastFuzz(c *C) {
 }
 
 func (Ed25519Suite) TestUnmarshalEd25519_TooLongContent(c *C) {
-	randomSeed := make(json.RawMessage, 1024*1024)
+	randomSeed := make([]byte, MaxJSONKeySize)
 	_, err := io.ReadFull(rand.Reader, randomSeed)
 	c.Assert(err, IsNil)
 
 	tooLongPayload, err := json.Marshal(
 		&ed25519Verifier{
-			PublicKey: data.HexBytes(randomSeed),
+			PublicKey: data.HexBytes(hex.EncodeToString(randomSeed)),
 		},
 	)
 	c.Assert(err, IsNil)
