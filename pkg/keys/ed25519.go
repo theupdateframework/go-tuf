@@ -63,8 +63,8 @@ func (e *ed25519Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
 		}
 		return err
 	}
-	if len(e.PublicKey) != ed25519.PublicKeySize {
-		return errors.New("tuf: unexpected public key length for ed25519 key")
+	if n := len(e.PublicKey); n != ed25519.PublicKeySize {
+		return fmt.Errorf("tuf: unexpected public key length for ed25519 key, expected %d, got %d", ed25519.PublicKeySize, n)
 	}
 	return nil
 }
