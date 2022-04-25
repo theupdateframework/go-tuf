@@ -741,10 +741,6 @@ func (r *Repo) setMeta(roleFilename string, meta interface{}) error {
 // It returns the total number of keys used for signing, 0 (along with
 // ErrNoKeys) if no keys were found, or -1 (along with an error) in error cases.
 func (r *Repo) SignPayload(role string, payload *data.Signed) (int, error) {
-	if !roles.IsTopLevelRole(role) {
-		return -1, ErrInvalidRole{role, "only signing top-level metadata supported"}
-	}
-
 	keys, err := r.signersForRole(role)
 	if err != nil {
 		return -1, err
@@ -1550,12 +1546,6 @@ func (r *Repo) timestampFileMeta(roleFilename string) (data.TimestampFileMeta, e
 }
 
 func (r *Repo) Payload(roleFilename string) ([]byte, error) {
-	role := strings.TrimSuffix(roleFilename, ".json")
-	if !roles.IsTopLevelRole(role) {
-		// TODO: handle payloads with delegated roles
-		return nil, ErrInvalidRole{role, "only signing top-level metadata supported"}
-	}
-
 	s, err := r.SignedMeta(roleFilename)
 	if err != nil {
 		return nil, err

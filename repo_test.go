@@ -2566,7 +2566,7 @@ func (rs *RepoSuite) TestOfflineFlow(c *C) {
 
 	// Get the payload to sign
 	_, err = r.Payload("badrole.json")
-	c.Assert(err, Equals, ErrInvalidRole{"badrole", "only signing top-level metadata supported"})
+	c.Assert(err, Equals, ErrMissingMetadata{"badrole.json"})
 	_, err = r.Payload("root")
 	c.Assert(err, Equals, ErrMissingMetadata{"root"})
 	payload, err := r.Payload("root.json")
@@ -2582,8 +2582,6 @@ func (rs *RepoSuite) TestOfflineFlow(c *C) {
 
 	// Sign the payload
 	signed := data.Signed{Signed: payload}
-	_, err = r.SignPayload("badrole", &signed)
-	c.Assert(err, Equals, ErrInvalidRole{"badrole", "only signing top-level metadata supported"})
 	_, err = r.SignPayload("targets", &signed)
 	c.Assert(err, Equals, ErrNoKeys{"targets"})
 	numKeys, err := r.SignPayload("root", &signed)
