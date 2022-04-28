@@ -8,7 +8,7 @@ jobs:
     outputs:
       matrix: ${{ steps.versions.outputs.matrix }}
     steps:
-      - uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
+      - uses: actions/checkout@v3
       - uses: arnested/go-version-action@75e53ba83545379e9f189ecb73b53b8b3e126c7f
         id: versions
 
@@ -21,7 +21,7 @@ jobs:
     needs: get-go-versions
     steps:
       - name: Checkout code
-        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
+        uses: actions/checkout@v3
 
       - name: Setup - Go ${{ matrix.go-version }}
         uses: actions/setup-go@f6164bd8c8acb4a71fb2791a8b6c4024ff038dab
@@ -59,18 +59,8 @@ jobs:
     needs: get-go-versions
     steps:
       - uses: actions/setup-go@f6164bd8c8acb4a71fb2791a8b6c4024ff038dab
-      - uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
+      - uses: actions/checkout@v3
       - name: golangci-lint
         uses: golangci/golangci-lint-action@5c56cd6c9dc07901af25baab6f2b0d9f3b7c3018
         with:
-          version: v1.44
-
-  conventional-commits-lint-check:
-    runs-on: "ubuntu-latest"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
-        with:
-          fetch-depth: 0
-      - name: Commitsar Action
-        uses: aevea/commitsar@159cec82966ca402a09ae3c185524a5256affa22
+          version: v1.45.2

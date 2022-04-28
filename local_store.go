@@ -14,7 +14,6 @@ import (
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/encrypted"
-	"github.com/theupdateframework/go-tuf/internal/roles"
 	"github.com/theupdateframework/go-tuf/internal/sets"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/util"
@@ -40,9 +39,11 @@ type LocalStore interface {
 	// This will also reset the staged meta to signal incrementing version numbers.
 	// TUF 1.0 requires that the root metadata version numbers in the repository does not
 	// gaps. To avoid this, we will only increment the number once until we commit.
-	Commit(bool, map[string]int, map[string]data.Hashes) error
+	Commit(bool, map[string]int64, map[string]data.Hashes) error
 
 	// GetSigners return a list of signers for a role.
+	// This may include revoked keys, so the signers should not
+	// be used without filtering.
 	GetSigners(role string) ([]keys.Signer, error)
 
 	// SaveSigner adds a signer to a role.
@@ -125,7 +126,7 @@ func (m *memoryStore) WalkStagedTargets(paths []string, targetsFn TargetsWalkFun
 	return nil
 }
 
-func (m *memoryStore) Commit(consistentSnapshot bool, versions map[string]int, hashes map[string]data.Hashes) error {
+func (m *memoryStore) Commit(consistentSnapshot bool, versions map[string]int64, hashes map[string]data.Hashes) error {
 	for name, meta := range m.stagedMeta {
 		paths := computeMetadataPaths(consistentSnapshot, name, versions)
 		for _, path := range paths {
@@ -222,8 +223,7 @@ func (f *fileSystemStore) stagedDir() string {
 }
 
 func isMetaFile(e os.DirEntry) (bool, error) {
-	name := e.Name()
-	if e.IsDir() || !(filepath.Ext(name) == ".json" && roles.IsTopLevelManifest(name)) {
+	if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
 		return false, nil
 	}
 
@@ -369,7 +369,7 @@ func (f *fileSystemStore) createRepoFile(path string) (*os.File, error) {
 	return os.Create(dst)
 }
 
-func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]int, hashes map[string]data.Hashes) error {
+func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]int64, hashes map[string]data.Hashes) error {
 	isTarget := func(path string) bool {
 		return strings.HasPrefix(path, "targets/")
 	}
@@ -700,7 +700,7 @@ func computeTargetPaths(consistentSnapshot bool, name string, hashes map[string]
 	}
 }
 
-func computeMetadataPaths(consistentSnapshot bool, name string, versions map[string]int) []string {
+func computeMetadataPaths(consistentSnapshot bool, name string, versions map[string]int64) []string {
 	copyVersion := false
 
 	switch name {

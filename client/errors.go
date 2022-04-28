@@ -3,8 +3,6 @@ package client
 import (
 	"errors"
 	"fmt"
-
-	"github.com/theupdateframework/go-tuf/verify"
 )
 
 var (
@@ -42,25 +40,11 @@ func (e ErrDecodeFailed) Error() string {
 type ErrMaxDelegations struct {
 	Target          string
 	MaxDelegations  int
-	SnapshotVersion int
+	SnapshotVersion int64
 }
 
 func (e ErrMaxDelegations) Error() string {
 	return fmt.Sprintf("tuf: max delegation of %d reached searching for %s with snapshot version %d", e.MaxDelegations, e.Target, e.SnapshotVersion)
-}
-
-//lint:ignore U1000 unused
-func isDecodeFailedWithErrRoleThreshold(err error) bool {
-	e, ok := err.(ErrDecodeFailed)
-	if !ok {
-		return false
-	}
-	return isErrRoleThreshold(e.Err)
-}
-
-func isErrRoleThreshold(err error) bool {
-	_, ok := err.(verify.ErrRoleThreshold)
-	return ok
 }
 
 type ErrNotFound struct {
@@ -87,7 +71,7 @@ func (e ErrWrongSize) Error() string {
 }
 
 type ErrLatestSnapshot struct {
-	Version int
+	Version int64
 }
 
 func (e ErrLatestSnapshot) Error() string {
@@ -101,7 +85,7 @@ func IsLatestSnapshot(err error) bool {
 
 type ErrUnknownTarget struct {
 	Name            string
-	SnapshotVersion int
+	SnapshotVersion int64
 }
 
 func (e ErrUnknownTarget) Error() string {
@@ -128,7 +112,7 @@ func (e ErrInvalidURL) Error() string {
 
 type ErrRoleNotInSnapshot struct {
 	Role            string
-	SnapshotVersion int
+	SnapshotVersion int64
 }
 
 func (e ErrRoleNotInSnapshot) Error() string {
