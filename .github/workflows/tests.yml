@@ -8,7 +8,7 @@ jobs:
     outputs:
       matrix: ${{ steps.versions.outputs.matrix }}
     steps:
-      - uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
+      - uses: actions/checkout@v3
       - uses: arnested/go-version-action@d44f8fbecf1ac5ea61d81603e99dfec9833f592f
         id: versions
         env:
@@ -23,7 +23,7 @@ jobs:
     needs: get-go-versions
     steps:
       - name: Checkout code
-        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
+        uses: actions/checkout@v3
 
       - name: Setup - Go ${{ matrix.go-version }}
         uses: actions/setup-go@f6164bd8c8acb4a71fb2791a8b6c4024ff038dab
@@ -61,7 +61,7 @@ jobs:
     needs: get-go-versions
     steps:
       - uses: actions/setup-go@f6164bd8c8acb4a71fb2791a8b6c4024ff038dab
-      - uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
+      - uses: actions/checkout@v3
       - name: golangci-lint
         uses: golangci/golangci-lint-action@5c56cd6c9dc07901af25baab6f2b0d9f3b7c3018
         with:
