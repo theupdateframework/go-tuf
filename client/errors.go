@@ -70,19 +70,6 @@ func (e ErrWrongSize) Error() string {
 	return fmt.Sprintf("tuf: unexpected file size: %s (expected %d bytes, got %d bytes)", e.File, e.Expected, e.Actual)
 }
 
-type ErrLatestSnapshot struct {
-	Version int64
-}
-
-func (e ErrLatestSnapshot) Error() string {
-	return fmt.Sprintf("tuf: the local snapshot version (%d) is the latest", e.Version)
-}
-
-func IsLatestSnapshot(err error) bool {
-	_, ok := err.(ErrLatestSnapshot)
-	return ok
-}
-
 type ErrUnknownTarget struct {
 	Name            string
 	SnapshotVersion int64

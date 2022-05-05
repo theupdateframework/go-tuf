@@ -22,7 +22,7 @@ List available target files.
 }
 
 func cmdList(args *docopt.Args, client *tuf.Client) error {
-	if _, err := client.Update(); err != nil && !tuf.IsLatestSnapshot(err) {
+	if _, err := client.Update(); err != nil {
 		return err
 	}
 	targets, err := client.Targets()

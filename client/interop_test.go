@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/theupdateframework/go-tuf/util"
 	. "gopkg.in/check.v1"
@@ -159,9 +158,17 @@ func (t *testCase) runStep(c *C, stepName string) {
 	// check update returns the correct updated targets
 	files, err := client.Update()
 	c.Assert(err, IsNil)
-	l, _ := strconv.Atoi(stepName)
-	c.Assert(files, HasLen, l+1)
-
+	if stepName != "2" {
+		// The rest of the test cases add one target file at a time for each cycle, so this is why we expect that
+		// the number of updated targets returned by Update() should equals to 1
+		c.Assert(files, HasLen, 1)
+	} else {
+		// The following test case (#2) verifies that when a targets key has been rotated in the latest 3.root.json,
+		// the local targets.json meta is indeed ignored since it's signed with a key that has been now changed.
+		// The reason we check for 3 here is that the updated targets corresponds to all target files listed in the
+		// targets.json for test case #2
+		c.Assert(files, HasLen, 3)
+	}
 	targetName := stepName
 	t.targets[targetName] = []byte(targetName)
 

@@ -47,7 +47,7 @@ func (db *DB) VerifyIgnoreExpiredCheck(s *data.Signed, role string, minVersion i
 }
 
 func (db *DB) Verify(s *data.Signed, role string, minVersion int64) error {
-
+	// Verify signatures and versions
 	err := db.VerifyIgnoreExpiredCheck(s, role, minVersion)
 
 	if err != nil {
@@ -58,7 +58,7 @@ func (db *DB) Verify(s *data.Signed, role string, minVersion int64) error {
 	if err := json.Unmarshal(s.Signed, sm); err != nil {
 		return err
 	}
-
+	// Verify expiration
 	if IsExpired(sm.Expires) {
 		return ErrExpired{sm.Expires}
 	}

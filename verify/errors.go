@@ -18,6 +18,7 @@ var (
 	ErrInvalidDelegatedRole = errors.New("tuf: invalid delegated role")
 	ErrInvalidKeyID         = errors.New("tuf: invalid key id")
 	ErrInvalidThreshold     = errors.New("tuf: invalid role threshold")
+	ErrMissingTargetFile    = errors.New("tuf: missing previously listed targets metadata file")
 )
 
 type ErrWrongID struct{}

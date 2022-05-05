@@ -31,7 +31,7 @@ func (t *tmpFile) Delete() error {
 }
 
 func cmdGet(args *docopt.Args, client *tuf.Client) error {
-	if _, err := client.Update(); err != nil && !tuf.IsLatestSnapshot(err) {
+	if _, err := client.Update(); err != nil {
 		return err
 	}
 	target := util.NormalizeTarget(args.String["<target>"])

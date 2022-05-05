@@ -118,13 +118,13 @@ func SnapshotFileMetaEqual(actual data.SnapshotFileMeta, expected data.SnapshotF
 	if expected.Length != 0 && actual.Length != expected.Length {
 		return ErrWrongLength{expected.Length, actual.Length}
 	}
-
+	// 5.6.2 - Check against snapshot role's targets hash
 	if len(expected.Hashes) != 0 {
 		if err := hashEqual(actual.Hashes, expected.Hashes); err != nil {
 			return err
 		}
 	}
-
+	// 5.6.4 - Check against snapshot role's snapshot version
 	if err := versionEqual(actual.Version, expected.Version); err != nil {
 		return err
 	}
@@ -137,13 +137,18 @@ func TargetFileMetaEqual(actual data.TargetFileMeta, expected data.TargetFileMet
 }
 
 func TimestampFileMetaEqual(actual data.TimestampFileMeta, expected data.TimestampFileMeta) error {
-	// As opposed to snapshots, the length and hashes are still required in
-	// TUF-1.0. See:
-	// https://github.com/theupdateframework/specification/issues/38
-	if err := FileMetaEqual(actual.FileMeta, expected.FileMeta); err != nil {
-		return err
+	// TUF no longer considers the length and hashes to be a required
+	// member of Timestamp.
+	if expected.Length != 0 && actual.Length != expected.Length {
+		return ErrWrongLength{expected.Length, actual.Length}
 	}
-
+	// 5.5.2 - Check against timestamp role's snapshot hash
+	if len(expected.Hashes) != 0 {
+		if err := hashEqual(actual.Hashes, expected.Hashes); err != nil {
+			return err
+		}
+	}
+	// 5.5.4 - Check against timestamp role's snapshot version
 	if err := versionEqual(actual.Version, expected.Version); err != nil {
 		return err
 	}
