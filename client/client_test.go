@@ -733,6 +733,36 @@ func (s *ClientSuite) TestNewTargetsKey(c *C) {
 	c.Assert(role.KeyIDs, DeepEquals, sets.StringSliceToSet(newIDs))
 }
 
+func (s *ClientSuite) TestOfflineSignatureFlow(c *C) {
+	client := s.newClient(c)
+
+	// replace key
+	oldIDs := s.keyIDs["targets"]
+	c.Assert(s.repo.RevokeKey("targets", oldIDs[0]), IsNil)
+	_ = s.genKey(c, "targets")
+
+	// re-sign targets using offline flow and generate new snapshot and timestamp
+	payload, err := s.repo.Payload("targets.json")
+	c.Assert(err, IsNil)
+	signed := data.Signed{Signed: payload}
+	_, err = s.repo.SignPayload("targets", &signed)
+	c.Assert(err, IsNil)
+	for _, sig := range signed.Signatures {
+		// This method checks that the signature verifies!
+		err = s.repo.AddOrUpdateSignature("targets.json", sig)
+		c.Assert(err, IsNil)
+	}
+	c.Assert(s.repo.Snapshot(), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
+	s.syncRemote(c)
+
+	// check update gets new metadata
+	c.Assert(client.getLocalMeta(), IsNil)
+	_, err = client.Update()
+	c.Assert(err, IsNil)
+}
+
 func (s *ClientSuite) TestLocalExpired(c *C) {
 	client := s.newClient(c)
 

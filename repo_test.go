@@ -1,6 +1,7 @@
 package tuf
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/rand"
 	"encoding/hex"
@@ -638,8 +639,8 @@ func (rs *RepoSuite) TestSign(c *C) {
 
 	c.Assert(r.Sign("foo.json"), Equals, ErrMissingMetadata{"foo.json"})
 
-	// signing with no keys returns ErrInsufficientKeys
-	c.Assert(r.Sign("root.json"), Equals, ErrInsufficientKeys{"root.json"})
+	// signing with no keys returns ErrNoKeys
+	c.Assert(r.Sign("root.json"), Equals, ErrNoKeys{"root.json"})
 
 	checkSigIDs := func(keyIDs ...string) {
 		meta, err := local.GetMeta()
@@ -1784,6 +1785,13 @@ func (rs *RepoSuite) TestBadAddOrUpdateSignatures(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(r.AddVerificationKey("timestamp", timestampKey.PublicData()), IsNil)
 
+	// attempt to sign `root`, rather than `root.json`
+	for _, id := range rootKey.PublicData().IDs() {
+		c.Assert(r.AddOrUpdateSignature("root", data.Signature{
+			KeyID:     id,
+			Signature: nil}), Equals, ErrMissingMetadata{"root"})
+	}
+
 	// add a signature with a bad role
 	rootMeta, err := r.SignedMeta("root.json")
 	c.Assert(err, IsNil)
@@ -2543,4 +2551,47 @@ func (rs *RepoSuite) TestAddOrUpdateSignatureWithDelegations(c *C) {
 	c.Assert(r.Snapshot(), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
+}
+
+// Test the offline signature flow: Payload -> SignPayload -> AddSignature
+func (rs *RepoSuite) TestOfflineFlow(c *C) {
+	// Set up repo.
+	meta := make(map[string]json.RawMessage)
+	local := MemoryStore(meta, nil)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+	c.Assert(r.Init(false), IsNil)
+	_, err = r.GenKey("root")
+	c.Assert(err, IsNil)
+
+	// Get the payload to sign
+	_, err = r.Payload("badrole.json")
+	c.Assert(err, Equals, ErrMissingMetadata{"badrole.json"})
+	_, err = r.Payload("root")
+	c.Assert(err, Equals, ErrMissingMetadata{"root"})
+	payload, err := r.Payload("root.json")
+	c.Assert(err, IsNil)
+
+	root, err := r.SignedMeta("root.json")
+	c.Assert(err, IsNil)
+	rootCanonical, err := cjson.EncodeCanonical(root.Signed)
+	c.Assert(err, IsNil)
+	if !bytes.Equal(payload, rootCanonical) {
+		c.Fatalf("Payload(): not canonical.\n%s\n%s", string(payload), string(rootCanonical))
+	}
+
+	// Sign the payload
+	signed := data.Signed{Signed: payload}
+	_, err = r.SignPayload("targets", &signed)
+	c.Assert(err, Equals, ErrNoKeys{"targets"})
+	numKeys, err := r.SignPayload("root", &signed)
+	c.Assert(err, IsNil)
+	c.Assert(numKeys, Equals, 1)
+
+	// Add the payload signatures back
+	for _, sig := range signed.Signatures {
+		// This method checks that the signature verifies!
+		err = r.AddOrUpdateSignature("root.json", sig)
+		c.Assert(err, IsNil)
+	}
 }

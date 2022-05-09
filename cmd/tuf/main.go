@@ -36,7 +36,10 @@ Commands:
   remove             Remove a target file
   snapshot           Update the snapshot metadata file
   timestamp          Update the timestamp metadata file
+  payload            Output a role's metadata file for signing
+  add-signatures     Adds signatures generated offline
   sign               Sign a role's metadata file
+  sign-payload       Sign a file from the "payload" command.
   commit             Commit staged files to the repository
   regenerate         Recreate the targets metadata file [Not supported yet]
   set-threshold      Sets the threshold for a role
