@@ -2595,3 +2595,39 @@ func (rs *RepoSuite) TestOfflineFlow(c *C) {
 		c.Assert(err, IsNil)
 	}
 }
+
+// Regression test: Snapshotting an invalid root should fail.
+func (rs *RepoSuite) TestSnapshotWithInvalidRoot(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// Init should create targets.json, but not signed yet
+	r.Init(false)
+
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+
+	// Clear the root signature so that signature verification fails.
+	s, err := r.SignedMeta("root.json")
+	c.Assert(err, IsNil)
+	c.Assert(s.Signatures, HasLen, 1)
+	s.Signatures[0].Signature = data.HexBytes{}
+	b, err := r.jsonMarshal(s)
+	c.Assert(err, IsNil)
+	r.meta["root.json"] = b
+	local.SetMeta("root.json", b)
+
+	// Snapshotting should fail.
+	c.Assert(r.Snapshot(), Equals, ErrInsufficientSignatures{"root.json", verify.ErrInvalid})
+
+	// Correctly sign root
+	c.Assert(r.Sign("root.json"), IsNil)
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+}
