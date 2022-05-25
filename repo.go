@@ -1280,6 +1280,11 @@ func (r *Repo) SnapshotWithExpires(expires time.Time) error {
 		return err
 	}
 
+	// Verify root metadata before verifying signatures on role metadata.
+	if err := r.verifySignatures("root.json"); err != nil {
+		return err
+	}
+
 	for _, metaName := range r.snapshotMetadata() {
 		if err := r.verifySignatures(metaName); err != nil {
 			return err
