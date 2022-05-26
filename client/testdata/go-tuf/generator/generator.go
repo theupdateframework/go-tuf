@@ -3,10 +3,11 @@ package generator
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/fs"
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -28,9 +29,41 @@ func assertNoError(err error) {
 	}
 }
 
-func copyRepo(src string, dst string) {
-	cmd := exec.Command("cp", "-r", src, dst)
-	assertNoError(cmd.Run())
+// copyRepo recursively copies all regular files and directories under src
+// to dst.  In the case where any destination file/directory exists
+// (including dst itself), an error is returned.
+func copyRepo(src string, dst string) error {
+	copyToDest := func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		mode := info.Mode()
+		if mode.IsDir() {
+			return os.Mkdir(target, mode.Perm())
+		} else if mode.IsRegular() {
+			sfile, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			defer sfile.Close()
+			dfile, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode.Perm())
+			if err != nil {
+				return err
+			}
+			defer dfile.Close()
+			if _, err := io.Copy(dfile, sfile); err != nil {
+				return err
+			}
+			return nil
+		}
+		return fmt.Errorf("unknown mode %v", mode)
+	}
+	return filepath.Walk(src, copyToDest)
 }
 
 func newRepo(dir string) *tuf.Repo {
@@ -103,7 +136,7 @@ func generateRepos(dir string, roleKeys map[string][][]*data.PrivateKey, consist
 		// Setup the repo.
 		stepName := fmt.Sprintf("%d", i)
 		d := filepath.Join(dir, stepName)
-		copyRepo(oldDir, d)
+		assertNoError(copyRepo(oldDir, d))
 		repo := newRepo(d)
 		addKeys(repo, keys)
 
@@ -125,7 +158,7 @@ func generateRepos(dir string, roleKeys map[string][][]*data.PrivateKey, consist
 	// Add another target file to make sure the workflow worked.
 	stepName := fmt.Sprintf("%d", i)
 	d := filepath.Join(dir, stepName)
-	copyRepo(oldDir, d)
+	assertNoError(copyRepo(oldDir, d))
 	repo := newRepo(d)
 	addKeys(repo, keys)
 	addTargets(repo, d, map[string][]byte{stepName: []byte(stepName)})

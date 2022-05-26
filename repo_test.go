@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -1047,20 +1048,20 @@ func (rs *RepoSuite) TestConsistentSnapshot(c *C) {
 	c.Assert(err, IsNil)
 
 	// root.json, targets.json and snapshot.json should exist at both versioned and unversioned paths
-	for _, path := range []string{"root.json", "targets.json", "snapshot.json"} {
-		repoPath := filepath.Join("repository", path)
-		if path != "root.json" {
-			c.Assert(len(hashes[path]) > 0, Equals, true)
+	for _, meta := range []string{"root.json", "targets.json", "snapshot.json"} {
+		repoPath := path.Join("repository", meta)
+		if meta != "root.json" {
+			c.Assert(len(hashes[meta]) > 0, Equals, true)
 		}
-		tmp.assertHashedFilesNotExist(repoPath, hashes[path])
-		tmp.assertVersionedFileExist(repoPath, versions[path])
+		tmp.assertHashedFilesNotExist(repoPath, hashes[meta])
+		tmp.assertVersionedFileExist(repoPath, versions[meta])
 		tmp.assertExists(repoPath)
 	}
 
 	// target files should exist at hashed but not unhashed paths
-	for _, path := range []string{"targets/foo.txt", "targets/dir/bar.txt"} {
-		repoPath := filepath.Join("repository", path)
-		tmp.assertHashedFilesExist(repoPath, hashes[path])
+	for _, target := range []string{"targets/foo.txt", "targets/dir/bar.txt"} {
+		repoPath := path.Join("repository", target)
+		tmp.assertHashedFilesExist(repoPath, hashes[target])
 		tmp.assertNotExist(repoPath)
 	}
 
@@ -1087,13 +1088,13 @@ func (rs *RepoSuite) TestConsistentSnapshot(c *C) {
 	c.Assert(err, IsNil)
 
 	// root.json, targets.json and snapshot.json should exist at both versioned and unversioned paths
-	for _, path := range []string{"root.json", "targets.json", "snapshot.json"} {
-		repoPath := filepath.Join("repository", path)
-		if path != "root.json" {
-			c.Assert(len(hashes[path]) > 0, Equals, true)
+	for _, meta := range []string{"root.json", "targets.json", "snapshot.json"} {
+		repoPath := path.Join("repository", meta)
+		if meta != "root.json" {
+			c.Assert(len(hashes[meta]) > 0, Equals, true)
 		}
-		tmp.assertHashedFilesNotExist(repoPath, hashes[path])
-		tmp.assertVersionedFileExist(repoPath, versions[path])
+		tmp.assertHashedFilesNotExist(repoPath, hashes[meta])
+		tmp.assertVersionedFileExist(repoPath, versions[meta])
 		tmp.assertExists(repoPath)
 	}
 
