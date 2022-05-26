@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -237,7 +237,7 @@ func (d *DelegatedRole) MatchesPath(file string) (bool, error) {
 	}
 
 	for _, pattern := range d.Paths {
-		if matched, _ := filepath.Match(pattern, file); matched {
+		if matched, _ := path.Match(pattern, file); matched {
 			return true, nil
 		}
 	}
