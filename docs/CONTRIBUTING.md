@@ -6,7 +6,7 @@ Please familiarize yourself with these Contribution Guidelines before contributi
 
 There are many ways to help go-tuf besides contributing code:
 
-- Fix bugs or file issues
+- Fix bugs or file issues.
 - Provide feedback on the CLI experience or suggest feature enhancements.
 - Improve documentation.
 
@@ -14,7 +14,7 @@ Please follow the [code of conduct](CODE_OF_CONDUCT.md) when contributing to thi
 
 ## Contributing Code
 
-Unless you are fixing a known bug, we strongly recommend discussing it with the community via a GitHub issue or Slack before getting started to ensure that your work is consistent with TUF's specification.
+Unless you are fixing a known bug, we strongly recommend discussing it with the community via a GitHub issue or Slack (see [Communication](#communication) below for details) before getting started to ensure that your work is consistent with TUF's specification.
 
 All contributions are made via pull request. All patches from all contributors get reviewed. See the [Pull Request procedure](#pull-request-procedure).
 
@@ -49,7 +49,7 @@ We use the [#tuf](https://cloud-native.slack.com/archives/C8NMD3QJ3) and [#go-tu
 You might also be interested in the TUF community beyond go-tuf; good places to start include:
 
 - [TUF mailing list](https://groups.google.com/g/theupdateframework)
-- TUF community meetings (monthly; join the mailing list to receive invitations)
+- TUF community meetings (monthly; join the mailing list or watch the Slack channel to see invitations)
 
 
 ## Pull Request Review Policy

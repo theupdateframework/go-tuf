@@ -12,7 +12,7 @@ Speedy communication makes contributors happy!
 - If you are assigned to review a PR, please try to *acknowledge* it within one business day (no need if you are OOO).
 - Please review all PRs within five business days (of course, it's okay if you're OOO).
 - Please use the review checklist below.
-- We should make sure there's a reviewer for every PR with tests passing within 
+- We should make sure there's an assigned reviewer for every PR which has passing tests.
   
 Versioning:
 
