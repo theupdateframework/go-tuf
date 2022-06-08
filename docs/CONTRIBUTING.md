@@ -21,7 +21,7 @@ All contributions are made via pull request. All patches from all contributors g
 
 ## Pull Request Procedure
 
-To make a pull request, you will need a GitHub account. See GitHub's documentation on [forking](https://help.github.com/articles/fork-a-repo) and [pull requests](https://help.github.com/articles/using-pull-requests). 
+To make a pull request, you will need a GitHub account. See GitHub's documentation on [forking](https://help.github.com/articles/fork-a-repo) and [pull requests](https://help.github.com/articles/using-pull-requests).
 
 Pull requests should be targeted at the `master` branch. Before creating a pull request, go through this checklist:
 
@@ -33,7 +33,7 @@ Pull requests should be targeted at the `master` branch. Before creating a pull 
 6. Run the full project test suite with the `go test ./...` command and confirm that it passes.
 7. Run `go fmt ./...`.
 
-When creating a PR, 
+When creating a PR:
 
 1. Your PR title should be descriptive, and follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification (start with `fix:`, `feat:`, or similar).
 2. Your PR commit message will be used as the commit message when your PR is merged. Update this field if your PR diverges during review.
