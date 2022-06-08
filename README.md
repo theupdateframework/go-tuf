@@ -605,7 +605,7 @@ For the client package, see https://godoc.org/github.com/theupdateframework/go-t
 
 For the client CLI, see https://github.com/theupdateframework/go-tuf/tree/master/cmd/tuf-client.
 
-## Development
+## Contributing and Development
 
 For local development, `go-tuf` requires Go version 1.16 or 1.17.
 
@@ -614,3 +614,5 @@ The [Python interoperability tests](client/python_interop/) require Python 3
 package](https://github.com/theupdateframework/python-tuf) installed (`pip
 install tuf`). To update the data for these tests requires Docker and make (see
 test data [README.md](client/python_interop/testdata/README.md) for details).
+
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines before making your first contribution!
