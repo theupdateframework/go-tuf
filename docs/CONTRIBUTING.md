@@ -30,7 +30,7 @@ Pull requests should be targeted at the `master` branch. Before creating a pull 
 3. PRs that change user-facing behavior or the command-line interface must have associated documentation.
 4. All code comments and documentation are expected to have proper English grammar and punctuation.
 5. [Rebase](http://git-scm.com/book/en/Git-Branching-Rebasing) your local changes against the `master` branch.
-6. Run the full project test suite with the `go test ./...` command and confirm that it passes.
+6. Run the full project test suite with the `go test ./...` command and confirm that it passes (see [TESTING.md](TESTING.md) for details).
 7. Run `go fmt ./...`.
 
 When creating a PR:
@@ -59,6 +59,3 @@ You might also be interested in the TUF community beyond go-tuf; good places to 
 * See [MAINTAINERS](MAINTAINERS) for the current list of maintainers.
 
 Maintainers should look in [MAINTAINERS.md](MAINTAINERS.md) for detailed quidelines.
-
-TODO: code of conduct.
-
