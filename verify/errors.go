@@ -21,10 +21,10 @@ var (
 	ErrMissingTargetFile    = errors.New("tuf: missing previously listed targets metadata file")
 )
 
-type ErrWrongID struct{}
+type ErrRepeatID struct{}
 
-func (ErrWrongID) Error() string {
-	return "tuf: key id mismatch"
+func (ErrRepeatID) Error() string {
+	return "tuf: duplicate key id"
 }
 
 type ErrUnknownRole struct {
