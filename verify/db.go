@@ -67,7 +67,7 @@ func (db *DB) AddKey(id string, k *data.PublicKey) error {
 	//
 	// TAP-12: https://github.com/theupdateframework/taps/blob/master/tap12.md
 	if oldVerifier, exists := db.verifiers[id]; exists && oldVerifier.Public() != verifier.Public() {
-		return ErrRepeatID{}
+		return ErrRepeatID{id}
 	}
 
 	db.verifiers[id] = verifier

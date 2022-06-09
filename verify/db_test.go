@@ -73,7 +73,7 @@ func TestTAP12(t *testing.T) {
 	assert.Nil(t, db.AddKey("key1", key1.PublicData()), "re-add")
 	// Adding a different key is allowed, unless the key ID is the same.
 	assert.Nil(t, db.AddKey("key2", key2.PublicData()), "different key with different ID")
-	assert.ErrorIs(t, db.AddKey("key1", key2.PublicData()), ErrRepeatID{}, "different key with same key ID")
+	assert.ErrorIs(t, db.AddKey("key1", key2.PublicData()), ErrRepeatID{"key1"}, "different key with same key ID")
 	assert.Nil(t, db.AddKey("key1-duplicate", key1.PublicData()), "same key with different ID should succeed")
 	assert.Nil(t, db.AddRole("diffkeys", &data.Role{
 		KeyIDs:    []string{"key1", "key2"},
