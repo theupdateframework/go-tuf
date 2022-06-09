@@ -16,7 +16,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Get Go version
-        uses: arnested/go-version-action@2a74f6effec7cb0b26c139ac1e59b4553c13b2a7
+        uses: arnested/go-version-action@0fe5edc8865e011726947d454e4d246fbb499eb6
         id: go-version
       - name: Set up Go
         uses: actions/setup-go@b22fbbc2921299758641fab08929b4ac52b32923
