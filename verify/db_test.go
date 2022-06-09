@@ -9,6 +9,8 @@ import (
 )
 
 func TestDelegationsDB(t *testing.T) {
+	key, err := keys.GenerateEd25519Key()
+	assert.Nil(t, err, "generating key failed")
 	var dbTests = []struct {
 		testName     string
 		delegations  *data.Delegations
@@ -33,6 +35,36 @@ func TestDelegationsDB(t *testing.T) {
 				{Threshold: 0},
 			}},
 			initErr: ErrInvalidThreshold,
+		},
+		{
+			testName: "standard key IDs supported",
+			delegations: &data.Delegations{
+				Keys: map[string]*data.PublicKey{
+					key.PublicData().IDs()[0]: key.PublicData(),
+				},
+				Roles: []data.DelegatedRole{{
+					Name:      "rolename",
+					KeyIDs:    key.PublicData().IDs(),
+					Threshold: 1,
+				},
+				},
+			},
+			unmarshalErr: ErrNoSignatures,
+		},
+		{
+			testName: "arbitrary key IDs supported",
+			delegations: &data.Delegations{
+				Keys: map[string]*data.PublicKey{
+					"a": key.PublicData(),
+				},
+				Roles: []data.DelegatedRole{{
+					Name:      "rolename",
+					KeyIDs:    []string{"a"},
+					Threshold: 1,
+				},
+				},
+			},
+			unmarshalErr: ErrNoSignatures,
 		},
 	}
 
