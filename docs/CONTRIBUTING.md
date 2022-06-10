@@ -32,6 +32,7 @@ Pull requests should be targeted at the `master` branch. Before creating a pull 
 5. [Rebase](http://git-scm.com/book/en/Git-Branching-Rebasing) your local changes against the `master` branch.
 6. Run the full project test suite with the `go test ./...` command and confirm that it passes (see [TESTING.md](TESTING.md) for details).
 7. Run `go fmt ./...`.
+8. You must agree to the [Developer Certificate of Origin](https://developercertificate.org/) for your contributions; use `git commit -s` ([detailed information here](https://wiki.linuxfoundation.org/dco)).
 
 When creating a PR:
 
