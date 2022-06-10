@@ -17,12 +17,12 @@ Speedy communication makes contributors happy!
 Versioning:
 
 - go-tuf releases follow [SemVer](https://semver.org/) with the following modification:
-    - While go-tuf is pre-1.0, increment the minor version for any breaking changes (in SemVer, there are no guarantees about API stability).
+  - While go-tuf is pre-1.0, increment the minor version for any breaking changes (in SemVer, there are no guarantees about API stability).
 - Releases should be tagged in this repository as usual in Go ([Publishing a module](https://go.dev/doc/modules/publishing)).
 
 Project management:
 
-- Try to keep issues up-to-date with status updates! 
+- Try to keep issues up-to-date with status updates!
   - Feel free to ping open issues to check on them.
   - Use the "assignee" field to indicate when you are working on an issue.
   - Use GitHub issue labels to describe the issue (exact labels are still changing, so just look through and add those that seem like a good fit).
@@ -45,4 +45,9 @@ Pre-merge (check everything again before hitting the merge button!):
   - This may be waived for PRs which only update docs or comments, or trivial changes to tests.
 - Make sure that the PR title, commit message, and description are updated if the PR changes significantly during review.
 
+New version of the TUF specification:
 
+- There's an automated workflow which monitors and opens an issue in case there's newer version of the [TUF specification](https://theupdateframework.github.io/specification/latest/)
+- Closing the issue should happen after completing the following steps:
+  - Review the changes to the specification and make sure they're addressed (possibly requires breaking out a few relevant issues).
+  - Bump the `tuf-version` in the `.github/workflows/specification-version-check.yml` workflow.
