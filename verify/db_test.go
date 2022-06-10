@@ -37,7 +37,7 @@ func TestDelegationsDB(t *testing.T) {
 			initErr: ErrInvalidThreshold,
 		},
 		{
-			testName: "standard key IDs supported",
+			testName: "standard (SHA256) key IDs supported",
 			delegations: &data.Delegations{
 				Keys: map[string]*data.PublicKey{
 					key.PublicData().IDs()[0]: key.PublicData(),
@@ -49,10 +49,13 @@ func TestDelegationsDB(t *testing.T) {
 				},
 				},
 			},
+			// If we get to ErrNoSignatures, we've passed key loading; see
+			// delegations_test.go to see tests that delegation DB *fully* works
+			// with valid signatures set up.
 			unmarshalErr: ErrNoSignatures,
 		},
 		{
-			testName: "arbitrary key IDs supported",
+			testName: "arbitrary (non-SHA256, per TAP-12) key IDs supported",
 			delegations: &data.Delegations{
 				Keys: map[string]*data.PublicKey{
 					"a": key.PublicData(),
@@ -64,6 +67,9 @@ func TestDelegationsDB(t *testing.T) {
 				},
 				},
 			},
+			// If we get to ErrNoSignatures, we've passed key loading; see
+			// delegations_test.go to see tests that delegation DB *fully* works
+			// with valid signatures set up.
 			unmarshalErr: ErrNoSignatures,
 		},
 	}
