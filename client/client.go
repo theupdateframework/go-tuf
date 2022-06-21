@@ -691,11 +691,16 @@ func (c *Client) downloadMetaFromTimestamp(name string, m data.TimestampFileMeta
 		return nil, err
 	}
 
+	// 5.2.2. – Check length and hashes of fetched bytes *before* parsing metadata
+	if err := util.BytesMatchLenAndHashes(b, m.Length, m.Hashes); err != nil {
+		return nil, ErrDownloadFailed{name, err}
+	}
+
 	meta, err := util.GenerateTimestampFileMeta(bytes.NewReader(b), m.HashAlgorithms()...)
 	if err != nil {
 		return nil, err
 	}
-	// 5.5.2 and 5.5.4 - Check against timestamp role's snapshot hash and version
+	// 5.5.4 - Check against timestamp role's snapshot hash and version
 	if err := util.TimestampFileMetaEqual(meta, m); err != nil {
 		return nil, ErrDownloadFailed{name, err}
 	}
