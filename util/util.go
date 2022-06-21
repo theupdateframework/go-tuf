@@ -86,6 +86,33 @@ func FileMetaEqual(actual data.FileMeta, expected data.FileMeta) error {
 	return nil
 }
 
+func BytesMatchLenAndHashes(fetched []byte, length int64, hashes data.Hashes) error {
+	flen := int64(len(fetched))
+	if length != 0 && flen != length {
+		return ErrWrongLength{length, flen}
+	}
+
+	if len(hashes) != 0 {
+		for alg, expected := range hashes {
+			var h hash.Hash
+			switch alg {
+			case "sha256":
+				h = sha256.New()
+			case "sha512":
+				h = sha512.New()
+			default:
+				return ErrUnknownHashAlgorithm{alg}
+			}
+			h.Write(fetched)
+			hash := h.Sum(nil)
+			if !hmac.Equal(hash, expected) {
+				return ErrWrongHash{alg, expected, hash}
+			}
+		}
+	}
+	return nil
+}
+
 func hashEqual(actual data.Hashes, expected data.Hashes) error {
 	hashChecked := false
 	for typ, hash := range expected {
