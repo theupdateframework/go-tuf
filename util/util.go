@@ -129,7 +129,7 @@ func hashEqual(actual data.Hashes, expected data.Hashes) error {
 	return nil
 }
 
-func versionEqual(actual int64, expected int64) error {
+func VersionEqual(actual int64, expected int64) error {
 	if actual != expected {
 		return ErrWrongVersion{expected, actual}
 	}
@@ -152,7 +152,7 @@ func SnapshotFileMetaEqual(actual data.SnapshotFileMeta, expected data.SnapshotF
 		}
 	}
 	// 5.6.4 - Check against snapshot role's snapshot version
-	if err := versionEqual(actual.Version, expected.Version); err != nil {
+	if err := VersionEqual(actual.Version, expected.Version); err != nil {
 		return err
 	}
 
@@ -176,7 +176,7 @@ func TimestampFileMetaEqual(actual data.TimestampFileMeta, expected data.Timesta
 		}
 	}
 	// 5.5.4 - Check against timestamp role's snapshot version
-	if err := versionEqual(actual.Version, expected.Version); err != nil {
+	if err := VersionEqual(actual.Version, expected.Version); err != nil {
 		return err
 	}
 
