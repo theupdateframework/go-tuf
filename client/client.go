@@ -683,10 +683,12 @@ func (c *Client) downloadMetaFromSnapshot(name string, m data.SnapshotFileMeta) 
 	if err != nil {
 		return nil, err
 	}
-	// 5.6.4 - Check against snapshot role's targets hash and version
-	if err := util.SnapshotFileMetaEqual(meta, m); err != nil {
+
+	// 5.6.4 - Check against snapshot role's version
+	if err := util.VersionEqual(meta.Version, m.Version); err != nil {
 		return nil, ErrDownloadFailed{name, err}
 	}
+
 	return b, nil
 }
 
@@ -705,10 +707,12 @@ func (c *Client) downloadMetaFromTimestamp(name string, m data.TimestampFileMeta
 	if err != nil {
 		return nil, err
 	}
-	// 5.5.4 - Check against timestamp role's snapshot hash and version
-	if err := util.TimestampFileMetaEqual(meta, m); err != nil {
+
+	// 5.5.4 - Check against timestamp role's version
+	if err := util.VersionEqual(meta.Version, m.Version); err != nil {
 		return nil, ErrDownloadFailed{name, err}
 	}
+
 	return b, nil
 }
 
