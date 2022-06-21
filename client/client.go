@@ -674,11 +674,16 @@ func (c *Client) downloadMetaFromSnapshot(name string, m data.SnapshotFileMeta) 
 		return nil, err
 	}
 
+	// 5.6.2 – Check length and hashes of fetched bytes *before* parsing metadata
+	if err := util.BytesMatchLenAndHashes(b, m.Length, m.Hashes); err != nil {
+		return nil, ErrDownloadFailed{name, err}
+	}
+
 	meta, err := util.GenerateSnapshotFileMeta(bytes.NewReader(b), m.HashAlgorithms()...)
 	if err != nil {
 		return nil, err
 	}
-	// 5.6.2 and 5.6.4 - Check against snapshot role's targets hash and version
+	// 5.6.4 - Check against snapshot role's targets hash and version
 	if err := util.SnapshotFileMetaEqual(meta, m); err != nil {
 		return nil, ErrDownloadFailed{name, err}
 	}
