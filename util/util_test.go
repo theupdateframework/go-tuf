@@ -2,7 +2,10 @@ package util
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
+	"hash"
 	"testing"
 
 	"github.com/theupdateframework/go-tuf/data"
@@ -193,5 +196,80 @@ func (UtilSuite) TestHashedPaths(c *C) {
 			c.Fatalf("unexpected path: %s", path)
 		}
 		delete(expected, path)
+	}
+}
+
+func (UtilSuite) TestVersionEqual(c *C) {
+	c.Assert(VersionEqual(1, 1), IsNil)
+	c.Assert(VersionEqual(1, 3), Equals, ErrWrongVersion{3, 1})
+}
+
+func makeHash(b []byte, alg string) []byte {
+	var h hash.Hash
+
+	switch alg {
+	case "sha256":
+		h = sha256.New()
+	case "sha512":
+		h = sha512.New()
+	}
+	h.Write(b)
+	return h.Sum(nil)
+}
+
+func (UtilSuite) TestBytesMatchLenAndHashes(c *C) {
+	type test struct {
+		name   string
+		bytes  []byte
+		length int64
+		hashes data.Hashes
+		err    func(test) error
+	}
+
+	b := []byte{82, 253, 252, 7, 33, 130, 101, 79, 22, 63, 95, 15, 154, 98, 29, 114}
+	bhashes := data.Hashes{
+		"sha512": makeHash(b, "sha512"),
+		"sha256": makeHash(b, "sha256"),
+	}
+
+	tests := []test{
+		{
+			name:   "correct len and hashes",
+			bytes:  b,
+			length: 16,
+			hashes: bhashes,
+			err:    func(test) error { return nil },
+		},
+		{
+			name:   "incorrect len",
+			bytes:  b,
+			length: 32,
+			hashes: bhashes,
+			err:    func(test) error { return ErrWrongLength{32, 16} },
+		},
+		{
+			name:   "incorrect hashes",
+			bytes:  b,
+			length: 16,
+			hashes: data.Hashes{
+				"sha512": makeHash(b, "sha256"),
+				"sha256": makeHash(b, "sha512"),
+			},
+			err: func(test) error { return ErrWrongHash{"sha512", bhashes["sha256"], bhashes["sha512"]} },
+		},
+		{
+			name:   "incorrect len and hashes",
+			bytes:  b,
+			length: 32,
+			hashes: data.Hashes{
+				"sha512": makeHash(b, "sha256"),
+				"sha256": makeHash(b, "sha512"),
+			},
+			err: func(test) error { return ErrWrongLength{32, 16} },
+		},
+	}
+
+	for _, t := range tests {
+		c.Assert(BytesMatchLenAndHashes(t.bytes, t.length, t.hashes), DeepEquals, t.err(t), Commentf("name = %s", t.name))
 	}
 }
