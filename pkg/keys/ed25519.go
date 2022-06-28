@@ -52,7 +52,6 @@ func (e *ed25519Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
 
 	// Prepare decoder limited to 512Kb
 	dec := json.NewDecoder(io.LimitReader(bytes.NewReader(key.Value), MaxJSONKeySize))
-	dec.DisallowUnknownFields()
 
 	// Unmarshal key value
 	if err := dec.Decode(e); err != nil {
@@ -132,13 +131,11 @@ func (e *ed25519Signer) UnmarshalPrivateKey(key *data.PrivateKey) error {
 
 	// Prepare decoder limited to 512Kb
 	dec := json.NewDecoder(io.LimitReader(bytes.NewReader(key.Value), MaxJSONKeySize))
-	dec.DisallowUnknownFields()
 
+	// Unmarshal key value
 	if err := dec.Decode(keyValue); err != nil {
-		switch {
-		case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 			return fmt.Errorf("tuf: the private key is truncated or too large: %w", err)
-		default:
 		}
 	}
 

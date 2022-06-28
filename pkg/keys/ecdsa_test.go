@@ -19,7 +19,7 @@ type ECDSASuite struct{}
 
 var _ = Suite(&ECDSASuite{})
 
-func (Ed25519Suite) TestUnmarshalECDSA(c *C) {
+func (ECDSASuite) TestUnmarshalECDSA(c *C) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), strings.NewReader("00001-deterministic-buffer-for-key-generation"))
 	c.Assert(err, IsNil)
 

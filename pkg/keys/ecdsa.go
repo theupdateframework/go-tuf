@@ -64,14 +64,11 @@ func (p *p256Verifier) MarshalPublicKey() *data.PublicKey {
 func (p *p256Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
 	// Prepare decoder limited to 512Kb
 	dec := json.NewDecoder(io.LimitReader(bytes.NewReader(key.Value), MaxJSONKeySize))
-	dec.DisallowUnknownFields()
 
 	// Unmarshal key value
 	if err := dec.Decode(p); err != nil {
-		switch {
-		case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 			return fmt.Errorf("tuf: the public key is truncated or too large: %w", err)
-		default:
 		}
 		return err
 	}
