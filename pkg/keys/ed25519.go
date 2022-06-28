@@ -55,10 +55,8 @@ func (e *ed25519Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
 
 	// Unmarshal key value
 	if err := dec.Decode(e); err != nil {
-		switch {
-		case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 			return fmt.Errorf("tuf: the public key is truncated or too large: %w", err)
-		default:
 		}
 		return err
 	}
