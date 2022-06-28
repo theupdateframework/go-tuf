@@ -287,7 +287,6 @@ func (d *DelegatedRole) UnmarshalJSON(b []byte) error {
 
 	// Prepare decoder
 	dec := json.NewDecoder(bytes.NewReader(b))
-	dec.DisallowUnknownFields()
 
 	// Unmarshal delegated role
 	if err := dec.Decode((*delegatedRoleAlias)(d)); err != nil {
