@@ -248,14 +248,22 @@ func (UtilSuite) TestBytesMatchLenAndHashes(c *C) {
 			err:    func(test) error { return ErrWrongLength{32, 16} },
 		},
 		{
-			name:   "incorrect hashes",
+			name:   "incorrect hashes sha512",
 			bytes:  b,
 			length: 16,
 			hashes: data.Hashes{
 				"sha512": makeHash(b, "sha256"),
-				"sha256": makeHash(b, "sha512"),
 			},
 			err: func(test) error { return ErrWrongHash{"sha512", bhashes["sha256"], bhashes["sha512"]} },
+		},
+		{
+			name:   "incorrect hashes sha256",
+			bytes:  b,
+			length: 16,
+			hashes: data.Hashes{
+				"sha256": makeHash(b, "sha512"),
+			},
+			err: func(test) error { return ErrWrongHash{"sha256", bhashes["sha512"], bhashes["sha256"]} },
 		},
 		{
 			name:   "incorrect len and hashes",
