@@ -17,8 +17,12 @@ Speedy communication makes contributors happy!
 Versioning:
 
 - go-tuf releases follow [SemVer](https://semver.org/) with the following modification:
-  - While go-tuf is pre-1.0, increment the minor version for any breaking changes (in SemVer, there are no guarantees about API stability).
-- Releases should be tagged in this repository as usual in Go ([Publishing a module](https://go.dev/doc/modules/publishing)).
+  - While go-tuf is pre-1.0, increment the minor version for any breaking changes (in SemVer, there are no guarantees about API stability before 1.0).
+- Releases should be tagged in this repository as usual in Go (e.g. `v0.3.1`; see [Publishing a module](https://go.dev/doc/modules/publishing)).
+  - All maintainers should have permissions to push an appropriately-named `tag`, which will trigger the full release process.
+  - A patch release can happen at any point, but give the other maintainers 1 day's notice via Slack or GitHub first.
+  - For a minor release, see the "Project management" tag below.
+  - We may revisit this policy post-1.0.
 
 Project management:
 
@@ -26,7 +30,7 @@ Project management:
   - Feel free to ping open issues to check on them.
   - Use the "assignee" field to indicate when you are working on an issue.
   - Use GitHub issue labels to describe the issue (exact labels are still changing, so just look through and add those that seem like a good fit).
-- Before publishing a new release, there should be an associated [GitHub project](https://github.com/theupdateframework/go-tuf/projects?type=beta) to track issues.
+- Before publishing a new minor release, there should be an associated [GitHub project](https://github.com/theupdateframework/go-tuf/projects?type=beta) to track issues.
 - We will develop more process around project management after we get through the v0.4.0 release.
 
 ## Review checklist
