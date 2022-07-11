@@ -152,6 +152,13 @@ Adds signatures (the output of `tuf sign-payload`) to the given role metadata fi
 
 If the signature does not verify, it will not be added.
 
+#### `tuf refresh --snapshot-threshold=2 --timestamp-threshold=1`
+
+Update the timestamp and/or snapshop expiration time if either is set to expire
+within the given number of hours.
+
+This command is usual for automation tools that try to keep the metadata fresh.
+
 #### Usage of environment variables
 
 The `tuf` CLI supports receiving passphrases via environment variables in

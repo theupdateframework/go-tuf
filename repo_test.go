@@ -754,6 +754,54 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	c.Assert(r.Commit(), DeepEquals, ErrNotEnoughKeys{"timestamp", 0, 1})
 }
 
+func (rs *RepoSuite) TestRefreshExpires(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	// Set up a scenario where only the timestamp needs to be refreshed
+	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+	c.Assert(r.SnapshotWithExpires(time.Now().Add(24*time.Hour)), IsNil)
+	c.Assert(r.TimestampWithExpires(time.Now().Add(1*time.Hour)), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	ss, _ := r.snapshot()
+	ssExpiresOrig := ss.Expires
+	ts, _ := r.timestamp()
+	tsExpiresOrig := ts.Expires
+
+	thresh := time.Now().Add(2 * time.Hour)
+	c.Assert(r.RefreshExpires(thresh, thresh), IsNil)
+
+	ss, _ = r.snapshot()
+	ts, _ = r.timestamp()
+	c.Assert(ss.Expires, Equals, ssExpiresOrig)
+	c.Assert(ts.Expires, Not(Equals), tsExpiresOrig)
+
+	// Now have the snapshot need refreshing (it will cause a timestamp change)
+	c.Assert(r.SnapshotWithExpires(time.Now().Add(1*time.Hour)), IsNil)
+	c.Assert(r.TimestampWithExpires(time.Now().Add(4*time.Hour)), IsNil)
+
+	ss, _ = r.snapshot()
+	ssExpiresOrig = ss.Expires
+	ts, _ = r.timestamp()
+	tsExpiresOrig = ts.Expires
+
+	thresh = time.Now().Add(2 * time.Hour)
+	c.Assert(r.RefreshExpires(thresh, thresh), IsNil)
+
+	ss, _ = r.snapshot()
+	ts, _ = r.timestamp()
+	c.Assert(ss.Expires, Not(Equals), ssExpiresOrig)
+	c.Assert(ts.Expires, Not(Equals), tsExpiresOrig)
+}
+
 func (rs *RepoSuite) TestCommitVersions(c *C) {
 	files := map[string][]byte{"foo.txt": []byte("foo")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)

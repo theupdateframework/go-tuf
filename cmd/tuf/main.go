@@ -41,6 +41,7 @@ Commands:
   sign               Sign a role's metadata file
   sign-payload       Sign a file from the "payload" command.
   commit             Commit staged files to the repository
+  refresh            Refresh timestamp and snapshot metadata if needed
   regenerate         Recreate the targets metadata file [Not supported yet]
   set-threshold      Sets the threshold for a role
   get-threshold      Outputs the threshold for a role

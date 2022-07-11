@@ -1555,3 +1555,35 @@ func (r *Repo) Payload(roleFilename string) ([]byte, error) {
 
 	return p, nil
 }
+
+func (r *Repo) RefreshExpires(snapshotExpires, timestampExpires time.Time) error {
+	ss, err := r.snapshot()
+	if err != nil {
+		return err
+	}
+	ts, err := r.timestamp()
+	if err != nil {
+		return err
+	}
+
+	changed := false
+
+	if ss.Expires.Before(snapshotExpires) {
+		if err = r.Snapshot(); err != nil {
+			return err
+		}
+		changed = true
+	}
+
+	if changed || ts.Expires.Before(timestampExpires) {
+		if err = r.Timestamp(); err != nil {
+			return err
+		}
+		changed = true
+	}
+
+	if changed {
+		err = r.Commit()
+	}
+	return err
+}
