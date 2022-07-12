@@ -688,6 +688,29 @@ func (rs *RepoSuite) TestSign(c *C) {
 	c.Assert(r.Sign("targets.json"), Equals, ErrMissingMetadata{"targets.json"})
 }
 
+func (rs *RepoSuite) TestStatus(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+	c.Assert(r.SnapshotWithExpires(time.Now().Add(24*time.Hour)), IsNil)
+	c.Assert(r.TimestampWithExpires(time.Now().Add(1*time.Hour)), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	expires := time.Now().Add(2 * time.Hour)
+	c.Assert(r.CheckRoleUnexpired("timestamp", expires), ErrorMatches, "role expired on.*")
+	c.Assert(r.CheckRoleUnexpired("snapshot", expires), IsNil)
+	c.Assert(r.CheckRoleUnexpired("targets", expires), IsNil)
+	c.Assert(r.CheckRoleUnexpired("root", expires), IsNil)
+}
+
 func (rs *RepoSuite) TestCommit(c *C) {
 	files := map[string][]byte{"foo.txt": []byte("foo"), "bar.txt": []byte("bar")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)

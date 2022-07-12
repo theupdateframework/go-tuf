@@ -152,6 +152,10 @@ Adds signatures (the output of `tuf sign-payload`) to the given role metadata fi
 
 If the signature does not verify, it will not be added.
 
+#### `tuf status --valid-at <date> <role>`
+
+Check if the role's metadata will be expired on the given date. 
+
 #### Usage of environment variables
 
 The `tuf` CLI supports receiving passphrases via environment variables in

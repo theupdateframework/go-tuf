@@ -40,6 +40,7 @@ Commands:
   add-signatures     Adds signatures generated offline
   sign               Sign a role's metadata file
   sign-payload       Sign a file from the "payload" command.
+  status             Check if a role's metadata has expired
   commit             Commit staged files to the repository
   regenerate         Recreate the targets metadata file [Not supported yet]
   set-threshold      Sets the threshold for a role
