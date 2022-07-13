@@ -1277,6 +1277,7 @@ func (r *Repo) SnapshotWithExpires(expires time.Time) error {
 		return err
 	}
 
+	snapshot.Meta = data.SnapshotFiles{}
 	for _, metaName := range r.snapshotMetadata() {
 		if err := r.verifySignatures(metaName); err != nil {
 			return err

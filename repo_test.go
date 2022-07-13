@@ -2631,3 +2631,48 @@ func (rs *RepoSuite) TestSnapshotWithInvalidRoot(c *C) {
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
 }
+
+// Regression test: Snapshotting after removing a delegation should remove the
+// removed delegation hash.
+func (rs *RepoSuite) TestSnapshotAfterRemoveDelegation(c *C) {
+	tmp := newTmpDir(c)
+	local := FileSystemStore(tmp.path, nil)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// Add one key to each role
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	// commit the metadata to the store.
+	c.Assert(r.AddTargets([]string{}, nil), IsNil)
+
+	// manually add root.json to snapshot metadata, as old versions did.
+	snapshot, err := r.snapshot()
+	c.Assert(err, IsNil)
+	snapshot.Meta["root.json"], err = r.snapshotFileMeta("root.json")
+	c.Assert(err, IsNil)
+	err = r.setMeta("snapshot.json", snapshot)
+	c.Assert(err, IsNil)
+
+	// check that the snapshot metadata includes root.
+	snapshot, err = r.snapshot()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Meta, HasLen, 1)
+	c.Assert(snapshot.Meta["root.json"].Version, Equals, int64(1))
+
+	// snapshot and timestamp
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	// check that the snapshot metadata removed the root.
+	snapshot, err = r.snapshot()
+	c.Assert(err, IsNil)
+	c.Assert(snapshot.Meta, HasLen, 1)
+	if _, ok := snapshot.Meta["root.json"]; ok {
+		c.Fatalf("expected root.json to be removed when snapshotting")
+	}
+}
