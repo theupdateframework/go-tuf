@@ -2632,8 +2632,7 @@ func (rs *RepoSuite) TestSnapshotWithInvalidRoot(c *C) {
 	c.Assert(r.Commit(), IsNil)
 }
 
-// Regression test: Snapshotting after removing a delegation should remove the
-// removed delegation hash.
+// Regression test: Snapshotting should remove old snapshot metadata.
 func (rs *RepoSuite) TestSnapshotAfterRemoveDelegation(c *C) {
 	tmp := newTmpDir(c)
 	local := FileSystemStore(tmp.path, nil)
