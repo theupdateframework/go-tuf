@@ -150,8 +150,8 @@ func (r *Role) AddKeyIDs(ids []string) bool {
 type Files map[string]FileMeta
 
 type FileMeta struct {
-	Length int64            `json:"length,omitempty"`
-	Hashes Hashes           `json:"hashes,omitempty"`
+	Length int64            `json:"length"`
+	Hashes Hashes           `json:"hashes"`
 	Custom *json.RawMessage `json:"custom,omitempty"`
 }
 
