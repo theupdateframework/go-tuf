@@ -669,7 +669,7 @@ func (c *Client) downloadMeta(name string, version int64, m data.FileMeta) ([]by
 }
 
 func (c *Client) downloadMetaFromSnapshot(name string, m data.SnapshotFileMeta) ([]byte, error) {
-	b, err := c.downloadMeta(name, m.Version, data.FileMeta{m.Length, m.Hashes})
+	b, err := c.downloadMeta(name, m.Version, data.FileMeta{Length: m.Length, Hashes: m.Hashes})
 	if err != nil {
 		return nil, err
 	}
@@ -693,7 +693,7 @@ func (c *Client) downloadMetaFromSnapshot(name string, m data.SnapshotFileMeta) 
 }
 
 func (c *Client) downloadMetaFromTimestamp(name string, m data.TimestampFileMeta) ([]byte, error) {
-	b, err := c.downloadMeta(name, m.Version, data.FileMeta{m.Length, m.Hashes})
+	b, err := c.downloadMeta(name, m.Version, data.FileMeta{Length: m.Length, Hashes: m.Hashes})
 	if err != nil {
 		return nil, err
 	}
