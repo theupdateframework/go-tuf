@@ -147,28 +147,25 @@ func (r *Role) AddKeyIDs(ids []string) bool {
 	return changed
 }
 
-type Files map[string]FileMeta
-
-type FileMeta struct {
-	Length int64            `json:"length"`
-	Hashes Hashes           `json:"hashes"`
-	Custom *json.RawMessage `json:"custom,omitempty"`
-}
+type Files map[string]TargetFileMeta
 
 type Hashes map[string]HexBytes
 
-func (f FileMeta) HashAlgorithms() []string {
-	funcs := make([]string, 0, len(f.Hashes))
-	for name := range f.Hashes {
+func (f Hashes) HashAlgorithms() []string {
+	funcs := make([]string, 0, len(f))
+	for name := range f {
 		funcs = append(funcs, name)
 	}
 	return funcs
 }
 
-type SnapshotFileMeta struct {
-	FileMeta
-	Version int64 `json:"version"`
+type MetapathFileMeta struct {
+	Length  int64  `json:"length,omitempty"`
+	Hashes  Hashes `json:"hashes,omitempty"`
+	Version int64  `json:"version"`
 }
+
+type SnapshotFileMeta MetapathFileMeta
 
 type SnapshotFiles map[string]SnapshotFileMeta
 
@@ -190,14 +187,20 @@ func NewSnapshot() *Snapshot {
 	}
 }
 
+type FileMeta struct {
+	Length int64  `json:"length"`
+	Hashes Hashes `json:"hashes"`
+}
+
 type TargetFiles map[string]TargetFileMeta
 
 type TargetFileMeta struct {
 	FileMeta
+	Custom *json.RawMessage `json:"custom,omitempty"`
 }
 
 func (f TargetFileMeta) HashAlgorithms() []string {
-	return f.FileMeta.HashAlgorithms()
+	return f.FileMeta.Hashes.HashAlgorithms()
 }
 
 type Targets struct {
@@ -300,10 +303,7 @@ func NewTargets() *Targets {
 	}
 }
 
-type TimestampFileMeta struct {
-	FileMeta
-	Version int64 `json:"version"`
-}
+type TimestampFileMeta MetapathFileMeta
 
 type TimestampFiles map[string]TimestampFileMeta
 

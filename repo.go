@@ -1027,7 +1027,7 @@ func (r *Repo) AddTargetsWithDigest(digest string, digestAlg string, length int6
 	// This is the targets role that needs to sign the target file.
 	targetsRoleName := delegation.Delegatee.Name
 
-	meta := data.FileMeta{Length: length, Hashes: make(data.Hashes, 1)}
+	meta := data.TargetFileMeta{FileMeta: data.FileMeta{Length: length, Hashes: make(data.Hashes, 1)}}
 	meta.Hashes[digestAlg], err = hex.DecodeString(digest)
 	if err != nil {
 		return err
@@ -1044,7 +1044,7 @@ func (r *Repo) AddTargetsWithDigest(digest string, digestAlg string, length int6
 	// What does G2 mean? Copying and pasting this comment from elsewhere in this file.
 	// G2 -> we no longer desire any readers to ever observe non-prefix targets.
 	delete(targetsMeta.Targets, "/"+path)
-	targetsMeta.Targets[path] = data.TargetFileMeta{FileMeta: meta}
+	targetsMeta.Targets[path] = meta
 
 	targetsMeta.Expires = expires.Round(time.Second)
 
