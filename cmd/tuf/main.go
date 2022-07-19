@@ -146,9 +146,9 @@ func getPassphrase(role string, confirm bool, change bool) ([]byte, error) {
 		// No environment variable set, so proceed prompting for new passphrase
 		role = fmt.Sprintf("new %s", role)
 	}
-	fmt.Printf("Enter %s keys passphrase: ", role)
+	fmt.Fprintf(os.Stderr, "Enter %s keys passphrase: ", role)
 	passphrase, err := term.ReadPassword(int(syscall.Stdin))
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 	if err != nil {
 		return nil, err
 	}
@@ -157,9 +157,9 @@ func getPassphrase(role string, confirm bool, change bool) ([]byte, error) {
 		return passphrase, nil
 	}
 
-	fmt.Printf("Repeat %s keys passphrase: ", role)
+	fmt.Fprintf(os.Stderr, "Repeat %s keys passphrase: ", role)
 	confirmation, err := term.ReadPassword(int(syscall.Stdin))
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 	if err != nil {
 		return nil, err
 	}

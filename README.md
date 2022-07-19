@@ -277,7 +277,7 @@ Enter root keys passphrase:
 Copy `root.json.sigs` back to the repo box and import the signatures:
 
 ``` bash
-$ tuf add-signatures --signatures=root.json.sigs root.json
+$ tuf add-signatures --signatures root.json.sigs root.json
 ```
 
 This achieves the same state as the above flow for the repo box:
