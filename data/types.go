@@ -159,13 +159,13 @@ func (f Hashes) HashAlgorithms() []string {
 	return funcs
 }
 
-type MetapathFileMeta struct {
+type metapathFileMeta struct {
 	Length  int64  `json:"length,omitempty"`
 	Hashes  Hashes `json:"hashes,omitempty"`
 	Version int64  `json:"version"`
 }
 
-type SnapshotFileMeta MetapathFileMeta
+type SnapshotFileMeta metapathFileMeta
 
 type SnapshotFiles map[string]SnapshotFileMeta
 
@@ -303,7 +303,7 @@ func NewTargets() *Targets {
 	}
 }
 
-type TimestampFileMeta MetapathFileMeta
+type TimestampFileMeta metapathFileMeta
 
 type TimestampFiles map[string]TimestampFileMeta
 
