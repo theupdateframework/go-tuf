@@ -1,12 +1,15 @@
 package keys
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/sha256"
 	"encoding/asn1"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"math/big"
 
 	"github.com/theupdateframework/go-tuf/data"
@@ -59,13 +62,25 @@ func (p *p256Verifier) MarshalPublicKey() *data.PublicKey {
 }
 
 func (p *p256Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
-	if err := json.Unmarshal(key.Value, p); err != nil {
+	// Prepare decoder limited to 512Kb
+	dec := json.NewDecoder(io.LimitReader(bytes.NewReader(key.Value), MaxJSONKeySize))
+
+	// Unmarshal key value
+	if err := dec.Decode(p); err != nil {
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return fmt.Errorf("tuf: the public key is truncated or too large: %w", err)
+		}
 		return err
 	}
-	x, _ := elliptic.Unmarshal(elliptic.P256(), p.PublicKey)
+
+	curve := elliptic.P256()
+
+	// Parse as uncompressed marshalled point.
+	x, _ := elliptic.Unmarshal(curve, p.PublicKey)
 	if x == nil {
 		return errors.New("tuf: invalid ecdsa public key point")
 	}
+
 	p.key = key
 	return nil
 }
