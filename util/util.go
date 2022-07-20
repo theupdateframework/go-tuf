@@ -247,8 +247,9 @@ func GenerateSnapshotFileMeta(r io.Reader, hashAlgorithms ...string) (data.Snaps
 		return data.SnapshotFileMeta{}, err
 	}
 	return data.SnapshotFileMeta{
-		FileMeta: m,
-		Version:  v,
+		Length:  m.Length,
+		Hashes:  m.Hashes,
+		Version: v,
 	}, nil
 }
 
@@ -268,8 +269,9 @@ func GenerateTimestampFileMeta(r io.Reader, hashAlgorithms ...string) (data.Time
 		return data.TimestampFileMeta{}, err
 	}
 	return data.TimestampFileMeta{
-		FileMeta: m,
-		Version:  v,
+		Length:  m.Length,
+		Hashes:  m.Hashes,
+		Version: v,
 	}, nil
 }
 

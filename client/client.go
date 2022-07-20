@@ -669,7 +669,7 @@ func (c *Client) downloadMeta(name string, version int64, m data.FileMeta) ([]by
 }
 
 func (c *Client) downloadMetaFromSnapshot(name string, m data.SnapshotFileMeta) ([]byte, error) {
-	b, err := c.downloadMeta(name, m.Version, m.FileMeta)
+	b, err := c.downloadMeta(name, m.Version, data.FileMeta{Length: m.Length, Hashes: m.Hashes})
 	if err != nil {
 		return nil, err
 	}
@@ -679,7 +679,7 @@ func (c *Client) downloadMetaFromSnapshot(name string, m data.SnapshotFileMeta) 
 		return nil, ErrDownloadFailed{name, err}
 	}
 
-	meta, err := util.GenerateSnapshotFileMeta(bytes.NewReader(b), m.HashAlgorithms()...)
+	meta, err := util.GenerateSnapshotFileMeta(bytes.NewReader(b), m.Hashes.HashAlgorithms()...)
 	if err != nil {
 		return nil, err
 	}
@@ -693,7 +693,7 @@ func (c *Client) downloadMetaFromSnapshot(name string, m data.SnapshotFileMeta) 
 }
 
 func (c *Client) downloadMetaFromTimestamp(name string, m data.TimestampFileMeta) ([]byte, error) {
-	b, err := c.downloadMeta(name, m.Version, m.FileMeta)
+	b, err := c.downloadMeta(name, m.Version, data.FileMeta{Length: m.Length, Hashes: m.Hashes})
 	if err != nil {
 		return nil, err
 	}
@@ -703,7 +703,7 @@ func (c *Client) downloadMetaFromTimestamp(name string, m data.TimestampFileMeta
 		return nil, ErrDownloadFailed{name, err}
 	}
 
-	meta, err := util.GenerateTimestampFileMeta(bytes.NewReader(b), m.HashAlgorithms()...)
+	meta, err := util.GenerateTimestampFileMeta(bytes.NewReader(b), m.Hashes.HashAlgorithms()...)
 	if err != nil {
 		return nil, err
 	}
@@ -825,7 +825,7 @@ func (c *Client) localMetaFromSnapshot(name string, m data.SnapshotFileMeta) (js
 	if !ok {
 		return nil, false
 	}
-	meta, err := util.GenerateSnapshotFileMeta(bytes.NewReader(b), m.HashAlgorithms()...)
+	meta, err := util.GenerateSnapshotFileMeta(bytes.NewReader(b), m.Hashes.HashAlgorithms()...)
 	if err != nil {
 		return nil, false
 	}
@@ -840,7 +840,7 @@ func (c *Client) hasTargetsMeta(m data.SnapshotFileMeta) bool {
 	if !ok {
 		return false
 	}
-	meta, err := util.GenerateSnapshotFileMeta(bytes.NewReader(b), m.HashAlgorithms()...)
+	meta, err := util.GenerateSnapshotFileMeta(bytes.NewReader(b), m.Hashes.HashAlgorithms()...)
 	if err != nil {
 		return false
 	}
@@ -855,7 +855,7 @@ func (c *Client) hasMetaFromTimestamp(name string, m data.TimestampFileMeta) boo
 	if !ok {
 		return false
 	}
-	meta, err := util.GenerateTimestampFileMeta(bytes.NewReader(b), m.HashAlgorithms()...)
+	meta, err := util.GenerateTimestampFileMeta(bytes.NewReader(b), m.Hashes.HashAlgorithms()...)
 	if err != nil {
 		return false
 	}

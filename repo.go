@@ -1027,7 +1027,7 @@ func (r *Repo) AddTargetsWithDigest(digest string, digestAlg string, length int6
 	// This is the targets role that needs to sign the target file.
 	targetsRoleName := delegation.Delegatee.Name
 
-	meta := data.FileMeta{Length: length, Hashes: make(data.Hashes, 1)}
+	meta := data.TargetFileMeta{FileMeta: data.FileMeta{Length: length, Hashes: make(data.Hashes, 1)}}
 	meta.Hashes[digestAlg], err = hex.DecodeString(digest)
 	if err != nil {
 		return err
@@ -1044,7 +1044,7 @@ func (r *Repo) AddTargetsWithDigest(digest string, digestAlg string, length int6
 	// What does G2 mean? Copying and pasting this comment from elsewhere in this file.
 	// G2 -> we no longer desire any readers to ever observe non-prefix targets.
 	delete(targetsMeta.Targets, "/"+path)
-	targetsMeta.Targets[path] = data.TargetFileMeta{FileMeta: meta}
+	targetsMeta.Targets[path] = meta
 
 	targetsMeta.Expires = expires.Round(time.Second)
 
@@ -1554,4 +1554,40 @@ func (r *Repo) Payload(roleFilename string) ([]byte, error) {
 	}
 
 	return p, nil
+}
+
+func (r *Repo) CheckRoleUnexpired(role string, validAt time.Time) error {
+	var expires time.Time
+	switch role {
+	case "root":
+		root, err := r.root()
+		if err != nil {
+			return err
+		}
+		expires = root.Expires
+	case "snapshot":
+		snapshot, err := r.snapshot()
+		if err != nil {
+			return err
+		}
+		expires = snapshot.Expires
+	case "timestamp":
+		timestamp, err := r.timestamp()
+		if err != nil {
+			return err
+		}
+		expires = timestamp.Expires
+	case "targets":
+		targets, err := r.topLevelTargets()
+		if err != nil {
+			return err
+		}
+		expires = targets.Expires
+	default:
+		return fmt.Errorf("invalid role: %s", role)
+	}
+	if expires.Before(validAt) || expires.Equal(validAt) {
+		return fmt.Errorf("role expired on: %s", expires)
+	}
+	return nil
 }
