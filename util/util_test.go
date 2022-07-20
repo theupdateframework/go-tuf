@@ -118,10 +118,8 @@ func (UtilSuite) TestSnapshotFileMetaEqual(c *C) {
 
 	fileMeta := func(version int64, length int64, hashes map[string]string) data.SnapshotFileMeta {
 		return data.SnapshotFileMeta{
-			FileMeta: data.FileMeta{
-				Length: length,
-				Hashes: makeHashes(c, hashes),
-			},
+			Length:  length,
+			Hashes:  makeHashes(c, hashes),
 			Version: version,
 		}
 	}
@@ -158,9 +156,10 @@ func (UtilSuite) TestSnapshotFileMetaEqual(c *C) {
 	}
 
 	for _, t := range testMetaFileCases(c) {
-		actual := data.SnapshotFileMeta{FileMeta: t.actual}
-		expected := data.SnapshotFileMeta{FileMeta: t.expected}
-		c.Assert(SnapshotFileMetaEqual(actual, expected), DeepEquals, t.err(t), Commentf("name = %s", t.name))
+		actual := data.SnapshotFileMeta{Length: t.actual.Length, Hashes: t.actual.Hashes}
+		expected := data.SnapshotFileMeta{Length: t.expected.Length, Hashes: t.expected.Hashes}
+		c.Assert(SnapshotFileMetaEqual(actual, expected), DeepEquals, t.err(t), Commentf("name = %s %d %d", t.name, t.actual.Length, t.expected.Length))
+		c.Assert(FileMetaEqual(t.actual, t.expected), DeepEquals, t.err(t), Commentf("name = %s", t.name))
 	}
 }
 
