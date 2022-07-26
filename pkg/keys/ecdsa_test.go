@@ -1,7 +1,8 @@
 package keys
 
 import (
-	"crypto/ed25519"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -14,13 +15,16 @@ import (
 	. "gopkg.in/check.v1"
 )
 
-type Ed25519Suite struct{}
+type ECDSASuite struct{}
 
-var _ = Suite(&Ed25519Suite{})
+var _ = Suite(&ECDSASuite{})
 
-func (Ed25519Suite) TestUnmarshalEd25519(c *C) {
-	pub, _, err := ed25519.GenerateKey(strings.NewReader("00001-deterministic-buffer-for-key-generation"))
+func (ECDSASuite) TestUnmarshalECDSA(c *C) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), strings.NewReader("00001-deterministic-buffer-for-key-generation"))
 	c.Assert(err, IsNil)
+
+	// Marshall as non compressed point
+	pub := elliptic.Marshal(elliptic.P256(), priv.X, priv.Y)
 
 	publicKey, err := json.Marshal(map[string]string{
 		"public": hex.EncodeToString(pub),
@@ -28,30 +32,31 @@ func (Ed25519Suite) TestUnmarshalEd25519(c *C) {
 	c.Assert(err, IsNil)
 
 	badKey := &data.PublicKey{
-		Type:       data.KeyTypeEd25519,
-		Scheme:     data.KeySchemeEd25519,
+		Type:       data.KeyTypeECDSA_SHA2_P256,
+		Scheme:     data.KeySchemeECDSA_SHA2_P256,
 		Algorithms: data.HashAlgorithms,
 		Value:      publicKey,
 	}
-	verifier := NewEd25519Verifier()
+	verifier := NewEcdsaVerifier()
 	c.Assert(verifier.UnmarshalPublicKey(badKey), IsNil)
 }
 
-func (Ed25519Suite) TestUnmarshalEd25519_Invalid(c *C) {
+func (ECDSASuite) TestUnmarshalECDSA_Invalid(c *C) {
 	badKeyValue, err := json.Marshal(true)
 	c.Assert(err, IsNil)
+
 	badKey := &data.PublicKey{
-		Type:       data.KeyTypeEd25519,
-		Scheme:     data.KeySchemeEd25519,
+		Type:       data.KeyTypeECDSA_SHA2_P256,
+		Scheme:     data.KeySchemeECDSA_SHA2_P256,
 		Algorithms: data.HashAlgorithms,
 		Value:      badKeyValue,
 	}
-	verifier := NewEd25519Verifier()
+	verifier := NewEcdsaVerifier()
 	c.Assert(verifier.UnmarshalPublicKey(badKey), ErrorMatches, "json: cannot unmarshal.*")
 }
 
-func (Ed25519Suite) TestUnmarshalEd25519_FastFuzz(c *C) {
-	verifier := NewEd25519Verifier()
+func (ECDSASuite) TestUnmarshalECDSA_FastFuzz(c *C) {
+	verifier := NewEcdsaVerifier()
 	for i := 0; i < 50; i++ {
 		// Ensure no basic panic
 
@@ -63,7 +68,7 @@ func (Ed25519Suite) TestUnmarshalEd25519_FastFuzz(c *C) {
 	}
 }
 
-func (Ed25519Suite) TestUnmarshalEd25519_TooLongContent(c *C) {
+func (ECDSASuite) TestUnmarshalECDSA_TooLongContent(c *C) {
 	randomSeed := make([]byte, MaxJSONKeySize)
 	_, err := io.ReadFull(rand.Reader, randomSeed)
 	c.Assert(err, IsNil)
@@ -76,24 +81,12 @@ func (Ed25519Suite) TestUnmarshalEd25519_TooLongContent(c *C) {
 	c.Assert(err, IsNil)
 
 	badKey := &data.PublicKey{
-		Type:       data.KeyTypeEd25519,
-		Scheme:     data.KeySchemeEd25519,
+		Type:       data.KeyTypeECDSA_SHA2_P256,
+		Scheme:     data.KeySchemeECDSA_SHA2_P256,
 		Algorithms: data.HashAlgorithms,
 		Value:      tooLongPayload,
 	}
-	verifier := NewEd25519Verifier()
+	verifier := NewEcdsaVerifier()
 	err = verifier.UnmarshalPublicKey(badKey)
 	c.Assert(errors.Is(err, io.ErrUnexpectedEOF), Equals, true)
-}
-
-func (Ed25519Suite) TestSignVerify(c *C) {
-	signer, err := GenerateEd25519Key()
-	c.Assert(err, IsNil)
-	msg := []byte("foo")
-	sig, err := signer.SignMessage(msg)
-	c.Assert(err, IsNil)
-	publicData := signer.PublicData()
-	pubKey, err := GetVerifier(publicData)
-	c.Assert(err, IsNil)
-	c.Assert(pubKey.Verify(msg, sig), IsNil)
 }

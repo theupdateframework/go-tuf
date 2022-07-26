@@ -16,14 +16,14 @@ jobs:
         with:
           fetch-depth: 0
       - name: Get Go version
-        uses: arnested/go-version-action@c8847d6b47d31ea7ff343b151ad514a41671babf
+        uses: arnested/go-version-action@bf453ac6d2e6817d97a063baeae3443f02181e29
         id: go-version
       - name: Set up Go
-        uses: actions/setup-go@fcdc43634adb5f7ae75a9d7a9b9361790f7293e2
+        uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a
         with:
           go-version: ${{ steps.go-version.outputs.minimal }}
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@b953231f81b8dfd023c58e0854a721e35037f28b
+        uses: goreleaser/goreleaser-action@68acf3b1adf004ac9c2f0a4259e85c5f66e99bef
         with:
           distribution: goreleaser
           version: "v1.7.0"

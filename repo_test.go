@@ -689,6 +689,29 @@ func (rs *RepoSuite) TestSign(c *C) {
 	c.Assert(r.Sign("targets.json"), Equals, ErrMissingMetadata{"targets.json"})
 }
 
+func (rs *RepoSuite) TestStatus(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+
+	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+	c.Assert(r.SnapshotWithExpires(time.Now().Add(24*time.Hour)), IsNil)
+	c.Assert(r.TimestampWithExpires(time.Now().Add(1*time.Hour)), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	expires := time.Now().Add(2 * time.Hour)
+	c.Assert(r.CheckRoleUnexpired("timestamp", expires), ErrorMatches, "role expired on.*")
+	c.Assert(r.CheckRoleUnexpired("snapshot", expires), IsNil)
+	c.Assert(r.CheckRoleUnexpired("targets", expires), IsNil)
+	c.Assert(r.CheckRoleUnexpired("root", expires), IsNil)
+}
+
 func (rs *RepoSuite) TestCommit(c *C) {
 	files := map[string][]byte{"foo.txt": []byte("foo"), "bar.txt": []byte("bar")}
 	local := MemoryStore(make(map[string]json.RawMessage), files)
@@ -1260,12 +1283,12 @@ func (rs *RepoSuite) TestHashAlgorithm(c *C) {
 		c.Assert(err, IsNil)
 		for name, file := range map[string]data.FileMeta{
 			"foo.txt":       targets.Targets["foo.txt"].FileMeta,
-			"targets.json":  snapshot.Meta["targets.json"].FileMeta,
-			"snapshot.json": timestamp.Meta["snapshot.json"].FileMeta,
+			"targets.json":  {Length: snapshot.Meta["targets.json"].Length, Hashes: snapshot.Meta["targets.json"].Hashes},
+			"snapshot.json": {Length: timestamp.Meta["snapshot.json"].Length, Hashes: timestamp.Meta["snapshot.json"].Hashes},
 		} {
 			for _, hashAlgorithm := range test.expected {
 				if _, ok := file.Hashes[hashAlgorithm]; !ok {
-					c.Fatalf("expected %s hash to contain hash func %s, got %s", name, hashAlgorithm, file.HashAlgorithms())
+					c.Fatalf("expected %s hash to contain hash func %s, got %s", name, hashAlgorithm, file.Hashes.HashAlgorithms())
 				}
 			}
 		}
@@ -2594,5 +2617,88 @@ func (rs *RepoSuite) TestOfflineFlow(c *C) {
 		// This method checks that the signature verifies!
 		err = r.AddOrUpdateSignature("root.json", sig)
 		c.Assert(err, IsNil)
+	}
+}
+
+// Regression test: Snapshotting an invalid root should fail.
+func (rs *RepoSuite) TestSnapshotWithInvalidRoot(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// Init should create targets.json, but not signed yet
+	r.Init(false)
+
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+
+	// Clear the root signature so that signature verification fails.
+	s, err := r.SignedMeta("root.json")
+	c.Assert(err, IsNil)
+	c.Assert(s.Signatures, HasLen, 1)
+	s.Signatures[0].Signature = data.HexBytes{}
+	b, err := r.jsonMarshal(s)
+	c.Assert(err, IsNil)
+	r.meta["root.json"] = b
+	local.SetMeta("root.json", b)
+
+	// Snapshotting should fail.
+	c.Assert(r.Snapshot(), Equals, ErrInsufficientSignatures{"root.json", verify.ErrInvalid})
+
+	// Correctly sign root
+	c.Assert(r.Sign("root.json"), IsNil)
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+}
+
+// Regression test: Do not omit length in target metadata files.
+func (rs *RepoSuite) TestTargetMetadataLength(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	// Init should create targets.json, but not signed yet
+	r.Init(false)
+
+	genKey(c, r, "root")
+	genKey(c, r, "targets")
+	genKey(c, r, "snapshot")
+	genKey(c, r, "timestamp")
+	c.Assert(r.AddTarget("foo.txt", nil), IsNil)
+	c.Assert(r.Snapshot(), IsNil)
+	c.Assert(r.Timestamp(), IsNil)
+	c.Assert(r.Commit(), IsNil)
+
+	// Check length field of foo.txt exists.
+	meta, err := local.GetMeta()
+	c.Assert(err, IsNil)
+	targetsJSON, ok := meta["targets.json"]
+	if !ok {
+		c.Fatal("missing targets metadata")
+	}
+	s := &data.Signed{}
+	c.Assert(json.Unmarshal(targetsJSON, s), IsNil)
+	fmt.Fprintf(os.Stderr, string(s.Signed))
+	var objMap map[string]json.RawMessage
+	c.Assert(json.Unmarshal(s.Signed, &objMap), IsNil)
+	targetsMap, ok := objMap["targets"]
+	if !ok {
+		c.Fatal("missing targets field in targets metadata")
+	}
+	c.Assert(json.Unmarshal(targetsMap, &objMap), IsNil)
+	targetsMap, ok = objMap["foo.txt"]
+	if !ok {
+		c.Fatal("missing foo.txt in targets")
+	}
+	c.Assert(json.Unmarshal(targetsMap, &objMap), IsNil)
+	targetsMap, ok = objMap["length"]
+	if !ok {
+		c.Fatal("missing length field in foo.txt file meta")
 	}
 }

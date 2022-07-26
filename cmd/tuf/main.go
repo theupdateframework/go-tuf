@@ -40,6 +40,7 @@ Commands:
   add-signatures     Adds signatures generated offline
   sign               Sign a role's metadata file
   sign-payload       Sign a file from the "payload" command.
+  status             Check if a role's metadata has expired
   commit             Commit staged files to the repository
   regenerate         Recreate the targets metadata file [Not supported yet]
   set-threshold      Sets the threshold for a role
@@ -145,9 +146,9 @@ func getPassphrase(role string, confirm bool, change bool) ([]byte, error) {
 		// No environment variable set, so proceed prompting for new passphrase
 		role = fmt.Sprintf("new %s", role)
 	}
-	fmt.Printf("Enter %s keys passphrase: ", role)
+	fmt.Fprintf(os.Stderr, "Enter %s keys passphrase: ", role)
 	passphrase, err := term.ReadPassword(int(syscall.Stdin))
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 	if err != nil {
 		return nil, err
 	}
@@ -156,9 +157,9 @@ func getPassphrase(role string, confirm bool, change bool) ([]byte, error) {
 		return passphrase, nil
 	}
 
-	fmt.Printf("Repeat %s keys passphrase: ", role)
+	fmt.Fprintf(os.Stderr, "Repeat %s keys passphrase: ", role)
 	confirmation, err := term.ReadPassword(int(syscall.Stdin))
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 	if err != nil {
 		return nil, err
 	}

@@ -32,7 +32,7 @@ The directories contain the following files:
 
 ### Install
 
-`go-tuf` is tested on Go versions 1.16 and 1.17.
+`go-tuf` is tested on Go versions 1.18.
 
 ```bash
 go get github.com/theupdateframework/go-tuf/cmd/tuf
@@ -151,6 +151,10 @@ See also `tuf add-signatures`.
 Adds signatures (the output of `tuf sign-payload`) to the given role metadata file.
 
 If the signature does not verify, it will not be added.
+
+#### `tuf status --valid-at <date> <role>`
+
+Check if the role's metadata will be expired on the given date. 
 
 #### Usage of environment variables
 
@@ -273,7 +277,7 @@ Enter root keys passphrase:
 Copy `root.json.sigs` back to the repo box and import the signatures:
 
 ``` bash
-$ tuf add-signatures --signatures=root.json.sigs root.json
+$ tuf add-signatures --signatures root.json.sigs root.json
 ```
 
 This achieves the same state as the above flow for the repo box:
@@ -605,12 +609,14 @@ For the client package, see https://godoc.org/github.com/theupdateframework/go-t
 
 For the client CLI, see https://github.com/theupdateframework/go-tuf/tree/master/cmd/tuf-client.
 
-## Development
+## Contributing and Development
 
-For local development, `go-tuf` requires Go version 1.16 or 1.17.
+For local development, `go-tuf` requires Go version 1.18.
 
 The [Python interoperability tests](client/python_interop/) require Python 3
 (available as `python` on the `$PATH`) and the [`python-tuf`
 package](https://github.com/theupdateframework/python-tuf) installed (`pip
 install tuf`). To update the data for these tests requires Docker and make (see
 test data [README.md](client/python_interop/testdata/README.md) for details).
+
+Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for contribution guidelines before making your first contribution!
