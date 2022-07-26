@@ -15,7 +15,7 @@ jobs:
   run:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         go-version: ${{ fromJSON(needs.get-go-versions.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
     needs: get-go-versions
@@ -54,7 +54,7 @@ jobs:
     strategy:
       matrix:
         go-version: ${{ fromJSON(needs.get-go-versions.outputs.matrix) }}
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     needs: get-go-versions
     steps:

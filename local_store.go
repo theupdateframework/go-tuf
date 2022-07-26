@@ -311,44 +311,44 @@ func (f *fileSystemStore) createDirs() error {
 
 func (f *fileSystemStore) WalkStagedTargets(paths []string, targetsFn TargetsWalkFunc) error {
 	if len(paths) == 0 {
-		walkFunc := func(path string, info os.FileInfo, err error) error {
+		walkFunc := func(fpath string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
 			if info.IsDir() || !info.Mode().IsRegular() {
 				return nil
 			}
-			rel, err := filepath.Rel(filepath.Join(f.stagedDir(), "targets"), path)
+			rel, err := filepath.Rel(filepath.Join(f.stagedDir(), "targets"), fpath)
 			if err != nil {
 				return err
 			}
-			file, err := os.Open(path)
+			file, err := os.Open(fpath)
 			if err != nil {
 				return err
 			}
 			defer file.Close()
-			return targetsFn(rel, file)
+			return targetsFn(filepath.ToSlash(rel), file)
 		}
 		return filepath.Walk(filepath.Join(f.stagedDir(), "targets"), walkFunc)
 	}
 
 	// check all the files exist before processing any files
 	for _, path := range paths {
-		realPath := filepath.Join(f.stagedDir(), "targets", path)
-		if _, err := os.Stat(realPath); err != nil {
+		realFilepath := filepath.Join(f.stagedDir(), "targets", path)
+		if _, err := os.Stat(realFilepath); err != nil {
 			if os.IsNotExist(err) {
-				return ErrFileNotFound{realPath}
+				return ErrFileNotFound{realFilepath}
 			}
 			return err
 		}
 	}
 
 	for _, path := range paths {
-		realPath := filepath.Join(f.stagedDir(), "targets", path)
-		file, err := os.Open(realPath)
+		realFilepath := filepath.Join(f.stagedDir(), "targets", path)
+		file, err := os.Open(realFilepath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return ErrFileNotFound{realPath}
+				return ErrFileNotFound{realFilepath}
 			}
 			return err
 		}
@@ -373,23 +373,24 @@ func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]in
 	isTarget := func(path string) bool {
 		return strings.HasPrefix(path, "targets/")
 	}
-	copyToRepo := func(path string, info os.FileInfo, err error) error {
+	copyToRepo := func(fpath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if info.IsDir() || !info.Mode().IsRegular() {
 			return nil
 		}
-		rel, err := filepath.Rel(f.stagedDir(), path)
+		rel, err := filepath.Rel(f.stagedDir(), fpath)
 		if err != nil {
 			return err
 		}
+		relpath := filepath.ToSlash(rel)
 
 		var paths []string
-		if isTarget(rel) {
-			paths = computeTargetPaths(consistentSnapshot, rel, hashes)
+		if isTarget(relpath) {
+			paths = computeTargetPaths(consistentSnapshot, relpath, hashes)
 		} else {
-			paths = computeMetadataPaths(consistentSnapshot, rel, versions)
+			paths = computeMetadataPaths(consistentSnapshot, relpath, versions)
 		}
 		var files []io.Writer
 		for _, path := range paths {
@@ -400,7 +401,7 @@ func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]in
 			defer file.Close()
 			files = append(files, file)
 		}
-		staged, err := os.Open(path)
+		staged, err := os.Open(fpath)
 		if err != nil {
 			return err
 		}
@@ -411,21 +412,21 @@ func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]in
 		return nil
 	}
 	// Checks if target file should be deleted
-	needsRemoval := func(path string) bool {
+	needsRemoval := func(fpath string) bool {
 		if consistentSnapshot {
 			// strip out the hash
-			name := strings.SplitN(filepath.Base(path), ".", 2)
+			name := strings.SplitN(filepath.Base(fpath), ".", 2)
 			if len(name) != 2 || name[1] == "" {
 				return false
 			}
-			path = filepath.Join(filepath.Dir(path), name[1])
+			fpath = filepath.Join(filepath.Dir(fpath), name[1])
 		}
-		_, ok := hashes[path]
+		_, ok := hashes[filepath.ToSlash(fpath)]
 		return !ok
 	}
 	// Checks if folder is empty
-	folderNeedsRemoval := func(path string) bool {
-		f, err := os.Open(path)
+	folderNeedsRemoval := func(fpath string) bool {
+		f, err := os.Open(fpath)
 		if err != nil {
 			return false
 		}
@@ -433,21 +434,22 @@ func (f *fileSystemStore) Commit(consistentSnapshot bool, versions map[string]in
 		_, err = f.Readdirnames(1)
 		return err == io.EOF
 	}
-	removeFile := func(path string, info os.FileInfo, err error) error {
+	removeFile := func(fpath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		rel, err := filepath.Rel(f.repoDir(), path)
+		rel, err := filepath.Rel(f.repoDir(), fpath)
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() && isTarget(rel) && needsRemoval(rel) {
+		relpath := filepath.ToSlash(rel)
+		if !info.IsDir() && isTarget(relpath) && needsRemoval(rel) {
 			// Delete the target file
-			if err := os.Remove(path); err != nil {
+			if err := os.Remove(fpath); err != nil {
 				return err
 			}
 			// Delete the target folder too if it's empty
-			targetFolder := filepath.Dir(path)
+			targetFolder := filepath.Dir(fpath)
 			if folderNeedsRemoval(targetFolder) {
 				if err := os.Remove(targetFolder); err != nil {
 					return err
