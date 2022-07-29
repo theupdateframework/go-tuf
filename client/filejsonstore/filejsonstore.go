@@ -1,4 +1,4 @@
-package filejsonstore
+package client
 
 import (
 	"encoding/json"

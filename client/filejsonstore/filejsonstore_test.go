@@ -1,4 +1,4 @@
-package filejsonstore
+package client
 
 import (
 	"encoding/json"
@@ -97,6 +97,22 @@ func (RawJSONStoreSuite) TestMetadataOperations(c *check.C) {
 	}
 
 	md, err = s.GetMeta()
+	c.Assert(err, check.IsNil)
+	c.Assert(md, check.HasLen, 0)
+}
+
+func (RawJSONStoreSuite) TestGetNoJSON(c *check.C) {
+	tmp := c.MkDir()
+	p := filepath.Join(tmp, "tuf_raw.db")
+	s, err := New(p)
+	c.Assert(s, check.NotNil)
+	c.Assert(err, check.IsNil)
+
+	// Create a file which does not end with '.json'
+	fp := filepath.FromSlash(filepath.Join(p, "meta.xml"))
+	os.WriteFile(fp, []byte{}, 0644)
+
+	md, err := s.GetMeta()
 	c.Assert(err, check.IsNil)
 	c.Assert(md, check.HasLen, 0)
 }
