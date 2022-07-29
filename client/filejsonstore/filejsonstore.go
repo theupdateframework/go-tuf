@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/theupdateframework/go-tuf/util"
 )
 
+var ErrNotJSON = errors.New("file is not in JSON format")
+
 type FileJSONStore struct {
-	f       *os.File
 	baseDir string
 }
 
@@ -23,39 +26,33 @@ func newImpl(baseDir string, recurse bool) (*FileJSONStore, error) {
 	}
 	var err error
 
-	if f.f, err = os.Open(baseDir); err != nil {
+	// Does the directory exist?
+	fi, err := os.Stat(baseDir)
+	if err != nil {
 		pe, ok := err.(*os.PathError)
-		fmt.Println(ok)
-		fmt.Println(pe.Err)
 		if ok && errors.Is(pe.Err, os.ErrNotExist) && recurse {
 			// Create the directory
+			// user:  rwx
+			// group: r-x
+			// other: ---
 			err = os.Mkdir(baseDir, 0750)
 			if err == nil {
 				return newImpl(baseDir, false)
 			}
-			return nil, err
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 
-	if stat, err := f.f.Stat(); err != nil {
-		f.f.Close()
-		return nil, fmt.Errorf("failed to stat file %s: %w",
-			baseDir, err)
-	} else {
-		if !stat.IsDir() {
-			f.f.Close()
-			return nil, fmt.Errorf("can not open %s, not a directory",
-				baseDir)
-		}
+	if !fi.IsDir() {
+		return nil, fmt.Errorf("can not open %s, not a directory",
+			baseDir)
 	}
 
 	return &f, nil
 }
 
 func (f *FileJSONStore) GetMeta() (map[string]json.RawMessage, error) {
-	names, err := f.f.Readdirnames(0)
+	names, err := os.ReadDir(f.baseDir)
 
 	if err != nil {
 		return nil, err
@@ -63,33 +60,41 @@ func (f *FileJSONStore) GetMeta() (map[string]json.RawMessage, error) {
 
 	meta := map[string]json.RawMessage{}
 	for _, name := range names {
-		p := filepath.FromSlash(filepath.Join(f.baseDir, name))
+		p := filepath.FromSlash(filepath.Join(f.baseDir, name.Name()))
+		if ok, err := util.IsMetaFile(name); !ok {
+			continue
+		} else if err != nil {
+			return nil, err
+		}
 		b, err := os.ReadFile(p)
 		if err != nil {
 			return nil, err
 		}
-		meta[name] = b
+		meta[name.Name()] = b
 	}
 
 	return meta, nil
 }
 
 func (f *FileJSONStore) SetMeta(name string, meta json.RawMessage) error {
+	if filepath.Ext(name) != ".json" {
+		return ErrNotJSON
+	}
+
 	p := filepath.FromSlash(filepath.Join(f.baseDir, name))
-	return os.WriteFile(p, meta, 0640)
+	// user:  rw-
+	// group: r--
+	// other: ---
+	err := util.AtomicallyWriteFile(p, meta, 0640)
+	return err
 }
 
 func (f *FileJSONStore) DeleteMeta(name string) error {
 	p := filepath.FromSlash(filepath.Join(f.baseDir, name))
-	return os.Remove(p)
+	err := os.Remove(p)
+	return err
 }
 
 func (f *FileJSONStore) Close() error {
-	if f == nil {
-		return nil
-	}
-	if f.f != nil {
-		return f.f.Close()
-	}
 	return nil
 }
