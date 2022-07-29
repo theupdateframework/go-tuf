@@ -331,3 +331,17 @@ func AtomicallyWriteFile(filename string, data []byte, perm os.FileMode) error {
 
 	return nil
 }
+
+// IsMetaFile tests wheter a DirEntry appears to be a metaddata file or not.
+func IsMetaFile(e os.DirEntry) (bool, error) {
+	if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
+		return false, nil
+	}
+
+	info, err := e.Info()
+	if err != nil {
+		return false, err
+	}
+
+	return info.Mode().IsRegular(), nil
+}

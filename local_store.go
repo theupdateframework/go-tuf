@@ -222,19 +222,6 @@ func (f *fileSystemStore) stagedDir() string {
 	return filepath.Join(f.dir, "staged")
 }
 
-func isMetaFile(e os.DirEntry) (bool, error) {
-	if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
-		return false, nil
-	}
-
-	info, err := e.Info()
-	if err != nil {
-		return false, err
-	}
-
-	return info.Mode().IsRegular(), nil
-}
-
 func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 	// Build a map of metadata names (e.g. root.json) to their full paths
 	// (whether in the committed repo dir, or in the staged repo dir).
@@ -247,7 +234,7 @@ func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 	}
 
 	for _, e := range committed {
-		imf, err := isMetaFile(e)
+		imf, err := util.IsMetaFile(e)
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +251,7 @@ func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 	}
 
 	for _, e := range staged {
-		imf, err := isMetaFile(e)
+		imf, err := util.IsMetaFile(e)
 		if err != nil {
 			return nil, err
 		}
