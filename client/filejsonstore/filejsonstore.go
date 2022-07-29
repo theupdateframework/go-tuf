@@ -35,7 +35,7 @@ func newImpl(baseDir string, recurse bool) (*FileJSONStore, error) {
 			// user:  rwx
 			// group: r-x
 			// other: ---
-			err = os.Mkdir(baseDir, 0750)
+			err = os.MkdirAll(baseDir, 0750)
 			if err == nil {
 				return newImpl(baseDir, false)
 			}
