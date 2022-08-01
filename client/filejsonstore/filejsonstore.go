@@ -10,13 +10,22 @@ import (
 	"github.com/theupdateframework/go-tuf/util"
 )
 
+// ErrNotJSON is returned when a metadata operation is attempted to be
+// performed against a file that does not seem to be a JSON file
+// (e.g. does not end in .json, case sensitive).
 var ErrNotJSON = errors.New("file is not in JSON format")
 
+// FileJSONStore represents a local metadata cache relying on raw JSON files
+// as retrieved from the remote repository.
 type FileJSONStore struct {
 	baseDir string
 }
 
-func New(baseDir string) (*FileJSONStore, error) {
+// NewFileJSONStore returns a new metadata cache, implemented using raw JSON
+// files, stored in a directory provided by the client.
+// If the provided directory does not exist on disk, it will be created.
+// The provided metadata cache is not safe for concurrent access.
+func NewFileJSONStore(baseDir string) (*FileJSONStore, error) {
 	return newImpl(baseDir, true)
 }
 
@@ -51,6 +60,7 @@ func newImpl(baseDir string, recurse bool) (*FileJSONStore, error) {
 	return &f, nil
 }
 
+// GetMeta returns the currently cached set of metadata files.
 func (f *FileJSONStore) GetMeta() (map[string]json.RawMessage, error) {
 	names, err := os.ReadDir(f.baseDir)
 
@@ -76,6 +86,8 @@ func (f *FileJSONStore) GetMeta() (map[string]json.RawMessage, error) {
 	return meta, nil
 }
 
+// SetMeta stores a metadata file in the cache. If the metadata file exist,
+// it will be overwritten.
 func (f *FileJSONStore) SetMeta(name string, meta json.RawMessage) error {
 	if filepath.Ext(name) != ".json" {
 		return ErrNotJSON
@@ -89,12 +101,19 @@ func (f *FileJSONStore) SetMeta(name string, meta json.RawMessage) error {
 	return err
 }
 
+// DeleteMeta deletes a metadata file from the cache.
+// If the file does not exist, an *os.PathError is returned.
 func (f *FileJSONStore) DeleteMeta(name string) error {
+	if filepath.Ext(name) != ".json" {
+		return ErrNotJSON
+	}
+
 	p := filepath.FromSlash(filepath.Join(f.baseDir, name))
 	err := os.Remove(p)
 	return err
 }
 
+// Close closes the metadata cache. This is a no-op.
 func (f *FileJSONStore) Close() error {
 	return nil
 }
