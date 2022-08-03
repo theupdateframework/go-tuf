@@ -15,7 +15,7 @@ type RawJSONStoreSuite struct{}
 
 var _ = check.Suite(&RawJSONStoreSuite{})
 
-// Hook up gocheck into the "go test" runnder
+// Hook up gocheck into the "go test" runner
 func Test(t *testing.T) { check.TestingT(t) }
 
 func (RawJSONStoreSuite) TestNewOk(c *check.C) {
