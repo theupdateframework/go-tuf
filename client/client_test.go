@@ -175,9 +175,11 @@ func (s *ClientSuite) addRemoteTarget(c *C, name string) {
 }
 
 func (s *ClientSuite) rootMeta(c *C) []byte {
-	meta, err := s.repo.RawMeta("root.json")
+	meta, err := s.repo.GetMeta()
 	c.Assert(err, IsNil)
-	return meta
+	rootMeta, ok := meta["root.json"]
+	c.Assert(ok, Equals, true)
+	return rootMeta
 }
 
 func (s *ClientSuite) newClient(c *C) *Client {
