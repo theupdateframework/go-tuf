@@ -106,49 +106,6 @@ func NewClient(local LocalStore, remote RemoteStore) *Client {
 	}
 }
 
-// Init initializes a local repository.
-//
-// The latest root.json is fetched from remote storage, verified using rootKeys
-// and threshold, and then saved in local storage. It is expected that rootKeys
-// were securely distributed with the software being updated.
-//
-// Deprecated: Use c.InitLocal and c.Update to initialize a local repository.
-func (c *Client) Init(rootKeys []*data.PublicKey, threshold int) error {
-	if len(rootKeys) < threshold {
-		return ErrInsufficientKeys
-	}
-	rootJSON, err := c.downloadMetaUnsafe("root.json", defaultRootDownloadLimit)
-	if err != nil {
-		return err
-	}
-
-	// create a new key database, and add all the public `rootKeys` to it.
-	c.db = verify.NewDB()
-	rootKeyIDs := make([]string, 0, len(rootKeys))
-	for _, key := range rootKeys {
-		for _, id := range key.IDs() {
-			rootKeyIDs = append(rootKeyIDs, id)
-			if err := c.db.AddKey(id, key); err != nil {
-				return err
-			}
-		}
-	}
-
-	// add a mock "root" role that trusts the passed in key ids. These keys
-	// will be used to verify the `root.json` we just fetched.
-	role := &data.Role{Threshold: threshold, KeyIDs: rootKeyIDs}
-	if err := c.db.AddRole("root", role); err != nil {
-		return err
-	}
-
-	// verify that the new root is valid.
-	if err := c.decodeRoot(rootJSON); err != nil {
-		return err
-	}
-
-	return c.local.SetMeta("root.json", rootJSON)
-}
-
 // InitLocal initializes a local repository from root metadata.
 //
 // The root's keys are extracted from the root and saved in local storage.
