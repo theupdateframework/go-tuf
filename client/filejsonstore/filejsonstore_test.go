@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"gopkg.in/check.v1"
+
+	"github.com/theupdateframework/go-tuf/client"
 )
 
 type RawJSONStoreSuite struct{}
@@ -159,4 +161,15 @@ func (RawJSONStoreSuite) TestDelete(c *check.C) {
 	c.Assert(err, check.Equals, ErrNotJSON)
 	err = s.DeleteMeta("non_existing.json")
 	c.Assert(errors.Is(err, os.ErrNotExist), check.Equals, true)
+}
+
+func (RawJSONStoreSuite) TestInterface(c *check.C) {
+	var localStore client.LocalStore
+	var err error
+
+	tmp := c.MkDir()
+	p := filepath.Join(tmp, "tuf_raw.db")
+	localStore, err = NewFileJSONStore(p)
+	c.Assert(localStore, check.NotNil)
+	c.Assert(err, check.IsNil)
 }
