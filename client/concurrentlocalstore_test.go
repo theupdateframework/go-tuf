@@ -15,8 +15,10 @@ var _ = check.Suite(&ConcurrentStoreSuite{})
 func ConcurrentTest(t *testing.T) { check.TestingT(t) }
 
 func (ConcurrentStoreSuite) TestOperations(c *check.C) {
+	var store LocalStore
+
 	mem := MemoryLocalStore()
-	store := NewConcurrentLocalStore(mem)
+	store = NewConcurrentLocalStore(mem)
 
 	c.Assert(store, check.NotNil)
 	expected := map[string]json.RawMessage{
