@@ -77,7 +77,8 @@ func (RawJSONStoreSuite) TestMetadataOperations(c *check.C) {
 	}
 
 	for k, v := range expected {
-		s.SetMeta(k, v)
+		err := s.SetMeta(k, v)
+		c.Assert(err, check.IsNil)
 	}
 
 	md, err := s.GetMeta()
