@@ -244,25 +244,6 @@ func (s *ClientSuite) assertErrExpired(c *C, err error, file string) {
 	c.Assert(expiredErr.Expired.Unix(), Equals, s.expiredTime.Round(time.Second).Unix())
 }
 
-func (s *ClientSuite) TestInit(c *C) {
-	client := NewClient(MemoryLocalStore(), s.remote)
-
-	// check invalid json
-	c.Assert(client.Init(make([]byte, 0)), NotNil)
-	rootJson := `{ "signatures": [], "signed": {"version": "wrongtype"}, "spec_version": "1.0.0", "version": 1}`
-	err := client.Init([]byte(rootJson))
-	c.Assert(err.Error(), Matches, "json: cannot unmarshal string.*")
-
-	// check Update() returns ErrNoRootKeys when uninitialized
-	_, err = client.Update()
-	c.Assert(err, Equals, ErrNoRootKeys)
-
-	// check Update() does not return ErrNoRootKeys after initialization
-	c.Assert(client.Init(s.rootMeta(c)), IsNil)
-	_, err = client.Update()
-	c.Assert(err, IsNil)
-}
-
 func (s *ClientSuite) TestInitAllowsExpired(c *C) {
 	s.genKeyExpired(c, "targets")
 	c.Assert(s.repo.Snapshot(), IsNil)
