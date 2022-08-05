@@ -35,5 +35,5 @@ func cmdInit(args *docopt.Args, client *tuf.Client) error {
 	if err != nil {
 		return err
 	}
-	return client.InitLocal(bytes)
+	return client.Init(bytes)
 }

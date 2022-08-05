@@ -185,7 +185,7 @@ func (s *ClientSuite) rootMeta(c *C) []byte {
 func (s *ClientSuite) newClient(c *C) *Client {
 	s.local = MemoryLocalStore()
 	client := NewClient(s.local, s.remote)
-	c.Assert(client.InitLocal(s.rootMeta(c)), IsNil)
+	c.Assert(client.Init(s.rootMeta(c)), IsNil)
 	return client
 }
 
@@ -244,26 +244,7 @@ func (s *ClientSuite) assertErrExpired(c *C, err error, file string) {
 	c.Assert(expiredErr.Expired.Unix(), Equals, s.expiredTime.Round(time.Second).Unix())
 }
 
-func (s *ClientSuite) TestInit(c *C) {
-	client := NewClient(MemoryLocalStore(), s.remote)
-
-	// check invalid json
-	c.Assert(client.InitLocal(make([]byte, 0)), NotNil)
-	rootJson := `{ "signatures": [], "signed": {"version": "wrongtype"}, "spec_version": "1.0.0", "version": 1}`
-	err := client.InitLocal([]byte(rootJson))
-	c.Assert(err.Error(), Matches, "json: cannot unmarshal string.*")
-
-	// check Update() returns ErrNoRootKeys when uninitialized
-	_, err = client.Update()
-	c.Assert(err, Equals, ErrNoRootKeys)
-
-	// check Update() does not return ErrNoRootKeys after initialization
-	c.Assert(client.InitLocal(s.rootMeta(c)), IsNil)
-	_, err = client.Update()
-	c.Assert(err, IsNil)
-}
-
-func (s *ClientSuite) TestInitLocalAllowsExpired(c *C) {
+func (s *ClientSuite) TestInitAllowsExpired(c *C) {
 	s.genKeyExpired(c, "targets")
 	c.Assert(s.repo.Snapshot(), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
@@ -273,11 +254,11 @@ func (s *ClientSuite) TestInitLocalAllowsExpired(c *C) {
 	bytes, err := io.ReadAll(s.remote.meta["root.json"])
 	c.Assert(err, IsNil)
 	s.withMetaExpired(func() {
-		c.Assert(client.InitLocal(bytes), IsNil)
+		c.Assert(client.Init(bytes), IsNil)
 	})
 }
 
-func (s *ClientSuite) TestInitLocal(c *C) {
+func (s *ClientSuite) TestInit(c *C) {
 	client := NewClient(MemoryLocalStore(), s.remote)
 	bytes, err := io.ReadAll(s.remote.meta["root.json"])
 	c.Assert(err, IsNil)
@@ -290,7 +271,7 @@ func (s *ClientSuite) TestInitLocal(c *C) {
 	_, err = client.Update()
 	c.Assert(err, Equals, ErrNoRootKeys)
 
-	// check InitLocal() returns ErrInvalid when the root's signature is
+	// check Init() returns ErrInvalid when the root's signature is
 	// invalid
 	// modify root and marshal without regenerating signatures
 	root.Version = root.Version + 1
@@ -299,10 +280,10 @@ func (s *ClientSuite) TestInitLocal(c *C) {
 	dataSigned.Signed = rootBytes
 	dataBytes, err := json.Marshal(dataSigned)
 	c.Assert(err, IsNil)
-	c.Assert(client.InitLocal(dataBytes), Equals, verify.ErrInvalid)
+	c.Assert(client.Init(dataBytes), Equals, verify.ErrInvalid)
 
 	// check Update() does not return ErrNoRootKeys after initialization
-	c.Assert(client.InitLocal(bytes), IsNil)
+	c.Assert(client.Init(bytes), IsNil)
 	_, err = client.Update()
 	c.Assert(err, IsNil)
 }
@@ -1042,7 +1023,7 @@ func (s *ClientSuite) TestUpdateHTTP(c *C) {
 		c.Assert(err, IsNil)
 		rootJsonBytes, err := json.Marshal(rootMeta)
 		c.Assert(err, IsNil)
-		c.Assert(client.InitLocal(rootJsonBytes), IsNil)
+		c.Assert(client.Init(rootJsonBytes), IsNil)
 
 		// check update is ok
 		targets, err := client.Update()
