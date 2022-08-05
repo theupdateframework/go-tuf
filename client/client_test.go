@@ -174,17 +174,18 @@ func (s *ClientSuite) addRemoteTarget(c *C, name string) {
 	s.syncRemote(c)
 }
 
-func (s *ClientSuite) rootKeys(c *C) []*data.PublicKey {
-	rootKeys, err := s.repo.RootKeys()
+func (s *ClientSuite) rootMeta(c *C) []byte {
+	meta, err := s.repo.GetMeta()
 	c.Assert(err, IsNil)
-	c.Assert(rootKeys, HasLen, 1)
-	return rootKeys
+	rootMeta, ok := meta["root.json"]
+	c.Assert(ok, Equals, true)
+	return rootMeta
 }
 
 func (s *ClientSuite) newClient(c *C) *Client {
 	s.local = MemoryLocalStore()
 	client := NewClient(s.local, s.remote)
-	c.Assert(client.Init(s.rootKeys(c), 1), IsNil)
+	c.Assert(client.InitLocal(s.rootMeta(c)), IsNil)
 	return client
 }
 
@@ -243,39 +244,21 @@ func (s *ClientSuite) assertErrExpired(c *C, err error, file string) {
 	c.Assert(expiredErr.Expired.Unix(), Equals, s.expiredTime.Round(time.Second).Unix())
 }
 
-func (s *ClientSuite) TestInitRootTooLarge(c *C) {
-	client := NewClient(MemoryLocalStore(), s.remote)
-	s.remote.meta["root.json"] = newFakeFile(make([]byte, defaultRootDownloadLimit+1))
-	c.Assert(client.Init(s.rootKeys(c), 0), Equals, ErrMetaTooLarge{"root.json", defaultRootDownloadLimit + 1, defaultRootDownloadLimit})
-}
-
-func (s *ClientSuite) TestInitRootExpired(c *C) {
-	s.genKeyExpired(c, "targets")
-	c.Assert(s.repo.Snapshot(), IsNil)
-	c.Assert(s.repo.Timestamp(), IsNil)
-	c.Assert(s.repo.Commit(), IsNil)
-	s.syncRemote(c)
-	client := NewClient(MemoryLocalStore(), s.remote)
-	s.withMetaExpired(func() {
-		s.assertErrExpired(c, client.Init(s.rootKeys(c), 1), "root.json")
-	})
-}
-
 func (s *ClientSuite) TestInit(c *C) {
 	client := NewClient(MemoryLocalStore(), s.remote)
 
-	// check Init() returns keys.ErrInvalidThreshold with an invalid threshold
-	c.Assert(client.Init(s.rootKeys(c), 0), Equals, verify.ErrInvalidThreshold)
-
-	// check Init() returns signed.ErrRoleThreshold when not enough keys
-	c.Assert(client.Init(s.rootKeys(c), 2), Equals, ErrInsufficientKeys)
+	// check invalid json
+	c.Assert(client.InitLocal(make([]byte, 0)), NotNil)
+	rootJson := `{ "signatures": [], "signed": {"version": "wrongtype"}, "spec_version": "1.0.0", "version": 1}`
+	err := client.InitLocal([]byte(rootJson))
+	c.Assert(err.Error(), Matches, "json: cannot unmarshal string.*")
 
 	// check Update() returns ErrNoRootKeys when uninitialized
-	_, err := client.Update()
+	_, err = client.Update()
 	c.Assert(err, Equals, ErrNoRootKeys)
 
 	// check Update() does not return ErrNoRootKeys after initialization
-	c.Assert(client.Init(s.rootKeys(c), 1), IsNil)
+	c.Assert(client.InitLocal(s.rootMeta(c)), IsNil)
 	_, err = client.Update()
 	c.Assert(err, IsNil)
 }
@@ -489,6 +472,8 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 		{"testdata/Published2Times_targets_keyrotated", nil, map[string]int64{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 2}},
 		// timestamp role key rotation increase the timestamp.
 		{"testdata/Published2Times_timestamp_keyrotated", nil, map[string]int64{"root": 2, "timestamp": 2, "snapshot": 1, "targets": 1}},
+		//root file size > defaultRootDownloadLimit
+		{"testdata/Published2Times_roottoolarge", ErrMetaTooLarge{Name: "2.root.json", Size: defaultRootDownloadLimit + 1, MaxSize: defaultRootDownloadLimit}, map[string]int64{}},
 	}
 
 	for _, test := range tests {
@@ -1053,10 +1038,11 @@ func (s *ClientSuite) TestUpdateHTTP(c *C) {
 		remote, err := HTTPRemoteStore(fmt.Sprintf("http://%s/%s/repository", addr, dir), nil, nil)
 		c.Assert(err, IsNil)
 		client := NewClient(MemoryLocalStore(), remote)
-		rootKeys, err := repo.RootKeys()
+		rootMeta, err := repo.SignedMeta("root.json")
 		c.Assert(err, IsNil)
-		c.Assert(rootKeys, HasLen, 1)
-		c.Assert(client.Init(rootKeys, 1), IsNil)
+		rootJsonBytes, err := json.Marshal(rootMeta)
+		c.Assert(err, IsNil)
+		c.Assert(client.InitLocal(rootJsonBytes), IsNil)
 
 		// check update is ok
 		targets, err := client.Update()
