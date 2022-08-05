@@ -59,7 +59,7 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 		client := client.NewClient(client.MemoryLocalStore(), remote)
 		rootJSON, err := ioutil.ReadFile(filepath.Join(testDataDir, dir, "repository", "metadata", "root.json"))
 		c.Assert(err, IsNil)
-		c.Assert(client.InitLocal(rootJSON), IsNil)
+		c.Assert(client.Init(rootJSON), IsNil)
 
 		// check update returns the correct updated targets
 		files, err := client.Update()

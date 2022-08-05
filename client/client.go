@@ -106,13 +106,13 @@ func NewClient(local LocalStore, remote RemoteStore) *Client {
 	}
 }
 
-// InitLocal initializes a local repository from root metadata.
+// Init initializes a local repository from root metadata.
 //
 // The root's keys are extracted from the root and saved in local storage.
 // Root expiration is not checked.
 // It is expected that rootJSON was securely distributed with the software
 // being updated.
-func (c *Client) InitLocal(rootJSON []byte) error {
+func (c *Client) Init(rootJSON []byte) error {
 	err := c.loadAndVerifyRootMeta(rootJSON, true /*ignoreExpiredCheck*/)
 	if err != nil {
 		return err

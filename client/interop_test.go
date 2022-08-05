@@ -153,7 +153,7 @@ func (t *testCase) runStep(c *C, stepName string) {
 	c.Assert(err, IsNil)
 	rootJsonBytes, err := io.ReadAll(ioReader)
 	c.Assert(err, IsNil)
-	c.Assert(client.InitLocal(rootJsonBytes), IsNil)
+	c.Assert(client.Init(rootJsonBytes), IsNil)
 
 	// check update returns the correct updated targets
 	files, err := client.Update()
