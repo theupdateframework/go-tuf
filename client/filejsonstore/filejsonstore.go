@@ -10,8 +10,8 @@ import (
 	"github.com/theupdateframework/go-tuf/util"
 )
 
-// ErrNotJSON is returned when a metadata operation is attempted to be
-// performed against a file that does not seem to be a JSON file
+// ErrNotJSON is returned when a metadata operation is attempted
+// against a file that does not seem to be a JSON file
 // (e.g. does not end in .json, case sensitive).
 var ErrNotJSON = errors.New("file is not in JSON format")
 
