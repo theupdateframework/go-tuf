@@ -88,7 +88,7 @@ func (RawJSONStoreSuite) TestMetadataOperations(c *check.C) {
 	c.Assert(md, check.HasLen, 3)
 	c.Assert(md, check.DeepEquals, expected)
 
-	// Nuke items
+	// Delete all items
 	count := 3
 	for k := range expected {
 		err = s.DeleteMeta(k)
