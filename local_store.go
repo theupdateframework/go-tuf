@@ -14,6 +14,7 @@ import (
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/encrypted"
+	"github.com/theupdateframework/go-tuf/internal/fsutil"
 	"github.com/theupdateframework/go-tuf/internal/sets"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/util"
@@ -234,7 +235,7 @@ func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 	}
 
 	for _, e := range committed {
-		imf, err := util.IsMetaFile(e)
+		imf, err := fsutil.IsMetaFile(e)
 		if err != nil {
 			return nil, err
 		}
@@ -251,7 +252,7 @@ func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 	}
 
 	for _, e := range staged {
-		imf, err := util.IsMetaFile(e)
+		imf, err := fsutil.IsMetaFile(e)
 		if err != nil {
 			return nil, err
 		}

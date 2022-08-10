@@ -13,14 +13,14 @@ import (
 	"github.com/theupdateframework/go-tuf/client"
 )
 
-type RawJSONStoreSuite struct{}
+type FileJSONStoreSuite struct{}
 
-var _ = check.Suite(&RawJSONStoreSuite{})
+var _ = check.Suite(&FileJSONStoreSuite{})
 
 // Hook up gocheck into the "go test" runner
 func Test(t *testing.T) { check.TestingT(t) }
 
-func (RawJSONStoreSuite) TestNewOk(c *check.C) {
+func (FileJSONStoreSuite) TestNewOk(c *check.C) {
 	tmp := c.MkDir()
 	p := filepath.Join(tmp, "tuf_raw.db")
 
@@ -41,7 +41,7 @@ func (RawJSONStoreSuite) TestNewOk(c *check.C) {
 	c.Assert(fi.IsDir(), check.Equals, true)
 }
 
-func (RawJSONStoreSuite) TestNewFileExists(c *check.C) {
+func (FileJSONStoreSuite) TestNewFileExists(c *check.C) {
 	tmp := c.MkDir()
 	p := filepath.Join(tmp, "tuf_raw.db")
 
@@ -58,7 +58,37 @@ func (RawJSONStoreSuite) TestNewFileExists(c *check.C) {
 	c.Assert(found, check.Equals, true)
 }
 
-func (RawJSONStoreSuite) TestGetMetaEmpty(c *check.C) {
+func (FileJSONStoreSuite) TestNewDirectoryExists(c *check.C) {
+	tmp := c.MkDir()
+	p := filepath.Join(tmp, "tuf_raw.db")
+
+	err := os.Mkdir(p, 0750)
+	c.Assert(err, check.IsNil)
+
+	// Create implementation
+	s, err := NewFileJSONStore(p)
+	c.Assert(s, check.NotNil)
+	c.Assert(err, check.IsNil)
+
+	// Modify the directory permission and try again
+	err = os.Chmod(p, 0751)
+	s, err = NewFileJSONStore(p)
+	c.Assert(s, check.IsNil)
+	c.Assert(err, check.Equals, ErrTooPermissive)
+}
+
+func (FileJSONStoreSuite) TestNewNoCreate(c *check.C) {
+	tmp := c.MkDir()
+	p := filepath.Join(tmp, "tuf_raw.db")
+
+	// Clear the write bit for the user
+	err := os.Chmod(tmp, 0551)
+	s, err := NewFileJSONStore(p)
+	c.Assert(s, check.IsNil)
+	c.Assert(err, check.NotNil)
+}
+
+func (FileJSONStoreSuite) TestGetMetaEmpty(c *check.C) {
 	tmp := c.MkDir()
 	p := filepath.Join(tmp, "tuf_raw.db")
 	s, err := NewFileJSONStore(p)
@@ -68,7 +98,20 @@ func (RawJSONStoreSuite) TestGetMetaEmpty(c *check.C) {
 	c.Assert(md, check.HasLen, 0)
 }
 
-func (RawJSONStoreSuite) TestMetadataOperations(c *check.C) {
+func (FileJSONStoreSuite) TestGetNoDirectory(c *check.C) {
+	tmp := c.MkDir()
+	p := filepath.Join(tmp, "tuf_raw.db")
+	s, err := NewFileJSONStore(p)
+
+	err = os.Remove(p)
+	c.Assert(err, check.IsNil)
+
+	md, err := s.GetMeta()
+	c.Assert(md, check.IsNil)
+	c.Assert(err, check.NotNil)
+}
+
+func (FileJSONStoreSuite) TestMetadataOperations(c *check.C) {
 	tmp := c.MkDir()
 	p := filepath.Join(tmp, "tuf_raw.db")
 	s, err := NewFileJSONStore(p)
@@ -104,7 +147,7 @@ func (RawJSONStoreSuite) TestMetadataOperations(c *check.C) {
 	c.Assert(md, check.HasLen, 0)
 }
 
-func (RawJSONStoreSuite) TestGetNoJSON(c *check.C) {
+func (FileJSONStoreSuite) TestGetNoJSON(c *check.C) {
 	tmp := c.MkDir()
 	p := filepath.Join(tmp, "tuf_raw.db")
 	s, err := NewFileJSONStore(p)
@@ -113,14 +156,32 @@ func (RawJSONStoreSuite) TestGetNoJSON(c *check.C) {
 
 	// Create a file which does not end with '.json'
 	fp := filepath.FromSlash(filepath.Join(p, "meta.xml"))
-	os.WriteFile(fp, []byte{}, 0644)
+	err = os.WriteFile(fp, []byte{}, 0644)
+	c.Assert(err, check.IsNil)
 
 	md, err := s.GetMeta()
 	c.Assert(err, check.IsNil)
 	c.Assert(md, check.HasLen, 0)
 }
 
-func (RawJSONStoreSuite) TestNoJSON(c *check.C) {
+func (FileJSONStoreSuite) TestGetTooPermissive(c *check.C) {
+	tmp := c.MkDir()
+	p := filepath.Join(tmp, "tuf_raw.db")
+	s, err := NewFileJSONStore(p)
+	c.Assert(s, check.NotNil)
+	c.Assert(err, check.IsNil)
+
+	// Create a file which does not end with '.json'
+	fp := filepath.FromSlash(filepath.Join(p, "meta.json"))
+	err = os.WriteFile(fp, []byte{}, 0644)
+	c.Assert(err, check.IsNil)
+
+	md, err := s.GetMeta()
+	c.Assert(md, check.IsNil)
+	c.Assert(err, check.Equals, ErrTooPermissive)
+}
+
+func (FileJSONStoreSuite) TestNoJSON(c *check.C) {
 	tmp := c.MkDir()
 	p := filepath.Join(tmp, "tuf_raw.db")
 	s, err := NewFileJSONStore(p)
@@ -138,7 +199,7 @@ func (RawJSONStoreSuite) TestNoJSON(c *check.C) {
 	}
 }
 
-func (RawJSONStoreSuite) TestClose(c *check.C) {
+func (FileJSONStoreSuite) TestClose(c *check.C) {
 	tmp := c.MkDir()
 	p := filepath.Join(tmp, "tuf_raw.db")
 	s, err := NewFileJSONStore(p)
@@ -149,7 +210,7 @@ func (RawJSONStoreSuite) TestClose(c *check.C) {
 	c.Assert(err, check.IsNil)
 }
 
-func (RawJSONStoreSuite) TestDelete(c *check.C) {
+func (FileJSONStoreSuite) TestDelete(c *check.C) {
 	tmp := c.MkDir()
 	p := filepath.Join(tmp, "tuf_raw.db")
 	s, err := NewFileJSONStore(p)
@@ -162,7 +223,7 @@ func (RawJSONStoreSuite) TestDelete(c *check.C) {
 	c.Assert(errors.Is(err, os.ErrNotExist), check.Equals, true)
 }
 
-func (RawJSONStoreSuite) TestInterface(c *check.C) {
+func (FileJSONStoreSuite) TestInterface(c *check.C) {
 	var localStore client.LocalStore
 	var err error
 
@@ -172,3 +233,6 @@ func (RawJSONStoreSuite) TestInterface(c *check.C) {
 	c.Assert(localStore, check.NotNil)
 	c.Assert(err, check.IsNil)
 }
+
+// test 3 file exist and is too permissive
+// test 4 remote base dir after create
