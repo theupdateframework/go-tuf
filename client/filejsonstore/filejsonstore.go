@@ -65,7 +65,6 @@ func newImpl(baseDir string, recurse bool) (*FileJSONStore, error) {
 // GetMeta returns the currently cached set of metadata files.
 func (f *FileJSONStore) GetMeta() (map[string]json.RawMessage, error) {
 	names, err := os.ReadDir(f.baseDir)
-
 	if err != nil {
 		return nil, err
 	}
