@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
+	"github.com/theupdateframework/go-tuf/internal/fsutil"
 	"github.com/theupdateframework/go-tuf/util"
 )
 
@@ -15,23 +17,33 @@ import (
 // (e.g. does not end in .json, case sensitive).
 var ErrNotJSON = errors.New("file is not in JSON format")
 
+// ErrToPermissive is returned when the metadata directory, or a metadata
+// file has too permissive file mode bits set
+var ErrTooPermissive = errors.New("permissions are too permissive")
+
+const (
+	// user:  rwx
+	// group: r-x
+	// other: ---
+	dirCreateMode = os.FileMode(0750)
+	// user:  rw-
+	// group: r--
+	// other: ---
+	fileCreateMode = os.FileMode(0640)
+)
+
 // FileJSONStore represents a local metadata cache relying on raw JSON files
 // as retrieved from the remote repository.
 type FileJSONStore struct {
+	mtx     sync.RWMutex
 	baseDir string
 }
 
 // NewFileJSONStore returns a new metadata cache, implemented using raw JSON
 // files, stored in a directory provided by the client.
 // If the provided directory does not exist on disk, it will be created.
-// The provided metadata cache is not safe for concurrent access, if
-// concurrent access safety is requires, wrap local store in a
-// ConcurrentLocalStore.
+// The provided metadata cache is afe for concurrent access
 func NewFileJSONStore(baseDir string) (*FileJSONStore, error) {
-	return newImpl(baseDir, true)
-}
-
-func newImpl(baseDir string, recurse bool) (*FileJSONStore, error) {
 	var f = FileJSONStore{
 		baseDir: baseDir,
 	}
@@ -41,22 +53,24 @@ func newImpl(baseDir string, recurse bool) (*FileJSONStore, error) {
 	fi, err := os.Stat(baseDir)
 	if err != nil {
 		pe, ok := err.(*os.PathError)
-		if ok && errors.Is(pe.Err, os.ErrNotExist) && recurse {
+		if ok && errors.Is(pe.Err, os.ErrNotExist) {
 			// Create the directory
-			// user:  rwx
-			// group: r-x
-			// other: ---
-			err = os.MkdirAll(baseDir, 0750)
-			if err == nil {
-				return newImpl(baseDir, false)
+			if err = os.MkdirAll(baseDir, dirCreateMode); err != nil {
+				return nil, err
 			}
+		} else {
+			return nil, err
 		}
-		return nil, err
-	}
-
-	if !fi.IsDir() {
-		return nil, fmt.Errorf("can not open %s, not a directory",
-			baseDir)
+	} else {
+		// Verify that it is a directory
+		if !fi.IsDir() {
+			return nil, fmt.Errorf("can not open %s, not a directory",
+				baseDir)
+		}
+		// Verify file mode is not too permissive.
+		if err = fsutil.EnsurePermission(fi, dirCreateMode); err != nil {
+			return nil, ErrTooPermissive
+		}
 	}
 
 	return &f, nil
@@ -64,6 +78,9 @@ func newImpl(baseDir string, recurse bool) (*FileJSONStore, error) {
 
 // GetMeta returns the currently cached set of metadata files.
 func (f *FileJSONStore) GetMeta() (map[string]json.RawMessage, error) {
+	f.mtx.RLock()
+	defer f.mtx.RUnlock()
+
 	names, err := os.ReadDir(f.baseDir)
 	if err != nil {
 		return nil, err
@@ -72,10 +89,20 @@ func (f *FileJSONStore) GetMeta() (map[string]json.RawMessage, error) {
 	meta := map[string]json.RawMessage{}
 	for _, name := range names {
 		p := filepath.FromSlash(filepath.Join(f.baseDir, name.Name()))
-		if ok, err := util.IsMetaFile(name); !ok {
-			continue
-		} else if err != nil {
+		ok, err := fsutil.IsMetaFile(name)
+		if err != nil {
 			return nil, err
+		}
+		if !ok {
+			continue
+		}
+		// Verify permissions
+		info, err := name.Info()
+		if err != nil {
+			return nil, err
+		}
+		if err = fsutil.EnsurePermission(info, fileCreateMode); err != nil {
+			return nil, ErrTooPermissive
 		}
 		b, err := os.ReadFile(p)
 		if err != nil {
@@ -90,21 +117,24 @@ func (f *FileJSONStore) GetMeta() (map[string]json.RawMessage, error) {
 // SetMeta stores a metadata file in the cache. If the metadata file exist,
 // it will be overwritten.
 func (f *FileJSONStore) SetMeta(name string, meta json.RawMessage) error {
+	f.mtx.Lock()
+	defer f.mtx.Unlock()
+
 	if filepath.Ext(name) != ".json" {
 		return ErrNotJSON
 	}
 
 	p := filepath.FromSlash(filepath.Join(f.baseDir, name))
-	// user:  rw-
-	// group: r--
-	// other: ---
-	err := util.AtomicallyWriteFile(p, meta, 0640)
+	err := util.AtomicallyWriteFile(p, meta, fileCreateMode)
 	return err
 }
 
 // DeleteMeta deletes a metadata file from the cache.
 // If the file does not exist, an *os.PathError is returned.
 func (f *FileJSONStore) DeleteMeta(name string) error {
+	f.mtx.Lock()
+	defer f.mtx.Unlock()
+
 	if filepath.Ext(name) != ".json" {
 		return ErrNotJSON
 	}
