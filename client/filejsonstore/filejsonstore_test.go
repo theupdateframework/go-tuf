@@ -136,7 +136,6 @@ func (RawJSONStoreSuite) TestNoJSON(c *check.C) {
 		err := s.SetMeta(f, []byte{})
 		c.Assert(err, check.Equals, ErrNotJSON)
 	}
-
 }
 
 func (RawJSONStoreSuite) TestClose(c *check.C) {
