@@ -42,7 +42,7 @@ type FileJSONStore struct {
 // NewFileJSONStore returns a new metadata cache, implemented using raw JSON
 // files, stored in a directory provided by the client.
 // If the provided directory does not exist on disk, it will be created.
-// The provided metadata cache is afe for concurrent access
+// The provided metadata cache is safe for concurrent access.
 func NewFileJSONStore(baseDir string) (*FileJSONStore, error) {
 	var f = FileJSONStore{
 		baseDir: baseDir,
