@@ -9,8 +9,6 @@ import (
 	"testing"
 
 	"gopkg.in/check.v1"
-
-	"github.com/theupdateframework/go-tuf/client"
 )
 
 type FileJSONStoreSuite struct{}
@@ -222,17 +220,3 @@ func (FileJSONStoreSuite) TestDelete(c *check.C) {
 	err = s.DeleteMeta("non_existing.json")
 	c.Assert(errors.Is(err, os.ErrNotExist), check.Equals, true)
 }
-
-func (FileJSONStoreSuite) TestInterface(c *check.C) {
-	var localStore client.LocalStore
-	var err error
-
-	tmp := c.MkDir()
-	p := filepath.Join(tmp, "tuf_raw.db")
-	localStore, err = NewFileJSONStore(p)
-	c.Assert(localStore, check.NotNil)
-	c.Assert(err, check.IsNil)
-}
-
-// test 3 file exist and is too permissive
-// test 4 remote base dir after create
