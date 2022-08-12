@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/theupdateframework/go-tuf/client"
 	"github.com/theupdateframework/go-tuf/internal/fsutil"
 	"github.com/theupdateframework/go-tuf/util"
 )
@@ -38,6 +39,8 @@ type FileJSONStore struct {
 	mtx     sync.RWMutex
 	baseDir string
 }
+
+var _ client.LocalStore = (*FileJSONStore)(nil)
 
 // NewFileJSONStore returns a new metadata cache, implemented using raw JSON
 // files, stored in a directory provided by the client.
