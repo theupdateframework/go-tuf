@@ -115,14 +115,6 @@ def make_test_repo(repo_dir: Path, consistent_snapshot: bool):
             filename = f"{name}.json"
         role.to_file(str(metadata_dir / filename), serializer=PRETTY)
 
-        if name == "snapshot":
-            # Stick info from written snapshot file in timestamp snapshot_meta
-            # TODO: shouldn't this happen less manually?
-            info = TargetFile.from_file("foo", str(metadata_dir / filename))
-            timestamp_metadata = roles["timestamp"].signed
-            timestamp_metadata.snapshot_meta.length = info.length
-            timestamp_metadata.snapshot_meta.hashes = info.hashes
-
 
 def main():
     parser = optparse.OptionParser()
