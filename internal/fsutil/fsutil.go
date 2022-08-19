@@ -4,7 +4,6 @@ package fsutil
 
 import (
 	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -23,17 +22,4 @@ func IsMetaFile(e os.DirEntry) (bool, error) {
 	}
 
 	return info.Mode().IsRegular(), nil
-}
-
-// EnsurePemissions tests the provided file info to make sure the
-// permission bits matches the provided.
-func EnsurePermission(fi os.FileInfo, perm os.FileMode) error {
-	// Clear all bits which are note related to the permission.
-	mode := fi.Mode() & fs.ModePerm
-	mask := ^perm
-	if (mode & mask) != 0 {
-		return ErrPermission
-	}
-
-	return nil
 }
