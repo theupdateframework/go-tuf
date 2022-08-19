@@ -275,7 +275,7 @@ func initTestDelegationClient(t *testing.T, dirPrefix string) (*Client, func() e
 	c := NewClient(MemoryLocalStore(), remote)
 	rawFile, err := ioutil.ReadFile(initialStateDir + "/" + "root.json")
 	assert.Nil(t, err)
-	assert.Nil(t, c.InitLocal(rawFile))
+	assert.Nil(t, c.Init(rawFile))
 	files, err := ioutil.ReadDir(initialStateDir)
 	assert.Nil(t, err)
 

@@ -1591,3 +1591,8 @@ func (r *Repo) CheckRoleUnexpired(role string, validAt time.Time) error {
 	}
 	return nil
 }
+
+// GetMeta returns the underlying meta file map from the store.
+func (r *Repo) GetMeta() (map[string]json.RawMessage, error) {
+	return r.local.GetMeta()
+}
