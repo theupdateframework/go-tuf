@@ -67,23 +67,6 @@ func (FileJSONStoreSuite) TestNewDirectoryExists(c *check.C) {
 	s, err := NewFileJSONStore(p)
 	c.Assert(s, check.NotNil)
 	c.Assert(err, check.IsNil)
-
-	// Modify the directory permission and try again
-	err = os.Chmod(p, 0751)
-	s, err = NewFileJSONStore(p)
-	c.Assert(s, check.IsNil)
-	c.Assert(err, check.Equals, ErrTooPermissive)
-}
-
-func (FileJSONStoreSuite) TestNewNoCreate(c *check.C) {
-	tmp := c.MkDir()
-	p := filepath.Join(tmp, "tuf_raw.db")
-
-	// Clear the write bit for the user
-	err := os.Chmod(tmp, 0551)
-	s, err := NewFileJSONStore(p)
-	c.Assert(s, check.IsNil)
-	c.Assert(err, check.NotNil)
 }
 
 func (FileJSONStoreSuite) TestGetMetaEmpty(c *check.C) {
@@ -160,23 +143,6 @@ func (FileJSONStoreSuite) TestGetNoJSON(c *check.C) {
 	md, err := s.GetMeta()
 	c.Assert(err, check.IsNil)
 	c.Assert(md, check.HasLen, 0)
-}
-
-func (FileJSONStoreSuite) TestGetTooPermissive(c *check.C) {
-	tmp := c.MkDir()
-	p := filepath.Join(tmp, "tuf_raw.db")
-	s, err := NewFileJSONStore(p)
-	c.Assert(s, check.NotNil)
-	c.Assert(err, check.IsNil)
-
-	// Create a file which does not end with '.json'
-	fp := filepath.FromSlash(filepath.Join(p, "meta.json"))
-	err = os.WriteFile(fp, []byte{}, 0644)
-	c.Assert(err, check.IsNil)
-
-	md, err := s.GetMeta()
-	c.Assert(md, check.IsNil)
-	c.Assert(err, check.Equals, ErrTooPermissive)
 }
 
 func (FileJSONStoreSuite) TestNoJSON(c *check.C) {
