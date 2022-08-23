@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"strings"
+	"testing"
 
 	fuzz "github.com/google/gofuzz"
 	"github.com/theupdateframework/go-tuf/data"
@@ -37,6 +38,32 @@ func (Ed25519Suite) TestUnmarshalEd25519(c *C) {
 	c.Assert(verifier.UnmarshalPublicKey(badKey), IsNil)
 }
 
+func FuzzUnmarshalEd25519(f *testing.F) {
+	f.Fuzz(func(t *testing.T, s string) {
+		if len(s) <= 32 { // ed25519 requires strings of len greater than 32
+			t.Skip()
+		}
+		c := &C{}
+
+		pub, _, err := ed25519.GenerateKey(strings.NewReader(s))
+		c.Assert(err, IsNil)
+
+		publicKey, err := json.Marshal(map[string]string{
+			"public": hex.EncodeToString(pub),
+		})
+		c.Assert(err, IsNil)
+
+		badKey := &data.PublicKey{
+			Type:       data.KeyTypeEd25519,
+			Scheme:     data.KeySchemeEd25519,
+			Algorithms: data.HashAlgorithms,
+			Value:      publicKey,
+		}
+		verifier := NewEd25519Verifier()
+		c.Assert(verifier.UnmarshalPublicKey(badKey), IsNil)
+	})
+
+}
 func (Ed25519Suite) TestUnmarshalEd25519_Invalid(c *C) {
 	badKeyValue, err := json.Marshal(true)
 	c.Assert(err, IsNil)
@@ -50,6 +77,22 @@ func (Ed25519Suite) TestUnmarshalEd25519_Invalid(c *C) {
 	c.Assert(verifier.UnmarshalPublicKey(badKey), ErrorMatches, "json: cannot unmarshal.*")
 }
 
+func FuzzUnmarshalEd25519_Invalid(f *testing.F) {
+	f.Fuzz(func(t *testing.T, s string) {
+		c := &C{}
+		badKeyValue, err := json.Marshal(s)
+		c.Assert(err, IsNil)
+		badKey := &data.PublicKey{
+			Type:       data.KeyTypeEd25519,
+			Scheme:     data.KeySchemeEd25519,
+			Algorithms: data.HashAlgorithms,
+			Value:      badKeyValue,
+		}
+		verifier := NewEd25519Verifier()
+		c.Assert(verifier.UnmarshalPublicKey(badKey), ErrorMatches, "json: cannot unmarshal.*")
+	})
+
+}
 func (Ed25519Suite) TestUnmarshalEd25519_FastFuzz(c *C) {
 	verifier := NewEd25519Verifier()
 	for i := 0; i < 50; i++ {
@@ -96,4 +139,18 @@ func (Ed25519Suite) TestSignVerify(c *C) {
 	pubKey, err := GetVerifier(publicData)
 	c.Assert(err, IsNil)
 	c.Assert(pubKey.Verify(msg, sig), IsNil)
+}
+func FuzzSignVerfiy(f *testing.F) {
+	f.Fuzz(func(t *testing.T, s string) {
+		c := &C{}
+		signer, err := GenerateEd25519Key()
+		c.Assert(err, IsNil)
+		msg := []byte(s)
+		sig, err := signer.SignMessage(msg)
+		c.Assert(err, IsNil)
+		publicData := signer.PublicData()
+		pubKey, err := GetVerifier(publicData)
+		c.Assert(err, IsNil)
+		c.Assert(pubKey.Verify(msg, sig), IsNil)
+	})
 }
