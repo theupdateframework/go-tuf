@@ -3,12 +3,9 @@
 package fsutil
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 )
-
-var ErrPermission = errors.New("unexpected permission")
 
 // IsMetaFile tests wheter a DirEntry appears to be a metaddata file or not.
 func IsMetaFile(e os.DirEntry) (bool, error) {

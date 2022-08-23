@@ -71,7 +71,7 @@ func NewFileJSONStore(baseDir string) (*FileJSONStore, error) {
 				baseDir)
 		}
 		// Verify file mode is not too permissive.
-		if err = fsutil.EnsurePermission(fi, dirCreateMode); err != nil {
+		if err = fsutil.EnsureMaxPermissions(fi, dirCreateMode); err != nil {
 			return nil, ErrTooPermissive
 		}
 	}
@@ -104,7 +104,7 @@ func (f *FileJSONStore) GetMeta() (map[string]json.RawMessage, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err = fsutil.EnsurePermission(info, fileCreateMode); err != nil {
+		if err = fsutil.EnsureMaxPermissions(info, fileCreateMode); err != nil {
 			return nil, ErrTooPermissive
 		}
 		b, err := os.ReadFile(p)
