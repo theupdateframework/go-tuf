@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"io/ioutil"
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/util"
@@ -550,7 +551,7 @@ func (c *Client) downloadMetaUnsafe(name string, maxMetaSize int64) ([]byte, err
 	// although the size has been checked above, use a LimitReader in case
 	// the reported size is inaccurate, or size is -1 which indicates an
 	// unknown length
-	return io.ReadAll(io.LimitReader(r, maxMetaSize))
+	return ioutil.ReadAll(io.LimitReader(r, maxMetaSize))
 }
 
 // remoteGetFunc is the type of function the download method uses to download
@@ -621,7 +622,7 @@ func (c *Client) downloadMeta(name string, version int64, m data.FileMeta) ([]by
 		stream = r
 	}
 
-	return io.ReadAll(stream)
+	return ioutil.ReadAll(stream)
 }
 
 func (c *Client) downloadMetaFromSnapshot(name string, m data.SnapshotFileMeta) ([]byte, error) {
@@ -673,6 +674,7 @@ func (c *Client) downloadMetaFromTimestamp(name string, m data.TimestampFileMeta
 }
 
 // decodeRoot decodes and verifies root metadata.
+//
 //lint:ignore U1000 unused
 func (c *Client) decodeRoot(b json.RawMessage) error {
 	root := &data.Root{}
@@ -791,6 +793,7 @@ func (c *Client) localMetaFromSnapshot(name string, m data.SnapshotFileMeta) (js
 }
 
 // hasTargetsMeta checks whether local metadata has the given snapshot meta
+//
 //lint:ignore U1000 unused
 func (c *Client) hasTargetsMeta(m data.SnapshotFileMeta) bool {
 	b, ok := c.localMeta["targets.json"]
@@ -806,6 +809,7 @@ func (c *Client) hasTargetsMeta(m data.SnapshotFileMeta) bool {
 }
 
 // hasSnapshotMeta checks whether local metadata has the given meta
+//
 //lint:ignore U1000 unused
 func (c *Client) hasMetaFromTimestamp(name string, m data.TimestampFileMeta) bool {
 	b, ok := c.localMeta[name]
@@ -829,11 +833,11 @@ type Destination interface {
 //
 // dest will be deleted and an error returned in the following situations:
 //
-//   * The target does not exist in the local targets.json
-//   * Failed to fetch the chain of delegations accessible from local snapshot.json
-//   * The target does not exist in any targets
-//   * Metadata cannot be generated for the downloaded data
-//   * Generated metadata does not match local metadata for the given file
+//   - The target does not exist in the local targets.json
+//   - Failed to fetch the chain of delegations accessible from local snapshot.json
+//   - The target does not exist in any targets
+//   - Metadata cannot be generated for the downloaded data
+//   - Generated metadata does not match local metadata for the given file
 func (c *Client) Download(name string, dest Destination) (err error) {
 	// delete dest if there is an error
 	defer func() {
