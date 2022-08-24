@@ -13,15 +13,6 @@ import (
 	"github.com/theupdateframework/go-tuf/util"
 )
 
-// ErrNotJSON is returned when a metadata operation is attempted
-// against a file that does not seem to be a JSON file
-// (e.g. does not end in .json, case sensitive).
-var ErrNotJSON = errors.New("file is not in JSON format")
-
-// ErrToPermissive is returned when the metadata directory, or a metadata
-// file has too permissive file mode bits set
-var ErrTooPermissive = errors.New("permissions are too permissive")
-
 const (
 	// user:  rwx
 	// group: r-x
@@ -47,22 +38,20 @@ var _ client.LocalStore = (*FileJSONStore)(nil)
 // If the provided directory does not exist on disk, it will be created.
 // The provided metadata cache is safe for concurrent access.
 func NewFileJSONStore(baseDir string) (*FileJSONStore, error) {
-	var f = FileJSONStore{
+	f := &FileJSONStore{
 		baseDir: baseDir,
 	}
-	var err error
 
 	// Does the directory exist?
 	fi, err := os.Stat(baseDir)
 	if err != nil {
-		pe, ok := err.(*os.PathError)
-		if ok && errors.Is(pe.Err, os.ErrNotExist) {
+		if errors.Is(err, os.ErrNotExist) {
 			// Create the directory
 			if err = os.MkdirAll(baseDir, dirCreateMode); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error creating directory for metadata cache: %w", err)
 			}
 		} else {
-			return nil, err
+			return nil, fmt.Errorf("error getting FileInfo for %s: %w", baseDir, err)
 		}
 	} else {
 		// Verify that it is a directory
@@ -72,11 +61,11 @@ func NewFileJSONStore(baseDir string) (*FileJSONStore, error) {
 		}
 		// Verify file mode is not too permissive.
 		if err = fsutil.EnsureMaxPermissions(fi, dirCreateMode); err != nil {
-			return nil, ErrTooPermissive
+			return nil, err
 		}
 	}
 
-	return &f, nil
+	return f, nil
 }
 
 // GetMeta returns the currently cached set of metadata files.
@@ -86,12 +75,11 @@ func (f *FileJSONStore) GetMeta() (map[string]json.RawMessage, error) {
 
 	names, err := os.ReadDir(f.baseDir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading directory %s: %w", f.baseDir, err)
 	}
 
 	meta := map[string]json.RawMessage{}
 	for _, name := range names {
-		p := filepath.FromSlash(filepath.Join(f.baseDir, name.Name()))
 		ok, err := fsutil.IsMetaFile(name)
 		if err != nil {
 			return nil, err
@@ -102,14 +90,15 @@ func (f *FileJSONStore) GetMeta() (map[string]json.RawMessage, error) {
 		// Verify permissions
 		info, err := name.Info()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error retrieving FileInfo for %s: %w", name.Name(), err)
 		}
 		if err = fsutil.EnsureMaxPermissions(info, fileCreateMode); err != nil {
-			return nil, ErrTooPermissive
+			return nil, err
 		}
+		p := filepath.Join(f.baseDir, name.Name())
 		b, err := os.ReadFile(p)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error reading file %s: %w", name.Name(), err)
 		}
 		meta[name.Name()] = b
 	}
@@ -124,7 +113,7 @@ func (f *FileJSONStore) SetMeta(name string, meta json.RawMessage) error {
 	defer f.mtx.Unlock()
 
 	if filepath.Ext(name) != ".json" {
-		return ErrNotJSON
+		return fmt.Errorf("file %s is not a JSON file", name)
 	}
 
 	p := filepath.FromSlash(filepath.Join(f.baseDir, name))
@@ -139,12 +128,16 @@ func (f *FileJSONStore) DeleteMeta(name string) error {
 	defer f.mtx.Unlock()
 
 	if filepath.Ext(name) != ".json" {
-		return ErrNotJSON
+		return fmt.Errorf("file %s is not a JSON file", name)
 	}
 
 	p := filepath.FromSlash(filepath.Join(f.baseDir, name))
 	err := os.Remove(p)
-	return err
+
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("error deleting file %s: %w", name, err)
 }
 
 // Close closes the metadata cache. This is a no-op.

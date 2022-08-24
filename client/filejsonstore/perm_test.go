@@ -21,7 +21,7 @@ func (FileJSONStoreSuite) TestNewDirectoryExistsWrongPerm(c *check.C) {
 	err = os.Chmod(p, 0751)
 	s, err := NewFileJSONStore(p)
 	c.Assert(s, check.IsNil)
-	c.Assert(err, check.Equals, ErrTooPermissive)
+	c.Assert(err, check.ErrorMatches, "permission bits for file tuf_raw.db failed.*")
 }
 
 func (FileJSONStoreSuite) TestNewNoCreate(c *check.C) {
@@ -42,11 +42,11 @@ func (FileJSONStoreSuite) TestGetTooPermissive(c *check.C) {
 	c.Assert(s, check.NotNil)
 	c.Assert(err, check.IsNil)
 
-	fp := filepath.FromSlash(filepath.Join(p, "meta.json"))
+	fp := filepath.Join(p, "meta.json")
 	err = os.WriteFile(fp, []byte{}, 0644)
 	c.Assert(err, check.IsNil)
 
 	md, err := s.GetMeta()
 	c.Assert(md, check.IsNil)
-	c.Assert(err, check.Equals, ErrTooPermissive)
+	c.Assert(err, check.ErrorMatches, "permission bits for file meta.json failed.*")
 }

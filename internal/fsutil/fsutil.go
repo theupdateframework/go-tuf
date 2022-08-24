@@ -3,6 +3,7 @@
 package fsutil
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -15,7 +16,7 @@ func IsMetaFile(e os.DirEntry) (bool, error) {
 
 	info, err := e.Info()
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("error retrieving FileInfo for %s: %w", e.Name(), err)
 	}
 
 	return info.Mode().IsRegular(), nil

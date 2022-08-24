@@ -159,7 +159,8 @@ func (FileJSONStoreSuite) TestNoJSON(c *check.C) {
 	}
 	for _, f := range files {
 		err := s.SetMeta(f, []byte{})
-		c.Assert(err, check.Equals, ErrNotJSON)
+		c.Assert(err, check.ErrorMatches, "file.*is not a JSON file")
+
 	}
 }
 
@@ -182,7 +183,7 @@ func (FileJSONStoreSuite) TestDelete(c *check.C) {
 	c.Assert(err, check.IsNil)
 
 	err = s.DeleteMeta("not_json.yml")
-	c.Assert(err, check.Equals, ErrNotJSON)
+	c.Assert(err, check.ErrorMatches, "file not_json\\.yml is not a JSON file")
 	err = s.DeleteMeta("non_existing.json")
 	c.Assert(errors.Is(err, os.ErrNotExist), check.Equals, true)
 }
