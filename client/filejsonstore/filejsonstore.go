@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sync"
@@ -45,7 +46,7 @@ func NewFileJSONStore(baseDir string) (*FileJSONStore, error) {
 	// Does the directory exist?
 	fi, err := os.Stat(baseDir)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, fs.ErrNotExist) {
 			// Create the directory
 			if err = os.MkdirAll(baseDir, dirCreateMode); err != nil {
 				return nil, fmt.Errorf("error creating directory for metadata cache: %w", err)
@@ -56,8 +57,7 @@ func NewFileJSONStore(baseDir string) (*FileJSONStore, error) {
 	} else {
 		// Verify that it is a directory
 		if !fi.IsDir() {
-			return nil, fmt.Errorf("can not open %s, not a directory",
-				baseDir)
+			return nil, fmt.Errorf("can not open %s, not a directory", baseDir)
 		}
 		// Verify file mode is not too permissive.
 		if err = fsutil.EnsureMaxPermissions(fi, dirCreateMode); err != nil {
