@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-// IsMetaFile tests wheter a DirEntry appears to be a metaddata file or not.
+// IsMetaFile tests wheter a DirEntry appears to be a metadata file or not.
 func IsMetaFile(e os.DirEntry) (bool, error) {
 	if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
 		return false, nil
