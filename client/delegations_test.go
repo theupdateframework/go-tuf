@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -273,10 +273,10 @@ func initTestDelegationClient(t *testing.T, dirPrefix string) (*Client, func() e
 	assert.Nil(t, err)
 
 	c := NewClient(MemoryLocalStore(), remote)
-	rawFile, err := ioutil.ReadFile(initialStateDir + "/" + "root.json")
+	rawFile, err := os.ReadFile(initialStateDir + "/" + "root.json")
 	assert.Nil(t, err)
 	assert.Nil(t, c.Init(rawFile))
-	files, err := ioutil.ReadDir(initialStateDir)
+	files, err := os.ReadDir(initialStateDir)
 	assert.Nil(t, err)
 
 	// load local files
@@ -287,7 +287,7 @@ func initTestDelegationClient(t *testing.T, dirPrefix string) (*Client, func() e
 		name := f.Name()
 		// ignoring consistent snapshot when loading initial state
 		if len(strings.Split(name, ".")) == 1 && strings.HasSuffix(name, ".json") {
-			rawFile, err := ioutil.ReadFile(initialStateDir + "/" + name)
+			rawFile, err := os.ReadFile(initialStateDir + "/" + name)
 			assert.Nil(t, err)
 			assert.Nil(t, c.local.SetMeta(name, rawFile))
 		}

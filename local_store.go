@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -276,7 +275,7 @@ func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 
 	meta := make(map[string]json.RawMessage)
 	for name, path := range metaPaths {
-		f, err := ioutil.ReadFile(path)
+		f, err := os.ReadFile(path)
 		if err != nil {
 			return nil, err
 		}

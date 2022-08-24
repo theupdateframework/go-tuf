@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/util"
@@ -551,7 +550,7 @@ func (c *Client) downloadMetaUnsafe(name string, maxMetaSize int64) ([]byte, err
 	// although the size has been checked above, use a LimitReader in case
 	// the reported size is inaccurate, or size is -1 which indicates an
 	// unknown length
-	return ioutil.ReadAll(io.LimitReader(r, maxMetaSize))
+	return io.ReadAll(io.LimitReader(r, maxMetaSize))
 }
 
 // remoteGetFunc is the type of function the download method uses to download
@@ -622,7 +621,7 @@ func (c *Client) downloadMeta(name string, version int64, m data.FileMeta) ([]by
 		stream = r
 	}
 
-	return ioutil.ReadAll(stream)
+	return io.ReadAll(stream)
 }
 
 func (c *Client) downloadMetaFromSnapshot(name string, m data.SnapshotFileMeta) ([]byte, error) {

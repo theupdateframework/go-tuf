@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -64,7 +63,7 @@ func addTargets(repo *tuf.Repo, dir string, files map[string][]byte) {
 	for file, data := range files {
 		path := filepath.Join(dir, "staged", "targets", file)
 		assertNoError(os.MkdirAll(filepath.Dir(path), 0755))
-		assertNoError(ioutil.WriteFile(path, data, 0644))
+		assertNoError(os.WriteFile(path, data, 0644))
 		paths = append(paths, file)
 	}
 	assertNoError(repo.AddTargetsWithExpires(paths, nil, expirationDate))

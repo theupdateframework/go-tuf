@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -400,7 +399,7 @@ func newClientWithMeta(baseDir string, relPath string, serverAddr string) (*Clie
 	c := NewClient(MemoryLocalStore(), remote)
 	for _, m := range []string{"root.json", "snapshot.json", "timestamp.json", "targets.json"} {
 		if _, err := os.Stat(initialStateDir + "/" + m); err == nil {
-			metadataJSON, err := ioutil.ReadFile(initialStateDir + "/" + m)
+			metadataJSON, err := os.ReadFile(initialStateDir + "/" + m)
 			if err != nil {
 				return nil, err
 			}
@@ -1213,7 +1212,7 @@ func generateRepoFS(c *C, dir string, files map[string][]byte, consistentSnapsho
 	for file, data := range files {
 		path := filepath.Join(dir, "staged", "targets", file)
 		c.Assert(os.MkdirAll(filepath.Dir(path), 0755), IsNil)
-		c.Assert(ioutil.WriteFile(path, data, 0644), IsNil)
+		c.Assert(os.WriteFile(path, data, 0644), IsNil)
 		c.Assert(repo.AddTarget(file, nil), IsNil)
 	}
 	c.Assert(repo.Snapshot(), IsNil)
