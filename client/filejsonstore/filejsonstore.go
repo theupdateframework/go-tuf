@@ -87,6 +87,7 @@ func (f *FileJSONStore) GetMeta() (map[string]json.RawMessage, error) {
 		if !ok {
 			continue
 		}
+
 		// Verify permissions
 		info, err := name.Info()
 		if err != nil {
@@ -95,6 +96,7 @@ func (f *FileJSONStore) GetMeta() (map[string]json.RawMessage, error) {
 		if err = fsutil.EnsureMaxPermissions(info, fileCreateMode); err != nil {
 			return nil, err
 		}
+
 		p := filepath.Join(f.baseDir, name.Name())
 		b, err := os.ReadFile(p)
 		if err != nil {
@@ -133,10 +135,10 @@ func (f *FileJSONStore) DeleteMeta(name string) error {
 
 	p := filepath.Join(f.baseDir, name)
 	err := os.Remove(p)
-
 	if err == nil {
 		return nil
 	}
+
 	return fmt.Errorf("error deleting file %s: %w", name, err)
 }
 

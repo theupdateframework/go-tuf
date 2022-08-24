@@ -73,6 +73,7 @@ func (FileJSONStoreSuite) TestGetMetaEmpty(c *check.C) {
 	tmp := c.MkDir()
 	p := filepath.Join(tmp, "tuf_raw.db")
 	s, err := NewFileJSONStore(p)
+	c.Assert(err, check.IsNil)
 
 	md, err := s.GetMeta()
 	c.Assert(err, check.IsNil)
@@ -83,6 +84,7 @@ func (FileJSONStoreSuite) TestGetNoDirectory(c *check.C) {
 	tmp := c.MkDir()
 	p := filepath.Join(tmp, "tuf_raw.db")
 	s, err := NewFileJSONStore(p)
+	c.Assert(err, check.IsNil)
 
 	err = os.Remove(p)
 	c.Assert(err, check.IsNil)
@@ -96,6 +98,8 @@ func (FileJSONStoreSuite) TestMetadataOperations(c *check.C) {
 	tmp := c.MkDir()
 	p := filepath.Join(tmp, "tuf_raw.db")
 	s, err := NewFileJSONStore(p)
+	c.Assert(err, check.IsNil)
+
 	expected := map[string]json.RawMessage{
 		"file1.json": []byte{0xf1, 0xe1, 0xd1},
 		"file2.json": []byte{0xf2, 0xe2, 0xd2},
@@ -116,10 +120,12 @@ func (FileJSONStoreSuite) TestMetadataOperations(c *check.C) {
 	count := 3
 	for k := range expected {
 		err = s.DeleteMeta(k)
-		count--
 		c.Assert(err, check.IsNil)
+
 		md, err := s.GetMeta()
 		c.Assert(err, check.IsNil)
+
+		count--
 		c.Assert(md, check.HasLen, count)
 	}
 
@@ -160,7 +166,6 @@ func (FileJSONStoreSuite) TestNoJSON(c *check.C) {
 	for _, f := range files {
 		err := s.SetMeta(f, []byte{})
 		c.Assert(err, check.ErrorMatches, "file.*is not a JSON file")
-
 	}
 }
 
