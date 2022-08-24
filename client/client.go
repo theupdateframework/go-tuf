@@ -674,6 +674,7 @@ func (c *Client) downloadMetaFromTimestamp(name string, m data.TimestampFileMeta
 }
 
 // decodeRoot decodes and verifies root metadata.
+//lint:ignore U1000 unused
 func (c *Client) decodeRoot(b json.RawMessage) error {
 	root := &data.Root{}
 	if err := c.db.Unmarshal(b, root, "root", c.rootVer); err != nil {

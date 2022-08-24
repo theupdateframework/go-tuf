@@ -11,7 +11,5 @@ linters:
     - gofmt
     - govet
     - gosimple
-    - structcheck
-    - varcheck
     - unused
     - typecheck

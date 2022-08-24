@@ -2684,7 +2684,7 @@ func (rs *RepoSuite) TestTargetMetadataLength(c *C) {
 	}
 	s := &data.Signed{}
 	c.Assert(json.Unmarshal(targetsJSON, s), IsNil)
-	fmt.Fprintf(os.Stderr, string(s.Signed))
+	fmt.Fprint(os.Stderr, s.Signed)
 	var objMap map[string]json.RawMessage
 	c.Assert(json.Unmarshal(s.Signed, &objMap), IsNil)
 	targetsMap, ok := objMap["targets"]
@@ -2697,8 +2697,11 @@ func (rs *RepoSuite) TestTargetMetadataLength(c *C) {
 		c.Fatal("missing foo.txt in targets")
 	}
 	c.Assert(json.Unmarshal(targetsMap, &objMap), IsNil)
-	targetsMap, ok = objMap["length"]
+	lengthMsg, ok := objMap["length"]
 	if !ok {
 		c.Fatal("missing length field in foo.txt file meta")
 	}
+	var length int64
+	c.Assert(json.Unmarshal(lengthMsg, &length), IsNil)
+	c.Assert(length, Equals, int64(0))
 }
