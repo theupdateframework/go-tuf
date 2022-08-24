@@ -778,38 +778,6 @@ func (c *Client) localMetaFromSnapshot(name string, m data.SnapshotFileMeta) (js
 	return b, err == nil
 }
 
-// hasTargetsMeta checks whether local metadata has the given snapshot meta
-//
-//lint:ignore U1000 unused
-func (c *Client) hasTargetsMeta(m data.SnapshotFileMeta) bool {
-	b, ok := c.localMeta["targets.json"]
-	if !ok {
-		return false
-	}
-	meta, err := util.GenerateSnapshotFileMeta(bytes.NewReader(b), m.Hashes.HashAlgorithms()...)
-	if err != nil {
-		return false
-	}
-	err = util.SnapshotFileMetaEqual(meta, m)
-	return err == nil
-}
-
-// hasSnapshotMeta checks whether local metadata has the given meta
-//
-//lint:ignore U1000 unused
-func (c *Client) hasMetaFromTimestamp(name string, m data.TimestampFileMeta) bool {
-	b, ok := c.localMeta[name]
-	if !ok {
-		return false
-	}
-	meta, err := util.GenerateTimestampFileMeta(bytes.NewReader(b), m.Hashes.HashAlgorithms()...)
-	if err != nil {
-		return false
-	}
-	err = util.TimestampFileMetaEqual(meta, m)
-	return err == nil
-}
-
 type Destination interface {
 	io.Writer
 	Delete() error
