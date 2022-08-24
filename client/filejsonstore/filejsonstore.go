@@ -116,7 +116,7 @@ func (f *FileJSONStore) SetMeta(name string, meta json.RawMessage) error {
 		return fmt.Errorf("file %s is not a JSON file", name)
 	}
 
-	p := filepath.FromSlash(filepath.Join(f.baseDir, name))
+	p := filepath.Join(f.baseDir, name)
 	err := util.AtomicallyWriteFile(p, meta, fileCreateMode)
 	return err
 }
@@ -131,7 +131,7 @@ func (f *FileJSONStore) DeleteMeta(name string) error {
 		return fmt.Errorf("file %s is not a JSON file", name)
 	}
 
-	p := filepath.FromSlash(filepath.Join(f.baseDir, name))
+	p := filepath.Join(f.baseDir, name)
 	err := os.Remove(p)
 
 	if err == nil {

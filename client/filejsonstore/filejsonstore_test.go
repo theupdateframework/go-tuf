@@ -136,7 +136,7 @@ func (FileJSONStoreSuite) TestGetNoJSON(c *check.C) {
 	c.Assert(err, check.IsNil)
 
 	// Create a file which does not end with '.json'
-	fp := filepath.FromSlash(filepath.Join(p, "meta.xml"))
+	fp := filepath.Join(p, "meta.xml")
 	err = os.WriteFile(fp, []byte{}, 0644)
 	c.Assert(err, check.IsNil)
 
