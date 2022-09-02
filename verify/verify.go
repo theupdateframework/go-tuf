@@ -92,8 +92,8 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 	// Verify that a threshold of keys signed the data. Since keys can have
 	// multiple key ids, we need to protect against multiple attached
 	// signatures that just differ on the key id.
-	seenKeys := make(map[string]struct{})
-	valid := 0
+	verifiedKeyIDs := make(map[string]struct{})
+	numVerifiedKeys := 0
 	for _, sig := range s.Signatures {
 		if !roleData.ValidKey(sig.KeyID) {
 			continue
@@ -104,6 +104,7 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 		}
 
 		if err := verifier.Verify(msg, sig.Signature); err != nil {
+			// FIXME: don't err out on the 1st bad signature.
 			return ErrInvalid
 		}
 
@@ -115,20 +116,20 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 		keyIDs := verifier.MarshalPublicKey().IDs()
 		wasKeySeen := false
 		for _, keyID := range keyIDs {
-			if _, present := seenKeys[keyID]; present {
+			if _, present := verifiedKeyIDs[keyID]; present {
 				wasKeySeen = true
 			}
 		}
 		if !wasKeySeen {
 			for _, id := range keyIDs {
-				seenKeys[id] = struct{}{}
+				verifiedKeyIDs[id] = struct{}{}
 			}
 
-			valid++
+			numVerifiedKeys++
 		}
 	}
-	if valid < roleData.Threshold {
-		return ErrRoleThreshold{roleData.Threshold, valid}
+	if numVerifiedKeys < roleData.Threshold {
+		return ErrRoleThreshold{roleData.Threshold, numVerifiedKeys}
 	}
 
 	return nil
