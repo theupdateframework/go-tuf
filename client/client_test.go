@@ -1348,7 +1348,7 @@ func (s *StateLessSuite) TestRejectsMultiSignaturesSameKeyDifferentIDs(c *C) {
 
 	err = client.UpdateRoots()
 	if err != nil {
-		c.Assert(err, DeepEquals, &verify.ErrRoleThreshold{Expected: 2, Actual: 1})
+		c.Assert(err, DeepEquals, verify.ErrRoleThreshold{Expected: 2, Actual: 1})
 	} else {
 		c.Fatalf("client returned no error when updating with evil root")
 	}

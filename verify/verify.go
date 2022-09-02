@@ -92,7 +92,7 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 	// Verify that a threshold of keys signed the data. Since keys can have
 	// multiple key ids, we need to protect against multiple attached
 	// signatures that just differ on the key id.
-	seen := make(map[string]struct{})
+	seenKeys := make(map[string]struct{})
 	valid := 0
 	for _, sig := range s.Signatures {
 		if !roleData.ValidKey(sig.KeyID) {
@@ -109,9 +109,19 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 
 		// Only consider this key valid if we haven't seen any of it's
 		// key ids before.
-		if _, ok := seen[sig.KeyID]; !ok {
-			for _, id := range verifier.MarshalPublicKey().IDs() {
-				seen[id] = struct{}{}
+		// Careful: we must not rely on the key IDs _declared in the file_,
+		// instead we get to decide what key IDs this key correspond to.
+		// XXX dangerous; better stop supporting multiple key IDs altogether.
+		keyIDs := verifier.MarshalPublicKey().IDs()
+		wasKeySeen := false
+		for _, keyID := range keyIDs {
+			if _, present := seenKeys[keyID]; present {
+				wasKeySeen = true
+			}
+		}
+		if !wasKeySeen {
+			for _, id := range keyIDs {
+				seenKeys[id] = struct{}{}
 			}
 
 			valid++
