@@ -2,6 +2,8 @@ package client
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1236,4 +1238,118 @@ func (s *ClientSuite) TestVerifyDigest(c *C) {
 	c.Assert(err, IsNil)
 
 	c.Assert(client.VerifyDigest(hash, "sha256", size, digest), IsNil)
+}
+
+type StateLessSuite struct{}
+
+var _ = Suite(&StateLessSuite{})
+
+func (s *StateLessSuite) TestRejectsMultiSignaturesSameKeyDifferentIDs(c *C) {
+	alice, err := keys.GenerateEd25519Key()
+	if err != nil {
+		panic(err)
+	}
+
+	root := data.NewRoot()
+	root.Version = 1
+	root.Roles["root"] = &data.Role{
+		KeyIDs:    []string{},
+		Threshold: 2,
+	}
+
+	// reproduces how IDs were computed in
+	// https://github.com/theupdateframework/go-tuf/blob/8e84384bebe3/data/types.go#L50
+	oldTUFIDs := func(k *data.PublicKey) []string {
+		bytes, _ := cjson.EncodeCanonical(k)
+		digest := sha256.Sum256(bytes)
+		ids := []string{hex.EncodeToString(digest[:])}
+
+		// FIXME(TUF-0.9) If we receive TUF-1.0 compatible metadata,
+		// the key id we just calculated won't be compatible with
+		// TUF-0.9. So we also need to calculate the TUF-0.9 key id to
+		// be backwards compatible.
+		if k.Scheme != "" || len(k.Algorithms) != 0 {
+			bytes, _ = cjson.EncodeCanonical(&data.PublicKey{
+				Type:  k.Type,
+				Value: k.Value,
+			})
+			digest = sha256.Sum256(bytes)
+			ids = append(ids, hex.EncodeToString(digest[:]))
+		}
+
+		return ids
+	}
+
+	// Alice adds her key using an old version of go-tuf
+	// which will use several IDs
+	for _, keyID := range oldTUFIDs(alice.PublicData()) {
+		root.Keys[keyID] = alice.PublicData()
+		root.Roles["root"].KeyIDs = append(root.Roles["root"].KeyIDs, keyID)
+	}
+
+	bob, err := keys.GenerateEd25519Key()
+	if err != nil {
+		panic(err)
+	}
+
+	root.AddKey(bob.PublicData())
+	root.Roles["root"].KeyIDs = append(
+		root.Roles["root"].KeyIDs,
+		bob.PublicData().IDs()...,
+	)
+
+	delegatedSigner, _ := keys.GenerateEd25519Key()
+	root.AddKey(delegatedSigner.PublicData())
+	for _, role := range []string{"targets", "snapshot", "timestamp"} {
+		root.Roles[role] = &data.Role{
+			KeyIDs:    delegatedSigner.PublicData().IDs(),
+			Threshold: 1,
+		}
+	}
+
+	signedRoot, err := sign.Marshal(root, alice, bob)
+	c.Assert(err, IsNil)
+	rootJSON, err := json.Marshal(signedRoot)
+	c.Assert(err, IsNil)
+
+	// producing evil root using only Alice's key
+
+	evilRoot := root
+	evilRoot.Version = 2
+
+	canonical, err := cjson.EncodeCanonical(evilRoot)
+	c.Assert(err, IsNil)
+	sig, err := alice.SignMessage(canonical)
+	c.Assert(err, IsNil)
+	signedEvilRoot := &data.Signed{
+		Signed:     canonical,
+		Signatures: make([]data.Signature, 0),
+	}
+	for _, keyID := range oldTUFIDs(alice.PublicData()) {
+		signedEvilRoot.Signatures = append(signedEvilRoot.Signatures, data.Signature{
+			Signature: sig,
+			KeyID:     keyID,
+		})
+	}
+	evilRootJSON, err := json.Marshal(signedEvilRoot)
+	c.Assert(err, IsNil)
+
+	// checking that client does not accept root rotation
+	// to evil root (was only signed with Alice's key)
+
+	localStore := MemoryLocalStore()
+	err = localStore.SetMeta("root.json", rootJSON)
+	c.Assert(err, IsNil)
+
+	remoteStore := newFakeRemoteStore()
+	remoteStore.meta["2.root.json"] = newFakeFile(evilRootJSON)
+
+	client := NewClient(localStore, remoteStore)
+
+	err = client.UpdateRoots()
+	if err != nil {
+		c.Assert(err, DeepEquals, &verify.ErrRoleThreshold{Expected: 2, Actual: 1})
+	} else {
+		c.Fatalf("client returned no error when updating with evil root")
+	}
 }
