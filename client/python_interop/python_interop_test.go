@@ -3,7 +3,6 @@ package client
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -58,7 +57,7 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 
 		// initiate a client with the root metadata
 		client := client.NewClient(client.MemoryLocalStore(), remote)
-		rootJSON, err := ioutil.ReadFile(filepath.Join(testDataDir, dir, "repository", "metadata", "1.root.json"))
+		rootJSON, err := os.ReadFile(filepath.Join(testDataDir, dir, "repository", "metadata", "1.root.json"))
 		c.Assert(err, IsNil)
 		c.Assert(client.Init(rootJSON), IsNil)
 
@@ -99,7 +98,7 @@ func generateRepoFS(c *C, dir string, files map[string][]byte, consistentSnapsho
 	for file, data := range files {
 		path := filepath.Join(dir, "staged", "targets", file)
 		c.Assert(os.MkdirAll(filepath.Dir(path), 0755), IsNil)
-		c.Assert(ioutil.WriteFile(path, data, 0644), IsNil)
+		c.Assert(os.WriteFile(path, data, 0644), IsNil)
 		c.Assert(repo.AddTarget(file, nil), IsNil)
 	}
 	c.Assert(repo.Snapshot(), IsNil)
@@ -134,9 +133,9 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 		prevDir := filepath.Join(clientDir, "tufrepo", "metadata", "previous")
 		c.Assert(os.MkdirAll(currDir, 0755), IsNil)
 		c.Assert(os.MkdirAll(prevDir, 0755), IsNil)
-		rootJSON, err := ioutil.ReadFile(filepath.Join(dir, "repository", "1.root.json"))
+		rootJSON, err := os.ReadFile(filepath.Join(dir, "repository", "1.root.json"))
 		c.Assert(err, IsNil)
-		c.Assert(ioutil.WriteFile(filepath.Join(currDir, "root.json"), rootJSON, 0644), IsNil)
+		c.Assert(os.WriteFile(filepath.Join(currDir, "root.json"), rootJSON, 0644), IsNil)
 
 		args := []string{
 			filepath.Join(cwd, "testdata", "python-tuf-v1.0.0", "client.py"),
@@ -155,7 +154,7 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 
 		// check the target files got downloaded
 		for path, expected := range files {
-			actual, err := ioutil.ReadFile(filepath.Join(clientDir, "tuftargets", url.QueryEscape(path)))
+			actual, err := os.ReadFile(filepath.Join(clientDir, "tuftargets", url.QueryEscape(path)))
 			c.Assert(err, IsNil)
 			c.Assert(actual, DeepEquals, expected)
 		}

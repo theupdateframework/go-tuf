@@ -7,7 +7,6 @@ package main
 import (
 	"crypto/sha256"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -55,7 +54,7 @@ func linkifyDir(rootDir string) error {
 }
 
 func readStepDirs(rootDir string) ([]string, error) {
-	dirEntries, err := ioutil.ReadDir(rootDir)
+	dirEntries, err := os.ReadDir(rootDir)
 	if err != nil {
 		return []string{}, err
 	}
@@ -79,7 +78,7 @@ func computeHashes(dir string) map[string][32]byte {
 			return nil
 		}
 
-		bytes, err := ioutil.ReadFile(path)
+		bytes, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}

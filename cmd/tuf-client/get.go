@@ -2,7 +2,6 @@ package main
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/flynn/go-docopt"
@@ -35,7 +34,7 @@ func cmdGet(args *docopt.Args, client *tuf.Client) error {
 		return err
 	}
 	target := util.NormalizeTarget(args.String["<target>"])
-	file, err := ioutil.TempFile("", "go-tuf")
+	file, err := os.CreateTemp("", "go-tuf")
 	if err != nil {
 		return err
 	}
