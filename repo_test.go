@@ -3,6 +3,7 @@ package tuf
 import (
 	"bytes"
 	"crypto"
+	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -2704,4 +2705,32 @@ func (rs *RepoSuite) TestTargetMetadataLength(c *C) {
 	var length int64
 	c.Assert(json.Unmarshal(lengthMsg, &length), IsNil)
 	c.Assert(length, Equals, int64(0))
+}
+
+func (rs *RepoSuite) TestDeprecatedHexEncodedKeysFails(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	r.Init(false)
+	// Add a root key with hex-encoded ecdsa format
+	signer, err := keys.GenerateEcdsaKey()
+	c.Assert(err, IsNil)
+	type deprecatedP256Verifier struct {
+		PublicKey data.HexBytes `json:"public"`
+	}
+	pub := signer.PublicKey
+	keyValBytes, err := json.Marshal(&deprecatedP256Verifier{PublicKey: elliptic.Marshal(pub.Curve, pub.X, pub.Y)})
+	c.Assert(err, IsNil)
+	publicData := &data.PublicKey{
+		Type:       data.KeyTypeECDSA_SHA2_P256,
+		Scheme:     data.KeySchemeECDSA_SHA2_P256,
+		Algorithms: data.HashAlgorithms,
+		Value:      keyValBytes,
+	}
+	err = r.AddVerificationKey("root", publicData)
+	c.Assert(err, IsNil)
+	// TODO: AddVerificationKey does no validation, so perform a sign operation.
+	c.Assert(r.Sign("root.json"), ErrorMatches, "tuf: error unmarshalling key: invalid PEM value")
 }
