@@ -22,6 +22,9 @@ func IsDelegatedTargetsRole(name string) bool {
 }
 
 func IsTopLevelManifest(name string) bool {
+	if IsVersionedManifest(name) {
+		name = strings.Join(strings.Split(name, ".")[1:], ".")
+	}
 	return IsTopLevelRole(strings.TrimSuffix(name, ".json"))
 }
 
