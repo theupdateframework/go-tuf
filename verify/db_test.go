@@ -93,7 +93,6 @@ func TestDelegationsDB(t *testing.T) {
 // Previously, every key's key ID was the SHA256 of the public key. TAP-12
 // allows arbitrary key IDs, with no loss in security.
 //
-//
 // TAP-12: https://github.com/theupdateframework/taps/blob/master/tap12.md
 func TestTAP12(t *testing.T) {
 	db := NewDB()

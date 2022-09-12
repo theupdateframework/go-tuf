@@ -7,7 +7,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/theupdateframework/go-tuf/data"
@@ -40,7 +40,7 @@ func main() {
 	s, err := json.MarshalIndent(&roles, "", "    ")
 	assertNoError(err)
 
-	ioutil.WriteFile("keys.json", []byte(s), 0644)
+	os.WriteFile("keys.json", []byte(s), 0644)
 }
 
 func assertNoError(err error) {

@@ -1,8 +1,10 @@
+PYTHON_TUF=python-tuf-v1.0.0
+
 all:
-	docker build -t tuf-gen ./generate
-	docker run tuf-gen | tar x
+	docker build -t tuf-gen ./$(PYTHON_TUF)
+	docker run tuf-gen | tar x -C $(PYTHON_TUF)
 
 clean:
-	rm -rf python-tuf-0.9/with{,out}-consistent-snapshot
+	rm -rf $(PYTHON_TUF)/with{,out}-consistent-snapshot
 
 .PHONY: all clean
