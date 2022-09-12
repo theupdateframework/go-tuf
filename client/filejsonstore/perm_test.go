@@ -19,6 +19,7 @@ func (FileJSONStoreSuite) TestNewDirectoryExistsWrongPerm(c *check.C) {
 
 	// Modify the directory permission and try again
 	err = os.Chmod(p, 0751)
+	c.Assert(err, check.IsNil)
 	s, err := NewFileJSONStore(p)
 	c.Assert(s, check.IsNil)
 	c.Assert(err, check.ErrorMatches, "permission bits for file tuf_raw.db failed.*")
@@ -30,6 +31,7 @@ func (FileJSONStoreSuite) TestNewNoCreate(c *check.C) {
 
 	// Clear the write bit for the user
 	err := os.Chmod(tmp, 0551)
+	c.Assert(err, check.IsNil)
 	s, err := NewFileJSONStore(p)
 	c.Assert(s, check.IsNil)
 	c.Assert(err, check.NotNil)
