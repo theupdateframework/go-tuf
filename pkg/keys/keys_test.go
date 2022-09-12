@@ -3,6 +3,7 @@ package keys
 import (
 	"testing"
 
+	"github.com/theupdateframework/go-tuf/data"
 	. "gopkg.in/check.v1"
 )
 
@@ -32,7 +33,7 @@ func (KeysSuite) TestSignerKeyIDs(c *C) {
 	c.Assert(err, IsNil)
 	privKey, err = signer.MarshalPrivateKey()
 	c.Assert(err, IsNil)
-	privKey.Algorithms = []string{}
+	privKey.Algorithms = []data.HashAlgorithm{}
 	err = signer.UnmarshalPrivateKey(privKey)
 	c.Assert(err, IsNil)
 }

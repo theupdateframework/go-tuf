@@ -3,12 +3,12 @@ package tuf
 import (
 	"bytes"
 	"crypto"
+	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -907,7 +907,8 @@ func (t *tmpDir) assertEmpty(dir string) {
 	}
 	t.c.Assert(err, IsNil)
 	t.c.Assert(f.IsDir(), Equals, true)
-	entries, err := ioutil.ReadDir(path)
+
+	entries, err := os.ReadDir(path)
 	t.c.Assert(err, IsNil)
 	// check that all (if any) entries are also empty
 	for _, e := range entries {
@@ -927,12 +928,12 @@ func (t *tmpDir) stagedTargetPath(path string) string {
 func (t *tmpDir) writeStagedTarget(path, data string) {
 	path = t.stagedTargetPath(path)
 	t.c.Assert(os.MkdirAll(filepath.Dir(path), 0755), IsNil)
-	t.c.Assert(ioutil.WriteFile(path, []byte(data), 0644), IsNil)
+	t.c.Assert(os.WriteFile(path, []byte(data), 0644), IsNil)
 }
 
 func (t *tmpDir) readFile(path string) []byte {
 	t.assertExists(path)
-	data, err := ioutil.ReadFile(filepath.Join(t.path, path))
+	data, err := os.ReadFile(filepath.Join(t.path, path))
 	t.c.Assert(err, IsNil)
 	return data
 }
@@ -2684,7 +2685,7 @@ func (rs *RepoSuite) TestTargetMetadataLength(c *C) {
 	}
 	s := &data.Signed{}
 	c.Assert(json.Unmarshal(targetsJSON, s), IsNil)
-	fmt.Fprintf(os.Stderr, string(s.Signed))
+	fmt.Fprint(os.Stderr, s.Signed)
 	var objMap map[string]json.RawMessage
 	c.Assert(json.Unmarshal(s.Signed, &objMap), IsNil)
 	targetsMap, ok := objMap["targets"]
@@ -2697,8 +2698,39 @@ func (rs *RepoSuite) TestTargetMetadataLength(c *C) {
 		c.Fatal("missing foo.txt in targets")
 	}
 	c.Assert(json.Unmarshal(targetsMap, &objMap), IsNil)
-	targetsMap, ok = objMap["length"]
+	lengthMsg, ok := objMap["length"]
 	if !ok {
 		c.Fatal("missing length field in foo.txt file meta")
 	}
+	var length int64
+	c.Assert(json.Unmarshal(lengthMsg, &length), IsNil)
+	c.Assert(length, Equals, int64(0))
+}
+
+func (rs *RepoSuite) TestDeprecatedHexEncodedKeysFails(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	r.Init(false)
+	// Add a root key with hex-encoded ecdsa format
+	signer, err := keys.GenerateEcdsaKey()
+	c.Assert(err, IsNil)
+	type deprecatedP256Verifier struct {
+		PublicKey data.HexBytes `json:"public"`
+	}
+	pub := signer.PublicKey
+	keyValBytes, err := json.Marshal(&deprecatedP256Verifier{PublicKey: elliptic.Marshal(pub.Curve, pub.X, pub.Y)})
+	c.Assert(err, IsNil)
+	publicData := &data.PublicKey{
+		Type:       data.KeyTypeECDSA_SHA2_P256,
+		Scheme:     data.KeySchemeECDSA_SHA2_P256,
+		Algorithms: data.HashAlgorithms,
+		Value:      keyValBytes,
+	}
+	err = r.AddVerificationKey("root", publicData)
+	c.Assert(err, IsNil)
+	// TODO: AddVerificationKey does no validation, so perform a sign operation.
+	c.Assert(r.Sign("root.json"), ErrorMatches, "tuf: error unmarshalling key: invalid PEM value")
 }

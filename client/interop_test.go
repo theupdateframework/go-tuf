@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -33,7 +32,7 @@ func checkGoIdentity(c *C, consistentSnapshot bool) {
 	c.Assert(err, IsNil)
 	testDataDir := filepath.Join(cwd, "testdata")
 
-	tempDir, err := ioutil.TempDir("", "")
+	tempDir, err := os.MkdirTemp("", "")
 	c.Assert(err, IsNil)
 	defer os.RemoveAll(tempDir)
 
@@ -59,7 +58,7 @@ func computeHashes(c *C, dir string) map[string]string {
 			return nil
 		}
 
-		bytes, err := ioutil.ReadFile(path)
+		bytes, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
@@ -108,7 +107,7 @@ func newTestCase(c *C, name string, consistentSnapshot bool, options *HTTPRemote
 	c.Assert(err, IsNil)
 	testDir := filepath.Join(cwd, "testdata", name, fmt.Sprintf("consistent-snapshot-%t", consistentSnapshot))
 
-	dirEntries, err := ioutil.ReadDir(testDir)
+	dirEntries, err := os.ReadDir(testDir)
 	c.Assert(err, IsNil)
 	c.Assert(dirEntries, Not(HasLen), 0)
 

@@ -309,19 +309,33 @@ func (r *Repo) GenKey(role string) ([]string, error) {
 }
 
 func (r *Repo) GenKeyWithExpires(keyRole string, expires time.Time) (keyids []string, err error) {
+	return r.GenKeyWithSchemeAndExpires(keyRole, expires, data.KeySchemeEd25519)
+}
+
+func (r *Repo) GenKeyWithSchemeAndExpires(role string, expires time.Time, keyScheme data.KeyScheme) ([]string, error) {
+	var signer keys.Signer
+	var err error
+	switch keyScheme {
+	case data.KeySchemeEd25519:
+		signer, err = keys.GenerateEd25519Key()
+	case data.KeySchemeECDSA_SHA2_P256:
+		signer, err = keys.GenerateEcdsaKey()
+	case data.KeySchemeRSASSA_PSS_SHA256:
+		signer, err = keys.GenerateRsaKey()
+	default:
+		return nil, errors.New("unknown key type")
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	// Not compatible with delegated targets roles, since delegated targets keys
 	// are associated with a delegation (edge), not a role (node).
 
-	signer, err := keys.GenerateEd25519Key()
-	if err != nil {
-		return []string{}, err
+	if err = r.AddPrivateKeyWithExpires(role, signer, expires); err != nil {
+		return nil, err
 	}
-
-	if err = r.AddPrivateKeyWithExpires(keyRole, signer, expires); err != nil {
-		return []string{}, err
-	}
-	keyids = signer.PublicData().IDs()
-	return
+	return signer.PublicData().IDs(), nil
 }
 
 func (r *Repo) AddPrivateKey(role string, signer keys.Signer) error {
