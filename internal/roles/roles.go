@@ -1,6 +1,7 @@
 package roles
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -23,7 +24,11 @@ func IsDelegatedTargetsRole(name string) bool {
 
 func IsTopLevelManifest(name string) bool {
 	if IsVersionedManifest(name) {
-		name = strings.Join(strings.Split(name, ".")[1:], ".")
+		var found bool
+		_, name, found = strings.Cut(name, ".")
+		if !found {
+			panic(fmt.Sprint("expected a versioned manifest of the form x.role.json"))
+		}
 	}
 	return IsTopLevelRole(strings.TrimSuffix(name, ".json"))
 }
