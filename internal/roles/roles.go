@@ -1,7 +1,6 @@
 package roles
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -27,7 +26,7 @@ func IsTopLevelManifest(name string) bool {
 		var found bool
 		_, name, found = strings.Cut(name, ".")
 		if !found {
-			panic(fmt.Sprint("expected a versioned manifest of the form x.role.json"))
+			panic("expected a versioned manifest of the form x.role.json")
 		}
 	}
 	return IsTopLevelRole(strings.TrimSuffix(name, ".json"))
