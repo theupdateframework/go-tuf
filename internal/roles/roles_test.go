@@ -24,18 +24,24 @@ func TestIsDelegatedTargetsRole(t *testing.T) {
 
 func TestIsTopLevelManifest(t *testing.T) {
 	assert.True(t, IsTopLevelManifest("root.json"))
+	assert.True(t, IsTopLevelManifest("1.root.json"))
 	assert.True(t, IsTopLevelManifest("targets.json"))
 	assert.True(t, IsTopLevelManifest("timestamp.json"))
 	assert.True(t, IsTopLevelManifest("snapshot.json"))
+	assert.True(t, IsTopLevelManifest("2.snapshot.json"))
 	assert.False(t, IsTopLevelManifest("bins.json"))
+	assert.False(t, IsTopLevelManifest("3.bins.json"))
 }
 
 func TestIsDelegatedTargetsManifest(t *testing.T) {
 	assert.False(t, IsDelegatedTargetsManifest("root.json"))
+	assert.False(t, IsDelegatedTargetsManifest("1.root.json"))
 	assert.False(t, IsDelegatedTargetsManifest("targets.json"))
+	assert.False(t, IsDelegatedTargetsManifest("2.targets.json"))
 	assert.False(t, IsDelegatedTargetsManifest("timestamp.json"))
 	assert.False(t, IsDelegatedTargetsManifest("snapshot.json"))
 	assert.True(t, IsDelegatedTargetsManifest("bins.json"))
+	assert.True(t, IsDelegatedTargetsManifest("2.bins.json"))
 }
 
 func TestIsVersionedManifest(t *testing.T) {
