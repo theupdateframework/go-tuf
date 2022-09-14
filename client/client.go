@@ -423,6 +423,16 @@ func (c *Client) getLocalMeta() error {
 			c.loadTargets(targets.Targets)
 		}
 	}
+
+	for fileName := range meta {
+		if fileName != "targets.json" &&
+			fileName != "snapshot.json" &&
+			fileName != "root.json" &&
+			fileName != "timestamp.json" {
+			c.localMeta[fileName] = meta[fileName]
+		}
+	}
+
 	if loadFailed {
 		// If any of the metadata failed to be verified, return the reason for that failure
 		return retErr
