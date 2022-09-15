@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/internal/roles"
 	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
 )
@@ -425,10 +426,7 @@ func (c *Client) getLocalMeta() error {
 	}
 
 	for fileName := range meta {
-		if fileName != "targets.json" &&
-			fileName != "snapshot.json" &&
-			fileName != "root.json" &&
-			fileName != "timestamp.json" {
+		if roles.IsDelegatedTargetsManifest(fileName) {
 			c.localMeta[fileName] = meta[fileName]
 		}
 	}
