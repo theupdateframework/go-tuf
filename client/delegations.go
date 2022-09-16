@@ -43,7 +43,8 @@ func (c *Client) getTargetFileMeta(target string) (data.TargetFileMeta, error) {
 		}
 
 		if targets.Delegations != nil {
-			delegationsDB, err := verify.NewDBFromDelegations(targets.Delegations)
+			delegationsDB, err := verify.NewDBFromDelegations(targets.Delegations,
+				verify.WithLogger(c.logger))
 			if err != nil {
 				return data.TargetFileMeta{}, err
 			}

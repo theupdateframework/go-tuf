@@ -21,7 +21,7 @@ func init() {
 	SignerMap.Store(data.KeyTypeRSASSA_PSS_SHA256, newRsaSigner)
 }
 
-func newRsaVerifier() Verifier {
+func newRsaVerifier(_ ...VerifierOpts) Verifier {
 	return &rsaVerifier{}
 }
 

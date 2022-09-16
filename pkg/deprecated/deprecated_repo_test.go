@@ -1,11 +1,14 @@
 package deprecated
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/json"
+	"log"
+	"strings"
 	"testing"
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
@@ -34,7 +37,10 @@ func genKey(c *C, r *repo.Repo, role string) []string {
 func (rs *RepoSuite) TestDeprecatedHexEncodedKeysSucceed(c *C) {
 	files := map[string][]byte{"foo.txt": []byte("foo")}
 	local := repo.MemoryStore(make(map[string]json.RawMessage), files)
-	r, err := repo.NewRepo(local)
+	var logBytes bytes.Buffer
+	opts := repo.WithLogger(log.New(&logBytes, "", 0))
+
+	r, err := repo.NewRepoWithOpts(local, opts)
 	c.Assert(err, IsNil)
 
 	r.Init(false)
@@ -79,4 +85,7 @@ func (rs *RepoSuite) TestDeprecatedHexEncodedKeysSucceed(c *C) {
 	c.Assert(r.Snapshot(), IsNil)
 	c.Assert(r.Timestamp(), IsNil)
 	c.Assert(r.Commit(), IsNil)
+
+	// Check logs.
+	c.Assert(strings.Contains(logBytes.String(), keys.WarnDeprecatedEcdsaKey), Equals, true)
 }

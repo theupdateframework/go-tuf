@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"path"
 	"sort"
 	"strings"
@@ -48,24 +49,64 @@ type Repo struct {
 	meta           map[string]json.RawMessage
 	prefix         string
 	indent         string
+	logger         *log.Logger
+}
+
+type RepoOpts func(r *Repo)
+
+func WithLogger(logger *log.Logger) RepoOpts {
+	return func(r *Repo) {
+		r.logger = logger
+	}
+}
+
+func WithHashAlgorithms(hashAlgorithms ...string) RepoOpts {
+	return func(r *Repo) {
+		r.hashAlgorithms = hashAlgorithms
+	}
+}
+
+func WithPrefix(prefix string) RepoOpts {
+	return func(r *Repo) {
+		r.prefix = prefix
+	}
+}
+
+func WithIndex(indent string) RepoOpts {
+	return func(r *Repo) {
+		r.indent = indent
+	}
 }
 
 func NewRepo(local LocalStore, hashAlgorithms ...string) (*Repo, error) {
 	return NewRepoIndent(local, "", "", hashAlgorithms...)
 }
 
-func NewRepoIndent(local LocalStore, prefix string, indent string, hashAlgorithms ...string) (*Repo, error) {
+func NewRepoIndent(local LocalStore, prefix string, indent string,
+	hashAlgorithms ...string) (*Repo, error) {
 	r := &Repo{
 		local:          local,
 		hashAlgorithms: hashAlgorithms,
 		prefix:         prefix,
 		indent:         indent,
+		logger:         log.New(io.Discard, "", 0),
 	}
 
 	var err error
 	r.meta, err = local.GetMeta()
 	if err != nil {
 		return nil, err
+	}
+	return r, nil
+}
+
+func NewRepoWithOpts(local LocalStore, opts ...RepoOpts) (*Repo, error) {
+	r, err := NewRepo(local)
+	if err != nil {
+		return nil, err
+	}
+	for _, opt := range opts {
+		opt(r)
 	}
 	return r, nil
 }
@@ -96,7 +137,7 @@ func (r *Repo) Init(consistentSnapshot bool) error {
 }
 
 func (r *Repo) topLevelKeysDB() (*verify.DB, error) {
-	db := verify.NewDB()
+	db := verify.NewDB(verify.WithLogger(r.logger))
 	root, err := r.root()
 	if err != nil {
 		return nil, err
@@ -934,7 +975,7 @@ func (r *Repo) delegatorDBs(delegateeRole string) ([]*verify.DB, error) {
 			continue
 		}
 
-		db, err := verify.NewDBFromDelegations(t.Delegations)
+		db, err := verify.NewDBFromDelegations(t.Delegations, verify.WithLogger(r.logger))
 		if err != nil {
 			return nil, err
 		}
@@ -983,7 +1024,8 @@ func (r *Repo) targetDelegationForPath(path string, preferredRole string) (*data
 		}
 
 		if targetsMeta.Delegations != nil && len(targetsMeta.Delegations.Roles) > 0 {
-			db, err := verify.NewDBFromDelegations(targetsMeta.Delegations)
+			db, err := verify.NewDBFromDelegations(targetsMeta.Delegations,
+				verify.WithLogger(r.logger))
 			if err != nil {
 				return nil, nil, err
 			}
