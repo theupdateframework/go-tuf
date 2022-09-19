@@ -13,3 +13,4 @@ linters:
     - gosimple
     - unused
     - typecheck
+    - forbidigo

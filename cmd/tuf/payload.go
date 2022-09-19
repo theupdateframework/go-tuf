@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/flynn/go-docopt"
 	"github.com/theupdateframework/go-tuf"
@@ -20,6 +21,6 @@ func cmdPayload(args *docopt.Args, repo *tuf.Repo) error {
 	if err != nil {
 		return err
 	}
-	fmt.Print(string(p))
+	fmt.Fprint(os.Stdout, string(p))
 	return nil
 }

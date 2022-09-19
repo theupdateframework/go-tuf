@@ -36,7 +36,7 @@ func cmdSignPayload(args *docopt.Args, repo *tuf.Repo) error {
 	if err != nil {
 		return err
 	}
-	fmt.Print(string(bytes))
+	fmt.Fprint(os.Stdout, string(bytes))
 
 	fmt.Fprintln(os.Stderr, "tuf: signed with", numKeys, "key(s)")
 	return nil
