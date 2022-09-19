@@ -1,9 +1,6 @@
 package verify
 
 import (
-	"io"
-	"log"
-
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/internal/roles"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
@@ -22,33 +19,22 @@ func (r *Role) ValidKey(id string) bool {
 type DB struct {
 	roles     map[string]*Role
 	verifiers map[string]keys.Verifier
-	logger    *log.Logger
 }
 
-type DBOpts func(db *DB)
-
-func WithLogger(logger *log.Logger) DBOpts {
-	return func(db *DB) {
-		db.logger = logger
-	}
-}
-
-func NewDB(opts ...DBOpts) *DB {
-	db := &DB{
+func NewDB() *DB {
+	return &DB{
 		roles:     make(map[string]*Role),
 		verifiers: make(map[string]keys.Verifier),
-		logger:    log.New(io.Discard, "", 0),
 	}
-	for _, opt := range opts {
-		opt(db)
-	}
-	return db
 }
 
 // NewDBFromDelegations returns a DB that verifies delegations
 // of a given Targets.
-func NewDBFromDelegations(d *data.Delegations, opts ...DBOpts) (*DB, error) {
-	db := NewDB(opts...)
+func NewDBFromDelegations(d *data.Delegations) (*DB, error) {
+	db := &DB{
+		roles:     make(map[string]*Role, len(d.Roles)),
+		verifiers: make(map[string]keys.Verifier, len(d.Keys)),
+	}
 	for _, r := range d.Roles {
 		if _, ok := roles.TopLevelRoles[r.Name]; ok {
 			return nil, ErrInvalidDelegatedRole
@@ -67,11 +53,7 @@ func NewDBFromDelegations(d *data.Delegations, opts ...DBOpts) (*DB, error) {
 }
 
 func (db *DB) AddKey(id string, k *data.PublicKey) error {
-	opts := make([]keys.VerifierOpts, 0)
-	if db.logger != nil {
-		opts = append(opts, keys.WithLogger(db.logger))
-	}
-	verifier, err := keys.GetVerifier(k, opts...)
+	verifier, err := keys.GetVerifier(k)
 	if err != nil {
 		return err // ErrInvalidKey
 	}

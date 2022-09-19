@@ -9,25 +9,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/theupdateframework/go-tuf/data"
 )
 
-var (
-	WarnDeprecatedEcdsaKey = "tuf: warning using deprecated ecdsa hex-encoded keys"
-)
-
-func NewDeprecatedEcdsaVerifier(opts ...VerifierOpts) Verifier {
-	verifier := &ecdsaVerifierWithDeprecatedSupport{
-		logger: log.New(io.Discard, "", log.LstdFlags),
-	}
-	for _, opt := range opts {
-		if opt.Logger != nil {
-			verifier.logger = opt.Logger
-		}
-	}
-	return verifier
+func NewDeprecatedEcdsaVerifier() Verifier {
+	return &ecdsaVerifierWithDeprecatedSupport{}
 }
 
 type ecdsaVerifierWithDeprecatedSupport struct {
@@ -35,8 +22,6 @@ type ecdsaVerifierWithDeprecatedSupport struct {
 	// This will switch based on whether this is a PEM-encoded key
 	// or a deprecated hex-encoded key.
 	Verifier
-	// This is used to write the deprecated warning to.
-	logger *log.Logger
 }
 
 func (p *ecdsaVerifierWithDeprecatedSupport) UnmarshalPublicKey(key *data.PublicKey) error {
@@ -44,9 +29,7 @@ func (p *ecdsaVerifierWithDeprecatedSupport) UnmarshalPublicKey(key *data.Public
 	pemVerifier := &EcdsaVerifier{}
 	if err := pemVerifier.UnmarshalPublicKey(key); err != nil {
 		// Try the deprecated hex-encoded verifier
-		hexVerifier := &deprecatedP256Verifier{
-			logger: p.logger,
-		}
+		hexVerifier := &deprecatedP256Verifier{}
 		if err := hexVerifier.UnmarshalPublicKey(key); err != nil {
 			return err
 		}
@@ -67,8 +50,6 @@ func (p *ecdsaVerifierWithDeprecatedSupport) UnmarshalPublicKey(key *data.Public
 type deprecatedP256Verifier struct {
 	PublicKey data.HexBytes `json:"public"`
 	key       *data.PublicKey
-	// This is used to write the deprecated warning to.
-	logger *log.Logger
 }
 
 func (p *deprecatedP256Verifier) Public() string {
@@ -116,6 +97,5 @@ func (p *deprecatedP256Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
 	}
 
 	p.key = key
-	p.logger.Print(WarnDeprecatedEcdsaKey)
 	return nil
 }

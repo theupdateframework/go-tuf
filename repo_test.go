@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -1422,7 +1423,12 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 	// Test changing the passphrase
 	// 1. Create a secure store with a passphrase (create new object and temp folder so we discard any previous state)
 	tmp = newTmpDir(c)
-	store = FileSystemStore(tmp.path, testPassphraseFunc)
+	var logBytes bytes.Buffer
+	storeOpts := StoreOpts{
+		Logger:   log.New(&logBytes, "", 0),
+		PassFunc: testPassphraseFunc,
+	}
+	store = FileSystemStoreWithOpts(tmp.path, storeOpts)
 
 	// 1.5. Changing passphrase works for top-level and delegated roles.
 	r, err := NewRepo(store)
@@ -1433,6 +1439,7 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 
 	// 2. Test changing the passphrase when the keys file does not exist - should FAIL
 	c.Assert(store.(PassphraseChanger).ChangePassphrase("root"), NotNil)
+	c.Assert(strings.Contains(logBytes.String(), "Missing keys file"), Equals, true)
 
 	// 3. Generate a new key
 	signer, err = keys.GenerateEd25519Key()

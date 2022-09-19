@@ -4,7 +4,6 @@
 package fsutil
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -59,7 +58,6 @@ func TestEnsureMaxPermissions(t *testing.T) {
 	assert.NoError(t, err)
 	err = EnsureMaxPermissions(fi, os.FileMode(0222))
 	assert.Error(t, err)
-	fmt.Println(err)
 
 	// Check matching due to more restrictive perms on file
 	err = os.Chmod(p, 0444)

@@ -1,7 +1,6 @@
 package keys
 
 import (
-	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -9,8 +8,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
-	"log"
-	"strings"
 
 	"github.com/theupdateframework/go-tuf/data"
 	. "gopkg.in/check.v1"
@@ -127,24 +124,6 @@ func (DeprecatedECDSASuite) TestMarshalUnmarshalPublicKey(c *C) {
 	deprecatedEcdsa := NewDeprecatedEcdsaVerifier()
 	err = deprecatedEcdsa.UnmarshalPublicKey(pub)
 	c.Assert(err, IsNil)
-
-	c.Assert(deprecatedEcdsa.MarshalPublicKey(), DeepEquals, pub)
-}
-
-func (DeprecatedECDSASuite) TestLogMessageWriter(c *C) {
-	signer, err := generatedDeprecatedSigner()
-	c.Assert(err, IsNil)
-
-	pub := signer.PublicData()
-
-	var logBytes bytes.Buffer
-	opts := WithLogger(log.New(&logBytes, "", 0))
-
-	deprecatedEcdsa := NewDeprecatedEcdsaVerifier(opts)
-	err = deprecatedEcdsa.UnmarshalPublicKey(pub)
-	c.Assert(err, IsNil)
-	c.Assert(strings.TrimSuffix(logBytes.String(), "\n"), Equals,
-		WarnDeprecatedEcdsaKey)
 
 	c.Assert(deprecatedEcdsa.MarshalPublicKey(), DeepEquals, pub)
 }

@@ -3,7 +3,6 @@ package keys
 import (
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/theupdateframework/go-tuf/data"
@@ -58,20 +57,12 @@ type Signer interface {
 	SignMessage(message []byte) ([]byte, error)
 }
 
-type VerifierOpts struct {
-	Logger *log.Logger
-}
-
-func WithLogger(logger *log.Logger) VerifierOpts {
-	return VerifierOpts{logger}
-}
-
-func GetVerifier(key *data.PublicKey, opts ...VerifierOpts) (Verifier, error) {
+func GetVerifier(key *data.PublicKey) (Verifier, error) {
 	st, ok := VerifierMap.Load(key.Type)
 	if !ok {
 		return nil, ErrInvalidKey
 	}
-	s := st.(func(opts ...VerifierOpts) Verifier)(opts...)
+	s := st.(func() Verifier)()
 	if err := s.UnmarshalPublicKey(key); err != nil {
 		return nil, fmt.Errorf("tuf: error unmarshalling key: %w", err)
 	}

@@ -24,7 +24,7 @@ func init() {
 	SignerMap.Store(data.KeyTypeECDSA_SHA2_P256, newEcdsaSigner)
 }
 
-func NewEcdsaVerifier(_ ...VerifierOpts) Verifier {
+func NewEcdsaVerifier() Verifier {
 	return &EcdsaVerifier{}
 }
 

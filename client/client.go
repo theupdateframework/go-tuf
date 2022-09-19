@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
-	"log"
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/util"
@@ -89,10 +88,6 @@ type Client struct {
 	// consistent snapshots (as specified in root.json)
 	consistentSnapshot bool
 
-	// this is an optional log writer.
-	// if nil, uses io.Discard
-	logger *log.Logger
-
 	// MaxDelegations limits by default the number of delegations visited for any
 	// target
 	MaxDelegations int
@@ -101,26 +96,13 @@ type Client struct {
 	MaxRootRotations int
 }
 
-type ClientOpts func(c *Client)
-
-func WithLogger(logger *log.Logger) ClientOpts {
-	return func(c *Client) {
-		c.logger = logger
-	}
-}
-
-func NewClient(local LocalStore, remote RemoteStore, opts ...ClientOpts) *Client {
-	client := &Client{
+func NewClient(local LocalStore, remote RemoteStore) *Client {
+	return &Client{
 		local:            local,
 		remote:           remote,
 		MaxDelegations:   defaultMaxDelegations,
 		MaxRootRotations: defaultMaxRootRotations,
-		logger:           log.New(io.Discard, "", 0),
 	}
-	for _, opt := range opts {
-		opt(client)
-	}
-	return client
 }
 
 // Init initializes a local repository from root metadata.
@@ -470,8 +452,7 @@ func (c *Client) loadAndVerifyRootMeta(rootJSON []byte, ignoreExpiredCheck bool)
 	if err := json.Unmarshal(s.Signed, root); err != nil {
 		return err
 	}
-
-	ndb := verify.NewDB(verify.WithLogger(c.logger))
+	ndb := verify.NewDB()
 	for id, k := range root.Keys {
 		if err := ndb.AddKey(id, k); err != nil {
 			return err
@@ -519,7 +500,7 @@ func (c *Client) verifyRoot(aJSON []byte, bJSON []byte) (*data.Root, error) {
 		return nil, err
 	}
 
-	ndb := verify.NewDB(verify.WithLogger(c.logger))
+	ndb := verify.NewDB()
 	for id, k := range aRoot.Keys {
 		if err := ndb.AddKey(id, k); err != nil {
 			return nil, err

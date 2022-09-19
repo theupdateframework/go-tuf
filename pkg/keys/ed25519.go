@@ -23,7 +23,7 @@ func NewEd25519Signer() Signer {
 	return &ed25519Signer{}
 }
 
-func NewEd25519Verifier(_ ...VerifierOpts) Verifier {
+func NewEd25519Verifier() Verifier {
 	return &ed25519Verifier{}
 }
 

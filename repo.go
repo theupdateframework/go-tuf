@@ -137,7 +137,7 @@ func (r *Repo) Init(consistentSnapshot bool) error {
 }
 
 func (r *Repo) topLevelKeysDB() (*verify.DB, error) {
-	db := verify.NewDB(verify.WithLogger(r.logger))
+	db := verify.NewDB()
 	root, err := r.root()
 	if err != nil {
 		return nil, err
@@ -975,7 +975,7 @@ func (r *Repo) delegatorDBs(delegateeRole string) ([]*verify.DB, error) {
 			continue
 		}
 
-		db, err := verify.NewDBFromDelegations(t.Delegations, verify.WithLogger(r.logger))
+		db, err := verify.NewDBFromDelegations(t.Delegations)
 		if err != nil {
 			return nil, err
 		}
@@ -1024,8 +1024,7 @@ func (r *Repo) targetDelegationForPath(path string, preferredRole string) (*data
 		}
 
 		if targetsMeta.Delegations != nil && len(targetsMeta.Delegations.Roles) > 0 {
-			db, err := verify.NewDBFromDelegations(targetsMeta.Delegations,
-				verify.WithLogger(r.logger))
+			db, err := verify.NewDBFromDelegations(targetsMeta.Delegations)
 			if err != nil {
 				return nil, nil, err
 			}
