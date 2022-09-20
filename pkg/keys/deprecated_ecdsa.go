@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/theupdateframework/go-tuf/data"
 )
@@ -98,6 +97,5 @@ func (p *deprecatedP256Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
 	}
 
 	p.key = key
-	fmt.Fprintln(os.Stderr, "tuf: warning using deprecated ecdsa hex-encoded keys")
 	return nil
 }

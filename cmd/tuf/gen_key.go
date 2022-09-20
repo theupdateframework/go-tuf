@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/flynn/go-docopt"
@@ -39,7 +40,7 @@ func cmdGenKey(args *docopt.Args, repo *tuf.Repo) error {
 		string(data.KeySchemeRSASSA_PSS_SHA256):
 		keyScheme = data.KeyScheme(t)
 	default:
-		fmt.Println("Using default key scheme", keyScheme)
+		fmt.Fprint(os.Stderr, "Using default key scheme", keyScheme)
 	}
 
 	var err error
@@ -57,7 +58,7 @@ func cmdGenKey(args *docopt.Args, repo *tuf.Repo) error {
 		return err
 	}
 	for _, id := range keyids {
-		fmt.Println("Generated", role, keyScheme, "key with ID", id)
+		fmt.Fprintf(os.Stdout, "Generated %s %s key with ID %s", role, keyScheme, id)
 	}
 	return nil
 }
