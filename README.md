@@ -612,7 +612,7 @@ $ tuf gen-key root
 $ tuf sign root.json
 ```
 
-Copy `staged/root.json` from the root box to commit:
+Copy `staged/root.json` from the root box and commit:
 
 ```bash
 $ tuf commit
