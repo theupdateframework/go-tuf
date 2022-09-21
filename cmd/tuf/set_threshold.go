@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/flynn/go-docopt"
@@ -28,6 +29,6 @@ func cmdSetThreshold(args *docopt.Args, repo *tuf.Repo) error {
 		return err
 	}
 
-	fmt.Println("The threshold for", role, "role is now", threshold)
+	fmt.Fprintf(os.Stdout, "The threshold for %s role is now %d", role, threshold)
 	return nil
 }

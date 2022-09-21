@@ -143,7 +143,13 @@ func (c *Client) Update() (data.TargetFiles, error) {
 	}
 	// 5.4.(2,3 and 4) - Verify timestamp against various attacks
 	// Returns the extracted snapshot metadata
-	snapshotMeta, err := c.decodeTimestamp(timestampJSON)
+	snapshotMeta, sameTimestampVersion, err := c.decodeTimestamp(timestampJSON)
+	if sameTimestampVersion {
+		// The new timestamp.json file had the same version; we don't need to
+		// update, so bail early.
+		return c.targets, nil
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -740,22 +746,31 @@ func (c *Client) decodeTargets(b json.RawMessage) (data.TargetFiles, error) {
 }
 
 // decodeTimestamp decodes and verifies timestamp metadata, and returns the
-// new snapshot file meta.
-func (c *Client) decodeTimestamp(b json.RawMessage) (data.TimestampFileMeta, error) {
+// new snapshot file meta and signals whether the update should be aborted early
+// (the new timestamp has the same version as the old one, so there's no need to
+// complete the update).
+func (c *Client) decodeTimestamp(b json.RawMessage) (data.TimestampFileMeta, bool, error) {
 	timestamp := &data.Timestamp{}
+
 	if err := c.db.Unmarshal(b, timestamp, "timestamp", c.timestampVer); err != nil {
-		return data.TimestampFileMeta{}, ErrDecodeFailed{"timestamp.json", err}
+		return data.TimestampFileMeta{}, false, ErrDecodeFailed{"timestamp.json", err}
+	}
+	// 5.4.3.1  - Check for timestamp rollback attack
+	// We already checked for timestamp.Version < c.timestampVer in the Unmarshal call above.
+	// Here, we're checking for version equality, which indicates that we can abandon this update.
+	if timestamp.Version == c.timestampVer {
+		return data.TimestampFileMeta{}, true, nil
 	}
 	// 5.4.3.2 - Check for snapshot rollback attack
 	// Verify that the current snapshot meta version is less than or equal to the new one
 	if timestamp.Meta["snapshot.json"].Version < c.snapshotVer {
-		return data.TimestampFileMeta{}, verify.ErrLowVersion{Actual: timestamp.Meta["snapshot.json"].Version, Current: c.snapshotVer}
+		return data.TimestampFileMeta{}, false, verify.ErrLowVersion{Actual: timestamp.Meta["snapshot.json"].Version, Current: c.snapshotVer}
 	}
-	// At this point we can trust the new timestamp and the snaphost version it refers to
+	// At this point we can trust the new timestamp and the snapshot version it refers to
 	// so we can update the client's trusted versions and proceed with persisting the new timestamp
 	c.timestampVer = timestamp.Version
 	c.snapshotVer = timestamp.Meta["snapshot.json"].Version
-	return timestamp.Meta["snapshot.json"], nil
+	return timestamp.Meta["snapshot.json"], false, nil
 }
 
 // hasMetaFromSnapshot checks whether local metadata has the given meta

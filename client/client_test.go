@@ -896,6 +896,7 @@ func (s *ClientSuite) TestUpdateMixAndMatchAttack(c *C) {
 	c.Assert(s.repo.AddTargetWithExpires("foo.txt", nil, expires), IsNil)
 	c.Assert(s.repo.Snapshot(), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 	client := s.updatedClient(c)
 
@@ -909,6 +910,7 @@ func (s *ClientSuite) TestUpdateMixAndMatchAttack(c *C) {
 	c.Assert(s.repo.AddTargetWithExpires("bar.txt", nil, expires), IsNil)
 	c.Assert(s.repo.Snapshot(), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 	newTargets, ok := s.remote.meta["targets.json"]
 	if !ok {
@@ -964,6 +966,41 @@ func (s *ClientSuite) TestUpdateReplayAttack(c *C) {
 	})
 }
 
+func (s *ClientSuite) TestUpdateForkTimestamp(c *C) {
+	client := s.updatedClient(c)
+
+	// grab the remote timestamp.json
+	oldTimestamp, ok := s.remote.meta["timestamp.json"]
+	if !ok {
+		c.Fatal("missing remote timestamp.json")
+	}
+
+	// generate a new timestamp and sync with the client
+	version := client.timestampVer
+	c.Assert(version > 0, Equals, true)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	s.syncRemote(c)
+	_, err := client.Update()
+	c.Assert(err, IsNil)
+	newVersion := client.timestampVer
+	c.Assert(newVersion > version, Equals, true)
+
+	// generate a new, different timestamp with the *same version*
+	s.remote.meta["timestamp.json"] = oldTimestamp
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(client.timestampVer, Equals, newVersion) // double-check: same version?
+	s.syncRemote(c)
+
+	oldMeta, err := client.local.GetMeta()
+	c.Assert(err, IsNil)
+	_, err = client.Update()
+	c.Assert(err, IsNil) // no error: the targets.json version didn't change, so there was no update!
+	// Client shouldn't update!
+	newMeta, err := client.local.GetMeta()
+	c.Assert(err, IsNil)
+	c.Assert(oldMeta, DeepEquals, newMeta)
+}
+
 func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
 	client := s.newClient(c)
 
@@ -998,6 +1035,7 @@ func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
 	c.Assert(err, IsNil)
 	s.store.SetMeta("targets.json", tamperedJSON)
 	s.store.Commit(false, nil, nil)
+	c.Assert(s.repo.Timestamp(), IsNil) // unless timestamp changes, the client doesn't even look at "targets.json"
 	s.syncRemote(c)
 	_, err = client.Update()
 	c.Assert(err, DeepEquals, ErrWrongSize{"targets.json", int64(len(tamperedJSON)), int64(len(targetsJSON))})
