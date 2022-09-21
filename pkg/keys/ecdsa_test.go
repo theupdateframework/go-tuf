@@ -85,10 +85,7 @@ func FuzzInvalidUnmarshalECDSA(f *testing.F) {
 			t.Skip()
 		}
 
-		badKeyValue, err := json.Marshal(s)
-		if err != nil {
-			t.Skip()
-		}
+		badKeyValue, _ := json.Marshal(s)
 
 		c := &C{}
 

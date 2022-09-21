@@ -140,7 +140,7 @@ func (Ed25519Suite) TestSignVerify(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(pubKey.Verify(msg, sig), IsNil)
 }
-func FuzzSignVerfiy(f *testing.F) {
+func FuzzSignVerify(f *testing.F) {
 	f.Fuzz(func(t *testing.T, s string) {
 		c := &C{}
 		signer, err := GenerateEd25519Key()
