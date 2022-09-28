@@ -25,7 +25,7 @@ func TestCreates(t *testing.T) {
 	}
 	t.Cleanup(func() { rmrf(dir, t.Logf) })
 	t.Cleanup(func() { rmrf(tmpDir, t.Logf) })
-	defer f.Close()
+	t.Cleanup(func() { f.Close() })
 
 	tests := []struct {
 		name    string
