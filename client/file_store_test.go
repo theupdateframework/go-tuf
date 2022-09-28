@@ -19,6 +19,8 @@ func TestCreates(t *testing.T) {
 	os.Mkdir(dir, os.ModePerm)
 	os.Mkdir(filepath.Join(dir, "targets"), os.ModePerm)
 	os.Create(filepath.Join(dir, "targets-that-isfile"))
+	t.Cleanup(func() { rmrf(dir, t.Logf) })
+	t.Cleanup(func() { rmrf(tmpDir, t.Logf) })
 
 	tests := []struct {
 		name    string
@@ -71,6 +73,7 @@ func TestBasicOps(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test FileStore")
 	}
+	t.Cleanup(func() { rmrf(dir, t.Logf) })
 	defer os.RemoveAll(dir)
 
 	// Add targets and metas and check them.
@@ -143,4 +146,35 @@ func newTestFileStoreFS() (*FileRemoteStore, string, error) {
 	fs, err := NewFileRemoteStore(os.DirFS(tufDir), targetsDir)
 	fs.testDir = tufDir
 	return fs, tufDir, err
+}
+
+// goes through a dir and removes everything. This is to work around:
+// https://github.com/golang/go/issues/51442
+func rmrf(dir string, logger func(string, ...interface{})) {
+	if dir == "" {
+		logger("cowardly refusing to remove a not fully specified fir")
+		return
+	}
+	logger("Removing %s", dir)
+	d, err := os.Open(dir)
+	if err != nil {
+		logger("Failed to open %s: %v", dir, err)
+		return
+	}
+	defer d.Close()
+	// -1 means give me everything, we don't have that many entries, so
+	// fine here.
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		logger("Failed to ReaddirNames %s: %v", dir, err)
+		return
+	}
+	for _, name := range names {
+		toRemove := filepath.Join(dir, name)
+		err = os.RemoveAll(toRemove)
+		if err != nil {
+			logger("Failed to RemoveAll %s: %v", toRemove, err)
+			// Do not want to fail here, just keep doing the best we can
+		}
+	}
 }
