@@ -15,4 +15,4 @@ go test ./...
 
 
 To update the data for these tests requires Docker and make (see
-test data [README.md](client/python_interop/testdata/README.md) for details).
+test data [README.md](../client/python_interop/testdata/README.md) for details).
