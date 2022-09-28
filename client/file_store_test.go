@@ -18,9 +18,14 @@ func TestCreates(t *testing.T) {
 	dir := filepath.Join(tmpDir, "repository")
 	os.Mkdir(dir, os.ModePerm)
 	os.Mkdir(filepath.Join(dir, "targets"), os.ModePerm)
-	os.Create(filepath.Join(dir, "targets-that-isfile"))
+	targetDirThatIsFile := filepath.Join(dir, "targets-that-isfile")
+	f, err := os.Create(targetDirThatIsFile)
+	if err != nil {
+		t.Fatalf("failed to create file: %s: %v", targetDirThatIsFile, err)
+	}
 	t.Cleanup(func() { rmrf(dir, t.Logf) })
 	t.Cleanup(func() { rmrf(tmpDir, t.Logf) })
+	defer f.Close()
 
 	tests := []struct {
 		name    string
