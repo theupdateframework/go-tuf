@@ -200,28 +200,7 @@ func (s *ClientSuite) SetUpTest(c *C) {
 
 func (s *ClientSuite) TearDownTest(c *C) {
 	if s.tmpDir != "" {
-		c.Logf("Removing %s", s.tmpDir)
-		d, err := os.Open(s.tmpDir)
-		if err != nil {
-			c.Logf("Failed to open %s: %v", s.tmpDir, err)
-			return
-		}
-		defer d.Close()
-		// -1 means give me everything, we don't have that many entries, so
-		// fine here.
-		names, err := d.Readdirnames(-1)
-		if err != nil {
-			c.Logf("Failed to ReaddirNames %s: %v", s.tmpDir, err)
-			return
-		}
-		for _, name := range names {
-			toRemove := filepath.Join(s.tmpDir, name)
-			err = os.RemoveAll(toRemove)
-			if err != nil {
-				c.Logf("Failed to RemoveAll %s: %v", toRemove, err)
-				// Do not want to fail here, because will fail test.
-			}
-		}
+		rmrf(s.tmpDir, c.Logf)
 	}
 }
 
