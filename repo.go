@@ -698,8 +698,7 @@ func (r *Repo) ResetTargetsDelegationsWithExpires(delegator string, expires time
 		return fmt.Errorf("error getting delegator (%q) metadata: %w", delegator, err)
 	}
 
-	t.Delegations = &data.Delegations{}
-	t.Delegations.Keys = make(map[string]*data.PublicKey)
+	t.Delegations = nil
 
 	t.Expires = expires.Round(time.Second)
 
