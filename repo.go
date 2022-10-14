@@ -23,6 +23,7 @@ import (
 	"github.com/theupdateframework/go-tuf/sign"
 	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
+	"golang.org/x/exp/maps"
 )
 
 const (
@@ -862,25 +863,33 @@ func (r *Repo) AddOrUpdateSignature(roleFilename string, signature data.Signatur
 		return err
 	}
 
-	// Add or update signature.
+	// Check signature on signed meta.
+	// We temporarily make this signature the only signature on the data and modify
+	// the db verification to allow a single signature to suffice.
+	// This way, we test if this new signature is valid.
+	oldSigs := s.Signatures
+	s.Signatures = []data.Signature{
+		signature,
+	}
+	for _, db := range dbs {
+		dbRole := db.GetRole(role)
+		// NOTE: We modify the database used to verify to have a threshold of 1.
+		// This way, we are testing whether this singly added new signature is valid.
+		db.AddRole(role, &data.Role{KeyIDs: maps.Keys(dbRole.KeyIDs), Threshold: 1})
+		if err := db.VerifySignatures(s, role); err != nil {
+			return verify.ErrInvalid
+		}
+	}
+
+	// Add or update this signature to the original signatures.
 	signatures := make([]data.Signature, 0, len(s.Signatures)+1)
-	for _, sig := range s.Signatures {
+	for _, sig := range oldSigs {
 		if sig.KeyID != signature.KeyID {
 			signatures = append(signatures, sig)
 		}
 	}
 	signatures = append(signatures, signature)
 	s.Signatures = signatures
-
-	// Check signature on signed meta. Ignore threshold errors as this may not be fully
-	// signed.
-	for _, db := range dbs {
-		if err := db.VerifySignatures(s, role); err != nil {
-			if _, ok := err.(verify.ErrRoleThreshold); !ok {
-				return err
-			}
-		}
-	}
 
 	b, err := r.jsonMarshal(s)
 	if err != nil {

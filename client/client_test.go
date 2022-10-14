@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -351,7 +352,7 @@ func (s *ClientSuite) TestInit(c *C) {
 	_, err = client.Update()
 	c.Assert(err, Equals, ErrNoRootKeys)
 
-	// check Init() returns ErrInvalid when the root's signature is
+	// check Init() returns ErrRoleThreshold when the root's signature is
 	// invalid
 	// modify root and marshal without regenerating signatures
 	root.Version = root.Version + 1
@@ -360,12 +361,36 @@ func (s *ClientSuite) TestInit(c *C) {
 	dataSigned.Signed = rootBytes
 	dataBytes, err := json.Marshal(dataSigned)
 	c.Assert(err, IsNil)
-	c.Assert(client.Init(dataBytes), Equals, verify.ErrInvalid)
+	c.Assert(client.Init(dataBytes), Equals, verify.ErrRoleThreshold{
+		Expected: 1, Actual: 0})
 
 	// check Update() does not return ErrNoRootKeys after initialization
 	c.Assert(client.Init(bytes), IsNil)
 	_, err = client.Update()
 	c.Assert(err, IsNil)
+}
+
+// This is a regression test for https://github.com/theupdateframework/go-tuf/issues/370
+// where a single invalid signature resulted in an early return.
+// Instead, the client should have continued and counted the number
+// of valid signatures, ignoring the incorrect one.
+func (s *ClientSuite) TestExtraRootSignaturesOnInit(c *C) {
+	client := NewClient(MemoryLocalStore(), s.remote)
+	bytes, err := s.readMeta("root.json")
+	c.Assert(err, IsNil)
+	dataSigned := &data.Signed{}
+	c.Assert(json.Unmarshal(bytes, dataSigned), IsNil)
+
+	// check Init() succeeds when an extra invalid signature was
+	// added to the root.
+	dataSigned.Signatures = append(dataSigned.Signatures,
+		data.Signature{
+			KeyID:     dataSigned.Signatures[0].KeyID,
+			Signature: make([]byte, ed25519.SignatureSize),
+		})
+	dataBytes, err := json.Marshal(dataSigned)
+	c.Assert(err, IsNil)
+	c.Assert(client.Init(dataBytes), IsNil)
 }
 
 func (s *ClientSuite) TestFirstUpdate(c *C) {
@@ -455,6 +480,44 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	}
 }
 
+// This is a regression test for https://github.com/theupdateframework/go-tuf/issues/370
+// where a single invalid signature resulted in an early return.
+// Instead, the client should have continued and counted the number
+// of valid signatures, ignoring the incorrect one.
+func (s *ClientSuite) TestExtraSignaturesOnRootUpdate(c *C) {
+	client := s.newClient(c)
+
+	// Add an extra root key to update the root to a new version.
+	s.genKey(c, "root")
+	// update metadata
+	c.Assert(s.repo.Sign("targets.json"), IsNil)
+	c.Assert(s.repo.Snapshot(), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
+	s.syncRemote(c)
+
+	// Add an extra signature to the new remote root.
+	bytes, err := s.readMeta("root.json")
+	c.Assert(err, IsNil)
+	dataSigned := &data.Signed{}
+	c.Assert(json.Unmarshal(bytes, dataSigned), IsNil)
+	dataSigned.Signatures = append(dataSigned.Signatures,
+		data.Signature{
+			KeyID:     dataSigned.Signatures[0].KeyID,
+			Signature: make([]byte, ed25519.SignatureSize),
+		})
+	dataBytes, err := json.Marshal(dataSigned)
+	c.Assert(err, IsNil)
+	s.setRemoteMeta("root.json", dataBytes)
+	s.setRemoteMeta("2.root.json", dataBytes)
+
+	// check Update() succeeds when an extra invalid signature was
+	// added to the root.
+	_, err = client.Update()
+	c.Assert(err, IsNil)
+	c.Assert(client.rootVer, Equals, int64(2))
+}
+
 // startTUFRepoServer starts a HTTP server to serve a TUF Repo.
 func startTUFRepoServer(baseDir string, relPath string) (net.Listener, error) {
 	serverDir := filepath.Join(baseDir, relPath)
@@ -517,9 +580,11 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 		// Fails updating root from version 1 to version 3 when versions 1 and 3 are expired but version 2 is not expired.
 		{"testdata/Published3Times_keyrotated_latestrootexpired", ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int64{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// Fails updating root from version 1 to version 2 when old root 1 did not sign off on it (nth root didn't sign off n+1).
-		{"testdata/Published2Times_keyrotated_invalidOldRootSignature", errors.New("tuf: signature verification failed"), map[string]int64{}},
+		// TODO(asraa): This testcase should have revoked the old key!
+		// https://github.com/theupdateframework/go-tuf/issues/417
+		{"testdata/Published2Times_keyrotated_invalidOldRootSignature", nil, map[string]int64{}},
 		// Fails updating root from version 1 to version 2 when the new root 2 did not sign itself (n+1th root didn't sign off n+1)
-		{"testdata/Published2Times_keyrotated_invalidNewRootSignature", errors.New("tuf: signature verification failed"), map[string]int64{}},
+		{"testdata/Published2Times_keyrotated_invalidNewRootSignature", verify.ErrRoleThreshold{Expected: 1, Actual: 0}, map[string]int64{}},
 		// Fails updating root to 2.root.json when the value of the version field inside it is 1 (rollback attack prevention).
 		{"testdata/Published1Time_backwardRootVersion", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), map[string]int64{}},
 		// Fails updating root to 2.root.json when the value of the version field inside it is 3 (rollforward attack prevention).

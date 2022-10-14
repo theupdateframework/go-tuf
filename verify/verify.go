@@ -104,8 +104,12 @@ func (db *DB) VerifySignatures(s *data.Signed, role string) error {
 		}
 
 		if err := verifier.Verify(msg, sig.Signature); err != nil {
-			// FIXME: don't err out on the 1st bad signature.
-			return ErrInvalid
+			// If a signature fails verification, don't count it towards the
+			// threshold but also return early and error out immediately.
+			// Note: Because of this, it is impossible to distinguish between
+			// an error of an invalid signature and a threshold not achieved.
+			// Invalid signatures lead to not achieving the threshold.
+			continue
 		}
 
 		// Only consider this key valid if we haven't seen any of it's
