@@ -23,7 +23,6 @@ import (
 	"github.com/theupdateframework/go-tuf/sign"
 	"github.com/theupdateframework/go-tuf/util"
 	"github.com/theupdateframework/go-tuf/verify"
-	"golang.org/x/exp/maps"
 )
 
 const (
@@ -844,7 +843,13 @@ func (r *Repo) AddOrUpdateSignature(roleFilename string, signature data.Signatur
 		return ErrInvalidRole{role, "no trusted keys for role"}
 	}
 
+	s, err := r.SignedMeta(roleFilename)
+	if err != nil {
+		return err
+	}
+
 	keyInDB := false
+	validSig := false
 	for _, db := range dbs {
 		roleData := db.GetRole(role)
 		if roleData == nil {
@@ -852,38 +857,31 @@ func (r *Repo) AddOrUpdateSignature(roleFilename string, signature data.Signatur
 		}
 		if roleData.ValidKey(signature.KeyID) {
 			keyInDB = true
+
+			verifier, err := db.GetVerifier(signature.KeyID)
+			if err != nil {
+				continue
+			}
+
+			// Now check if this validly signed the metadata.
+			if err := verify.VerifySignature(s.Signed, signature.Signature,
+				verifier); err == nil {
+				validSig = true
+			}
 		}
 	}
 	if !keyInDB {
+		// This key was not delegated for the role in any delegatee.
 		return verify.ErrInvalidKey
 	}
-
-	s, err := r.SignedMeta(roleFilename)
-	if err != nil {
-		return err
+	if !validSig {
+		// The signature was invalid.
+		return verify.ErrInvalid
 	}
 
-	// Check signature on signed meta.
-	// We temporarily make this signature the only signature on the data and modify
-	// the db verification to allow a single signature to suffice.
-	// This way, we test if this new signature is valid.
-	oldSigs := s.Signatures
-	s.Signatures = []data.Signature{
-		signature,
-	}
-	for _, db := range dbs {
-		dbRole := db.GetRole(role)
-		// NOTE: We modify the database used to verify to have a threshold of 1.
-		// This way, we are testing whether this singly added new signature is valid.
-		db.AddRole(role, &data.Role{KeyIDs: maps.Keys(dbRole.KeyIDs), Threshold: 1})
-		if err := db.VerifySignatures(s, role); err != nil {
-			return verify.ErrInvalid
-		}
-	}
-
-	// Add or update this signature to the original signatures.
+	// Add or update signature.
 	signatures := make([]data.Signature, 0, len(s.Signatures)+1)
-	for _, sig := range oldSigs {
+	for _, sig := range s.Signatures {
 		if sig.KeyID != signature.KeyID {
 			signatures = append(signatures, sig)
 		}
