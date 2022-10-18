@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Setup - Go ${{ matrix.go-version }}
-        uses: actions/setup-go@268d8c0ca0432bb2cf416faae41297df9d262d7f
+        uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -59,7 +59,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: get-go-versions
     steps:
-      - uses: actions/setup-go@268d8c0ca0432bb2cf416faae41297df9d262d7f
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: ${{ matrix.go-version }}
       - uses: actions/checkout@v3
