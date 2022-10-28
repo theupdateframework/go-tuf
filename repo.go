@@ -867,6 +867,7 @@ func (r *Repo) AddOrUpdateSignature(roleFilename string, signature data.Signatur
 			if err := verify.VerifySignature(s.Signed, signature.Signature,
 				verifier); err == nil {
 				validSig = true
+				break
 			}
 		}
 	}
