@@ -11,4 +11,4 @@ jobs:
       issues: write
     uses: theupdateframework/specification/.github/workflows/check-latest-spec-version.yml@master
     with:
-      tuf-version: "v1.0.29" # Should be updated to the according version either manually or extracted automatically as how it's done in python-tuf
+      tuf-version: "v1.0.31" # Should be updated to the according version either manually or extracted automatically as how it's done in python-tuf
