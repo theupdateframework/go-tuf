@@ -2044,6 +2044,14 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 		t, err := r.targets(delegator)
 		c.Assert(err, IsNil)
 
+		// Check if there are no delegations.
+		if t.Delegations == nil {
+			if delegatedRoles != nil {
+				c.Fatal("expected delegated roles on delegator")
+			}
+			return
+		}
+
 		// Check that delegated roles are copied verbatim.
 		c.Assert(t.Delegations.Roles, DeepEquals, delegatedRoles)
 

@@ -31,15 +31,19 @@ import (
 func Test(t *testing.T) { TestingT(t) }
 
 type ClientSuite struct {
-	store       tuf.LocalStore
-	repo        *tuf.Repo
-	local       LocalStore
-	remote      *fakeRemoteStore
-	expiredTime time.Time
-	keyIDs      map[string][]string
+	store        tuf.LocalStore
+	repo         *tuf.Repo
+	local        LocalStore
+	remote       RemoteStore
+	expiredTime  time.Time
+	keyIDs       map[string][]string
+	useFileStore bool
+	// Only used with FileStore
+	tmpDir string
 }
 
-var _ = Suite(&ClientSuite{})
+var _ = Suite(&ClientSuite{useFileStore: false})
+var _ = Suite(&ClientSuite{useFileStore: true})
 
 func newFakeRemoteStore() *fakeRemoteStore {
 	return &fakeRemoteStore{
@@ -67,6 +71,66 @@ func (f *fakeRemoteStore) get(name string, store map[string]*fakeFile) (io.ReadC
 		return nil, 0, ErrNotFound{name}
 	}
 	return file, file.size, nil
+}
+
+// These are helper methods for manipulating the internals of the Stores
+// because the set/delete methods are not part of the Interface, we need to
+// switch on the underlying implementation.
+// Also readMeta method is convenience for ease of testing.
+func (s *ClientSuite) setRemoteMeta(path string, data []byte) error {
+	switch impl := s.remote.(type) {
+	case *fakeRemoteStore:
+		impl.meta[path] = newFakeFile(data)
+		return nil
+	case *FileRemoteStore:
+		return impl.addMeta(path, data)
+	default:
+		return fmt.Errorf("non-supoprted RemoteStore, got %+v", impl)
+	}
+}
+
+func (s *ClientSuite) setRemoteTarget(path string, data []byte) error {
+	switch impl := s.remote.(type) {
+	case *fakeRemoteStore:
+		impl.targets[path] = newFakeFile(data)
+		return nil
+	case *FileRemoteStore:
+		return impl.addTarget(path, data)
+	default:
+		return fmt.Errorf("non-supoprted RemoteStore, got %+v", impl)
+	}
+}
+
+func (s *ClientSuite) deleteMeta(path string) error {
+	switch impl := s.remote.(type) {
+	case *fakeRemoteStore:
+		delete(impl.meta, path)
+		return nil
+	case *FileRemoteStore:
+		return impl.deleteMeta(path)
+	default:
+		return fmt.Errorf("non-supported RemoteStore, got %+v", impl)
+	}
+}
+
+func (s *ClientSuite) deleteTarget(path string) error {
+	switch impl := s.remote.(type) {
+	case *fakeRemoteStore:
+		delete(impl.targets, path)
+		return nil
+	case *FileRemoteStore:
+		return impl.deleteTarget(path)
+	default:
+		return fmt.Errorf("non-supported RemoteStore, got %+v", impl)
+	}
+}
+
+func (s *ClientSuite) readMeta(name string) ([]byte, error) {
+	stream, _, err := s.remote.GetMeta(name)
+	if err != nil {
+		return nil, err
+	}
+	return io.ReadAll(stream)
 }
 
 func newFakeFile(b []byte) *fakeFile {
@@ -118,13 +182,26 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	c.Assert(s.repo.Commit(), IsNil)
 
 	// create a remote store containing valid repo files
-	s.remote = newFakeRemoteStore()
+	if s.useFileStore {
+		s.remote, s.tmpDir, err = newTestFileStoreFS()
+		if err != nil {
+			c.Fatalf("failed to create new FileStore: %v", err)
+		}
+	} else {
+		s.remote = newFakeRemoteStore()
+	}
 	s.syncRemote(c)
 	for path, data := range targetFiles {
-		s.remote.targets[path] = newFakeFile(data)
+		s.setRemoteTarget(path, data)
 	}
 
 	s.expiredTime = time.Now().Add(time.Hour)
+}
+
+func (s *ClientSuite) TearDownTest(c *C) {
+	if s.tmpDir != "" {
+		rmrf(s.tmpDir, c.Logf)
+	}
 }
 
 func (s *ClientSuite) genKey(c *C, role string) []string {
@@ -163,7 +240,9 @@ func (s *ClientSuite) syncRemote(c *C) {
 	meta, err := s.store.GetMeta()
 	c.Assert(err, IsNil)
 	for name, data := range meta {
-		s.remote.meta[name] = newFakeFile(data)
+		if err := s.setRemoteMeta(name, data); err != nil {
+			panic(fmt.Sprintf("setMetadata failed: %v", err))
+		}
 	}
 }
 
@@ -252,7 +331,7 @@ func (s *ClientSuite) TestInitAllowsExpired(c *C) {
 	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 	client := NewClient(MemoryLocalStore(), s.remote)
-	bytes, err := io.ReadAll(s.remote.meta["root.json"])
+	bytes, err := s.readMeta("root.json")
 	c.Assert(err, IsNil)
 	s.withMetaExpired(func() {
 		c.Assert(client.Init(bytes), IsNil)
@@ -261,7 +340,7 @@ func (s *ClientSuite) TestInitAllowsExpired(c *C) {
 
 func (s *ClientSuite) TestInit(c *C) {
 	client := NewClient(MemoryLocalStore(), s.remote)
-	bytes, err := io.ReadAll(s.remote.meta["root.json"])
+	bytes, err := s.readMeta("root.json")
 	c.Assert(err, IsNil)
 	dataSigned := &data.Signed{}
 	c.Assert(json.Unmarshal(bytes, dataSigned), IsNil)
@@ -308,11 +387,11 @@ func (s *ClientSuite) TestFirstUpdate(c *C) {
 func (s *ClientSuite) TestMissingRemoteMetadata(c *C) {
 	client := s.newClient(c)
 
-	delete(s.remote.meta, "targets.json")
+	s.deleteMeta("targets.json")
 	_, err := client.Update()
 	c.Assert(err, Equals, ErrMissingRemoteMetadata{"targets.json"})
 
-	delete(s.remote.meta, "timestamp.json")
+	s.deleteMeta("timestamp.json")
 	_, err = client.Update()
 	c.Assert(err, Equals, ErrMissingRemoteMetadata{"timestamp.json"})
 }
@@ -783,7 +862,7 @@ func (s *ClientSuite) TestLocalExpired(c *C) {
 }
 
 func (s *ClientSuite) TestTimestampTooLarge(c *C) {
-	s.remote.meta["timestamp.json"] = newFakeFile(make([]byte, defaultTimestampDownloadLimit+1))
+	s.setRemoteMeta("timestamp.json", make([]byte, defaultTimestampDownloadLimit+1))
 	_, err := s.newClient(c).Update()
 	c.Assert(err, Equals, ErrMetaTooLarge{"timestamp.json", defaultTimestampDownloadLimit + 1, defaultTimestampDownloadLimit})
 }
@@ -910,8 +989,8 @@ func (s *ClientSuite) TestUpdateMixAndMatchAttack(c *C) {
 	client := s.updatedClient(c)
 
 	// grab the remote targets.json
-	oldTargets, ok := s.remote.meta["targets.json"]
-	if !ok {
+	oldTargets, err := s.readMeta("targets.json")
+	if err != nil {
 		c.Fatal("missing remote targets.json")
 	}
 
@@ -921,22 +1000,22 @@ func (s *ClientSuite) TestUpdateMixAndMatchAttack(c *C) {
 	c.Assert(s.repo.Timestamp(), IsNil)
 	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
-	newTargets, ok := s.remote.meta["targets.json"]
-	if !ok {
+	newTargets, err := s.readMeta("targets.json")
+	if err != nil {
 		c.Fatal("missing remote targets.json")
 	}
-	s.remote.meta["targets.json"] = oldTargets
+	s.setRemoteMeta("targets.json", oldTargets)
 
 	// check update returns ErrWrongSize for targets.json
-	_, err := client.Update()
-	c.Assert(err, DeepEquals, ErrWrongSize{"targets.json", oldTargets.size, newTargets.size})
+	_, err = client.Update()
+	c.Assert(err, DeepEquals, ErrWrongSize{"targets.json", int64(len(oldTargets)), int64(len(newTargets))})
 
 	// do the same but keep the size the same
 	c.Assert(s.repo.RemoveTargetWithExpires("foo.txt", expires), IsNil)
 	c.Assert(s.repo.Snapshot(), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncRemote(c)
-	s.remote.meta["targets.json"] = oldTargets
+	s.setRemoteMeta("targets.json", oldTargets)
 
 	// check update returns ErrWrongHash
 	_, err = client.Update()
@@ -947,8 +1026,8 @@ func (s *ClientSuite) TestUpdateReplayAttack(c *C) {
 	client := s.updatedClient(c)
 
 	// grab the remote timestamp.json
-	oldTimestamp, ok := s.remote.meta["timestamp.json"]
-	if !ok {
+	oldTimestamp, err := s.readMeta("timestamp.json")
+	if err != nil {
 		c.Fatal("missing remote timestamp.json")
 	}
 
@@ -957,12 +1036,12 @@ func (s *ClientSuite) TestUpdateReplayAttack(c *C) {
 	c.Assert(version > 0, Equals, true)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncRemote(c)
-	_, err := client.Update()
+	_, err = client.Update()
 	c.Assert(err, IsNil)
 	c.Assert(client.timestampVer > version, Equals, true)
 
 	// replace remote timestamp.json with the old one
-	s.remote.meta["timestamp.json"] = oldTimestamp
+	s.setRemoteMeta("timestamp.json", oldTimestamp)
 
 	// check update returns ErrLowVersion
 	_, err = client.Update()
@@ -979,8 +1058,8 @@ func (s *ClientSuite) TestUpdateForkTimestamp(c *C) {
 	client := s.updatedClient(c)
 
 	// grab the remote timestamp.json
-	oldTimestamp, ok := s.remote.meta["timestamp.json"]
-	if !ok {
+	oldTimestamp, err := s.readMeta("timestamp.json")
+	if err != nil {
 		c.Fatal("missing remote timestamp.json")
 	}
 
@@ -989,13 +1068,13 @@ func (s *ClientSuite) TestUpdateForkTimestamp(c *C) {
 	c.Assert(version > 0, Equals, true)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncRemote(c)
-	_, err := client.Update()
+	_, err = client.Update()
 	c.Assert(err, IsNil)
 	newVersion := client.timestampVer
 	c.Assert(newVersion > version, Equals, true)
 
 	// generate a new, different timestamp with the *same version*
-	s.remote.meta["timestamp.json"] = oldTimestamp
+	s.setRemoteMeta("timestamp.json", oldTimestamp)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	c.Assert(client.timestampVer, Equals, newVersion) // double-check: same version?
 	s.syncRemote(c)
@@ -1107,7 +1186,7 @@ func (s *ClientSuite) TestDownloadUnknownTarget(c *C) {
 
 func (s *ClientSuite) TestDownloadNoExist(c *C) {
 	client := s.updatedClient(c)
-	delete(s.remote.targets, "foo.txt")
+	s.deleteTarget("foo.txt")
 	var dest testDestination
 	c.Assert(client.Download("foo.txt", &dest), Equals, ErrNotFound{"foo.txt"})
 	c.Assert(dest.deleted, Equals, true)
@@ -1126,29 +1205,24 @@ func (s *ClientSuite) TestDownloadOK(c *C) {
 
 func (s *ClientSuite) TestDownloadWrongSize(c *C) {
 	client := s.updatedClient(c)
-	remoteFile := &fakeFile{buf: bytes.NewReader([]byte("wrong-size")), size: 10}
-	s.remote.targets["foo.txt"] = remoteFile
+	// Update with a file that's incorrect size.
+	s.setRemoteTarget("foo.txt", []byte("wrong-size"))
 	var dest testDestination
 	c.Assert(client.Download("foo.txt", &dest), DeepEquals, ErrWrongSize{"foo.txt", 10, 3})
-	c.Assert(remoteFile.bytesRead, Equals, 0)
 	c.Assert(dest.deleted, Equals, true)
 }
 
 func (s *ClientSuite) TestDownloadTargetTooLong(c *C) {
 	client := s.updatedClient(c)
-	remoteFile := s.remote.targets["foo.txt"]
-	remoteFile.buf = bytes.NewReader([]byte("foo-ooo"))
+	s.setRemoteTarget("foo.txt", []byte("foo-ooo"))
 	var dest testDestination
-	c.Assert(client.Download("foo.txt", &dest), IsNil)
-	c.Assert(remoteFile.bytesRead, Equals, 3)
-	c.Assert(dest.deleted, Equals, false)
-	c.Assert(dest.String(), Equals, "foo")
+	c.Assert(client.Download("foo.txt", &dest), DeepEquals, ErrWrongSize{"foo.txt", 7, 3})
+	c.Assert(dest.deleted, Equals, true)
 }
 
 func (s *ClientSuite) TestDownloadTargetTooShort(c *C) {
 	client := s.updatedClient(c)
-	remoteFile := s.remote.targets["foo.txt"]
-	remoteFile.buf = bytes.NewReader([]byte("fo"))
+	s.setRemoteTarget("foo.txt", []byte("fo"))
 	var dest testDestination
 	c.Assert(client.Download("foo.txt", &dest), DeepEquals, ErrWrongSize{"foo.txt", 2, 3})
 	c.Assert(dest.deleted, Equals, true)
@@ -1156,8 +1230,7 @@ func (s *ClientSuite) TestDownloadTargetTooShort(c *C) {
 
 func (s *ClientSuite) TestDownloadTargetCorruptData(c *C) {
 	client := s.updatedClient(c)
-	remoteFile := s.remote.targets["foo.txt"]
-	remoteFile.buf = bytes.NewReader([]byte("corrupt"))
+	s.setRemoteTarget("foo.txt", []byte("ooo"))
 	var dest testDestination
 	assertWrongHash(c, client.Download("foo.txt", &dest))
 	c.Assert(dest.deleted, Equals, true)

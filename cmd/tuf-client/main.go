@@ -33,7 +33,7 @@ See "tuf-client help <command>" for more information on a specific command.
 
 	if cmd == "help" {
 		if len(cmdArgs) == 0 { // `tuf-client help`
-			fmt.Fprint(os.Stderr, usage)
+			fmt.Fprint(os.Stdout, usage)
 			return
 		} else { // `tuf-client help <command>`
 			cmd = cmdArgs[0]
