@@ -89,9 +89,12 @@ func (VerifySuite) Test(c *C) {
 			err:  ErrUnknownRole{"foo"},
 		},
 		{
+			// It is impossible to distinguish between an error of an invalid
+			// signature and a threshold not achieved. Invalid signatures lead
+			// to not achieving the threshold.
 			name: "signature wrong length",
 			mut:  func(t *test) { t.s.Signatures[0].Signature = []byte{0} },
-			err:  ErrInvalid,
+			err:  ErrRoleThreshold{1, 0},
 		},
 		{
 			name: "key missing from role",
@@ -101,7 +104,15 @@ func (VerifySuite) Test(c *C) {
 		{
 			name: "invalid signature",
 			mut:  func(t *test) { t.s.Signatures[0].Signature = make([]byte, ed25519.SignatureSize) },
-			err:  ErrInvalid,
+			err:  ErrRoleThreshold{1, 0},
+		},
+		{
+			name: "enough signatures with extra invalid signature",
+			mut: func(t *test) {
+				t.s.Signatures = append(t.s.Signatures, data.Signature{
+					KeyID:     t.s.Signatures[0].KeyID,
+					Signature: make([]byte, ed25519.SignatureSize)})
+			},
 		},
 		{
 			name: "not enough signatures",
@@ -189,7 +200,8 @@ func (VerifySuite) Test(c *C) {
 			},
 		},
 		{
-			name: "invalid ecdsa signature",
+			// The threshold is still achieved.
+			name: "invalid second ecdsa signature",
 			mut: func(t *test) {
 				k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 				s := ecdsaSigner{k}
@@ -198,7 +210,6 @@ func (VerifySuite) Test(c *C) {
 				t.keys = append(t.keys, s.PublicData())
 				t.roles["root"].KeyIDs = append(t.roles["root"].KeyIDs, s.PublicData().IDs()...)
 			},
-			err: ErrInvalid,
 		},
 	}
 	for _, t := range tests {
