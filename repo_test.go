@@ -2663,7 +2663,8 @@ func (rs *RepoSuite) TestSnapshotWithInvalidRoot(c *C) {
 	local.SetMeta("root.json", b)
 
 	// Snapshotting should fail.
-	c.Assert(r.Snapshot(), Equals, ErrInsufficientSignatures{"root.json", verify.ErrInvalid})
+	c.Assert(r.Snapshot(), Equals, ErrInsufficientSignatures{
+		"root.json", verify.ErrRoleThreshold{Expected: 1, Actual: 0}})
 
 	// Correctly sign root
 	c.Assert(r.Sign("root.json"), IsNil)
