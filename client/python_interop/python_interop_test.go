@@ -43,7 +43,7 @@ func (InteropSuite) TestGoClientPythonGenerated(c *C) {
 	// start file server
 	cwd, err := os.Getwd()
 	c.Assert(err, IsNil)
-	testDataDir := filepath.Join(cwd, "testdata", "python-tuf-v1.0.0")
+	testDataDir := filepath.Join(cwd, "testdata", "python-tuf-v2.0.0")
 	addr, cleanup := startFileServer(c, testDataDir)
 	defer cleanup()
 
@@ -145,7 +145,7 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 		c.Assert(os.WriteFile(filepath.Join(currDir, "root.json"), rootJSON, 0644), IsNil)
 
 		args := []string{
-			filepath.Join(cwd, "testdata", "python-tuf-v1.0.0", "client.py"),
+			filepath.Join(cwd, "testdata", "python-tuf-v2.0.0", "client.py"),
 			"--repo=http://" + addr + "/" + name,
 		}
 		for path := range files {
@@ -204,7 +204,7 @@ func (InteropSuite) TestPythonClientGoGeneratedNullDelegations(c *C) {
 		c.Assert(os.WriteFile(filepath.Join(currDir, "root.json"), rootJSON, 0644), IsNil)
 
 		args := []string{
-			filepath.Join(cwd, "testdata", "python-tuf-v1.0.0", "client.py"),
+			filepath.Join(cwd, "testdata", "python-tuf-v2.0.0", "client.py"),
 			"--repo=http://" + addr + "/" + name,
 		}
 		for path := range files {
