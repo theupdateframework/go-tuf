@@ -1,0 +1,39 @@
+{
+ "signatures": [
+  {
+   "keyid": "5ac9d776498e3678d7b9709b18b42793e4f0ea12dcdbe287b586e926a62e11ed",
+   "sig": "bad74a90c337cbf50bd3f103b29dca0f86848b87691e3d78cd45fb81aefe5af3ac0b19da4c7395d7ae3db08b0b616b429b93c7e968d2d159697701986b08ea03"
+  }
+ ],
+ "signed": {
+  "_type": "targets",
+  "delegations": {
+   "keys": {
+    "322cf964acb4d34e57a7cd2ddfbdc75583a2baba04446338aea15febc4249c87": {
+     "keytype": "ed25519",
+     "keyval": {
+      "public": "2a2ce05007e88856d095cc882fdf580c821badaf3a4f9e84489ac8b09aca38c2"
+     },
+     "scheme": "ed25519"
+    }
+   },
+   "roles": [
+    {
+     "keyids": [
+      "322cf964acb4d34e57a7cd2ddfbdc75583a2baba04446338aea15febc4249c87"
+     ],
+     "name": "python-scripts",
+     "paths": [
+      "*.py"
+     ],
+     "terminating": true,
+     "threshold": 1
+    }
+   ]
+  },
+  "expires": "2023-11-21T17:14:43Z",
+  "spec_version": "1.0.30",
+  "targets": {},
+  "version": 2
+ }
+}
