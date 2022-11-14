@@ -1,0 +1,22 @@
+{
+ "signatures": [
+  {
+   "keyid": "5ac9d776498e3678d7b9709b18b42793e4f0ea12dcdbe287b586e926a62e11ed",
+   "sig": "cdfb73a25173d87701dcefd8ffdfc08acb86e190f31ac59b11dbbea9e03fcec1603904a7c7306af496e24f397664d373c960e46a80ed3d3570647a19bd981202"
+  }
+ ],
+ "signed": {
+  "_type": "targets",
+  "expires": "2022-11-28T17:14:43Z",
+  "spec_version": "1.0.30",
+  "targets": {
+   "repo_example/basic_repo.py": {
+    "hashes": {
+     "sha256": "f29be71d9f3e83945e5bc7ea5a187338e1a5a2ec5bb746481aa6faa59ebaf40e"
+    },
+    "length": 14721
+   }
+  },
+  "version": 1
+ }
+}
