@@ -8,7 +8,8 @@ You may report issues for the most recent version of go-tuf. We will not retroac
 
 ## Reporting a Vulnerability
 
-If you discover a potential security issue in this project we ask that you notify the go-tuf maintainers via our [vulnerability reporting form](https://forms.gle/ShM4s3mLbUAx5QHo8). At the minimum, the report must contain the following:
+If you discover a potential security issue in this project we ask that you notify the go-tuf maintainers via [Github's private reporting feature](https://github.com/theupdateframework/go-tuf/security/advisories/new) (requires being signed in to GitHub). At the minimum, the report must contain the following:
+
 * A description of the issue.
 * A specific version or commit SHA of `go-tuf` where the issue reproduces.
 * Instructions to reproduce the issue.
