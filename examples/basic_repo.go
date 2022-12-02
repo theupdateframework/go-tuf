@@ -41,7 +41,8 @@ func main() {
 	// protect, i.e. target files.
 
 	// Define containers for metadata objects and cryptographic keys created below. This
-	// allows us to sign and write metadata in a batch more easily.
+	// allows us to sign and write metadata in a batch more easily. The repo.New() instance
+	// is really just to help and be used as a placeholder for all metadata.
 	roles := repo.New()
 	keys := map[string]ed25519.PrivateKey{}
 
@@ -65,7 +66,7 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintln("basic_repo.go:", "generating target file info failed", err))
 	}
-	targets.Signed.Targets[targetPath] = *targetFileInfo
+	roles.Targets("targets").Signed.Targets[targetPath] = *targetFileInfo
 	// Snapshot (consistency)
 	// ----------------------
 	// The snapshot role guarantees consistency of the entire repository. It does so
