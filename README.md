@@ -50,9 +50,9 @@ Roadmap
 
 [] Verify the metadata API is complete
 
-[] Implement a client (standalone package built on top of metadata, to be split into several other parts)
+[] Implement a client (standalone package built on top of metadata, to be split into several other tasks)
 
-[] Implement a repository (standalone package built on top of metadata, to be split into several other parts)
+[] Implement a repository (standalone package built on top of metadata, to be split into several other tasks)
 
 Documentation
 -------------
@@ -61,8 +61,7 @@ Documentation
 
 Contact
 -------
-Questions, feedback, and suggestions are welcomed on the [#tuf]
-(https://cloud-native.slack.com/archives/C8NMD3QJ3) channel on
+Questions, feedback, and suggestions are welcomed on the [#tuf](https://cloud-native.slack.com/archives/C8NMD3QJ3) channel on
 [CNCF Slack](https://slack.cncf.io/).
 
 We strive to make the specification easy to implement, so if you come across
