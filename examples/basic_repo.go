@@ -225,7 +225,7 @@ func main() {
 	// on that key owner's computer. All the owner has to do is read the metadata
 	// file, sign it, and write it back to the same file, and this can be repeated
 	// until the threshold is satisfied.
-	outofbandRoot, err := metadata.Root().FromFile(filepath.Join(tmpDir, "1.root.json"))
+	_, err = roles.Root().FromFile(filepath.Join(tmpDir, "1.root.json"))
 	if err != nil {
 		panic(fmt.Sprintln("basic_repo.go:", "loading root metadata from file failed", err))
 	}
@@ -233,11 +233,11 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintln("basic_repo.go:", "loading a signer failed", err))
 	}
-	_, err = outofbandRoot.Sign(outofbandSigner)
+	_, err = roles.Root().Sign(outofbandSigner)
 	if err != nil {
 		panic(fmt.Sprintln("basic_repo.go:", "signing root failed", err))
 	}
-	err = outofbandRoot.ToFile(filepath.Join(tmpDir, "1.root.json"), true)
+	err = roles.Root().ToFile(filepath.Join(tmpDir, "1.root.json"), true)
 	if err != nil {
 		panic(fmt.Sprintln("basic_repo.go:", "saving root metadata to file failed", err))
 	}
@@ -245,25 +245,25 @@ func main() {
 	// Verify that metadata is signed correctly
 	// ====================================
 	// Verify root
-	err = outofbandRoot.VerifyDelegate("root", outofbandRoot)
+	err = roles.Root().VerifyDelegate("root", roles.Root())
 	if err != nil {
 		panic(fmt.Sprintln("basic_repo.go:", "verifying root metadata failed", err))
 	}
 
 	// Verify targets
-	err = outofbandRoot.VerifyDelegate("targets", roles.Targets("targets"))
+	err = roles.Root().VerifyDelegate("targets", roles.Targets("targets"))
 	if err != nil {
 		panic(fmt.Sprintln("basic_repo.go:", "verifying targets metadata failed", err))
 	}
 
 	// Verify snapshot
-	err = outofbandRoot.VerifyDelegate("snapshot", roles.Snapshot())
+	err = roles.Root().VerifyDelegate("snapshot", roles.Snapshot())
 	if err != nil {
 		panic(fmt.Sprintln("basic_repo.go:", "verifying snapshot metadata failed", err))
 	}
 
 	// Verify timestamp
-	err = outofbandRoot.VerifyDelegate("timestamp", roles.Timestamp())
+	err = roles.Root().VerifyDelegate("timestamp", roles.Timestamp())
 	if err != nil {
 		panic(fmt.Sprintln("basic_repo.go:", "verifying timestamp metadata failed", err))
 	}
@@ -443,7 +443,40 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintln("basic_repo.go:", "saving root to file failed", err))
 	}
+
+	// Verify again that metadata is signed correctly
+	// ====================================
+	// Verify root
+	err = roles.Root().VerifyDelegate("root", roles.Root())
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "verifying root metadata failed", err))
+	}
+
+	// Verify targets
+	err = roles.Root().VerifyDelegate("targets", roles.Targets("targets"))
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "verifying targets metadata failed", err))
+	}
+
+	// Verify snapshot
+	err = roles.Root().VerifyDelegate("snapshot", roles.Snapshot())
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "verifying snapshot metadata failed", err))
+	}
+
+	// Verify timestamp
+	err = roles.Root().VerifyDelegate("timestamp", roles.Timestamp())
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "verifying timestamp metadata failed", err))
+	}
+
+	// Verify delegatee
+	err = roles.Targets("targets").VerifyDelegate(delegateeName, roles.Targets(delegateeName))
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "verifying delegatee metadata failed", err))
+	}
 	fmt.Println("Done! Metadata files location:", tmpDir)
+
 }
 
 // helperExpireIn returns time offset by days
