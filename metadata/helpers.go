@@ -1,11 +1,14 @@
 package metadata
 
 import (
+	"bytes"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"os"
 
@@ -18,11 +21,11 @@ func fromFile[T Roles](name string) (*Metadata[T], error) {
 		return nil, fmt.Errorf("error opening metadata file - %s", name)
 	}
 	defer in.Close()
-	bytes, err := io.ReadAll(in)
+	data, err := io.ReadAll(in)
 	if err != nil {
 		return nil, fmt.Errorf("error reading metadata bytes from file - %s", name)
 	}
-	meta, err := fromBytes[T](bytes)
+	meta, err := fromBytes[T](data)
 	if err != nil {
 		return nil, fmt.Errorf("error generating metadata from bytes - %s", name)
 	}
@@ -91,12 +94,32 @@ func checkType[T Roles](bytes []byte) error {
 }
 
 func verifyLength(data []byte, length int64) error {
-	// TODO
+	len, err := io.Copy(io.Discard, bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	if length != len {
+		return fmt.Errorf("length verification failed - expected %d, got %d", length, len)
+	}
 	return nil
 }
 
 func verifyHashes(data []byte, hashes Hashes) error {
-	// TODO
+	var hasher hash.Hash
+	for k, v := range hashes {
+		switch k {
+		case "sha256":
+			hasher = sha256.New()
+		case "sha512":
+			hasher = sha512.New()
+		default:
+			return fmt.Errorf("hash verification failed - unknown hashing algorithm - %s", k)
+		}
+		hasher.Write(data)
+		if hex.EncodeToString(v) != hex.EncodeToString(hasher.Sum(nil)) {
+			return fmt.Errorf("hash verification failed - mismatch for algorithm %s", k)
+		}
+	}
 	return nil
 }
 

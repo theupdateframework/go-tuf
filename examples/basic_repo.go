@@ -62,7 +62,7 @@ func main() {
 	// 	   |----base URL---||-----target path-----|
 	// e.g. tuf-examples.org/examples/basic_repo.py
 	targetPath, localPath := helperGetPathForTarget("basic_repo.go")
-	targetFileInfo, err := metadata.TargetFile().FromFile(targetPath, localPath)
+	targetFileInfo, err := metadata.TargetFile().FromFile(localPath, "sha256")
 	if err != nil {
 		panic(fmt.Sprintln("basic_repo.go:", "generating target file info failed", err))
 	}
