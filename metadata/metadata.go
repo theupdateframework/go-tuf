@@ -3,9 +3,14 @@ package metadata
 import (
 	"bytes"
 	"crypto"
+	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/json"
 	"fmt"
+	"hash"
+	"io"
 	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
@@ -326,9 +331,28 @@ func (signed *TargetsType) IsExpired(referenceTime time.Time) bool {
 	return referenceTime.After(signed.Expires)
 }
 
-// VerifyLengthHashes checks whether the data matches its corresponding
+// VerifyLengthHashes checks whether the Metafile data matches its corresponding
 // length and hashes
 func (f *MetaFiles) VerifyLengthHashes(data []byte) error {
+	// hashes and length are optional for MetaFiles
+	if len(f.Hashes) > 0 {
+		err := verifyHashes(data, f.Hashes)
+		if err != nil {
+			return err
+		}
+	}
+	if f.Length != 0 {
+		err := verifyLength(data, f.Length)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// VerifyLengthHashes checks whether the TargetFiles data matches its corresponding
+// length and hashes
+func (f *TargetFiles) VerifyLengthHashes(data []byte) error {
 	err := verifyHashes(data, f.Hashes)
 	if err != nil {
 		return err
@@ -341,8 +365,47 @@ func (f *MetaFiles) VerifyLengthHashes(data []byte) error {
 }
 
 // FromFile generates TargetFiles from file
-func (t *TargetFiles) FromFile(targetPath, localPath string) (*TargetFiles, error) {
-	return &TargetFiles{}, nil
+func (t *TargetFiles) FromFile(localPath string, hashes ...string) (*TargetFiles, error) {
+	var hasher hash.Hash
+	targetFile := &TargetFiles{
+		Hashes: map[string]HexBytes{},
+	}
+	// use default hash algorithm if not set
+	if len(hashes) == 0 {
+		hashes = []string{"sha256"}
+	}
+	// open file
+	in, err := os.Open(localPath)
+	if err != nil {
+		return nil, fmt.Errorf("error opening target file - %s", localPath)
+	}
+	defer in.Close()
+	data, err := io.ReadAll(in)
+	if err != nil {
+		return nil, fmt.Errorf("error reading bytes from target file - %s", localPath)
+	}
+	// calculate length
+	len, err := io.Copy(io.Discard, bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	targetFile.Length = len
+	for _, v := range hashes {
+		switch v {
+		case "sha256":
+			hasher = sha256.New()
+		case "sha512":
+			hasher = sha512.New()
+		default:
+			return nil, fmt.Errorf("hash calculation failed - unknown hashing algorithm - %s", v)
+		}
+		_, err := hasher.Write(data)
+		if err != nil {
+			return nil, err
+		}
+		targetFile.Hashes[v] = hasher.Sum(nil)
+	}
+	return targetFile, nil
 }
 
 // ClearSignatures clears the Signatures
