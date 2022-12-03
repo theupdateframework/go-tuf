@@ -38,7 +38,7 @@ func Root(expires ...time.Time) *Metadata[RootType] {
 			Expires:            expires[0],
 			Keys:               map[string]*Key{},
 			Roles:              roles,
-			ConsistentSnapshot: false,
+			ConsistentSnapshot: true,
 		},
 		Signatures: []Signature{},
 	}
