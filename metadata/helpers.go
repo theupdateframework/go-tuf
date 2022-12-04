@@ -15,6 +15,8 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// fromFile returns *Metadata[T] object from file and verifies
+// that the data corresponds to the caller struct type
 func fromFile[T Roles](name string) (*Metadata[T], error) {
 	in, err := os.Open(name)
 	if err != nil {
@@ -32,14 +34,16 @@ func fromFile[T Roles](name string) (*Metadata[T], error) {
 	return meta, nil
 }
 
-func fromBytes[T Roles](bytes []byte) (*Metadata[T], error) {
+// fromBytes returns *Metadata[T] object from bytes and verifies
+// that the data corresponds to the caller struct type
+func fromBytes[T Roles](data []byte) (*Metadata[T], error) {
 	meta := &Metadata[T]{}
 	// verify that the type we used to create the object is the same as the type of the metadata file
-	if err := checkType[T](bytes); err != nil {
+	if err := checkType[T](data); err != nil {
 		return nil, err
 	}
 	// if all is okay, unmarshal meta to the desired Metadata[T] type
-	if err := json.Unmarshal(bytes, meta); err != nil {
+	if err := json.Unmarshal(data, meta); err != nil {
 		return nil, err
 	}
 	// Make sure signature key IDs are unique
@@ -62,10 +66,10 @@ func checkUniqueSignatures[T Roles](meta Metadata[T]) error {
 }
 
 // Verifies if the Generic type used to create the object is the same as the type of the metadata file in bytes
-func checkType[T Roles](bytes []byte) error {
+func checkType[T Roles](data []byte) error {
 	var m map[string]any
 	i := any(new(T))
-	if err := json.Unmarshal(bytes, &m); err != nil {
+	if err := json.Unmarshal(data, &m); err != nil {
 		return err
 	}
 	signedType := m["signed"].(map[string]any)["_type"].(string)

@@ -23,6 +23,7 @@ func Root(expires ...time.Time) *Metadata[RootType] {
 	if len(expires) == 0 {
 		expires = []time.Time{time.Now().UTC()}
 	}
+	// populate Roles
 	roles := map[string]*Role{}
 	for _, r := range []string{ROOT, SNAPSHOT, TARGETS, TIMESTAMP} {
 		roles[r] = &Role{
@@ -120,6 +121,10 @@ func TargetFile() *TargetFiles {
 
 // MetaFile create new metadata instance of type MetaFile
 func MetaFile(version int64) *MetaFiles {
+	if version < 0 {
+		// attempting to set incorrect version
+		version = 1
+	}
 	return &MetaFiles{
 		Length:  0,
 		Hashes:  Hashes{},
@@ -138,8 +143,8 @@ func (meta *Metadata[T]) FromFile(name string) (*Metadata[T], error) {
 }
 
 // FromBytes deserialize metadata from bytes
-func (meta *Metadata[T]) FromBytes(bytes []byte) (*Metadata[T], error) {
-	m, err := fromBytes[T](bytes)
+func (meta *Metadata[T]) FromBytes(data []byte) (*Metadata[T], error) {
+	m, err := fromBytes[T](data)
 	if err != nil {
 		return nil, err
 	}
