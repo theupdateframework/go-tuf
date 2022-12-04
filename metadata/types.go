@@ -37,11 +37,11 @@ type Signature struct {
 type RootType struct {
 	Type               string           `json:"_type"`
 	SpecVersion        string           `json:"spec_version"`
+	ConsistentSnapshot bool             `json:"consistent_snapshot"`
 	Version            int64            `json:"version"`
 	Expires            time.Time        `json:"expires"`
 	Keys               map[string]*Key  `json:"keys"`
 	Roles              map[string]*Role `json:"roles"`
-	ConsistentSnapshot bool             `json:"consistent_snapshot"`
 	Custom             *json.RawMessage `json:"custom,omitempty"`
 }
 
