@@ -2,6 +2,10 @@ package main
 
 import (
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/rsa"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -67,6 +71,7 @@ func main() {
 		panic(fmt.Sprintln("basic_repo.go:", "generating target file info failed", err))
 	}
 	roles.Targets("targets").Signed.Targets[targetPath] = *targetFileInfo
+
 	// Snapshot (consistency)
 	// ----------------------
 	// The snapshot role guarantees consistency of the entire repository. It does so
@@ -75,6 +80,7 @@ func main() {
 	// repository and we want to protect the client against mix-and-match attacks.
 	snapshot := metadata.Snapshot(helperExpireIn(7))
 	roles.SetSnapshot(snapshot)
+
 	// Timestamp (freshness)
 	// ---------------------
 	// The timestamp role guarantees freshness of the repository metadata. It does
@@ -135,9 +141,6 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintln("basic_repo.go:", "key generation failed", err))
 	}
-	// TODO: Extend the example to showcase a mixture of keys, i.e.
-	// anotherRootKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	// anotherRootKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 
 	anotherKey, err := metadata.KeyFromPublicKey(anotherRootKey.Public())
 	if err != nil {
@@ -446,7 +449,7 @@ func main() {
 	}
 
 	// Verify again that metadata is signed correctly
-	// ====================================
+	// ==============================================
 	// Verify root
 	err = roles.Root().VerifyDelegate("root", roles.Root())
 	if err != nil {
@@ -476,8 +479,90 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintln("basic_repo.go:", "verifying delegatee metadata failed", err))
 	}
-	fmt.Println("Done! Metadata files location:", tmpDir)
 
+	// Use a mixture of key types
+	// ==========================
+	// Create an RSA key
+	anotherRootKeyRSA, _ := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "RSA key generation failed", err))
+	}
+	anotherKeyRSA, err := metadata.KeyFromPublicKey(anotherRootKeyRSA.Public())
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "RSA key conversion failed", err))
+	}
+
+	// Create an ECDSA key
+	anotherRootKeyECDSA, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "ECDSA key generation failed", err))
+	}
+	anotherKeyECDSA, err := metadata.KeyFromPublicKey(anotherRootKeyECDSA.Public())
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "ECDSA key conversion failed", err))
+	}
+
+	// Add the RSA key to root keys
+	err = roles.Root().Signed.AddKey(anotherKeyRSA, "root")
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "adding RSA key to root failed", err))
+	}
+
+	// Add the ECDSA key to root keys
+	err = roles.Root().Signed.AddKey(anotherKeyECDSA, "root")
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "adding ECDSA key to root failed", err))
+	}
+
+	// Clear existing signatures, bump version and threshold
+	roles.Root().Signed.Roles["root"].Threshold = 4
+	roles.Root().Signed.Version += 1
+	roles.Root().ClearSignatures()
+
+	// Sign root with existing ed25519 keys
+	for _, k := range []ed25519.PrivateKey{keys["root"], anotherRootKey, newRootKey} {
+		signer, err := signature.LoadSigner(k, crypto.Hash(0))
+		if err != nil {
+			panic(fmt.Sprintln("basic_repo.go:", "loading a signer failed", err))
+		}
+		_, err = roles.Root().Sign(signer)
+		if err != nil {
+			panic(fmt.Sprintln("basic_repo.go:", "signing root failed", err))
+		}
+	}
+
+	// Sign root with the new RSA and ECDSA keys
+	outofbandSignerRSA, err := signature.LoadSigner(anotherRootKeyRSA, crypto.SHA256)
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "loading RSA signer failed", err))
+	}
+	outofbandSignerECDSA, err := signature.LoadSigner(anotherRootKeyECDSA, crypto.SHA256)
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "loading ECDSA signer failed", err))
+	}
+	_, err = roles.Root().Sign(outofbandSignerRSA)
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "signing root failed", err))
+	}
+	_, err = roles.Root().Sign(outofbandSignerECDSA)
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "signing root failed", err))
+	}
+
+	// Verify that root is signed correctly
+	// ====================================
+	err = roles.Root().VerifyDelegate("root", roles.Root())
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "verifying root metadata failed", err))
+	}
+
+	// Save root to file
+	filename = fmt.Sprintf("%d.%s.json", roles.Root().Signed.Version, "root")
+	err = roles.Root().ToFile(filepath.Join(tmpDir, filename), true)
+	if err != nil {
+		panic(fmt.Sprintln("basic_repo.go:", "saving root to file failed", err))
+	}
+	fmt.Println("Done! Metadata files location:", tmpDir)
 }
 
 // helperExpireIn returns time offset by days

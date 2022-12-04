@@ -232,7 +232,6 @@ func (meta *Metadata[T]) VerifyDelegate(delegated_role string, delegated_metadat
 	}
 	// if there are no keyIDs for that role it means there's no delegation found
 	if len(roleKeyIDs) == 0 {
-		fmt.Println("no delegation found for", delegated_role)
 		return fmt.Errorf("no delegation found for %s", delegated_role)
 	}
 	// loop through each role keyID
@@ -243,8 +242,13 @@ func (meta *Metadata[T]) VerifyDelegate(delegated_role string, delegated_metadat
 			fmt.Println("failed to generate crypto.PublicKey from Key")
 			return err
 		}
+		// use corresponding hash function for key type
+		hash := crypto.Hash(0)
+		if keys[v].Type != KeyTypeEd25519 {
+			hash = crypto.SHA256
+		}
 		// load a verifier based on that key
-		verifier, err := signature.LoadVerifier(key, crypto.Hash(0))
+		verifier, err := signature.LoadVerifier(key, hash)
 		if err != nil {
 			fmt.Println("failed to load verifier")
 			return err
@@ -297,13 +301,13 @@ func (meta *Metadata[T]) VerifyDelegate(delegated_role string, delegated_metadat
 		}
 		// verify if the signature for that payload corresponds to the given key
 		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payload)); err == nil {
-			// save the verified keyID only if there's no err value
+			// save the verified keyID only if verification passed
 			signing_keys[v] = true
 		}
 	}
 	// check if the amount of valid signatures is enough
 	if len(signing_keys) < roleThreshold {
-		return fmt.Errorf("signature verification failed, not enough signatures")
+		return fmt.Errorf("signature verification failed, not enough signatures, got %d, want %d", len(signing_keys), roleThreshold)
 	}
 	return nil
 }
