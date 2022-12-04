@@ -102,10 +102,6 @@ func Targets(expires ...time.Time) *Metadata[TargetsType] {
 			Version:     1,
 			Expires:     expires[0],
 			Targets:     map[string]TargetFiles{},
-			Delegations: &Delegations{
-				Keys:  map[string]*Key{},
-				Roles: []DelegatedRole{},
-			},
 		},
 		Signatures: []Signature{},
 	}
