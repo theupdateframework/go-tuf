@@ -42,7 +42,7 @@ type RootType struct {
 	Expires            time.Time        `json:"expires"`
 	Keys               map[string]*Key  `json:"keys"`
 	Roles              map[string]*Role `json:"roles"`
-	Custom             *json.RawMessage `json:"custom,omitempty"`
+	Custom             json.RawMessage  `json:"custom,omitempty"`
 }
 
 type SnapshotType struct {
@@ -51,7 +51,7 @@ type SnapshotType struct {
 	Version     int64                `json:"version"`
 	Expires     time.Time            `json:"expires"`
 	Meta        map[string]MetaFiles `json:"meta"`
-	Custom      *json.RawMessage     `json:"custom,omitempty"`
+	Custom      json.RawMessage      `json:"custom,omitempty"`
 }
 
 type TargetsType struct {
@@ -61,7 +61,7 @@ type TargetsType struct {
 	Expires     time.Time              `json:"expires"`
 	Targets     map[string]TargetFiles `json:"targets"`
 	Delegations *Delegations           `json:"delegations,omitempty"`
-	Custom      *json.RawMessage       `json:"custom,omitempty"`
+	Custom      json.RawMessage        `json:"custom,omitempty"`
 }
 
 type TimestampType struct {
@@ -70,14 +70,14 @@ type TimestampType struct {
 	Version     int64                `json:"version"`
 	Expires     time.Time            `json:"expires"`
 	Meta        map[string]MetaFiles `json:"meta"`
-	Custom      *json.RawMessage     `json:"custom,omitempty"`
+	Custom      json.RawMessage      `json:"custom,omitempty"`
 }
 
 type Key struct {
-	Type   KeyType          `json:"keytype"`
-	Scheme KeyScheme        `json:"scheme"`
-	Value  json.RawMessage  `json:"keyval"`
-	Custom *json.RawMessage `json:"custom,omitempty"`
+	Type   KeyType         `json:"keytype"`
+	Scheme KeyScheme       `json:"scheme"`
+	Value  json.RawMessage `json:"keyval"`
+	Custom json.RawMessage `json:"custom,omitempty"`
 	id     string
 	idOnce sync.Once
 }
@@ -96,16 +96,16 @@ type KeyScheme string
 type Hashes map[string]HexBytes
 
 type MetaFiles struct {
-	Length  int64            `json:"length,omitempty"`
-	Hashes  Hashes           `json:"hashes,omitempty"`
-	Version int64            `json:"version"`
-	Custom  *json.RawMessage `json:"custom,omitempty"`
+	Length  int64           `json:"length,omitempty"`
+	Hashes  Hashes          `json:"hashes,omitempty"`
+	Version int64           `json:"version"`
+	Custom  json.RawMessage `json:"custom,omitempty"`
 }
 
 type TargetFiles struct {
-	Length int64            `json:"length"`
-	Hashes Hashes           `json:"hashes"`
-	Custom *json.RawMessage `json:"custom,omitempty"`
+	Length int64           `json:"length"`
+	Hashes Hashes          `json:"hashes"`
+	Custom json.RawMessage `json:"custom,omitempty"`
 }
 
 type Delegations struct {
