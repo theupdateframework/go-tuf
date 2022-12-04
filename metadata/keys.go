@@ -1,7 +1,6 @@
 package metadata
 
 import (
-	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
@@ -9,12 +8,10 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"golang.org/x/exp/slices"
 )
 
@@ -23,79 +20,81 @@ const (
 	MaxJSONKeySize = 512 * 1024 // 512Kb
 	KeyIDLength    = sha256.Size * 2
 
-	KeyTypeEd25519           KeyType = "ed25519"
-	KeyTypeECDSA_SHA2_P256   KeyType = "ecdsa-sha2-nistp256"
-	KeyTypeRSASSA_PSS_SHA256 KeyType = "rsa"
+	KeyTypeEd25519           = "ed25519"
+	KeyTypeECDSA_SHA2_P256   = "ecdsa-sha2-nistp256"
+	KeyTypeRSASSA_PSS_SHA256 = "rsa"
 
-	KeySchemeEd25519           KeyScheme = "ed25519"
-	KeySchemeECDSA_SHA2_P256   KeyScheme = "ecdsa-sha2-nistp256"
-	KeySchemeRSASSA_PSS_SHA256 KeyScheme = "rsassa-pss-sha256"
+	KeySchemeEd25519           = "ed25519"
+	KeySchemeECDSA_SHA2_P256   = "ecdsa-sha2-nistp256"
+	KeySchemeRSASSA_PSS_SHA256 = "rsassa-pss-sha256"
 )
-
-type helperED25519 struct {
-	PublicKey HexBytes `json:"public"`
-}
-type helperRSAECDSA struct {
-	PublicKey crypto.PublicKey `json:"public"`
-}
 
 // ToPublicKey generate crypto.PublicKey from metadata type Key
 func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
+	publicKey, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(k.Value.PublicKey))
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal PEM keyval: %w", err)
+	}
 	switch k.Type {
 	case KeyTypeRSASSA_PSS_SHA256:
-		return k.toPublicKeyRSA()
+		rsaKey, ok := publicKey.(*rsa.PublicKey)
+		if !ok {
+			return nil, fmt.Errorf("invalid rsa public key")
+		}
+		if _, err := x509.MarshalPKIXPublicKey(rsaKey); err != nil {
+			return nil, fmt.Errorf("marshalling to PKIX key failed")
+		}
+		return rsaKey, nil
 	case KeyTypeECDSA_SHA2_P256:
-		return k.toPublicKeyECDSA()
+		ecdsaKey, ok := publicKey.(*ecdsa.PublicKey)
+		if !ok {
+			return nil, fmt.Errorf("invalid ecdsa public key")
+		}
+		if _, err := x509.MarshalPKIXPublicKey(ecdsaKey); err != nil {
+			return nil, fmt.Errorf("marshalling to PKIX key failed")
+		}
+		return ecdsaKey, nil
 	case KeyTypeEd25519:
-		return k.toPublicKeyED25519()
+		ed25519Key := publicKey.(ed25519.PublicKey)
+		if _, err := x509.MarshalPKIXPublicKey(ed25519Key); err != nil {
+			return nil, fmt.Errorf("marshalling to PKIX key: invalid public key")
+		}
+		return ed25519Key, nil
 	}
 	return nil, fmt.Errorf("unsupported public key type")
 }
 
 // KeyFromPublicKey generate metadata type Key from crypto.PublicKey
 func KeyFromPublicKey(k crypto.PublicKey) (*Key, error) {
-	var b []byte
-	var err error
 	key := &Key{}
 	switch k := k.(type) {
 	case *rsa.PublicKey:
 		key.Type = KeyTypeRSASSA_PSS_SHA256
 		key.Scheme = KeySchemeRSASSA_PSS_SHA256
-		// pemKey, err := cryptoutils.MarshalPublicKeyToPEM(k)
-		s := &helperRSAECDSA{
-			PublicKey: k,
-			// PublicKey: string(pemKey),
-		}
-		b, err = json.Marshal(s)
+		pemKey, err := cryptoutils.MarshalPublicKeyToPEM(k)
 		if err != nil {
 			return nil, err
 		}
+		key.Value.PublicKey = string(pemKey)
 	case *ecdsa.PublicKey:
 		key.Type = KeyTypeECDSA_SHA2_P256
 		key.Scheme = KeySchemeECDSA_SHA2_P256
-		// pemKey, err := cryptoutils.MarshalPublicKeyToPEM(k)
-		s := &helperRSAECDSA{
-			PublicKey: k,
-			// PublicKey: string(pemKey),
-		}
-		b, err = json.Marshal(s)
+		pemKey, err := cryptoutils.MarshalPublicKeyToPEM(k)
 		if err != nil {
 			return nil, err
 		}
+		key.Value.PublicKey = string(pemKey)
 	case ed25519.PublicKey:
 		key.Type = KeyTypeEd25519
 		key.Scheme = KeySchemeEd25519
-		s := &helperED25519{
-			PublicKey: []byte(k),
-		}
-		b, err = json.Marshal(s)
+		pemKey, err := cryptoutils.MarshalPublicKeyToPEM(k)
 		if err != nil {
 			return nil, err
 		}
+		key.Value.PublicKey = string(pemKey)
 	default:
 		return nil, fmt.Errorf("unsupported public key type")
 	}
-	key.Value = b
 	return key, nil
 }
 
@@ -210,71 +209,6 @@ func (signed *TargetsType) RevokeKey(keyID string, role string) error {
 	// delete the keyID from Keys if it's not used anywhere else
 	delete(signed.Delegations.Keys, keyID)
 	return nil
-}
-
-func (k *Key) toPublicKeyED25519() (crypto.PublicKey, error) {
-	// Prepare decoder limited to 512Kb
-	dec := json.NewDecoder(io.LimitReader(bytes.NewReader(k.Value), MaxJSONKeySize))
-	s := &helperED25519{}
-	// Unmarshal key value
-	if err := dec.Decode(s); err != nil {
-		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-			return nil, fmt.Errorf("the public key is truncated or too large: %w", err)
-		}
-		return nil, err
-	}
-	if n := len(s.PublicKey); n != ed25519.PublicKeySize {
-		return nil, fmt.Errorf("unexpected public key length for ed25519 key, expected %d, got %d", ed25519.PublicKeySize, n)
-	}
-	ed25519Key := ed25519.PublicKey(s.PublicKey)
-	if _, err := x509.MarshalPKIXPublicKey(ed25519Key); err != nil {
-		return nil, fmt.Errorf("marshalling to PKIX key: invalid public key")
-	}
-	return ed25519Key, nil
-}
-
-func (k *Key) toPublicKeyECDSA() (crypto.PublicKey, error) {
-	// Prepare decoder limited to 512Kb
-	dec := json.NewDecoder(io.LimitReader(bytes.NewReader(k.Value), MaxJSONKeySize))
-	s := &helperRSAECDSA{}
-	// Unmarshal key value
-	if err := dec.Decode(s); err != nil {
-		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-			return nil, fmt.Errorf("the public key is truncated or too large: %w", err)
-		}
-		return nil, err
-	}
-	ecdsaKey, ok := s.PublicKey.(*ecdsa.PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("invalid public key")
-	}
-
-	if _, err := x509.MarshalPKIXPublicKey(ecdsaKey); err != nil {
-		return nil, fmt.Errorf("marshalling to PKIX key: invalid public key")
-	}
-	return ecdsaKey, nil
-}
-
-func (k *Key) toPublicKeyRSA() (crypto.PublicKey, error) {
-	// Prepare decoder limited to 512Kb
-	dec := json.NewDecoder(io.LimitReader(bytes.NewReader(k.Value), MaxJSONKeySize))
-	s := &helperRSAECDSA{}
-	// Unmarshal key value
-	if err := dec.Decode(s); err != nil {
-		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-			return nil, fmt.Errorf("the public key is truncated or too large: %w", err)
-		}
-		return nil, err
-	}
-	rsaKey, ok := s.PublicKey.(*rsa.PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("invalid public key")
-	}
-
-	if _, err := x509.MarshalPKIXPublicKey(rsaKey); err != nil {
-		return nil, fmt.Errorf("marshalling to PKIX key: invalid public key")
-	}
-	return rsaKey, nil
 }
 
 // ID returns the keyID value for the given Key

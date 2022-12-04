@@ -74,24 +74,22 @@ type TimestampType struct {
 }
 
 type Key struct {
-	Type   KeyType         `json:"keytype"`
-	Scheme KeyScheme       `json:"scheme"`
-	Value  json.RawMessage `json:"keyval"`
+	Type   string          `json:"keytype"`
+	Scheme string          `json:"scheme"`
+	Value  KeyVal          `json:"keyval"`
 	Custom json.RawMessage `json:"custom,omitempty"`
 	id     string
 	idOnce sync.Once
 }
-
+type KeyVal struct {
+	PublicKey string `json:"public"`
+}
 type Role struct {
 	KeyIDs    []string `json:"keyids"`
 	Threshold int      `json:"threshold"`
 }
 
 type HexBytes []byte
-
-type KeyType string
-
-type KeyScheme string
 
 type Hashes map[string]HexBytes
 
