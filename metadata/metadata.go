@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
@@ -117,7 +118,7 @@ func TargetFile() *TargetFiles {
 
 // MetaFile create new metadata instance of type MetaFile
 func MetaFile(version int64) *MetaFiles {
-	if version < 0 {
+	if version <= 0 {
 		// attempting to set incorrect version
 		version = 1
 	}
@@ -416,4 +417,33 @@ func (t *TargetFiles) FromFile(localPath string, hashes ...string) (*TargetFiles
 // ClearSignatures clears the Signatures
 func (meta *Metadata[T]) ClearSignatures() {
 	meta.Signatures = []Signature{}
+}
+
+// IsDelegatedPath determines whether the given "targetFilepath" is in one of
+// the paths that "DelegatedRole" is trusted to provide
+func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) {
+	if len(role.PathHashPrefixes) > 0 {
+		// TODO
+		return false, nil
+	} else if len(role.Paths) > 0 {
+		for _, pathPattern := range role.Paths {
+			return filepath.Match(targetFilepath, pathPattern)
+		}
+	}
+	return false, nil
+}
+
+// GetRolesForTarget returns names and terminating status of all
+// delegated roles who are responsible for targetFilepath
+func (role *Delegations) GetRolesForTarget(targetFilepath string) map[string]bool {
+	res := map[string]bool{}
+	if len(role.Roles) > 0 {
+		for _, r := range role.Roles {
+			ok, err := r.IsDelegatedPath(targetFilepath)
+			if err == nil && ok {
+				res[r.Name] = r.Terminating
+			}
+		}
+	}
+	return res
 }
