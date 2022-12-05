@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/rdimitrov/ngo-tuf/metadata"
-	"github.com/rdimitrov/ngo-tuf/repo"
+	"github.com/rdimitrov/ngo-tuf/metadata/repo"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"golang.org/x/crypto/ed25519"
 )
