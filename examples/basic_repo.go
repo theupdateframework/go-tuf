@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/rdimitrov/ngo-tuf/metadata"
-	"github.com/rdimitrov/ngo-tuf/metadata/repo"
+	"github.com/rdimitrov/ngo-tuf/metadata/repository"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"golang.org/x/crypto/ed25519"
 )
@@ -45,9 +45,9 @@ func main() {
 	// protect, i.e. target files.
 
 	// Define containers for metadata objects and cryptographic keys created below. This
-	// allows us to sign and write metadata in a batch more easily. The repo.New() instance
-	// is really just to help and be used as a placeholder for all metadata.
-	roles := repo.New()
+	// allows us to sign and write metadata in a batch more easily. The repository.New() instance
+	// doesn't provide anything else yet other than serving as a placeholder for all metadata.
+	roles := repository.New()
 	keys := map[string]ed25519.PrivateKey{}
 
 	// Targets (integrity)

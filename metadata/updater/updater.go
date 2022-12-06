@@ -3,31 +3,23 @@ package updater
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"strings"
 
 	"github.com/rdimitrov/ngo-tuf/metadata"
+	"github.com/rdimitrov/ngo-tuf/metadata/config"
 	"github.com/rdimitrov/ngo-tuf/metadata/trustedmetadata"
 )
 
-type UpdaterConfig struct {
-	MaxRootRotations      int64
-	MaxDelegations        int64
-	RootMaxLength         int64
-	TimestampMaxLength    int64
-	SnapshotMaxLength     int64
-	TargetsMaxLength      int64
-	PrefixTargetsWithHash bool
-}
 type Updater struct {
 	metadataDir     string
 	metadataBaseUrl string
 	targetDir       string
 	targetBaseUrl   string
 	trusted         *trustedmetadata.TrustedMetadata
-	config          *UpdaterConfig
+	config          *config.UpdaterConfig
 	// fetcher
-	// config
 }
 
 // New creates a new “Updater“ instance and loads trusted root metadata.
@@ -52,36 +44,36 @@ func New(metadataDir, metadataBaseUrl, targetDir, targetBaseUrl string) (*Update
 		targetDir:       targetDir,
 		targetBaseUrl:   targetBaseUrl,
 		trusted:         trustedMetadataSet,
-		config:          NewConfig(),
+		config:          config.New(),
 	}, nil
 }
 
-func loadLocalMetadata(name string) ([]byte, error) {
-	name = fmt.Sprintf("%s.json", name)
-	in, err := os.Open(name)
+// downloadMetadata download a metadata file and return it as bytes
+func (up *Updater) downloadMetadata(roleName string, length int, version string) ([]byte, error) {
+	var urlPath string
+	roleName = url.QueryEscape(roleName)
+	if version == "" {
+		urlPath = fmt.Sprint("%s%s.json", up.metadataBaseUrl, roleName)
+	} else {
+		urlPath = fmt.Sprint("%s%s.%s.json", up.metadataBaseUrl, version, roleName)
+	}
+	_ = urlPath
+	// download file with size length from path
+	return nil, nil
+}
+
+func loadLocalMetadata(roleName string) ([]byte, error) {
+	roleName = fmt.Sprintf("%s.json", url.QueryEscape(roleName))
+	in, err := os.Open(roleName)
 	if err != nil {
-		return nil, fmt.Errorf("error opening metadata file - %s", name)
+		return nil, fmt.Errorf("error opening metadata file - %s", roleName)
 	}
 	defer in.Close()
 	data, err := io.ReadAll(in)
 	if err != nil {
-		return nil, fmt.Errorf("error reading metadata bytes from file - %s", name)
+		return nil, fmt.Errorf("error reading metadata bytes from file - %s", roleName)
 	}
 	return data, nil
-}
-
-// NewConfig creates a new UpdaterConfig instance used by the Updater to
-// store configuration
-func NewConfig() *UpdaterConfig {
-	return &UpdaterConfig{
-		MaxRootRotations:      32,
-		MaxDelegations:        32,
-		RootMaxLength:         512000,  // bytes
-		TimestampMaxLength:    16384,   // bytes
-		SnapshotMaxLength:     2000000, // bytes
-		TargetsMaxLength:      5000000, // bytes
-		PrefixTargetsWithHash: true,
-	}
 }
 
 // ensureTrailingSlash ensures url ends with a slash
