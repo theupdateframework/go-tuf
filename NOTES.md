@@ -4,7 +4,8 @@
 * Add the option to set custom key ID
 * Add creating a metadata from init struct
 * Support for hashbin delegations and succint roles
-* Make sure to not discard custom fields when converting, i.e. for keys and such
-* Verify and fix how rsa and ecdsa keys are stored
-* Revisit the design - should we use generics or just 4 different structs for each metadata type?
+* Verify we don't discard custom fields when converting, i.e. for keys and such
+* Verify and fix if needed the format of which keys are stored
+* Revisit the design - should we use generics or just 4 different types for each metadata?
 * Investigate whether depending on `sigstore/signatures` can cause dependency cycle and if so, how to avoid it?
+* Add support for storing/loading metadata and target files from AWS S3 buckets
