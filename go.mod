@@ -1,4 +1,4 @@
-module github.com/rdimitrov/ngo-tuf
+module github.com/rdimitrov/go-tuf-metadata
 
 go 1.19
 

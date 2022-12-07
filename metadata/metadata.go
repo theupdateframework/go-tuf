@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -159,11 +158,11 @@ func (meta *Metadata[T]) ToBytes(pretty bool) ([]byte, error) {
 
 // ToFile save metadata to file
 func (meta *Metadata[T]) ToFile(name string, pretty bool) error {
-	bytes, err := meta.ToBytes(pretty)
+	data, err := meta.ToBytes(pretty)
 	if err != nil {
 		return fmt.Errorf("failed serializing metadata")
 	}
-	return ioutil.WriteFile(name, bytes, 0644)
+	return os.WriteFile(name, data, 0644)
 }
 
 // Sign create signature over Signed and assign it to Signatures
@@ -411,6 +410,7 @@ func (t *TargetFiles) FromFile(localPath string, hashes ...string) (*TargetFiles
 		}
 		targetFile.Hashes[v] = hasher.Sum(nil)
 	}
+	targetFile.Path = localPath
 	return targetFile, nil
 }
 

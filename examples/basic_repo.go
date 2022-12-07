@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/rdimitrov/ngo-tuf/metadata"
-	"github.com/rdimitrov/ngo-tuf/metadata/repository"
+	"github.com/rdimitrov/go-tuf-metadata/metadata"
+	"github.com/rdimitrov/go-tuf-metadata/metadata/repository"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"golang.org/x/crypto/ed25519"
 )
