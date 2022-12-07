@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"github.com/rdimitrov/ngo-tuf/metadata"
+	"github.com/rdimitrov/go-tuf-metadata/metadata"
 )
 
 // repositoryType struct for storing metadata

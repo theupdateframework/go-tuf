@@ -104,6 +104,7 @@ type TargetFiles struct {
 	Length int64           `json:"length"`
 	Hashes Hashes          `json:"hashes"`
 	Custom json.RawMessage `json:"custom,omitempty"`
+	Path   string
 }
 
 type Delegations struct {

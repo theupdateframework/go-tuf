@@ -5,7 +5,7 @@
 secure content delivery and updates. It protects against various types of
 supply chain attacks and provides resilience to compromise.
 
-NGO-TUF is started from the idea of providing a Go implementation of TUF that is heavily influenced by the
+go-tuf-metadata is started from the idea of providing a Go implementation of TUF that is heavily influenced by the
 design decisions made in [python-tuf](https://github.com/theupdateframework/python-tuf).
 
 ## About The Update Framework
