@@ -1,22 +1,22 @@
 {
- "signatures": [
-  {
-   "keyid": "46525ed124f01a204652cfb62bb339ec6b8808036aecc505188620c2729743b5",
-   "sig": "a0c2cd11a47a12e11fc563cafaec57531ce53dc5f9f65e222ec91c9904e8afa1e5a66198d8971c357c3f8cc154a53fcae34561c07b3aad1c97c7cb091058440f"
-  }
- ],
- "signed": {
-  "_type": "snapshot",
-  "expires": "2022-11-28T17:14:43Z",
-  "meta": {
-   "python-scripts.json": {
-    "version": 1
-   },
-   "targets.json": {
-    "version": 2
-   }
-  },
-  "spec_version": "1.0.30",
-  "version": 2
- }
+	"signed": {
+		"_type": "snapshot",
+		"spec_version": "1.0.31",
+		"version": 2,
+		"expires": "2022-12-14T21:45:43.583628Z",
+		"meta": {
+			"go-scripts": {
+				"version": 1
+			},
+			"targets.json": {
+				"version": 2
+			}
+		}
+	},
+	"signatures": [
+		{
+			"keyid": "cbdee1866087fe22839341b12f2b7d90b0aa3f9d867815759be1a16a685e9fa8",
+			"sig": "e3f21edc33bcda3d64a4fa5ad44885eada6a6c735d4010bb00089d89cb76618e8c21a8cb5489c9eb8d0a19fcb40670001221f8dfb66dcc6c51088d3f1fd7fe0b"
+		}
+	]
 }

@@ -1,39 +1,39 @@
 {
- "signatures": [
-  {
-   "keyid": "5ac9d776498e3678d7b9709b18b42793e4f0ea12dcdbe287b586e926a62e11ed",
-   "sig": "bad74a90c337cbf50bd3f103b29dca0f86848b87691e3d78cd45fb81aefe5af3ac0b19da4c7395d7ae3db08b0b616b429b93c7e968d2d159697701986b08ea03"
-  }
- ],
- "signed": {
-  "_type": "targets",
-  "delegations": {
-   "keys": {
-    "322cf964acb4d34e57a7cd2ddfbdc75583a2baba04446338aea15febc4249c87": {
-     "keytype": "ed25519",
-     "keyval": {
-      "public": "2a2ce05007e88856d095cc882fdf580c821badaf3a4f9e84489ac8b09aca38c2"
-     },
-     "scheme": "ed25519"
-    }
-   },
-   "roles": [
-    {
-     "keyids": [
-      "322cf964acb4d34e57a7cd2ddfbdc75583a2baba04446338aea15febc4249c87"
-     ],
-     "name": "python-scripts",
-     "paths": [
-      "*.py"
-     ],
-     "terminating": true,
-     "threshold": 1
-    }
-   ]
-  },
-  "expires": "2023-11-21T17:14:43Z",
-  "spec_version": "1.0.30",
-  "targets": {},
-  "version": 2
- }
+	"signed": {
+		"_type": "targets",
+		"spec_version": "1.0.31",
+		"version": 2,
+		"expires": "2023-12-07T21:45:43.593989Z",
+		"targets": {},
+		"delegations": {
+			"keys": {
+				"0df633150a8f5bf05a2619221f030ddb4a4511db4f6c8f3aae8c2eb0e97915e4": {
+					"keytype": "ed25519",
+					"scheme": "ed25519",
+					"keyval": {
+						"public": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEApfH0vl7dtoz0J3UJS6V47d1P0h3PxftYE0Ev9P0L8pk=\n-----END PUBLIC KEY-----\n"
+					}
+				}
+			},
+			"roles": [
+				{
+					"name": "go-scripts",
+					"keyids": [
+						"0df633150a8f5bf05a2619221f030ddb4a4511db4f6c8f3aae8c2eb0e97915e4"
+					],
+					"threshold": 1,
+					"terminating": true,
+					"paths": [
+						"*.go"
+					]
+				}
+			]
+		}
+	},
+	"signatures": [
+		{
+			"keyid": "58600cba2d377583e5af1081f20b0b618edebd4cd1e4798261869114da681bc2",
+			"sig": "f8fc91acf209aab59a68e1862fa4efee07ccf08dfc68edfde8b413e60d480cef16c5035f2a54a31fbd9164275c62effc9dd5dbf8b23a3aae61c4cbe7e57e440c"
+		}
+	]
 }

@@ -64,7 +64,7 @@ or “update workflow”.
 * The example demonstrates how to *manually* create and
 maintain repository metadata using the low-level Metadata API.
 
-### :white_check_mark: - Implement the `TrustedMetadata` package
+### :white_check_mark: - Implement the `trustedmetadata` package
 
 * A `TrustedMetadata` instance ensures that the collection of metadata in it is valid
 and trusted through the whole client update workflow. It provides easy ways to update
@@ -74,7 +74,7 @@ the metadata with the caller making decisions on what is updated.
 
 * The `config` package is used to store ``Updater`` configuration.
 
-### :construction: - Implement client API - `fetcher` package
+### :white_check_mark: - Implement client API - `fetcher` package
 
 * The `fetcher` package defines an interface for abstract network download.
 
