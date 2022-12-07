@@ -6,6 +6,8 @@ on:
     tags:
       - "v*"
 name: CI
+permissions:
+  contents: write
 jobs:
   tests:
     uses: ./.github/workflows/tests.yml
