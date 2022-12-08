@@ -58,7 +58,7 @@ func (trusted *TrustedMetadata) loadTrustedRoot(rootData []byte) error {
 	return nil
 }
 
-// UpdateRoot verifies and loads “data“ as new root metadata.
+// UpdateRoot verifies and loads “rootData“ as new root metadata.
 // Note that an expired intermediate root is considered valid: expiry is
 // only checked for the final root in “UpdateTimestamp()“.
 func (trusted *TrustedMetadata) UpdateRoot(rootData []byte) (*metadata.Metadata[metadata.RootType], error) {
@@ -95,10 +95,10 @@ func (trusted *TrustedMetadata) UpdateRoot(rootData []byte) (*metadata.Metadata[
 	return trusted.Root, nil
 }
 
-// UpdateTimestamp verifies and loads “data“ as new timestamp metadata.
+// UpdateTimestamp verifies and loads “timestampData“ as new timestamp metadata.
 // Note that an intermediate timestamp is allowed to be expired. "TrustedMetadata"
 // will error in this case but the intermediate timestamp will be loaded.
-// This way	a newer timestamp can still be loaded (and the intermediate
+// This way a newer timestamp can still be loaded (and the intermediate
 // timestamp will be used for rollback protection). Expired timestamp will
 // prevent loading snapshot metadata.
 func (trusted *TrustedMetadata) UpdateTimestamp(timestampData []byte) (*metadata.Metadata[metadata.TimestampType], error) {
@@ -166,7 +166,7 @@ func (trusted *TrustedMetadata) checkFinalTimestamp() error {
 	return nil
 }
 
-// UpdateSnapshot verifies and loads “data“ as new snapshot metadata.
+// UpdateSnapshot verifies and loads “snapshotData“ as new snapshot metadata.
 // Note that an intermediate snapshot is allowed to be expired and version
 // is allowed to not match timestamp meta version: TrustedMetadata
 // will error for case of expired metadata or when using bad versions but the
@@ -255,12 +255,12 @@ func (trusted *TrustedMetadata) checkFinalSnapshot() error {
 	return nil
 }
 
-// UpdateTargets verifies and loads “data“ as new top-level targets metadata.
+// UpdateTargets verifies and loads “targetsData“ as new top-level targets metadata.
 func (trusted *TrustedMetadata) UpdateTargets(targetsData []byte) (*metadata.Metadata[metadata.TargetsType], error) {
 	return trusted.UpdateDelegatedTargets(targetsData, metadata.TARGETS, metadata.ROOT)
 }
 
-// UpdateDelegatedTargets verifies and loads “data“ as new metadata for target “role_name“
+// UpdateDelegatedTargets verifies and loads “targetsData“ as new metadata for target “roleName“
 func (trusted *TrustedMetadata) UpdateDelegatedTargets(targetsData []byte, roleName, delegatorName string) (*metadata.Metadata[metadata.TargetsType], error) {
 	var ok bool
 	if trusted.Snapshot == nil {
