@@ -3,7 +3,7 @@
 		"_type": "timestamp",
 		"spec_version": "1.0.31",
 		"version": 2,
-		"expires": "2022-12-08T21:45:43.583629Z",
+		"expires": "2022-12-09T23:33:57.867599Z",
 		"meta": {
 			"snapshot.json": {
 				"version": 2
@@ -12,8 +12,8 @@
 	},
 	"signatures": [
 		{
-			"keyid": "77370a909cbf2c392a56977b61c178235bf8799e21ee6cd6583886705acbf9ee",
-			"sig": "71efad39a7e1046ca359957a6084ce4ab47162e441a05614b8e1d243b342c8dfc271a68037d899e7bd8f33e8a2525199362b4ff0384b57d286cccd0145e17202"
+			"keyid": "c253eafd5918633833540e5f7d6c0f6385ae61e99fa6600b1c4ae769186ba4ad",
+			"sig": "a6201165eaceb2b5b6c1fc0a991607a89aca53fe15d54bd6eb7af148983236c3b254c07e83ab65bba6ee6b277d77cb65aa7d11c2e028326529ab1a6366c0ef05"
 		}
 	]
 }

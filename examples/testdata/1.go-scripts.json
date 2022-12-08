@@ -3,7 +3,7 @@
 		"_type": "targets",
 		"spec_version": "1.0.31",
 		"version": 1,
-		"expires": "2022-12-14T21:45:43.593949Z",
+		"expires": "2022-12-15T23:33:57.876917Z",
 		"targets": {
 			"examples/basic_repo.go": {
 				"length": 23252,
@@ -16,8 +16,8 @@
 	},
 	"signatures": [
 		{
-			"keyid": "0df633150a8f5bf05a2619221f030ddb4a4511db4f6c8f3aae8c2eb0e97915e4",
-			"sig": "e3e22236ac1700b16c047ed7a8e06083cf08867466c0f3362007fab4c6e33719d100ac52ea9495a1cf908ca811f385cceeaa97cecd014ec3e9c2c5c7eaffc206"
+			"keyid": "027249e08beb71d4960953524334f82fa037b811e3dfece8f3e3f91587043a2f",
+			"sig": "74fe989da6d187b31245b326ecbdb3926c5485285b2836bccf0c93d95183370aa0ba0ecd9a4166c873e92bf0b1e9ac13fc70acd0b0a743113bc474a26ca04b0c"
 		}
 	]
 }
