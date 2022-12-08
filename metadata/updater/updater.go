@@ -1,6 +1,7 @@
 package updater
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/url"
@@ -14,6 +15,29 @@ import (
 	"github.com/rdimitrov/go-tuf-metadata/metadata/fetcher"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/trustedmetadata"
 )
+
+// Client update workflow implementation
+// The "Updater" provides an implementation of the `TUF client workflow
+// <https://theupdateframework.github.io/specification/latest/#detailed-client-workflow>`_.
+// "Updater" provides an API to query available targets and to download them in a
+// secure manner: All downloaded files are verified by signed metadata.
+// High-level description of "Updater" functionality:
+//   * Initializing an "Updater" loads and validates the trusted local root
+//     metadata: This root metadata is used as the source of trust for all other
+//     metadata.
+//   * "Refresh()"" can optionally be called to update and load all top-level
+//     metadata as described in the specification, using both locally cached
+//     metadata and metadata downloaded from the remote repository. If refresh is
+//     not done explicitly, it will happen automatically during the first target
+//     info lookup.
+//   * "Updater" can be used to download targets. For each target:
+//       * "GetTargetInfo()"" is first used to find information about a
+//         specific target. This will load new targets metadata as needed (from
+//         local cache or remote repository).
+//       * "FindCachedTarget()"" can optionally be used to check if a
+//         target file is already locally cached.
+//       * "DownloadTarget()" downloads a target file and ensures it is
+//         verified correct by the metadata.
 
 type Updater struct {
 	metadataDir     string
@@ -94,14 +118,64 @@ func (up *Updater) loadSnapshot() error {
 }
 
 // loadTargets load local (and if needed remote) metadata for roleName.
-func (up *Updater) loadTargets(roleName, parent string) error {
-	return nil
+func (up *Updater) loadTargets(roleName, parentName string) (*metadata.Metadata[metadata.TargetsType], error) {
+	// avoid loading 'roleName' more than once during "GetTargetInfo"
+	role, ok := up.trusted.Targets[roleName]
+	if ok {
+		return role, nil
+	}
+	data, err := up.loadLocalMetadata(roleName)
+	if err != nil {
+		return nil, err
+	}
+	delegatedTargets, err := up.trusted.UpdateDelegatedTargets(data, roleName, parentName)
+	if err == nil {
+		fmt.Printf("Local %s is valid: not downloading new one\n", roleName)
+		return delegatedTargets, nil
+	} else {
+		// local 'role' does not exist or is invalid: update from remote
+		if up.trusted.Snapshot != nil {
+			metaInfo := up.trusted.Snapshot.Signed.Meta[fmt.Sprintf("%s.json", roleName)]
+			length := metaInfo.Length
+			if length != 0 {
+				length = up.config.TargetsMaxLength
+			}
+			version := ""
+			if up.trusted.Root.Signed.ConsistentSnapshot {
+				version = strconv.FormatInt(metaInfo.Version, 10)
+			}
+			data, err := up.downloadMetadata(roleName, length, version)
+			if err != nil {
+				return nil, err
+			}
+			delegatedTargets, err := up.trusted.UpdateDelegatedTargets(data, roleName, parentName)
+			if err != nil {
+				return nil, err
+			}
+			err = up.persistMetadata(roleName, data)
+			if err != nil {
+				return nil, err
+			}
+			return delegatedTargets, nil
+		}
+		return nil, err
+	}
 }
 
-// preorderDepthFirstWalk interrogates the tree of target delegations
+// preOrderDepthFirstWalk interrogates the tree of target delegations
 // in order of appearance (which implicitly order trustworthiness),
 // and returns the matching target found in the most trusted role.
-func (up *Updater) preorderDepthFirstWalk(targetFilePath string) (*metadata.TargetFiles, error) {
+func (up *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.TargetFiles, error) {
+	// list of delegations to be interrogated. A (role, parent role) pair
+	// is needed to load and verify the delegated targets metadata.
+	delegationsToVisit := []string{metadata.TARGETS, metadata.ROOT}
+	visitedRoleNames := map[string]bool{}
+
+	// pre-order depth-first traversal of the graph of target delegations.
+	for len(visitedRoleNames) <= up.config.MaxDelegations && len(delegationsToVisit) > 0 {
+		// pop the role name from the top of the stack.
+
+	}
 	return nil, nil
 }
 
@@ -152,12 +226,57 @@ func (up *Updater) GetTargetInfo(targetPath string) (*metadata.TargetFiles, erro
 			return nil, err
 		}
 	}
-	return up.preorderDepthFirstWalk(targetPath)
+	return up.preOrderDepthFirstWalk(targetPath)
 }
 
 // DownloadTarget downloads the target file specified by “targetinfo“
 func (up *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath, targetBaseURL string) (string, error) {
-	return "", nil
+	var err error
+	if filePath == "" {
+		filePath, err = up.generateTargetFilePath(targetFile)
+		if err != nil {
+			return "", err
+		}
+	}
+	if targetBaseURL == "" {
+		if up.targetBaseUrl == "" {
+			return "", fmt.Errorf("targetBaseURL must be set in either DownloadTarget() or the Updater struct")
+		}
+		targetBaseURL = up.targetBaseUrl
+	} else {
+		targetBaseURL = ensureTrailingSlash(targetBaseURL)
+	}
+	targetFilePath := targetFile.Path
+	consistentSnapshot := up.trusted.Root.Signed.ConsistentSnapshot
+	if consistentSnapshot && up.config.PrefixTargetsWithHash {
+		hashes := ""
+		// get first hex value of hashes
+		for _, v := range targetFile.Hashes {
+			hashes = hex.EncodeToString(v)
+			break
+		}
+		dirName, baseName, ok := strings.Cut(targetFilePath, "/")
+		if !ok {
+			return "", fmt.Errorf("error handling targetFilePath %s, no separator found", targetFilePath)
+		}
+		targetFilePath = fmt.Sprintf("%s/%s.%s", dirName, hashes, baseName)
+	}
+	fullURL := fmt.Sprintf("%s%s", targetBaseURL, targetFilePath)
+	data, err := up.fetcher.DownloadFile(fullURL, targetFile.Length)
+	if err != nil {
+		return "", err
+	}
+	err = targetFile.VerifyLengthHashes(data)
+	if err != nil {
+		return "", err
+	}
+	// write the data content to the temporary file
+	err = os.WriteFile(filePath, data, 0644)
+	if err != nil {
+		return "", err
+	}
+	fmt.Printf("Downloaded target %s\n", targetFile.Path)
+	return filePath, nil
 }
 
 // FindCachedTarget checks whether a local file is an up to date target
@@ -246,7 +365,7 @@ func (up *Updater) Refresh() error {
 	if err != nil {
 		return err
 	}
-	err = up.loadTargets(metadata.TARGETS, metadata.ROOT)
+	_, err = up.loadTargets(metadata.TARGETS, metadata.ROOT)
 	if err != nil {
 		return err
 	}
