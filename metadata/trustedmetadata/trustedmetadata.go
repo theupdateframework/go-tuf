@@ -257,11 +257,11 @@ func (trusted *TrustedMetadata) checkFinalSnapshot() error {
 
 // UpdateTargets verifies and loads “data“ as new top-level targets metadata.
 func (trusted *TrustedMetadata) UpdateTargets(targetsData []byte) (*metadata.Metadata[metadata.TargetsType], error) {
-	return trusted.updateDelegatedTargets(targetsData, metadata.TARGETS, metadata.ROOT)
+	return trusted.UpdateDelegatedTargets(targetsData, metadata.TARGETS, metadata.ROOT)
 }
 
-// updateDelegatedTargets verifies and loads “data“ as new metadata for target “role_name“
-func (trusted *TrustedMetadata) updateDelegatedTargets(targetsData []byte, roleName, delegatorName string) (*metadata.Metadata[metadata.TargetsType], error) {
+// UpdateDelegatedTargets verifies and loads “data“ as new metadata for target “role_name“
+func (trusted *TrustedMetadata) UpdateDelegatedTargets(targetsData []byte, roleName, delegatorName string) (*metadata.Metadata[metadata.TargetsType], error) {
 	var ok bool
 	if trusted.Snapshot == nil {
 		return nil, fmt.Errorf("cannot load targets before snapshot")

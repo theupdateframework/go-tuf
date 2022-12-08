@@ -2,7 +2,7 @@ package config
 
 type UpdaterConfig struct {
 	MaxRootRotations      int64
-	MaxDelegations        int64
+	MaxDelegations        int
 	RootMaxLength         int64
 	TimestampMaxLength    int64
 	SnapshotMaxLength     int64
