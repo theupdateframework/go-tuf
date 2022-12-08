@@ -16,14 +16,9 @@ import (
 )
 
 const (
-	// MaxJSONKeySize defines the maximum length of a JSON payload.
-	MaxJSONKeySize = 512 * 1024 // 512Kb
-	KeyIDLength    = sha256.Size * 2
-
-	KeyTypeEd25519           = "ed25519"
-	KeyTypeECDSA_SHA2_P256   = "ecdsa-sha2-nistp256"
-	KeyTypeRSASSA_PSS_SHA256 = "rsa"
-
+	KeyTypeEd25519             = "ed25519"
+	KeyTypeECDSA_SHA2_P256     = "ecdsa-sha2-nistp256"
+	KeyTypeRSASSA_PSS_SHA256   = "rsa"
 	KeySchemeEd25519           = "ed25519"
 	KeySchemeECDSA_SHA2_P256   = "ecdsa-sha2-nistp256"
 	KeySchemeRSASSA_PSS_SHA256 = "rsassa-pss-sha256"
@@ -31,12 +26,12 @@ const (
 
 // ToPublicKey generate crypto.PublicKey from metadata type Key
 func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
-	publicKey, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(k.Value.PublicKey))
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal PEM keyval: %w", err)
-	}
 	switch k.Type {
 	case KeyTypeRSASSA_PSS_SHA256:
+		publicKey, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(k.Value.PublicKey))
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal PEM keyval: %w", err)
+		}
 		rsaKey, ok := publicKey.(*rsa.PublicKey)
 		if !ok {
 			return nil, fmt.Errorf("invalid rsa public key")
@@ -46,6 +41,10 @@ func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 		}
 		return rsaKey, nil
 	case KeyTypeECDSA_SHA2_P256:
+		publicKey, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(k.Value.PublicKey))
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal PEM keyval: %w", err)
+		}
 		ecdsaKey, ok := publicKey.(*ecdsa.PublicKey)
 		if !ok {
 			return nil, fmt.Errorf("invalid ecdsa public key")
@@ -55,7 +54,11 @@ func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 		}
 		return ecdsaKey, nil
 	case KeyTypeEd25519:
-		ed25519Key := publicKey.(ed25519.PublicKey)
+		publicKey, err := hex.DecodeString(k.Value.PublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode public ed25519 hex keyval: %w", err)
+		}
+		ed25519Key := ed25519.PublicKey(publicKey)
 		if _, err := x509.MarshalPKIXPublicKey(ed25519Key); err != nil {
 			return nil, fmt.Errorf("marshalling to PKIX key: invalid public key")
 		}
@@ -87,11 +90,7 @@ func KeyFromPublicKey(k crypto.PublicKey) (*Key, error) {
 	case ed25519.PublicKey:
 		key.Type = KeyTypeEd25519
 		key.Scheme = KeySchemeEd25519
-		pemKey, err := cryptoutils.MarshalPublicKeyToPEM(k)
-		if err != nil {
-			return nil, err
-		}
-		key.Value.PublicKey = string(pemKey)
+		key.Value.PublicKey = hex.EncodeToString(k)
 	default:
 		return nil, fmt.Errorf("unsupported public key type")
 	}

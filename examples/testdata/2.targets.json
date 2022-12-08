@@ -3,15 +3,15 @@
 		"_type": "targets",
 		"spec_version": "1.0.31",
 		"version": 2,
-		"expires": "2023-12-07T21:45:43.593989Z",
+		"expires": "2023-12-08T23:33:57.876945Z",
 		"targets": {},
 		"delegations": {
 			"keys": {
-				"0df633150a8f5bf05a2619221f030ddb4a4511db4f6c8f3aae8c2eb0e97915e4": {
+				"027249e08beb71d4960953524334f82fa037b811e3dfece8f3e3f91587043a2f": {
 					"keytype": "ed25519",
 					"scheme": "ed25519",
 					"keyval": {
-						"public": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEApfH0vl7dtoz0J3UJS6V47d1P0h3PxftYE0Ev9P0L8pk=\n-----END PUBLIC KEY-----\n"
+						"public": "4a37db60d479d095864af8ce5b91cce4fac052cd42eb5bd354c9118f64e6b161"
 					}
 				}
 			},
@@ -19,7 +19,7 @@
 				{
 					"name": "go-scripts",
 					"keyids": [
-						"0df633150a8f5bf05a2619221f030ddb4a4511db4f6c8f3aae8c2eb0e97915e4"
+						"027249e08beb71d4960953524334f82fa037b811e3dfece8f3e3f91587043a2f"
 					],
 					"threshold": 1,
 					"terminating": true,
@@ -32,8 +32,8 @@
 	},
 	"signatures": [
 		{
-			"keyid": "58600cba2d377583e5af1081f20b0b618edebd4cd1e4798261869114da681bc2",
-			"sig": "f8fc91acf209aab59a68e1862fa4efee07ccf08dfc68edfde8b413e60d480cef16c5035f2a54a31fbd9164275c62effc9dd5dbf8b23a3aae61c4cbe7e57e440c"
+			"keyid": "283017a68d8b686d8de4237da15fe4d75567cf893afc847358a41981cc99ff01",
+			"sig": "39865fab715dc9a566fc7c54b4e35412bfd760655244d2d1378df02d53bb40d8cfc8a79f4aba87b19eb74598960002df548d15c0f6c8e8ab601a31e2d8bc260a"
 		}
 	]
 }

@@ -3,7 +3,7 @@
 		"_type": "snapshot",
 		"spec_version": "1.0.31",
 		"version": 2,
-		"expires": "2022-12-14T21:45:43.583628Z",
+		"expires": "2022-12-15T23:33:57.867598Z",
 		"meta": {
 			"go-scripts": {
 				"version": 1
@@ -15,8 +15,8 @@
 	},
 	"signatures": [
 		{
-			"keyid": "cbdee1866087fe22839341b12f2b7d90b0aa3f9d867815759be1a16a685e9fa8",
-			"sig": "e3f21edc33bcda3d64a4fa5ad44885eada6a6c735d4010bb00089d89cb76618e8c21a8cb5489c9eb8d0a19fcb40670001221f8dfb66dcc6c51088d3f1fd7fe0b"
+			"keyid": "3d9a842805ff4831dfedfa83666fd24c8fec642f1a7658297cd288505193e304",
+			"sig": "e9184054a652a91e61fc5d85e96ef6de8395cd958e4bca710d6243cf8b44080a233af0c94f2443a565e0dac4a657d284bb9ac35ee52c27adedacef0a9264180c"
 		}
 	]
 }
