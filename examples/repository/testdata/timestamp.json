@@ -1,0 +1,19 @@
+{
+	"signed": {
+		"_type": "timestamp",
+		"spec_version": "1.0.31",
+		"version": 2,
+		"expires": "2022-12-10T00:00:16.538096Z",
+		"meta": {
+			"snapshot.json": {
+				"version": 2
+			}
+		}
+	},
+	"signatures": [
+		{
+			"keyid": "ea890e76d6be8f6c5f028efd24b0d99596beb0c3141c9186e3269441d158e3a9",
+			"sig": "657cf4584d34950f5685694d5dee0888767a732386647fd23d57e62c32e1d58fadc3c70cce2220b49bcb9d2d5d9f86c9bf22e8ab94c978f0722ab55c628ee10a"
+		}
+	]
+}

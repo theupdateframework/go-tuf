@@ -117,7 +117,7 @@ func TargetFile() *TargetFiles {
 
 // MetaFile create new metadata instance of type MetaFile
 func MetaFile(version int64) *MetaFiles {
-	if version <= 0 {
+	if version < 1 {
 		// attempting to set incorrect version
 		version = 1
 	}
@@ -132,7 +132,7 @@ func MetaFile(version int64) *MetaFiles {
 func (meta *Metadata[T]) FromFile(name string) (*Metadata[T], error) {
 	m, err := fromFile[T](name)
 	if err != nil {
-		return nil, fmt.Errorf("error generating metadata from bytes - %s", name)
+		return nil, err
 	}
 	*meta = *m
 	return meta, nil
@@ -336,7 +336,7 @@ func (signed *TargetsType) IsExpired(referenceTime time.Time) bool {
 	return referenceTime.After(signed.Expires)
 }
 
-// VerifyLengthHashes checks whether the Metafile data matches its corresponding
+// VerifyLengthHashes checks whether the MetaFiles data matches its corresponding
 // length and hashes
 func (f *MetaFiles) VerifyLengthHashes(data []byte) error {
 	// hashes and length are optional for MetaFiles
