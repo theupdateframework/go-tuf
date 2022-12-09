@@ -63,12 +63,12 @@ func main() {
 	// hash and length of this file at the local path. In addition, it specifies the
 	// 'target path', which a client uses to locate the target file relative to a
 	// configured mirror base URL.
-	// 	   |----base URL---||-----target path-----|
-	// e.g. tuf-examples.org/examples/basic_repo.py
-	targetPath, localPath := helperGetPathForTarget("basic_repo.go")
+	// 	   |----base URL---||--------target path--------|
+	// e.g. tuf-examples.org/examples/basic_repository.py
+	targetPath, localPath := helperGetPathForTarget("basic_repository.go")
 	targetFileInfo, err := metadata.TargetFile().FromFile(localPath, "sha256")
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "generating target file info failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "generating target file info failed", err))
 	}
 	roles.Targets("targets").Signed.Targets[targetPath] = *targetFileInfo
 
@@ -114,16 +114,16 @@ func main() {
 	for _, name := range []string{"targets", "snapshot", "timestamp", "root"} {
 		_, private, err := ed25519.GenerateKey(nil)
 		if err != nil {
-			panic(fmt.Sprintln("basic_repo.go:", "key generation failed", err))
+			panic(fmt.Sprintln("basic_repository.go:", "key generation failed", err))
 		}
 		keys[name] = private
 		key, err := metadata.KeyFromPublicKey(private.Public())
 		if err != nil {
-			panic(fmt.Sprintln("basic_repo.go:", "key conversion failed", err))
+			panic(fmt.Sprintln("basic_repository.go:", "key conversion failed", err))
 		}
 		err = roles.Root().Signed.AddKey(key, name)
 		if err != nil {
-			panic(fmt.Sprintln("basic_repo.go:", "adding key to root failed", err))
+			panic(fmt.Sprintln("basic_repository.go:", "adding key to root failed", err))
 		}
 	}
 	// NOTE: We only need the public part to populate root, so it is possible to use
@@ -139,16 +139,16 @@ func main() {
 	// required signature threshold.
 	_, anotherRootKey, err := ed25519.GenerateKey(nil)
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "key generation failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "key generation failed", err))
 	}
 
 	anotherKey, err := metadata.KeyFromPublicKey(anotherRootKey.Public())
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "key conversion failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "key conversion failed", err))
 	}
 	err = roles.Root().Signed.AddKey(anotherKey, "root")
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "adding another key to root failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "adding another key to root failed", err))
 	}
 	roles.Root().Signed.Roles["root"].Threshold = 2
 
@@ -160,7 +160,7 @@ func main() {
 		key := keys[name]
 		signer, err := signature.LoadSigner(key, crypto.Hash(0))
 		if err != nil {
-			panic(fmt.Sprintln("basic_repo.go:", "loading a signer failed", err))
+			panic(fmt.Sprintln("basic_repository.go:", "loading a signer failed", err))
 		}
 		switch name {
 		case "targets":
@@ -173,7 +173,7 @@ func main() {
 			_, err = roles.Root().Sign(signer)
 		}
 		if err != nil {
-			panic(fmt.Sprintln("basic_repo.go:", "metadata signing failed", err))
+			panic(fmt.Sprintln("basic_repository.go:", "metadata signing failed", err))
 		}
 	}
 
@@ -194,11 +194,11 @@ func main() {
 	// temporary directory at CWD for review.
 	cwd, err := os.Getwd()
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "getting cwd failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "getting cwd failed", err))
 	}
 	tmpDir, err := os.MkdirTemp(cwd, "tmp")
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "creating a temporary folder failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "creating a temporary folder failed", err))
 	}
 
 	for _, name := range []string{"targets", "snapshot", "timestamp", "root"} {
@@ -217,7 +217,7 @@ func main() {
 			err = roles.Root().ToFile(filepath.Join(tmpDir, filename), true)
 		}
 		if err != nil {
-			panic(fmt.Sprintln("basic_repo.go:", "saving metadata to file failed", err))
+			panic(fmt.Sprintln("basic_repository.go:", "saving metadata to file failed", err))
 		}
 	}
 
@@ -231,19 +231,19 @@ func main() {
 	// until the threshold is satisfied.
 	_, err = roles.Root().FromFile(filepath.Join(tmpDir, "1.root.json"))
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "loading root metadata from file failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "loading root metadata from file failed", err))
 	}
 	outofbandSigner, err := signature.LoadSigner(anotherRootKey, crypto.Hash(0))
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "loading a signer failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "loading a signer failed", err))
 	}
 	_, err = roles.Root().Sign(outofbandSigner)
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "signing root failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "signing root failed", err))
 	}
 	err = roles.Root().ToFile(filepath.Join(tmpDir, "1.root.json"), true)
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "saving root metadata to file failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "saving root metadata to file failed", err))
 	}
 
 	// Verify that metadata is signed correctly
@@ -251,25 +251,25 @@ func main() {
 	// Verify root
 	err = roles.Root().VerifyDelegate("root", roles.Root())
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "verifying root metadata failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "verifying root metadata failed", err))
 	}
 
 	// Verify targets
 	err = roles.Root().VerifyDelegate("targets", roles.Targets("targets"))
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "verifying targets metadata failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "verifying targets metadata failed", err))
 	}
 
 	// Verify snapshot
 	err = roles.Root().VerifyDelegate("snapshot", roles.Snapshot())
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "verifying snapshot metadata failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "verifying snapshot metadata failed", err))
 	}
 
 	// Verify timestamp
 	err = roles.Root().VerifyDelegate("timestamp", roles.Timestamp())
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "verifying timestamp metadata failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "verifying timestamp metadata failed", err))
 	}
 
 	// Targets delegation
@@ -285,7 +285,7 @@ func main() {
 	delegateeName := "go-scripts"
 	_, delegateePrivateKey, err := ed25519.GenerateKey(nil)
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "key generation failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "key generation failed", err))
 	}
 	keys[delegateeName] = delegateePrivateKey
 
@@ -353,14 +353,14 @@ func main() {
 		key := keys[name]
 		signer, err := signature.LoadSigner(key, crypto.Hash(0))
 		if err != nil {
-			panic(fmt.Sprintln("basic_repo.go:", "loading a signer failed", err))
+			panic(fmt.Sprintln("basic_repository.go:", "loading a signer failed", err))
 		}
 		switch name {
 		case "targets":
 			roles.Targets("targets").ClearSignatures()
 			_, err = roles.Targets("targets").Sign(signer)
 			if err != nil {
-				panic(fmt.Sprintln("basic_repo.go:", "signing metadata failed", err))
+				panic(fmt.Sprintln("basic_repository.go:", "signing metadata failed", err))
 			}
 			filename := fmt.Sprintf("%d.%s.json", roles.Targets("targets").Signed.Version, name)
 			err = roles.Targets("targets").ToFile(filepath.Join(tmpDir, filename), true)
@@ -368,7 +368,7 @@ func main() {
 			roles.Snapshot().ClearSignatures()
 			_, err = roles.Snapshot().Sign(signer)
 			if err != nil {
-				panic(fmt.Sprintln("basic_repo.go:", "signing metadata failed", err))
+				panic(fmt.Sprintln("basic_repository.go:", "signing metadata failed", err))
 			}
 			filename := fmt.Sprintf("%d.%s.json", roles.Snapshot().Signed.Version, name)
 			err = roles.Snapshot().ToFile(filepath.Join(tmpDir, filename), true)
@@ -376,7 +376,7 @@ func main() {
 			roles.Timestamp().ClearSignatures()
 			_, err = roles.Timestamp().Sign(signer)
 			if err != nil {
-				panic(fmt.Sprintln("basic_repo.go:", "signing metadata failed", err))
+				panic(fmt.Sprintln("basic_repository.go:", "signing metadata failed", err))
 			}
 			filename := fmt.Sprintf("%s.json", name)
 			err = roles.Timestamp().ToFile(filepath.Join(tmpDir, filename), true)
@@ -384,13 +384,13 @@ func main() {
 			roles.Targets(delegateeName).ClearSignatures()
 			_, err = roles.Targets(delegateeName).Sign(signer)
 			if err != nil {
-				panic(fmt.Sprintln("basic_repo.go:", "signing metadata failed", err))
+				panic(fmt.Sprintln("basic_repository.go:", "signing metadata failed", err))
 			}
 			filename := fmt.Sprintf("%d.%s.json", roles.Targets(delegateeName).Signed.Version, name)
 			err = roles.Targets(delegateeName).ToFile(filepath.Join(tmpDir, filename), true)
 		}
 		if err != nil {
-			panic(fmt.Sprintln("basic_repo.go:", "saving metadata to file failed", err))
+			panic(fmt.Sprintln("basic_repository.go:", "saving metadata to file failed", err))
 		}
 	}
 
@@ -409,24 +409,24 @@ func main() {
 	// remains in place, it can be used to count towards the old and new threshold.
 	_, newRootKey, err := ed25519.GenerateKey(nil)
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "key generation failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "key generation failed", err))
 	}
 	oldRootKey, err := metadata.KeyFromPublicKey(keys["root"].Public())
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "key conversion failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "key conversion failed", err))
 	}
 	err = roles.Root().Signed.RevokeKey(oldRootKey.ID(), "root")
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "revoking key failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "revoking key failed", err))
 	}
 	// Add new key for root
 	newRootKeyTUF, err := metadata.KeyFromPublicKey(newRootKey.Public())
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "key conversion failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "key conversion failed", err))
 	}
 	err = roles.Root().Signed.AddKey(newRootKeyTUF, "root")
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "adding key to root failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "adding key to root failed", err))
 	}
 	roles.Root().Signed.Version += 1
 	roles.Root().ClearSignatures()
@@ -435,17 +435,17 @@ func main() {
 	for _, k := range []ed25519.PrivateKey{keys["root"], anotherRootKey, newRootKey} {
 		signer, err := signature.LoadSigner(k, crypto.Hash(0))
 		if err != nil {
-			panic(fmt.Sprintln("basic_repo.go:", "loading a signer failed", err))
+			panic(fmt.Sprintln("basic_repository.go:", "loading a signer failed", err))
 		}
 		_, err = roles.Root().Sign(signer)
 		if err != nil {
-			panic(fmt.Sprintln("basic_repo.go:", "signing root failed", err))
+			panic(fmt.Sprintln("basic_repository.go:", "signing root failed", err))
 		}
 	}
 	filename := fmt.Sprintf("%d.%s.json", roles.Root().Signed.Version, "root")
 	err = roles.Root().ToFile(filepath.Join(tmpDir, filename), true)
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "saving root to file failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "saving root to file failed", err))
 	}
 
 	// Verify again that metadata is signed correctly
@@ -453,31 +453,31 @@ func main() {
 	// Verify root
 	err = roles.Root().VerifyDelegate("root", roles.Root())
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "verifying root metadata failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "verifying root metadata failed", err))
 	}
 
 	// Verify targets
 	err = roles.Root().VerifyDelegate("targets", roles.Targets("targets"))
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "verifying targets metadata failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "verifying targets metadata failed", err))
 	}
 
 	// Verify snapshot
 	err = roles.Root().VerifyDelegate("snapshot", roles.Snapshot())
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "verifying snapshot metadata failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "verifying snapshot metadata failed", err))
 	}
 
 	// Verify timestamp
 	err = roles.Root().VerifyDelegate("timestamp", roles.Timestamp())
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "verifying timestamp metadata failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "verifying timestamp metadata failed", err))
 	}
 
 	// Verify delegatee
 	err = roles.Targets("targets").VerifyDelegate(delegateeName, roles.Targets(delegateeName))
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "verifying delegatee metadata failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "verifying delegatee metadata failed", err))
 	}
 
 	// Use a mixture of key types
@@ -485,33 +485,33 @@ func main() {
 	// Create an RSA key
 	anotherRootKeyRSA, _ := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "RSA key generation failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "RSA key generation failed", err))
 	}
 	anotherKeyRSA, err := metadata.KeyFromPublicKey(anotherRootKeyRSA.Public())
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "RSA key conversion failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "RSA key conversion failed", err))
 	}
 
 	// Create an ECDSA key
 	anotherRootKeyECDSA, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "ECDSA key generation failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "ECDSA key generation failed", err))
 	}
 	anotherKeyECDSA, err := metadata.KeyFromPublicKey(anotherRootKeyECDSA.Public())
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "ECDSA key conversion failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "ECDSA key conversion failed", err))
 	}
 
 	// Add the RSA key to root keys
 	err = roles.Root().Signed.AddKey(anotherKeyRSA, "root")
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "adding RSA key to root failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "adding RSA key to root failed", err))
 	}
 
 	// Add the ECDSA key to root keys
 	err = roles.Root().Signed.AddKey(anotherKeyECDSA, "root")
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "adding ECDSA key to root failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "adding ECDSA key to root failed", err))
 	}
 
 	// Clear existing signatures, bump version and threshold
@@ -523,44 +523,44 @@ func main() {
 	for _, k := range []ed25519.PrivateKey{keys["root"], anotherRootKey, newRootKey} {
 		signer, err := signature.LoadSigner(k, crypto.Hash(0))
 		if err != nil {
-			panic(fmt.Sprintln("basic_repo.go:", "loading a signer failed", err))
+			panic(fmt.Sprintln("basic_repository.go:", "loading a signer failed", err))
 		}
 		_, err = roles.Root().Sign(signer)
 		if err != nil {
-			panic(fmt.Sprintln("basic_repo.go:", "signing root failed", err))
+			panic(fmt.Sprintln("basic_repository.go:", "signing root failed", err))
 		}
 	}
 
 	// Sign root with the new RSA and ECDSA keys
 	outofbandSignerRSA, err := signature.LoadSigner(anotherRootKeyRSA, crypto.SHA256)
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "loading RSA signer failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "loading RSA signer failed", err))
 	}
 	outofbandSignerECDSA, err := signature.LoadSigner(anotherRootKeyECDSA, crypto.SHA256)
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "loading ECDSA signer failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "loading ECDSA signer failed", err))
 	}
 	_, err = roles.Root().Sign(outofbandSignerRSA)
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "signing root failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "signing root failed", err))
 	}
 	_, err = roles.Root().Sign(outofbandSignerECDSA)
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "signing root failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "signing root failed", err))
 	}
 
 	// Verify that root is signed correctly
 	// ====================================
 	err = roles.Root().VerifyDelegate("root", roles.Root())
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "verifying root metadata failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "verifying root metadata failed", err))
 	}
 
 	// Save root to file
 	filename = fmt.Sprintf("%d.%s.json", roles.Root().Signed.Version, "root")
 	err = roles.Root().ToFile(filepath.Join(tmpDir, filename), true)
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "saving root to file failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "saving root to file failed", err))
 	}
 	fmt.Println("Done! Metadata files location:", tmpDir)
 }
@@ -574,7 +574,7 @@ func helperExpireIn(days int) time.Time {
 func helperGetPathForTarget(name string) (string, string) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		panic(fmt.Sprintln("basic_repo.go:", "getting cwd failed", err))
+		panic(fmt.Sprintln("basic_repository.go:", "getting cwd failed", err))
 	}
 	_, dir := filepath.Split(cwd)
 	return filepath.Join(dir, name), filepath.Join(cwd, name)

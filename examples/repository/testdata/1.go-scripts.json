@@ -1,0 +1,22 @@
+{
+	"signed": {
+		"_type": "targets",
+		"spec_version": "1.0.31",
+		"version": 1,
+		"expires": "2022-12-16T00:00:16.544976Z",
+		"targets": {
+			"repository/basic_repository.go": {
+				"length": 23594,
+				"hashes": {
+					"sha256": "105490713c14383c130878c1eb0f4837e4f0b47bcaaff285115c3413e6eed5f4"
+				}
+			}
+		}
+	},
+	"signatures": [
+		{
+			"keyid": "a40e836cb2c2b4ebec806dabc04776d859c74bd6346e9c3e4cc88157d68fffc9",
+			"sig": "fd9112808c961129e0e2a0cd4524451c77901d5577b38a1bbc9ce7b4e2b7fbc0a2c281d0966ea328058e0b2f7a94ee6afb4c47f1e08704dd71e45fef6b5fae0d"
+		}
+	]
+}
