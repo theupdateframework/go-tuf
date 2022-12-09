@@ -14,6 +14,7 @@ import (
 	"github.com/rdimitrov/go-tuf-metadata/metadata/config"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/fetcher"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/trustedmetadata"
+	log "github.com/sirupsen/logrus"
 )
 
 // Client update workflow implementation
@@ -179,7 +180,7 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 	if err != nil {
 		return "", err
 	}
-	fmt.Printf("Downloaded target %s\n", targetFile.Path)
+	log.Debugf("Downloaded target %s", targetFile.Path)
 	return filePath, nil
 }
 
@@ -196,16 +197,10 @@ func (update *Updater) FindCachedTarget(targetFile *metadata.TargetFiles, filePa
 	} else {
 		targetFilePath = filePath
 	}
-	// open the file
-	in, err := os.Open(targetFilePath)
+	// get file content
+	data, err := readFile(targetFilePath)
 	if err != nil {
-		return "", fmt.Errorf("error opening target file - %s", targetFilePath)
-	}
-	defer in.Close()
-	// read its data
-	data, err := io.ReadAll(in)
-	if err != nil {
-		return "", fmt.Errorf("error reading target bytes from file - %s", targetFilePath)
+		return "", err
 	}
 	// verify if this local target file is an up-to-date target
 	err = targetFile.VerifyLengthHashes(data)
@@ -218,26 +213,28 @@ func (update *Updater) FindCachedTarget(targetFile *metadata.TargetFiles, filePa
 
 // loadTimestamp load local and remote timestamp metadata
 func (update *Updater) loadTimestamp() error {
+	// try to read local timestamp
 	data, err := update.loadLocalMetadata(metadata.TIMESTAMP)
-	if err != nil {
-		return err
-	}
-	temp, err := update.trusted.UpdateTimestamp(data)
-	if err != nil {
-		if temp == nil {
+	if err == nil {
+		// try to verify and load it to the trusted metadata set
+		result, err := update.trusted.UpdateTimestamp(data)
+		if result == nil && err != nil {
 			return err
 		}
-		fmt.Printf("Local timestamp not valid as final: %s", err)
+		// proceed if both res and temp are != nil
+		log.Debugf("local timestamp is verified, but expired: %s", err)
 	}
 	// Load from remote (whether local load succeeded or not)
 	data, err = update.downloadMetadata(metadata.TIMESTAMP, update.config.TimestampMaxLength, "")
 	if err != nil {
 		return err
 	}
-	_, err = update.trusted.UpdateTimestamp(data)
-	// TODO: If the new timestamp version is the same as current, discard the
+	// if the new timestamp version is the same as current, discard the
 	// new timestamp. This is normal and it shouldn't raise any error.
-	if err != nil {
+	// a bit hacky, but if both result and err are nil it means new timestamp
+	// version is the same as current
+	result, err := update.trusted.UpdateTimestamp(data)
+	if result == nil && err != nil {
 		return err
 	}
 	err = update.persistMetadata(metadata.TIMESTAMP, data)
@@ -249,17 +246,20 @@ func (update *Updater) loadTimestamp() error {
 
 // loadSnapshot load local (and if needed remote) snapshot metadata
 func (update *Updater) loadSnapshot() error {
+	// try to read local snapshot
 	data, err := update.loadLocalMetadata(metadata.SNAPSHOT)
-	if err != nil {
-		return err
+	if err == nil {
+		// try to verify and load local snapshot to trusted metadata set
+		_, err = update.trusted.UpdateSnapshot(data, true)
+		if err == nil {
+			log.Debugf("Local snapshot is valid: not downloading new one")
+			return nil
+		}
 	}
-	_, err = update.trusted.UpdateSnapshot(data, true)
-	if err != nil {
-		return err
-	} else {
-		fmt.Println("Local snapshot is valid: not downloading new one")
+	// local snapshot does not exist or is invalid, update from remote
+	if update.trusted.Timestamp == nil {
+		return fmt.Errorf("trusted timestamp not set")
 	}
-	// Local snapshot not valid as final
 	snapshotMeta := update.trusted.Timestamp.Signed.Meta[fmt.Sprintf("%s.json", metadata.SNAPSHOT)]
 	length := snapshotMeta.Length
 	if length == 0 {
@@ -291,42 +291,42 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 	if ok {
 		return role, nil
 	}
+	// try to read local targets
 	data, err := update.loadLocalMetadata(roleName)
+	if err == nil {
+		// try to verify and load local targets file to trusted metadata set
+		delegatedTargets, err := update.trusted.UpdateDelegatedTargets(data, roleName, parentName)
+		if err == nil {
+			log.Debugf("Local %s is valid: not downloading new one\n", roleName)
+			return delegatedTargets, nil
+		}
+	}
+	// local 'role' does not exist or is invalid, update from remote
+	if update.trusted.Snapshot == nil {
+		return nil, fmt.Errorf("trusted snapshot not set")
+	}
+	metaInfo := update.trusted.Snapshot.Signed.Meta[fmt.Sprintf("%s.json", roleName)]
+	length := metaInfo.Length
+	if length != 0 {
+		length = update.config.TargetsMaxLength
+	}
+	version := ""
+	if update.trusted.Root.Signed.ConsistentSnapshot {
+		version = strconv.FormatInt(metaInfo.Version, 10)
+	}
+	data, err = update.downloadMetadata(roleName, length, version)
 	if err != nil {
 		return nil, err
 	}
 	delegatedTargets, err := update.trusted.UpdateDelegatedTargets(data, roleName, parentName)
-	if err == nil {
-		fmt.Printf("Local %s is valid: not downloading new one\n", roleName)
-		return delegatedTargets, nil
-	} else {
-		// local 'role' does not exist or is invalid: update from remote
-		if update.trusted.Snapshot != nil {
-			metaInfo := update.trusted.Snapshot.Signed.Meta[fmt.Sprintf("%s.json", roleName)]
-			length := metaInfo.Length
-			if length != 0 {
-				length = update.config.TargetsMaxLength
-			}
-			version := ""
-			if update.trusted.Root.Signed.ConsistentSnapshot {
-				version = strconv.FormatInt(metaInfo.Version, 10)
-			}
-			data, err := update.downloadMetadata(roleName, length, version)
-			if err != nil {
-				return nil, err
-			}
-			delegatedTargets, err := update.trusted.UpdateDelegatedTargets(data, roleName, parentName)
-			if err != nil {
-				return nil, err
-			}
-			err = update.persistMetadata(roleName, data)
-			if err != nil {
-				return nil, err
-			}
-			return delegatedTargets, nil
-		}
+	if err != nil {
 		return nil, err
 	}
+	err = update.persistMetadata(roleName, data)
+	if err != nil {
+		return nil, err
+	}
+	return delegatedTargets, nil
 }
 
 // loadRoot load remote root metadata. Sequentially load and
@@ -341,11 +341,8 @@ func (update *Updater) loadRoot() error {
 	for nextVersion := lowerBound; nextVersion <= upperBound; nextVersion++ {
 		data, err := update.downloadMetadata(metadata.ROOT, update.config.RootMaxLength, strconv.FormatInt(nextVersion, 10))
 		if err != nil {
-			// if err has status codes 403 or 404 it means current root is newest available
-			if strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), "404") {
-				break
-			}
-			return err
+			// current root is newest available
+			break
 		}
 		// verify and load the root data
 		_, err = update.trusted.UpdateRoot(data)
@@ -380,7 +377,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 		// skip any visited current role to prevent cycles.
 		_, ok := visitedRoleNames[delegation.Role]
 		if ok {
-			fmt.Printf("Skipping visited current role %s\n", delegation.Role)
+			log.Debugf("Skipping visited current role %s\n", delegation.Role)
 			continue
 		}
 		// The metadata for 'delegation.Role' must be downloaded/updated before
@@ -391,7 +388,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 		}
 		target, ok := targets.Signed.Targets[targetFilePath]
 		if ok {
-			fmt.Printf("Found target in current role %s\n", delegation.Role)
+			log.Debugf("Found target in current role %s\n", delegation.Role)
 			return &target, nil
 		}
 		// After pre-order check, add current role to set of visited roles.
@@ -402,10 +399,10 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 			// delegated roles.
 			roles := targets.Signed.Delegations.GetRolesForTarget(targetFilePath)
 			for child, terminating := range roles {
-				fmt.Printf("Adding child role %s\n", child)
+				log.Debugf("Adding child role %s", child)
 				childRolesToVisit = append(childRolesToVisit, roleParentTuple{Role: child, Parent: delegation.Role})
 				if terminating {
-					fmt.Println("Not backtracking to other roles")
+					log.Debugf("Not backtracking to other roles")
 				}
 				delegationsToVisit = []roleParentTuple{}
 				break
@@ -418,7 +415,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 		}
 	}
 	if len(delegationsToVisit) > 0 {
-		fmt.Printf("%d roles left to visit, but allowed at most %d delegations",
+		log.Debugf("%d roles left to visit, but allowed at most %d delegations",
 			len(delegationsToVisit),
 			update.config.MaxDelegations)
 	}
@@ -477,16 +474,7 @@ func (update *Updater) generateTargetFilePath(tf *metadata.TargetFiles) (string,
 // loadLocalMetadata reads a local <roleName>.json file and returns its bytes
 func (update *Updater) loadLocalMetadata(roleName string) ([]byte, error) {
 	roleName = fmt.Sprintf("%s.json", url.QueryEscape(roleName))
-	in, err := os.Open(roleName)
-	if err != nil {
-		return nil, fmt.Errorf("error opening metadata file - %s", roleName)
-	}
-	defer in.Close()
-	data, err := io.ReadAll(in)
-	if err != nil {
-		return nil, fmt.Errorf("error reading metadata bytes from file - %s", roleName)
-	}
-	return data, nil
+	return readFile(roleName)
 }
 
 // ensureTrailingSlash ensures url ends with a slash
@@ -502,4 +490,18 @@ func reverseSlice[S ~[]E, E any](s S) {
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
 		s[i], s[j] = s[j], s[i]
 	}
+}
+
+// readFile reads the content of a file and return its bytes
+func readFile(name string) ([]byte, error) {
+	in, err := os.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer in.Close()
+	data, err := io.ReadAll(in)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
