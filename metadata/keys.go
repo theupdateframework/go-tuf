@@ -30,37 +30,37 @@ func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 	case KeyTypeRSASSA_PSS_SHA256:
 		publicKey, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(k.Value.PublicKey))
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal PEM keyval: %w", err)
+			return nil, err
 		}
 		rsaKey, ok := publicKey.(*rsa.PublicKey)
 		if !ok {
 			return nil, fmt.Errorf("invalid rsa public key")
 		}
 		if _, err := x509.MarshalPKIXPublicKey(rsaKey); err != nil {
-			return nil, fmt.Errorf("marshalling to PKIX key failed")
+			return nil, err
 		}
 		return rsaKey, nil
 	case KeyTypeECDSA_SHA2_P256:
 		publicKey, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(k.Value.PublicKey))
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal PEM keyval: %w", err)
+			return nil, err
 		}
 		ecdsaKey, ok := publicKey.(*ecdsa.PublicKey)
 		if !ok {
 			return nil, fmt.Errorf("invalid ecdsa public key")
 		}
 		if _, err := x509.MarshalPKIXPublicKey(ecdsaKey); err != nil {
-			return nil, fmt.Errorf("marshalling to PKIX key failed")
+			return nil, err
 		}
 		return ecdsaKey, nil
 	case KeyTypeEd25519:
 		publicKey, err := hex.DecodeString(k.Value.PublicKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode public ed25519 hex keyval: %w", err)
+			return nil, err
 		}
 		ed25519Key := ed25519.PublicKey(publicKey)
 		if _, err := x509.MarshalPKIXPublicKey(ed25519Key); err != nil {
-			return nil, fmt.Errorf("marshalling to PKIX key: invalid public key")
+			return nil, err
 		}
 		return ed25519Key, nil
 	}
@@ -104,7 +104,7 @@ func KeyFromPublicKey(k crypto.PublicKey) (*Key, error) {
 func (signed *RootType) AddKey(key *Key, role string) error {
 	// verify role is present
 	if _, ok := signed.Roles[role]; !ok {
-		return fmt.Errorf("Role %s doesn't exist", role)
+		return fmt.Errorf("role %s doesn't exist", role)
 	}
 	// add keyID to role
 	if !slices.Contains(signed.Roles[role].KeyIDs, key.ID()) {
@@ -121,11 +121,11 @@ func (signed *RootType) AddKey(key *Key, role string) error {
 func (signed *RootType) RevokeKey(keyID, role string) error {
 	// verify role is present
 	if _, ok := signed.Roles[role]; !ok {
-		return fmt.Errorf("Role %s doesn't exist", role)
+		return fmt.Errorf("role %s doesn't exist", role)
 	}
 	// verify keyID is present for given role
 	if !slices.Contains(signed.Roles[role].KeyIDs, keyID) {
-		return fmt.Errorf("Key with id %s is not used by %s", keyID, role)
+		return fmt.Errorf("key with id %s is not used by %s", keyID, role)
 	}
 	// remove keyID from role
 	filteredKeyIDs := []string{}
@@ -185,7 +185,7 @@ func (signed *TargetsType) RevokeKey(keyID string, role string) error {
 		if d.Name == role {
 			// check if keyID is present in keyIDs for that role
 			if !slices.Contains(d.KeyIDs, keyID) {
-				return fmt.Errorf("Key with id %s is not used by %s", keyID, role)
+				return fmt.Errorf("key with id %s is not used by %s", keyID, role)
 			}
 			// remove keyID from role
 			filteredKeyIDs := []string{}
@@ -215,7 +215,7 @@ func (k *Key) ID() string {
 	k.idOnce.Do(func() {
 		data, err := cjson.EncodeCanonical(k)
 		if err != nil {
-			panic(fmt.Errorf("tuf: error creating key ID: %w", err))
+			panic(fmt.Errorf("error creating key ID: %w", err))
 		}
 		digest := sha256.Sum256(data)
 		k.id = hex.EncodeToString(digest[:])

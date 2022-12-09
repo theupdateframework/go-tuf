@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 )
 
@@ -35,13 +34,9 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, 
 		return nil, err
 	}
 	defer res.Body.Close()
-	// handle bad status codes
-	if res.StatusCode == http.StatusNotFound || res.StatusCode != http.StatusOK {
-		return nil, &url.Error{
-			Op:  "GET",
-			URL: urlPath,
-			Err: fmt.Errorf("unexpected HTTP status %d", res.StatusCode),
-		}
+	// handle HTTP status codes
+	if res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusForbidden || res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to download %s, http status code: %d", urlPath, res.StatusCode)
 	}
 	// get content length
 	length, err := strconv.ParseInt(res.Header.Get("Content-Length"), 10, 0)
