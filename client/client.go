@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 
 	"github.com/theupdateframework/go-tuf/data"
@@ -400,8 +401,8 @@ func (c *Client) getLocalMeta() error {
 		}
 	}
 
+	snapshot := &data.Snapshot{}
 	if snapshotJSON, ok := meta["snapshot.json"]; ok {
-		snapshot := &data.Snapshot{}
 		if err := c.db.UnmarshalTrusted(snapshotJSON, snapshot, "snapshot"); err != nil {
 			loadFailed = true
 			retErr = err
@@ -425,10 +426,31 @@ func (c *Client) getLocalMeta() error {
 		}
 	}
 
+	if loadFailed {
+		// If any of the metadata failed to be verified, return the reason for that failure
+		// and fail fast before delegated targets
+		return retErr
+	}
+
+	verifiedDelegatedTargets := make(map[string]bool)
 	for fileName := range meta {
 		if roles.IsDelegatedTargetsManifest(fileName) {
-			c.localMeta[fileName] = meta[fileName]
+			if delegations, err := c.getDelegationPathFromRaw(snapshot, meta[fileName]); err != nil {
+				loadFailed = true
+				retErr = err
+			} else {
+				for _, key := range delegations {
+					fileName := fmt.Sprintf("%s.json", key)
+					if !verifiedDelegatedTargets[fileName] {
+						verifiedDelegatedTargets[fileName] = true
+					}
+				}
+			}
 		}
+	}
+
+	for fileName := range verifiedDelegatedTargets {
+		c.localMeta[fileName] = meta[fileName]
 	}
 
 	if loadFailed {
@@ -436,6 +458,33 @@ func (c *Client) getLocalMeta() error {
 		return retErr
 	}
 	return nil
+}
+
+// getDelegationPathFromRaw verifies a delegated targets against
+// a given snapshot and returns an error if it's invalid
+//
+// Delegation must have targets to get a path, else an empty list
+// will be returned: this is because the delegation iterator is leveraged.
+func (c *Client) getDelegationPathFromRaw(snapshot *data.Snapshot, delegatedTargetsJSON json.RawMessage) ([]string, error) {
+	// unmarshal the delegated targets first without verifying as
+	// we need at least one targets file name to leverage the
+	// getTargetFileMetaDelegationPath method
+	s := &data.Signed{}
+	if err := json.Unmarshal(delegatedTargetsJSON, s); err != nil {
+		return nil, err
+	}
+	targets := &data.Targets{}
+	if err := json.Unmarshal(s.Signed, targets); err != nil {
+		return nil, err
+	}
+	for targetPath := range targets.Targets {
+		_, resp, err := c.getTargetFileMetaDelegationPath(targetPath, snapshot)
+		// We only need to test one targets file:
+		// - If it is valid, it means the delegated targets has been validated
+		// - If it is not, the delegated targets isn't valid
+		return resp, err
+	}
+	return nil, nil
 }
 
 // loadAndVerifyLocalRootMeta decodes and verifies root metadata from
