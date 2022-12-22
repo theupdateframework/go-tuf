@@ -432,18 +432,19 @@ func (c *Client) getLocalMeta() error {
 		return retErr
 	}
 
+	// verifiedDelegatedTargets is a set of verified delegated targets
 	verifiedDelegatedTargets := make(map[string]bool)
 	for fileName := range meta {
 		if roles.IsDelegatedTargetsManifest(fileName) {
-			if delegations, err := c.getDelegationPathFromRaw(snapshot, meta[fileName]); err != nil {
+			if delegationPath, err := c.getDelegationPathFromRaw(snapshot, meta[fileName]); err != nil {
 				loadFailed = true
 				retErr = err
 			} else {
-				for _, key := range delegations {
+				// Every delegated targets in the path has been verified
+				// as a side effect of getDelegationPathFromRaw
+				for _, key := range delegationPath {
 					fileName := fmt.Sprintf("%s.json", key)
-					if !verifiedDelegatedTargets[fileName] {
-						verifiedDelegatedTargets[fileName] = true
-					}
+					verifiedDelegatedTargets[fileName] = true
 				}
 			}
 		}
@@ -465,6 +466,20 @@ func (c *Client) getLocalMeta() error {
 //
 // Delegation must have targets to get a path, else an empty list
 // will be returned: this is because the delegation iterator is leveraged.
+//
+// Concrete example:
+// targets
+// └── a.json
+//   └── b.json
+//      └── c.json
+//        └── target_file.txt
+//
+// If you try to use that function on "a.json" or "b.json", it'll return an empty list
+// with no error, as neither of them declare a target file
+// On the other hand, if you use that function on "c.json", it'll return & verify
+// [c.json, b.json, a.json]. Running that function on every delegated targets
+// guarantees that if a delegated targets is in the path of a target file, then it will
+// appear at least once in the result
 func (c *Client) getDelegationPathFromRaw(snapshot *data.Snapshot, delegatedTargetsJSON json.RawMessage) ([]string, error) {
 	// unmarshal the delegated targets first without verifying as
 	// we need at least one targets file name to leverage the
