@@ -30,6 +30,8 @@ const (
 	defaultMaxDelegations = 32
 )
 
+var errUninitializedRoot = errors.New("a root must be initialized")
+
 // topLevelMetadata determines the order signatures are verified when committing.
 var topLevelMetadata = []string{
 	"root.json",
@@ -97,6 +99,13 @@ func NewRepoIndent(local LocalStore, prefix string, indent string,
 	if err != nil {
 		return nil, err
 	}
+	// Stage a new root if one isn't present
+	if _, err := r.root(); err != nil && errors.Is(err, errUninitializedRoot) {
+		if _, err = r.NewRoot(); err != nil {
+			return nil, err
+		}
+	}
+
 	return r, nil
 }
 
@@ -119,7 +128,10 @@ func (r *Repo) Init(consistentSnapshot bool) error {
 	if len(t.Targets) > 0 {
 		return ErrInitNotAllowed
 	}
-	root := data.NewRoot()
+	root, err := r.root()
+	if err != nil {
+		return err
+	}
 	root.ConsistentSnapshot = consistentSnapshot
 	// Set root version to 1 for a new root.
 	root.Version = 1
@@ -136,10 +148,19 @@ func (r *Repo) Init(consistentSnapshot bool) error {
 	return nil
 }
 
+func (r *Repo) NewRoot() (*data.Root, error) {
+	root := data.NewRoot()
+	// This will stage the metadata, which means that there won't be any further increments.
+	return root, r.setMeta("root.json", root)
+}
+
 func (r *Repo) topLevelKeysDB() (*verify.DB, error) {
 	db := verify.NewDB()
 	root, err := r.root()
 	if err != nil {
+		if errors.Is(err, errUninitializedRoot) {
+			return db, nil
+		}
 		return nil, err
 	}
 	for id, k := range root.Keys {
@@ -158,7 +179,7 @@ func (r *Repo) topLevelKeysDB() (*verify.DB, error) {
 func (r *Repo) root() (*data.Root, error) {
 	rootJSON, ok := r.meta["root.json"]
 	if !ok {
-		return data.NewRoot(), nil
+		return nil, errUninitializedRoot
 	}
 	s := &data.Signed{}
 	if err := json.Unmarshal(rootJSON, s); err != nil {

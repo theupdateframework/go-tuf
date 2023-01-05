@@ -719,8 +719,8 @@ func (rs *RepoSuite) TestCommit(c *C) {
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
 
-	// commit without root.json
-	c.Assert(r.Commit(), DeepEquals, ErrMissingMetadata{"root.json"})
+	// commit without targets.json
+	c.Assert(r.Commit(), DeepEquals, ErrMissingMetadata{"targets.json"})
 
 	// Init should create targets.json, but not signed yet
 	r.Init(false)

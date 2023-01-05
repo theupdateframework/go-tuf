@@ -124,6 +124,7 @@ func NewRoot() *Root {
 		Expires:            DefaultExpires("root"),
 		Keys:               make(map[string]*PublicKey),
 		Roles:              make(map[string]*Role),
+		Version:            1,
 		ConsistentSnapshot: true,
 	}
 }
