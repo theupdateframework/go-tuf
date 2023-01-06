@@ -435,7 +435,7 @@ func (c *Client) getLocalMeta() error {
 	// verifiedDelegatedTargets is a set of verified delegated targets
 	verifiedDelegatedTargets := make(map[string]bool)
 	for fileName := range meta {
-		if roles.IsDelegatedTargetsManifest(fileName) {
+		if !verifiedDelegatedTargets[fileName] && roles.IsDelegatedTargetsManifest(fileName) {
 			if delegationPath, err := c.getDelegationPathFromRaw(snapshot, meta[fileName]); err != nil {
 				loadFailed = true
 				retErr = err
