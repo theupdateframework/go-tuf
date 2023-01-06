@@ -1,4 +1,4 @@
-PYTHON_TUF=python-tuf-v1.0.0
+PYTHON_TUF=python-tuf-v2.0.0
 
 all:
 	docker build -t tuf-gen ./$(PYTHON_TUF)
