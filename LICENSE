@@ -1,8 +1,8 @@
 Copyright 2022 VMware, Inc.
 
-The BSD-2 license (the "License") set forth below applies to all parts of the go-tuf-metadata project. You may not use this file except in compliance with the License.
+The BSD-2-Clause license (the "License") set forth below applies to all parts of the go-tuf-metadata project. You may not use this file except in compliance with the License.
 
-BSD-2 License
+BSD-2-Clause License
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
