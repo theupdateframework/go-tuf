@@ -26,11 +26,11 @@ by various tech companies and open source organizations.
 
 Please see [TUF's website](https://theupdateframework.com/) for more information about TUF!
 
-## How to use it
+## Getting started
 
 ----------------------------
 
-See the [basic_repo.go](examples/basic_repo.go) example which demonstrates how to *manually* create and
+See the [basic_repository.go](examples/repository/basic_repository.go) example which demonstrates how to *manually* create and
 maintain repository metadata using the low-level Metadata API.
 
 The example highlights the following functionality supported by the metadata API:
@@ -38,7 +38,7 @@ The example highlights the following functionality supported by the metadata API
 * creation of top-level metadata
 * target file handling
 * consistent snapshots
-* key management
+* key management (supports ED25519, RSA and ECDSA key types)
 * top-level delegation and signing thresholds
 * metadata verification
 * target delegation
@@ -64,7 +64,7 @@ or “update workflow”.
 * The example demonstrates how to *manually* create and
 maintain repository metadata using the low-level Metadata API.
 
-### :white_check_mark: - Implement the `trustedmetadata` package
+### :white_check_mark: - Implement client API - `trustedmetadata` package
 
 * A `TrustedMetadata` instance ensures that the collection of metadata in it is valid
 and trusted through the whole client update workflow. It provides easy ways to update
