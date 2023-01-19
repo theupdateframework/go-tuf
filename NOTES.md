@@ -9,3 +9,6 @@
 * Revisit the design - should we use generics or just 4 different types for each metadata?
 * Investigate whether depending on `sigstore/signatures` can cause dependency cycle and if so, how to avoid it?
 * Add support for storing/loading metadata and target files from AWS S3 buckets
+* Make sure keys can be unmarshalled - https://github.com/theupdateframework/go-tuf/issues/363#issuecomment-1227340241
+* Revisit logging
+* Searching through delegations

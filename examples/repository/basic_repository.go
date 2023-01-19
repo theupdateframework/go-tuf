@@ -1,4 +1,4 @@
-// Copyright 2022 VMware, Inc.
+// Copyright 2022-2023 VMware, Inc.
 //
 // This product is licensed to you under the BSD-2 license (the "License").
 // You may not use this product except in compliance with the BSD-2 License.
@@ -74,7 +74,7 @@ func main() {
 	// hash and length of this file at the local path. In addition, it specifies the
 	// 'target path', which a client uses to locate the target file relative to a
 	// configured mirror base URL.
-	// 	   |----base URL---||--------target path--------|
+	//     |----base URL---||--------target path--------|
 	// e.g. tuf-examples.org/examples/basic_repository.py
 	targetPath, localPath := helperGetPathForTarget("basic_repository.go")
 	targetFileInfo, err := metadata.TargetFile().FromFile(localPath, "sha256")
