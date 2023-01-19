@@ -1,5 +1,6 @@
 ![GitHub Workflow Status (with branch)](https://img.shields.io/github/actions/workflow/status/rdimitrov/go-tuf-metadata/ci.yml?branch=main)
 [![codecov](https://codecov.io/github/rdimitrov/go-tuf-metadata/branch/main/graph/badge.svg?token=2ZUA68ZL13)](https://codecov.io/github/rdimitrov/go-tuf-metadata)
+[![Go Reference](https://pkg.go.dev/badge/github.com/rdimitrov/go-tuf-metadata.svg)](https://pkg.go.dev/github.com/rdimitrov/go-tuf-metadata)
 [![License](https://img.shields.io/badge/License-BSD_2--Clause-orange.svg)](https://opensource.org/licenses/BSD-2-Clause)
 
 # <img src="https://cdn.rawgit.com/theupdateframework/artwork/3a649fa6/tuf-logo.svg" height="100" valign="middle" alt="TUF"/> A Framework for Securing Software Update Systems
