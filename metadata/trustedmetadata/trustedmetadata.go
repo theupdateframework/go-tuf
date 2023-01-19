@@ -1,4 +1,4 @@
-// Copyright 2022 VMware, Inc.
+// Copyright 2022-2023 VMware, Inc.
 //
 // This product is licensed to you under the BSD-2 license (the "License").
 // You may not use this product except in compliance with the BSD-2 License.
@@ -66,7 +66,7 @@ func (trusted *TrustedMetadata) loadTrustedRoot(rootData []byte) error {
 	}
 	// save root if verified
 	trusted.Root = newRoot
-	log.Debugf("Loaded trusted root v", trusted.Root.Signed.Version)
+	log.Debugf("Loaded trusted root v%d", trusted.Root.Signed.Version)
 	return nil
 }
 
