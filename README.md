@@ -96,6 +96,8 @@ and can be used to implement various TUF clients with relatively little effort.
 
 ----------------------------
 
+* [go-tuf-metadata documentation](https://pkg.go.dev/github.com/rdimitrov/go-tuf-metadata)
+
 * [Introduction to TUF's Design](https://theupdateframework.io/overview/)
 
 * [The TUF Specification](https://theupdateframework.github.io/specification/latest/)
