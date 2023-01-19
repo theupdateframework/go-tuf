@@ -40,14 +40,12 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - name: Run tests
-        run: go test -race -covermode atomic -coverprofile='profile.cov' ./...
+        run: go test -race -covermode atomic -coverprofile=coverage.out ./...
 
       - name: Send coverage
-        uses: shogo82148/actions-goveralls@31ee804b8576ae49f6dc3caa22591bc5080e7920
+        uses: codecov/codecov-action@v3
         with:
-          path-to-profile: profile.cov
-          flag-name: Go-${{ matrix.go-version }}
-          parallel: true
+          flags: Go-${{ matrix.go-version }}
 
   golangci:
     strategy:
