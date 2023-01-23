@@ -1328,6 +1328,7 @@ func (s *ClientSuite) TestRollbackDelegatedTargets(c *C) {
 	// rollback role.json version.
 	c.Assert(s.store.SetMeta("role.json", oldRole), IsNil)
 	repo, err := tuf.NewRepo(s.store)
+	c.Assert(err, IsNil)
 	c.Assert(repo.Snapshot(), IsNil)
 	c.Assert(repo.Timestamp(), IsNil)
 	c.Assert(repo.Commit(), IsNil)
