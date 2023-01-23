@@ -1223,6 +1223,124 @@ func (s *ClientSuite) TestUpdateHTTP(c *C) {
 	}
 }
 
+// TestRollbackSnapshot tests a rollback version of snapshot.
+func (s *ClientSuite) TestRollbackSnapshot(c *C) {
+	client := s.updatedClient(c)
+
+	// generate a new snapshot & timestamp v2 and sync with the client
+	version := client.snapshotVer
+	c.Assert(version > 0, Equals, true)
+	c.Assert(s.repo.Snapshot(), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
+	s.syncRemote(c)
+	_, err := client.Update()
+	c.Assert(err, IsNil)
+	c.Assert(client.snapshotVer > version, Equals, true)
+
+	// replace remote snapshot.json with old version and timestamp again.
+	s.repo.SetSnapshotVersion(version)
+	c.Assert(s.repo.Snapshot(), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
+	s.syncRemote(c)
+
+	// check update returns ErrLowVersion
+	_, err = client.Update()
+
+	c.Assert(err, DeepEquals, verify.ErrLowVersion{
+		Actual:  version,
+		Current: client.snapshotVer,
+	})
+}
+
+func (s *ClientSuite) TestRollbackTopLevelTargets(c *C) {
+	client := s.updatedClient(c)
+
+	// generate a new targets and sync with the client
+	version := client.targetsVer
+	c.Assert(version > 0, Equals, true)
+	s.addRemoteTarget(c, "bar.txt")
+	_, err := client.Update()
+	c.Assert(err, IsNil)
+	c.Assert(client.targetsVer > version, Equals, true)
+
+	// replace remote snapshot.json with old version and timestamp again.
+	s.repo.SetTargetsVersion(version)
+	c.Assert(s.repo.Snapshot(), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
+	s.syncRemote(c)
+
+	// check update returns ErrLowVersion
+	_, err = client.Update()
+	c.Assert(err, DeepEquals, verify.ErrLowVersion{
+		Actual:  version,
+		Current: client.targetsVer,
+	})
+}
+
+func (s *ClientSuite) TestRollbackDelegatedTargets(c *C) {
+	client := s.updatedClient(c)
+	// add a delegation
+	signer, err := keys.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	role := data.DelegatedRole{
+		Name:      "role",
+		KeyIDs:    signer.PublicData().IDs(),
+		Paths:     []string{"bar.txt", "baz.txt"},
+		Threshold: 1,
+	}
+	s.store.SaveSigner("role", signer)
+	s.repo.AddDelegatedRole("targets", role, []*data.PublicKey{signer.PublicData()})
+	s.repo.AddTargetToPreferredRole("bar.txt", nil, "role")
+	c.Assert(s.repo.Snapshot(), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
+	s.syncRemote(c)
+
+	// save v1 delegation
+	meta, err := s.store.GetMeta()
+	c.Assert(err, IsNil)
+	oldRole, ok := meta["role.json"]
+	if !ok {
+		c.Fatal("missing role.json")
+	}
+	// update client and verify download delegated target
+	_, err = client.Update()
+	c.Assert(err, IsNil)
+	var dest testDestination
+	c.Assert(client.Download("bar.txt", &dest), IsNil)
+
+	// update delegation to v2
+	s.repo.AddTargetToPreferredRole("baz.txt", nil, "role")
+	c.Assert(s.repo.Snapshot(), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
+	s.syncRemote(c)
+
+	// update client and verify download v2 delegated target
+	_, err = client.Update()
+	c.Assert(err, IsNil)
+	c.Assert(dest.Delete(), IsNil)
+	c.Assert(client.Download("baz.txt", &dest), IsNil)
+
+	// rollback role.json version.
+	c.Assert(s.store.SetMeta("role.json", oldRole), IsNil)
+	repo, err := tuf.NewRepo(s.store)
+	c.Assert(repo.Snapshot(), IsNil)
+	c.Assert(repo.Timestamp(), IsNil)
+	c.Assert(repo.Commit(), IsNil)
+	s.syncRemote(c)
+
+	// check update returns ErrLowVersion
+	_, err = client.Update()
+	c.Assert(err, DeepEquals, verify.ErrLowVersion{
+		Actual:  1,
+		Current: 2,
+	})
+}
+
 type testDestination struct {
 	bytes.Buffer
 	deleted bool
