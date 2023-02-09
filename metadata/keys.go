@@ -23,7 +23,6 @@ import (
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
-	"golang.org/x/exp/slices"
 )
 
 const (
@@ -47,6 +46,7 @@ func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 		if !ok {
 			return nil, fmt.Errorf("invalid rsa public key")
 		}
+		// done for verification - ref. https://github.com/theupdateframework/go-tuf/pull/357
 		if _, err := x509.MarshalPKIXPublicKey(rsaKey); err != nil {
 			return nil, err
 		}
@@ -60,6 +60,7 @@ func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 		if !ok {
 			return nil, fmt.Errorf("invalid ecdsa public key")
 		}
+		// done for verification - ref. https://github.com/theupdateframework/go-tuf/pull/357
 		if _, err := x509.MarshalPKIXPublicKey(ecdsaKey); err != nil {
 			return nil, err
 		}
@@ -70,6 +71,7 @@ func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 			return nil, err
 		}
 		ed25519Key := ed25519.PublicKey(publicKey)
+		// done for verification - ref. https://github.com/theupdateframework/go-tuf/pull/357
 		if _, err := x509.MarshalPKIXPublicKey(ed25519Key); err != nil {
 			return nil, err
 		}
@@ -106,119 +108,6 @@ func KeyFromPublicKey(k crypto.PublicKey) (*Key, error) {
 		return nil, fmt.Errorf("unsupported public key type")
 	}
 	return key, nil
-}
-
-// AddKey adds new signing key for delegated role "role"
-// keyID: Identifier of the key to be added for “role“.
-// key: Signing key to be added for “role“.
-// role: Name of the role, for which “key“ is added.
-func (signed *RootType) AddKey(key *Key, role string) error {
-	// verify role is present
-	if _, ok := signed.Roles[role]; !ok {
-		return fmt.Errorf("role %s doesn't exist", role)
-	}
-	// add keyID to role
-	if !slices.Contains(signed.Roles[role].KeyIDs, key.ID()) {
-		signed.Roles[role].KeyIDs = append(signed.Roles[role].KeyIDs, key.ID())
-	}
-	// update Keys
-	signed.Keys[key.ID()] = key
-	return nil
-}
-
-// RevokeKey revoke key from “role“ and updates the Keys store.
-// keyID: Identifier of the key to be removed for “role“.
-// role: Name of the role, for which a signing key is removed.
-func (signed *RootType) RevokeKey(keyID, role string) error {
-	// verify role is present
-	if _, ok := signed.Roles[role]; !ok {
-		return fmt.Errorf("role %s doesn't exist", role)
-	}
-	// verify keyID is present for given role
-	if !slices.Contains(signed.Roles[role].KeyIDs, keyID) {
-		return fmt.Errorf("key with id %s is not used by %s", keyID, role)
-	}
-	// remove keyID from role
-	filteredKeyIDs := []string{}
-	for _, k := range signed.Roles[role].KeyIDs {
-		if k != keyID {
-			filteredKeyIDs = append(filteredKeyIDs, k)
-		}
-	}
-	// overwrite the old keyID slice
-	signed.Roles[role].KeyIDs = filteredKeyIDs
-	// check if keyID is used by other roles too
-	for _, r := range signed.Roles {
-		if slices.Contains(r.KeyIDs, keyID) {
-			return nil
-		}
-	}
-	// delete the keyID from Keys if it's not used anywhere else
-	delete(signed.Keys, keyID)
-	return nil
-}
-
-// AddKey adds new signing key for delegated role "role"
-// key: Signing key to be added for “role“.
-// role: Name of the role, for which “key“ is added.
-func (signed *TargetsType) AddKey(key *Key, role string) error {
-	// check if Delegations are even present
-	if signed.Delegations == nil {
-		return fmt.Errorf("delegated role %s doesn't exist", role)
-	}
-	// loop through all delegated roles
-	for i, d := range signed.Delegations.Roles {
-		// if role is found
-		if d.Name == role {
-			// add key if keyID is not already part of keyIDs for that role
-			if !slices.Contains(d.KeyIDs, key.ID()) {
-				signed.Delegations.Roles[i].KeyIDs = append(signed.Delegations.Roles[i].KeyIDs, key.ID())
-				signed.Delegations.Keys[key.ID()] = key
-				return nil
-			}
-			return fmt.Errorf("delegated role %s already has keyID %s", role, key.ID())
-		}
-	}
-	return fmt.Errorf("delegated role %s doesn't exist", role)
-}
-
-// RevokeKey revokes key from delegated role "role" and updates the delegations key store
-// keyID: Identifier of the key to be removed for “role“.
-// role: Name of the role, for which a signing key is removed.
-func (signed *TargetsType) RevokeKey(keyID string, role string) error {
-	// check if Delegations are even present
-	if signed.Delegations == nil {
-		return fmt.Errorf("delegated role %s doesn't exist", role)
-	}
-	// loop through all delegated roles
-	for i, d := range signed.Delegations.Roles {
-		// if role is found
-		if d.Name == role {
-			// check if keyID is present in keyIDs for that role
-			if !slices.Contains(d.KeyIDs, keyID) {
-				return fmt.Errorf("key with id %s is not used by %s", keyID, role)
-			}
-			// remove keyID from role
-			filteredKeyIDs := []string{}
-			for _, k := range signed.Delegations.Roles[i].KeyIDs {
-				if k != keyID {
-					filteredKeyIDs = append(filteredKeyIDs, k)
-				}
-			}
-			// overwrite the old keyID slice
-			signed.Delegations.Roles[i].KeyIDs = filteredKeyIDs
-			break
-		}
-	}
-	// check if keyID is used by other roles too
-	for _, r := range signed.Delegations.Roles {
-		if slices.Contains(r.KeyIDs, keyID) {
-			return nil
-		}
-	}
-	// delete the keyID from Keys if it's not used anywhere else
-	delete(signed.Delegations.Keys, keyID)
-	return nil
 }
 
 // ID returns the keyID value for the given Key

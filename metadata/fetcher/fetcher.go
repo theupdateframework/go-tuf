@@ -16,6 +16,8 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+
+	"github.com/rdimitrov/go-tuf-metadata/metadata"
 )
 
 // Fetcher interface
@@ -47,7 +49,7 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, 
 	defer res.Body.Close()
 	// handle HTTP status codes
 	if res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusForbidden || res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to download %s, http status code: %d", urlPath, res.StatusCode)
+		return nil, metadata.ErrDownloadHTTP{StatusCode: res.StatusCode, URL: urlPath}
 	}
 	// get content length
 	length, err := strconv.ParseInt(res.Header.Get("Content-Length"), 10, 0)
@@ -56,7 +58,7 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, 
 	}
 	// error if the reported size is greater than what is expected
 	if length > maxLength {
-		return nil, fmt.Errorf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)
+		return nil, metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
 	}
 	// although the size has been checked above, use a LimitReader in case
 	// the reported size is inaccurate, or size is -1 which indicates an

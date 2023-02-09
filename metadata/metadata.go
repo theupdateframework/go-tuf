@@ -18,7 +18,6 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"hash"
 	"io"
@@ -32,7 +31,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-// Root create new metadata instance of type Root
+// Root return new metadata instance of type Root
 func Root(expires ...time.Time) *Metadata[RootType] {
 	// expire now if there's nothing set
 	if len(expires) == 0 {
@@ -46,7 +45,7 @@ func Root(expires ...time.Time) *Metadata[RootType] {
 			Threshold: 1,
 		}
 	}
-	log.Debugf("Created a metadata of type %s expiring at %s", ROOT, expires[0])
+	log.Debugf("Created a metadata of type %s expiring at %s\n", ROOT, expires[0])
 	return &Metadata[RootType]{
 		Signed: RootType{
 			Type:               ROOT,
@@ -61,13 +60,13 @@ func Root(expires ...time.Time) *Metadata[RootType] {
 	}
 }
 
-// Snapshot create new metadata instance of type Snapshot
+// Snapshot return new metadata instance of type Snapshot
 func Snapshot(expires ...time.Time) *Metadata[SnapshotType] {
 	// expire now if there's nothing set
 	if len(expires) == 0 {
 		expires = []time.Time{time.Now().UTC()}
 	}
-	log.Debugf("Created a metadata of type %s expiring at %s", SNAPSHOT, expires[0])
+	log.Debugf("Created a metadata of type %s expiring at %s\n", SNAPSHOT, expires[0])
 	return &Metadata[SnapshotType]{
 		Signed: SnapshotType{
 			Type:        SNAPSHOT,
@@ -84,13 +83,13 @@ func Snapshot(expires ...time.Time) *Metadata[SnapshotType] {
 	}
 }
 
-// Timestamp create new metadata instance of type Timestamp
+// Timestamp return new metadata instance of type Timestamp
 func Timestamp(expires ...time.Time) *Metadata[TimestampType] {
 	// expire now if there's nothing set
 	if len(expires) == 0 {
 		expires = []time.Time{time.Now().UTC()}
 	}
-	log.Debugf("Created a metadata of type %s expiring at %s", TIMESTAMP, expires[0])
+	log.Debugf("Created a metadata of type %s expiring at %s\n", TIMESTAMP, expires[0])
 	return &Metadata[TimestampType]{
 		Signed: TimestampType{
 			Type:        TIMESTAMP,
@@ -107,13 +106,13 @@ func Timestamp(expires ...time.Time) *Metadata[TimestampType] {
 	}
 }
 
-// Targets create new metadata instance of type Targets
+// Targets return new metadata instance of type Targets
 func Targets(expires ...time.Time) *Metadata[TargetsType] {
 	// expire now if there's nothing set
 	if len(expires) == 0 {
 		expires = []time.Time{time.Now().UTC()}
 	}
-	log.Debugf("Created a metadata of type %s expiring at %s", TARGETS, expires[0])
+	log.Debugf("Created a metadata of type %s expiring at %s\n", TARGETS, expires[0])
 	return &Metadata[TargetsType]{
 		Signed: TargetsType{
 			Type:        TARGETS,
@@ -126,7 +125,7 @@ func Targets(expires ...time.Time) *Metadata[TargetsType] {
 	}
 }
 
-// TargetFile create new metadata instance of type TargetFiles
+// TargetFile return new metadata instance of type TargetFiles
 func TargetFile() *TargetFiles {
 	return &TargetFiles{
 		Length: 0,
@@ -134,11 +133,11 @@ func TargetFile() *TargetFiles {
 	}
 }
 
-// MetaFile create new metadata instance of type MetaFile
+// MetaFile return new metadata instance of type MetaFile
 func MetaFile(version int64) *MetaFiles {
 	if version < 1 {
 		// attempting to set incorrect version
-		log.Debugf("Attempting to set incorrect version of %d for MetaFile", version)
+		log.Debugf("Attempting to set incorrect version of %d for MetaFile\n", version)
 		version = 1
 	}
 	return &MetaFiles{
@@ -164,7 +163,7 @@ func (meta *Metadata[T]) FromFile(name string) (*Metadata[T], error) {
 		return nil, err
 	}
 	*meta = *m
-	log.Debugf("Loaded metadata from file %s", name)
+	log.Debugf("Loaded metadata from file %s\n", name)
 	return meta, nil
 }
 
@@ -190,7 +189,7 @@ func (meta *Metadata[T]) ToBytes(pretty bool) ([]byte, error) {
 
 // ToFile save metadata to file
 func (meta *Metadata[T]) ToFile(name string, pretty bool) error {
-	log.Debugf("Writing metadata to file %s", name)
+	log.Debugf("Writing metadata to file %s\n", name)
 	data, err := meta.ToBytes(pretty)
 	if err != nil {
 		return err
@@ -208,7 +207,7 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	// sign the Signed part
 	sb, err := signer.SignMessage(bytes.NewReader(payload))
 	if err != nil {
-		return nil, err
+		return nil, ErrUnsignedMetadata{Msg: "problem signing metadata"}
 	}
 	// get the signer's PublicKey
 	publ, err := signer.PublicKey()
@@ -228,7 +227,7 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	// update the Signatures part
 	meta.Signatures = append(meta.Signatures, *sig)
 	// return the new signature
-	log.Debugf("Signed metadata with key ID: %s", key.ID())
+	log.Infof("Signed metadata with key ID: %s\n", key.ID())
 	return sig, nil
 }
 
@@ -240,7 +239,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegated_role string, delegated_metadat
 	var roleThreshold int
 	signing_keys := map[string]bool{}
 	i := any(meta)
-	log.Debugf("Verifying %s", delegated_role)
+	log.Debugf("Verifying %s\n", delegated_role)
 	// collect keys, keyIDs and threshold based on delegator type
 	switch i := i.(type) {
 	case *Metadata[RootType]:
@@ -249,7 +248,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegated_role string, delegated_metadat
 			roleKeyIDs = role.KeyIDs
 			roleThreshold = role.Threshold
 		} else {
-			return fmt.Errorf("no delegation found for %s", delegated_role)
+			return ErrValue{Msg: fmt.Sprintf("no delegation found for %s", delegated_role)}
 		}
 	case *Metadata[TargetsType]:
 		keys = i.Signed.Delegations.Keys
@@ -261,16 +260,16 @@ func (meta *Metadata[T]) VerifyDelegate(delegated_role string, delegated_metadat
 			}
 		}
 	default:
-		return fmt.Errorf("call is valid only on delegator metadata (root or targets)")
+		return ErrType{Msg: "call is valid only on delegator metadata (should be either root or targets)"}
 	}
 	// if there are no keyIDs for that role it means there's no delegation found
 	if len(roleKeyIDs) == 0 {
-		return fmt.Errorf("no delegation found for %s", delegated_role)
+		return ErrValue{Msg: fmt.Sprintf("no delegation found for %s", delegated_role)}
 	}
 	// loop through each role keyID
 	for _, v := range roleKeyIDs {
 		sign := Signature{}
-		payload := []byte{}
+		var payload []byte
 		// convert to a PublicKey type
 		key, err := keys[v].ToPublicKey()
 		if err != nil {
@@ -330,22 +329,24 @@ func (meta *Metadata[T]) VerifyDelegate(delegated_role string, delegated_metadat
 				return err
 			}
 		default:
-			log.Debugf("unknown delegated metadata type")
+			return ErrType{Msg: "unknown delegated metadata type"}
 		}
 		// verify if the signature for that payload corresponds to the given key
-		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payload)); err == nil {
+		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payload)); err != nil {
+			// failed to verify the metadata with that key ID
+			log.Debugf("Failed to verify %s with key ID %s\n", delegated_role, v)
+		} else {
 			// save the verified keyID only if verification passed
 			signing_keys[v] = true
-			log.Debugf("Verified %s with key ID %s", delegated_role, v)
+			log.Debugf("Verified %s with key ID %s\n", delegated_role, v)
 		}
 	}
 	// check if the amount of valid signatures is enough
 	if len(signing_keys) < roleThreshold {
-		log.Debugf("Verifying %s failed, not enough signatures, got %d, want %d", delegated_role, len(signing_keys), roleThreshold)
-		return fmt.Errorf("verifying %s failed", delegated_role)
-
+		log.Infof("Verifying %s failed, not enough signatures, got %d, want %d\n", delegated_role, len(signing_keys), roleThreshold)
+		return ErrUnsignedMetadata{Msg: fmt.Sprintf("Verifying %s failed, not enough signatures, got %d, want %d", delegated_role, len(signing_keys), roleThreshold)}
 	}
-	log.Debugf("Verified %s successfully", delegated_role)
+	log.Infof("Verified %s successfully\n", delegated_role)
 	return nil
 }
 
@@ -406,9 +407,9 @@ func (f *TargetFiles) VerifyLengthHashes(data []byte) error {
 	return nil
 }
 
-// FromFile generates TargetFiles from file
+// FromFile generate TargetFiles from file
 func (t *TargetFiles) FromFile(localPath string, hashes ...string) (*TargetFiles, error) {
-	log.Debugf("Generating target file from file %s", localPath)
+	log.Debugf("Generating target file from file %s\n", localPath)
 	// open file
 	in, err := os.Open(localPath)
 	if err != nil {
@@ -423,9 +424,9 @@ func (t *TargetFiles) FromFile(localPath string, hashes ...string) (*TargetFiles
 	return t.FromBytes(localPath, data, hashes...)
 }
 
-// FromBytes generates TargetFiles from bytes
+// FromBytes generate TargetFiles from bytes
 func (t *TargetFiles) FromBytes(localPath string, data []byte, hashes ...string) (*TargetFiles, error) {
-	log.Debugf("Generating target file from bytes %s", localPath)
+	log.Debugf("Generating target file from bytes %s\n", localPath)
 	var hasher hash.Hash
 	targetFile := &TargetFiles{
 		Hashes: map[string]HexBytes{},
@@ -447,7 +448,7 @@ func (t *TargetFiles) FromBytes(localPath string, data []byte, hashes ...string)
 		case "sha512":
 			hasher = sha512.New()
 		default:
-			return nil, fmt.Errorf("hash calculation failed - unknown hashing algorithm - %s", v)
+			return nil, ErrValue{Msg: fmt.Sprintf("failed generating TargetFile - unsupported hashing algorithm - %s", v)}
 		}
 		_, err := hasher.Write(data)
 		if err != nil {
@@ -461,7 +462,7 @@ func (t *TargetFiles) FromBytes(localPath string, data []byte, hashes ...string)
 
 // ClearSignatures clears Signatures
 func (meta *Metadata[T]) ClearSignatures() {
-	log.Debugf("Cleared signatures")
+	log.Debug("Cleared signatures")
 	meta.Signatures = []Signature{}
 }
 
@@ -469,7 +470,7 @@ func (meta *Metadata[T]) ClearSignatures() {
 // the paths that "DelegatedRole" is trusted to provide
 func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) {
 	if len(role.PathHashPrefixes) > 0 {
-		// TODO
+		// TODO: handle succinct roles
 		return false, nil
 	} else if len(role.Paths) > 0 {
 		for _, pathPattern := range role.Paths {
@@ -479,7 +480,7 @@ func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) 
 	return false, nil
 }
 
-// GetRolesForTarget returns names and terminating status of all
+// GetRolesForTarget return the names and terminating status of all
 // delegated roles who are responsible for targetFilepath
 func (role *Delegations) GetRolesForTarget(targetFilepath string) map[string]bool {
 	res := map[string]bool{}
@@ -491,10 +492,11 @@ func (role *Delegations) GetRolesForTarget(targetFilepath string) map[string]boo
 			}
 		}
 	}
+	// TODO: handle succinct roles
 	return res
 }
 
-// fromBytes returns *Metadata[T] object from bytes and verifies
+// fromBytes return a *Metadata[T] object from bytes and verifies
 // that the data corresponds to the caller struct type
 func fromBytes[T Roles](data []byte) (*Metadata[T], error) {
 	meta := &Metadata[T]{}
@@ -513,19 +515,19 @@ func fromBytes[T Roles](data []byte) (*Metadata[T], error) {
 	return meta, nil
 }
 
-// Verifies if the signature key IDs are unique for that metadata
+// checkUniqueSignatures verifies if the signature key IDs are unique for that metadata
 func checkUniqueSignatures[T Roles](meta Metadata[T]) error {
 	signatures := []string{}
 	for _, sig := range meta.Signatures {
 		if slices.Contains(signatures, sig.KeyID) {
-			return fmt.Errorf("multiple signatures found for key ID %s", sig.KeyID)
+			return ErrValue{Msg: fmt.Sprintf("multiple signatures found for key ID %s", sig.KeyID)}
 		}
 		signatures = append(signatures, sig.KeyID)
 	}
 	return nil
 }
 
-// Verifies if the Generic type used to create the object is the same as the type of the metadata file in bytes
+// checkType verifies if the generic type used to create the object is the same as the type of the metadata file in bytes
 func checkType[T Roles](data []byte) error {
 	var m map[string]any
 	i := any(new(T))
@@ -536,38 +538,40 @@ func checkType[T Roles](data []byte) error {
 	switch i.(type) {
 	case *RootType:
 		if ROOT != signedType {
-			return fmt.Errorf("expected type %s, got - %s", ROOT, signedType)
+			return ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", ROOT, signedType)}
 		}
 	case *SnapshotType:
 		if SNAPSHOT != signedType {
-			return fmt.Errorf("expected type %s, got - %s", SNAPSHOT, signedType)
+			return ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", SNAPSHOT, signedType)}
 		}
 	case *TimestampType:
 		if TIMESTAMP != signedType {
-			return fmt.Errorf("expected type %s, got - %s", TIMESTAMP, signedType)
+			return ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", TIMESTAMP, signedType)}
 		}
 	case *TargetsType:
 		if TARGETS != signedType {
-			return fmt.Errorf("expected type %s, got - %s", TARGETS, signedType)
+			return ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", TARGETS, signedType)}
 		}
 	default:
-		return fmt.Errorf("unrecognized metadata type - %s", signedType)
+		return ErrValue{Msg: fmt.Sprintf("unrecognized metadata type - %s", signedType)}
 	}
 	// all okay
 	return nil
 }
 
+// verifyLength verifies if the passed data has the corresponding length
 func verifyLength(data []byte, length int64) error {
 	len, err := io.Copy(io.Discard, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
 	if length != len {
-		return fmt.Errorf("length verification failed - expected %d, got %d", length, len)
+		return ErrLengthOrHashMismatch{Msg: fmt.Sprintf("length verification failed - expected %d, got %d", length, len)}
 	}
 	return nil
 }
 
+// verifyHashes verifies if the hash of the passed data corresponds to it
 func verifyHashes(data []byte, hashes Hashes) error {
 	var hasher hash.Hash
 	for k, v := range hashes {
@@ -577,42 +581,127 @@ func verifyHashes(data []byte, hashes Hashes) error {
 		case "sha512":
 			hasher = sha512.New()
 		default:
-			return fmt.Errorf("hash verification failed - unknown hashing algorithm - %s", k)
+			return ErrLengthOrHashMismatch{Msg: fmt.Sprintf("hash verification failed - unknown hashing algorithm - %s", k)}
 		}
 		hasher.Write(data)
 		if hex.EncodeToString(v) != hex.EncodeToString(hasher.Sum(nil)) {
-			return fmt.Errorf("hash verification failed - mismatch for algorithm %s", k)
+			return ErrLengthOrHashMismatch{Msg: fmt.Sprintf("hash verification failed - mismatch for algorithm %s", k)}
 		}
 	}
 	return nil
 }
 
-func (b *HexBytes) UnmarshalJSON(data []byte) error {
-	if len(data) < 2 || len(data)%2 != 0 || data[0] != '"' || data[len(data)-1] != '"' {
-		return errors.New("tuf: invalid JSON hex bytes")
+// AddKey adds new signing key for delegated role "role"
+// keyID: Identifier of the key to be added for “role“.
+// key: Signing key to be added for “role“.
+// role: Name of the role, for which “key“ is added.
+func (signed *RootType) AddKey(key *Key, role string) error {
+	// verify role is present
+	if _, ok := signed.Roles[role]; !ok {
+		return ErrValue{Msg: fmt.Sprintf("role %s doesn't exist", role)}
 	}
-	res := make([]byte, hex.DecodedLen(len(data)-2))
-	_, err := hex.Decode(res, data[1:len(data)-1])
-	if err != nil {
-		return err
+	// add keyID to role
+	if !slices.Contains(signed.Roles[role].KeyIDs, key.ID()) {
+		signed.Roles[role].KeyIDs = append(signed.Roles[role].KeyIDs, key.ID())
 	}
-	*b = res
+	// update Keys
+	signed.Keys[key.ID()] = key // TODO: should we check if we don't accidentally override an existing keyID with another key value?
 	return nil
 }
 
-func (b HexBytes) MarshalJSON() ([]byte, error) {
-	res := make([]byte, hex.EncodedLen(len(b))+2)
-	res[0] = '"'
-	res[len(res)-1] = '"'
-	hex.Encode(res[1:], b)
-	return res, nil
+// RevokeKey revoke key from “role“ and updates the Keys store.
+// keyID: Identifier of the key to be removed for “role“.
+// role: Name of the role, for which a signing key is removed.
+func (signed *RootType) RevokeKey(keyID, role string) error {
+	// verify role is present
+	if _, ok := signed.Roles[role]; !ok {
+		return ErrValue{Msg: fmt.Sprintf("role %s doesn't exist", role)}
+	}
+	// verify keyID is present for given role
+	if !slices.Contains(signed.Roles[role].KeyIDs, keyID) {
+		return ErrValue{Msg: fmt.Sprintf("key with id %s is not used by %s", keyID, role)}
+	}
+	// remove keyID from role
+	filteredKeyIDs := []string{}
+	for _, k := range signed.Roles[role].KeyIDs {
+		if k != keyID {
+			filteredKeyIDs = append(filteredKeyIDs, k)
+		}
+	}
+	// overwrite the old keyID slice
+	signed.Roles[role].KeyIDs = filteredKeyIDs
+	// check if keyID is used by other roles too
+	for _, r := range signed.Roles {
+		if slices.Contains(r.KeyIDs, keyID) {
+			return nil
+		}
+	}
+	// delete the keyID from Keys if it's not used anywhere else
+	delete(signed.Keys, keyID)
+	return nil
 }
 
-func (b HexBytes) String() string {
-	return hex.EncodeToString(b)
+// AddKey adds new signing key for delegated role "role"
+// key: Signing key to be added for “role“.
+// role: Name of the role, for which “key“ is added.
+func (signed *TargetsType) AddKey(key *Key, role string) error {
+	// check if Delegations are even present
+	if signed.Delegations == nil {
+		return ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
+	}
+	// loop through all delegated roles
+	for i, d := range signed.Delegations.Roles {
+		// if role is found
+		if d.Name == role {
+			// add key if keyID is not already part of keyIDs for that role
+			if !slices.Contains(d.KeyIDs, key.ID()) {
+				signed.Delegations.Roles[i].KeyIDs = append(signed.Delegations.Roles[i].KeyIDs, key.ID())
+				signed.Delegations.Keys[key.ID()] = key // TODO: should we check if we don't accidentally override an existing keyID with another key value?
+				return nil
+			}
+			log.Debugf("Delegated role %s already has keyID %s\n", role, key.ID())
+		}
+	}
+	// TODO: Handle succinct roles
+	return ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
 }
 
-func PathHexDigest(s string) string {
-	b := sha256.Sum256([]byte(s))
-	return hex.EncodeToString(b[:])
+// RevokeKey revokes key from delegated role "role" and updates the delegations key store
+// keyID: Identifier of the key to be removed for “role“.
+// role: Name of the role, for which a signing key is removed.
+func (signed *TargetsType) RevokeKey(keyID string, role string) error {
+	// check if Delegations are even present
+	if signed.Delegations == nil {
+		return ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
+	}
+	// loop through all delegated roles
+	for i, d := range signed.Delegations.Roles {
+		// if role is found
+		if d.Name == role {
+			// check if keyID is present in keyIDs for that role
+			if !slices.Contains(d.KeyIDs, keyID) {
+				return ErrValue{Msg: fmt.Sprintf("key with id %s is not used by %s", keyID, role)}
+			}
+			// remove keyID from role
+			filteredKeyIDs := []string{}
+			for _, k := range signed.Delegations.Roles[i].KeyIDs {
+				if k != keyID {
+					filteredKeyIDs = append(filteredKeyIDs, k)
+				}
+			}
+			// overwrite the old keyID slice for that role
+			signed.Delegations.Roles[i].KeyIDs = filteredKeyIDs
+			// check if keyID is used by other roles too
+			for _, r := range signed.Delegations.Roles {
+				if slices.Contains(r.KeyIDs, keyID) {
+					return nil
+				}
+			}
+			// delete the keyID from Keys if it's not used anywhere else
+			delete(signed.Delegations.Keys, keyID)
+			return nil
+		}
+	}
+	// TODO: Handle succinct roles
+	return ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
 }

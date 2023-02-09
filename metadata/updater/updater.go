@@ -13,8 +13,10 @@ package updater
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -156,7 +158,7 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 	}
 	if targetBaseURL == "" {
 		if update.targetBaseUrl == "" {
-			return "", fmt.Errorf("targetBaseURL must be set in either DownloadTarget() or the Updater struct")
+			return "", metadata.ErrValue{Msg: "targetBaseURL must be set in either DownloadTarget() or the Updater struct"}
 		}
 		targetBaseURL = update.targetBaseUrl
 	} else {
@@ -173,7 +175,7 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 		}
 		dirName, baseName, ok := strings.Cut(targetFilePath, "/")
 		if !ok {
-			return "", fmt.Errorf("error handling targetFilePath %s, no separator found", targetFilePath)
+			return "", metadata.ErrValue{Msg: fmt.Sprintf("error handling targetFilePath %s, no separator found", targetFilePath)}
 		}
 		targetFilePath = fmt.Sprintf("%s/%s.%s", dirName, hashes, baseName)
 	}
@@ -186,12 +188,12 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 	if err != nil {
 		return "", err
 	}
-	// write the data content to the temporary file
+	// write the data content to file
 	err = os.WriteFile(filePath, data, 0644)
 	if err != nil {
 		return "", err
 	}
-	log.Debugf("Downloaded target %s", targetFile.Path)
+	log.Infof("Downloaded target %s\n", targetFile.Path)
 	return filePath, nil
 }
 
@@ -213,7 +215,7 @@ func (update *Updater) FindCachedTarget(targetFile *metadata.TargetFiles, filePa
 	if err != nil {
 		return "", err
 	}
-	// verify if this local target file is an up-to-date target
+	// verify if the length and hashes of this target file match the expected values
 	err = targetFile.VerifyLengthHashes(data)
 	if err != nil {
 		return "", err
@@ -226,28 +228,42 @@ func (update *Updater) FindCachedTarget(targetFile *metadata.TargetFiles, filePa
 func (update *Updater) loadTimestamp() error {
 	// try to read local timestamp
 	data, err := update.loadLocalMetadata(metadata.TIMESTAMP)
-	if err == nil {
-		// try to verify and load it to the trusted metadata set
-		result, err := update.trusted.UpdateTimestamp(data)
-		if result == nil && err != nil {
-			return err
+	if err != nil {
+		// this means there's no existing local timestamp so we should proceed downloading it without the need to UpdateTimestamp
+		log.Debug("Local timestamp does not exist")
+	} else {
+		// local timestamp exists, let's try to verify it and load it to the trusted metadata set
+		_, err := update.trusted.UpdateTimestamp(data)
+		if err != nil {
+			if errors.Is(err, metadata.ErrRepository{}) {
+				// local timestamp is not valid, proceed downloading from remote; note that this error type includes several other subset errors
+				log.Debug("Local timestamp is not valid")
+			} else {
+				// another error
+				return err
+			}
 		}
-		// proceed if both res and temp are != nil
-		log.Debugf("local timestamp is verified, but expired: %s", err)
+		log.Debug("Local timestamp is valid")
+		// all okay, local timestamp exists and it is valid, nevertheless proceed with downloading from remote
 	}
-	// Load from remote (whether local load succeeded or not)
+	// load from remote (whether local load succeeded or not)
 	data, err = update.downloadMetadata(metadata.TIMESTAMP, update.config.TimestampMaxLength, "")
 	if err != nil {
 		return err
 	}
-	// if the new timestamp version is the same as current, discard the
-	// new timestamp. This is normal and it shouldn't raise any error.
-	// a bit hacky, but if both result and err are nil it means new timestamp
-	// version is the same as current
-	result, err := update.trusted.UpdateTimestamp(data)
-	if result == nil && err != nil {
-		return err
+	// try to verify and load the newly downloaded timestamp
+	_, err = update.trusted.UpdateTimestamp(data)
+	if err != nil {
+		if errors.Is(err, metadata.ErrEqualVersionNumber{}) {
+			// if the new timestamp version is the same as current, discard the
+			// new timestamp; this is normal and it shouldn't raise any error
+			return nil
+		} else {
+			// another error
+			return err
+		}
 	}
+	// proceed with persisting the new timestamp
 	err = update.persistMetadata(metadata.TIMESTAMP, data)
 	if err != nil {
 		return err
@@ -259,80 +275,120 @@ func (update *Updater) loadTimestamp() error {
 func (update *Updater) loadSnapshot() error {
 	// try to read local snapshot
 	data, err := update.loadLocalMetadata(metadata.SNAPSHOT)
-	if err == nil {
-		// try to verify and load local snapshot to trusted metadata set
+	if err != nil {
+		// this means there's no existing local snapshot so we should proceed downloading it without the need to UpdateSnapshot
+		log.Debug("Local snapshot does not exist")
+	} else {
+		// successfully read a local snapshot metadata, so let's try to verify and load it to the trusted metadata set
 		_, err = update.trusted.UpdateSnapshot(data, true)
-		if err == nil {
-			log.Debugf("Local snapshot is valid: not downloading new one")
+		if err != nil {
+			// this means snapshot verification/loading failed
+			if errors.Is(err, metadata.ErrRepository{}) {
+				// local snapshot is not valid, proceed downloading from remote; note that this error type includes several other subset errors
+				log.Debug("Local snapshot is not valid")
+			} else {
+				// another error
+				return err
+			}
+		} else {
+			// this means snapshot verification/loading succeeded
+			log.Debug("Local snapshot is valid: not downloading new one")
 			return nil
 		}
 	}
 	// local snapshot does not exist or is invalid, update from remote
+	log.Debug("Failed to load local snapshot")
 	if update.trusted.Timestamp == nil {
 		return fmt.Errorf("trusted timestamp not set")
 	}
+	// extract the snapshot meta from the trusted timestamp metadata
 	snapshotMeta := update.trusted.Timestamp.Signed.Meta[fmt.Sprintf("%s.json", metadata.SNAPSHOT)]
+	// extract the length of the snapshot metadata to be downloaded
 	length := snapshotMeta.Length
 	if length == 0 {
 		length = update.config.SnapshotMaxLength
 	}
+	// extract which snapshot version should be downloaded in case of consistent snapshots
 	version := ""
 	if update.trusted.Root.Signed.ConsistentSnapshot {
 		version = strconv.FormatInt(snapshotMeta.Version, 10)
 	}
+	// download snapshot metadata
 	data, err = update.downloadMetadata(metadata.SNAPSHOT, length, version)
 	if err != nil {
 		return err
 	}
+	// verify and load the new snapshot
 	_, err = update.trusted.UpdateSnapshot(data, false)
 	if err != nil {
 		return err
 	}
-	err = update.persistMetadata(metadata.TIMESTAMP, data)
+	// persist the new snapshot
+	err = update.persistMetadata(metadata.SNAPSHOT, data)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// loadTargets load local (and if needed remote) metadata for roleName.
+// loadTargets load local (and if needed remote) metadata for roleName
 func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metadata[metadata.TargetsType], error) {
-	// avoid loading 'roleName' more than once during "GetTargetInfo"
+	// avoid loading "roleName" more than once during "GetTargetInfo"
 	role, ok := update.trusted.Targets[roleName]
 	if ok {
 		return role, nil
 	}
 	// try to read local targets
 	data, err := update.loadLocalMetadata(roleName)
-	if err == nil {
-		// try to verify and load local targets file to trusted metadata set
+	if err != nil {
+		// this means there's no existing local target file so we should proceed downloading it without the need to UpdateDelegatedTargets
+		log.Debugf("Local %s does not exist\n", roleName)
+	} else {
+		// successfully read a local targets metadata, so let's try to verify and load it to the trusted metadata set
 		delegatedTargets, err := update.trusted.UpdateDelegatedTargets(data, roleName, parentName)
-		if err == nil {
+		if err != nil {
+			// this means targets verification/loading failed
+			if errors.Is(err, metadata.ErrRepository{}) {
+				// local target file is not valid, proceed downloading from remote; note that this error type includes several other subset errors
+				log.Debugf("Local %s is not valid\n", roleName)
+			} else {
+				// another error
+				return nil, err
+			}
+		} else {
+			// this means targets verification/loading succeeded
 			log.Debugf("Local %s is valid: not downloading new one\n", roleName)
 			return delegatedTargets, nil
 		}
 	}
-	// local 'role' does not exist or is invalid, update from remote
+	// local "roleName" does not exist or is invalid, update from remote
+	log.Debugf("Failed to load local %s\n", roleName)
 	if update.trusted.Snapshot == nil {
 		return nil, fmt.Errorf("trusted snapshot not set")
 	}
+	// extract the targets meta from the trusted snapshot metadata
 	metaInfo := update.trusted.Snapshot.Signed.Meta[fmt.Sprintf("%s.json", roleName)]
+	// extract the length of the target metadata to be downloaded
 	length := metaInfo.Length
 	if length != 0 {
 		length = update.config.TargetsMaxLength
 	}
+	// extract which target metadata version should be downloaded in case of consistent snapshots
 	version := ""
 	if update.trusted.Root.Signed.ConsistentSnapshot {
 		version = strconv.FormatInt(metaInfo.Version, 10)
 	}
+	// download targets metadata
 	data, err = update.downloadMetadata(roleName, length, version)
 	if err != nil {
 		return nil, err
 	}
+	// verify and load the new target metadata
 	delegatedTargets, err := update.trusted.UpdateDelegatedTargets(data, roleName, parentName)
 	if err != nil {
 		return nil, err
 	}
+	// persist the new target metadata
 	err = update.persistMetadata(roleName, data)
 	if err != nil {
 		return nil, err
@@ -348,22 +404,33 @@ func (update *Updater) loadRoot() error {
 	lowerBound := update.trusted.Root.Signed.Version + 1
 	upperBound := lowerBound + update.config.MaxRootRotations
 
-	// loop until we find the latest available version of root
+	// loop until we find the latest available version of root (download -> verify -> load -> persist)
 	for nextVersion := lowerBound; nextVersion <= upperBound; nextVersion++ {
 		data, err := update.downloadMetadata(metadata.ROOT, update.config.RootMaxLength, strconv.FormatInt(nextVersion, 10))
 		if err != nil {
-			// current root is newest available
-			break
-		}
-		// verify and load the root data
-		_, err = update.trusted.UpdateRoot(data)
-		if err != nil {
+			// downloading the root metadata failed for some reason
+			var downloadErr *metadata.ErrDownloadHTTP
+			if errors.As(err, &downloadErr) {
+				if downloadErr.StatusCode != http.StatusNotFound && downloadErr.StatusCode != http.StatusForbidden {
+					// unexpected HTTP status code
+					return err
+				}
+				// 404/403 means current root is newest available, so we can stop the loop and move forward
+				break
+			}
+			// some other error ocurred
 			return err
-		}
-		// write root to disk
-		err = update.persistMetadata(metadata.ROOT, data)
-		if err != nil {
-			return err
+		} else {
+			// downloading root metadata succeeded, so let's try to verify and load it
+			_, err = update.trusted.UpdateRoot(data)
+			if err != nil {
+				return err
+			}
+			// persist root metadata to disk
+			err = update.persistMetadata(metadata.ROOT, data)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -410,23 +477,23 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 			// delegated roles.
 			roles := targets.Signed.Delegations.GetRolesForTarget(targetFilePath)
 			for child, terminating := range roles {
-				log.Debugf("Adding child role %s", child)
+				log.Debugf("Adding child role %s\n", child)
 				childRolesToVisit = append(childRolesToVisit, roleParentTuple{Role: child, Parent: delegation.Role})
 				if terminating {
-					log.Debugf("Not backtracking to other roles")
+					log.Debug("Not backtracking to other roles")
 				}
 				delegationsToVisit = []roleParentTuple{}
 				break
 			}
-			// Push 'childRolesToVisit' in reverse order of appearance
-			// onto 'delegationsToVisit'.  Roles are popped from the end of
+			// Push "childRolesToVisit" in reverse order of appearance
+			// onto "delegationsToVisit".  Roles are popped from the end of
 			// the list.
 			reverseSlice(childRolesToVisit)
 			delegationsToVisit = append(delegationsToVisit, childRolesToVisit...)
 		}
 	}
 	if len(delegationsToVisit) > 0 {
-		log.Debugf("%d roles left to visit, but allowed at most %d delegations",
+		log.Debugf("%d roles left to visit, but allowed at most %d delegations\n",
 			len(delegationsToVisit),
 			update.config.MaxDelegations)
 	}
@@ -450,7 +517,11 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 	err = os.WriteFile(file.Name(), data, 0644)
 	if err != nil {
 		// delete the temporary file if there was an error while writing
-		os.Remove(file.Name())
+		errRemove := os.Remove(file.Name())
+		if errRemove != nil {
+			log.Debugf("Failed to delete temporary file: %w\n", errRemove)
+			// writing failed and we return either way so better to use the err message of os.WriteFile
+		}
 		return err
 	}
 	// if all okay, rename the temporary file to the desired one
@@ -476,7 +547,7 @@ func (update *Updater) downloadMetadata(roleName string, length int64, version s
 // generateTargetFilePath generates path from TargetFiles
 func (update *Updater) generateTargetFilePath(tf *metadata.TargetFiles) (string, error) {
 	if update.targetDir == "" {
-		return "", fmt.Errorf("target_dir must be set if filepath is not given")
+		return "", metadata.ErrValue{Msg: "target_dir must be set if filepath is not given"}
 	}
 	// Use URL encoded target path as filename
 	return url.JoinPath(update.targetDir, url.QueryEscape(tf.Path))
