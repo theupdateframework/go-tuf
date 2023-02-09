@@ -62,5 +62,5 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@07db5389c99593f11ad7b44463c2d4233066a9b1
         with:
-          version: v1.49
+          version: v1.51 # has to be pinned and thus manually updated due to https://github.com/golangci/golangci-lint-action/blob/6a290f7d5d488e1e423b0b37fe802c822ca2c08c/README.md?plain=1#L108
           args: --timeout 5m --verbose

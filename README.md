@@ -84,7 +84,7 @@ the metadata with the caller making decisions on what is updated.
 
 * The `fetcher` package defines an interface for abstract network download.
 
-### :construction: - Implement client API - `updater` package
+### :white_check_mark: - Implement client API - `updater` package
 
 * The `updater` package provides an implementation of the TUF client workflow.
 It provides ways to query and download target files securely, while handling the
