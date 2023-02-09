@@ -519,8 +519,7 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 		// delete the temporary file if there was an error while writing
 		errRemove := os.Remove(file.Name())
 		if errRemove != nil {
-			log.Debugf("Failed to delete temporary file: %w\n", errRemove)
-			// writing failed and we return either way so better to use the err message of os.WriteFile
+			log.Debugf("Failed to delete temporary file: %s\n", file.Name())
 		}
 		return err
 	}
