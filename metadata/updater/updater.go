@@ -31,32 +31,32 @@ import (
 )
 
 // Client update workflow implementation
-// The "Updater" provides an implementation of the `TUF client workflow
-// <https://theupdateframework.github.io/specification/latest/#detailed-client-workflow>`_.
+
+type roleParentTuple struct {
+	Role   string
+	Parent string
+}
+
+// The "Updater" provides an implementation of the TUF client workflow (ref. https://theupdateframework.github.io/specification/latest/#detailed-client-workflow).
 // "Updater" provides an API to query available targets and to download them in a
 // secure manner: All downloaded files are verified by signed metadata.
 // High-level description of "Updater" functionality:
 //   - Initializing an "Updater" loads and validates the trusted local root
 //     metadata: This root metadata is used as the source of trust for all other
 //     metadata.
-//   - "Refresh()"" can optionally be called to update and load all top-level
+//   - Refresh() can optionally be called to update and load all top-level
 //     metadata as described in the specification, using both locally cached
 //     metadata and metadata downloaded from the remote repository. If refresh is
 //     not done explicitly, it will happen automatically during the first target
 //     info lookup.
-//   - "Updater" can be used to download targets. For each target:
-//   - "GetTargetInfo()"" is first used to find information about a
+//   - Updater can be used to download targets. For each target:
+//   - GetTargetInfo() is first used to find information about a
 //     specific target. This will load new targets metadata as needed (from
 //     local cache or remote repository).
-//   - "FindCachedTarget()"" can optionally be used to check if a
+//   - FindCachedTarget() can optionally be used to check if a
 //     target file is already locally cached.
-//   - "DownloadTarget()" downloads a target file and ensures it is
+//   - DownloadTarget() downloads a target file and ensures it is
 //     verified correct by the metadata.
-type roleParentTuple struct {
-	Role   string
-	Parent string
-}
-
 type Updater struct {
 	metadataDir     string
 	metadataBaseUrl string
@@ -67,7 +67,7 @@ type Updater struct {
 	fetcher         fetcher.Fetcher
 }
 
-// New creates a new “Updater“ instance and loads trusted root metadata.
+// New creates a new Updater instance and loads trusted root metadata
 func New(metadataDir, metadataBaseUrl, targetDir, targetBaseUrl string, f fetcher.Fetcher) (*Updater, error) {
 	// use the built-in download fetcher if nothing is provided
 	if f == nil {
@@ -100,15 +100,13 @@ func New(metadataDir, metadataBaseUrl, targetDir, targetBaseUrl string, f fetche
 // Downloads, verifies, and loads metadata for the top-level roles in the
 // specified order (root -> timestamp -> snapshot -> targets) implementing
 // all the checks required in the TUF client workflow.
-// A Refresh()“ can be done only once during the lifetime of an Updater.
-// If Refresh()“ has not been explicitly called before the first
-// “GetTargetInfo()“ call, it will be done implicitly at that time.
-// The metadata for delegated roles is not updated by Refresh()“:
-// that happens on demand during GetTargetInfo()“. However, if the
-// repository uses `consistent_snapshot
-// <https://theupdateframework.github.io/specification/latest/#consistent-snapshots>`_,
-// then all metadata downloaded by the Updater will use the same consistent
-// repository state.
+// A Refresh() can be done only once during the lifetime of an Updater.
+// If Refresh() has not been explicitly called before the first
+// GetTargetInfo() call, it will be done implicitly at that time.
+// The metadata for delegated roles is not updated by Refresh():
+// that happens on demand during GetTargetInfo(). However, if the
+// repository uses consistent snapshots (ref. https://theupdateframework.github.io/specification/latest/#consistent-snapshots),
+// then all metadata downloaded by the Updater will use the same consistent repository state.
 func (update *Updater) Refresh() error {
 	err := update.loadRoot()
 	if err != nil {
@@ -129,11 +127,11 @@ func (update *Updater) Refresh() error {
 	return nil
 }
 
-// GetTargetInfo returns “metadata.TargetFiles“ instance with information
+// GetTargetInfo returns metadata.TargetFiles instance with information
 // for targetPath. The return value can be used as an argument to
-// “DownloadTarget()“ and “FindCachedTarget()“.
-// If “Refresh()“ has not been called before calling
-// “GetTargetInfo()“, the refresh will be done implicitly.
+// DownloadTarget() and FindCachedTarget().
+// If Refresh() has not been called before calling
+// GetTargetInfo(), the refresh will be done implicitly.
 // As a side-effect this method downloads all the additional (delegated
 // targets) metadata it needs to return the target information.
 func (update *Updater) GetTargetInfo(targetPath string) (*metadata.TargetFiles, error) {
@@ -398,7 +396,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 
 // loadRoot load remote root metadata. Sequentially load and
 // persist on local disk every newer root metadata version
-// available on the remote.
+// available on the remote
 func (update *Updater) loadRoot() error {
 	// calculate boundaries
 	lowerBound := update.trusted.Root.Signed.Version + 1
@@ -441,25 +439,25 @@ func (update *Updater) loadRoot() error {
 // and returns the matching target found in the most trusted role.
 func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.TargetFiles, error) {
 	// list of delegations to be interrogated. A (role, parent role) pair
-	// is needed to load and verify the delegated targets metadata.
+	// is needed to load and verify the delegated targets metadata
 	delegationsToVisit := []roleParentTuple{{
 		Role:   metadata.TARGETS,
 		Parent: metadata.ROOT,
 	}}
 	visitedRoleNames := map[string]bool{}
-	// pre-order depth-first traversal of the graph of target delegations.
+	// pre-order depth-first traversal of the graph of target delegations
 	for len(visitedRoleNames) <= update.config.MaxDelegations && len(delegationsToVisit) > 0 {
-		// pop the role name from the top of the stack.
+		// pop the role name from the top of the stack
 		delegation := delegationsToVisit[len(delegationsToVisit)-1]
 		delegationsToVisit = delegationsToVisit[:len(delegationsToVisit)-1]
-		// skip any visited current role to prevent cycles.
+		// skip any visited current role to prevent cycles
 		_, ok := visitedRoleNames[delegation.Role]
 		if ok {
 			log.Debugf("Skipping visited current role %s\n", delegation.Role)
 			continue
 		}
-		// The metadata for 'delegation.Role' must be downloaded/updated before
-		// its targets, delegations, and child roles can be inspected.
+		// the metadata for delegation.Role must be downloaded/updated before
+		// its targets, delegations, and child roles can be inspected
 		targets, err := update.loadTargets(delegation.Role, delegation.Parent)
 		if err != nil {
 			return nil, err
@@ -469,12 +467,12 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 			log.Debugf("Found target in current role %s\n", delegation.Role)
 			return &target, nil
 		}
-		// After pre-order check, add current role to set of visited roles.
+		// after pre-order check, add current role to set of visited roles
 		visitedRoleNames[delegation.Role] = true
 		if targets.Signed.Delegations != nil {
 			childRolesToVisit := []roleParentTuple{}
-			// NOTE: This may be a slow operation if there are many
-			// delegated roles.
+			// note that this may be a slow operation if there are many
+			// delegated roles
 			roles := targets.Signed.Delegations.GetRolesForTarget(targetFilePath)
 			for child, terminating := range roles {
 				log.Debugf("Adding child role %s\n", child)
@@ -485,9 +483,9 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 				delegationsToVisit = []roleParentTuple{}
 				break
 			}
-			// Push "childRolesToVisit" in reverse order of appearance
-			// onto "delegationsToVisit".  Roles are popped from the end of
-			// the list.
+			// push childRolesToVisit in reverse order of appearance
+			// onto delegationsToVisit. Roles are popped from the end of
+			// the list
 			reverseSlice(childRolesToVisit)
 			delegationsToVisit = append(delegationsToVisit, childRolesToVisit...)
 		}
@@ -497,11 +495,11 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 			len(delegationsToVisit),
 			update.config.MaxDelegations)
 	}
-	// If this point is reached then target is not found, return nil
+	// if this point is reached then target is not found, return nil
 	return nil, fmt.Errorf("target %s not found", targetFilePath)
 }
 
-// persistMetadata writes metadata to disk atomically to avoid data loss.
+// persistMetadata writes metadata to disk atomically to avoid data loss
 func (update *Updater) persistMetadata(roleName string, data []byte) error {
 	fileName := filepath.Join(update.metadataDir, fmt.Sprintf("%s.json", url.QueryEscape(roleName)))
 	cwd, err := os.Getwd()

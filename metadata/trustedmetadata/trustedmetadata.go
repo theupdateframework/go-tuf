@@ -31,14 +31,14 @@ type TrustedMetadata struct {
 // New creates a new TrustedMetadata instance which ensures that the
 // collection of metadata in it is valid and trusted through the whole
 // client update workflow. It provides easy ways to update the metadata
-// with the caller making decisions on what is updated.
+// with the caller making decisions on what is updated
 func New(rootData []byte) (*TrustedMetadata, error) {
 	res := &TrustedMetadata{
 		Targets: map[string]*metadata.Metadata[metadata.TargetsType]{},
 		RefTime: time.Now().UTC(),
 	}
-	// load and validate the local root metadata.
-	// Valid initial trusted root metadata is required
+	// load and validate the local root metadata
+	// valid initial trusted root metadata is required
 	err := res.loadTrustedRoot(rootData)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func New(rootData []byte) (*TrustedMetadata, error) {
 
 // UpdateRoot verifies and loads “rootData“ as new root metadata.
 // Note that an expired intermediate root is considered valid: expiry is
-// only checked for the final root in “UpdateTimestamp()“.
+// only checked for the final root in UpdateTimestamp()
 func (trusted *TrustedMetadata) UpdateRoot(rootData []byte) (*metadata.Metadata[metadata.RootType], error) {
 	if trusted.Timestamp != nil {
 		return nil, metadata.ErrRuntime{Msg: "cannot update root after timestamp"}
