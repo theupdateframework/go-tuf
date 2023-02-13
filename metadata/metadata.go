@@ -474,7 +474,7 @@ func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) 
 		return false, nil
 	} else if len(role.Paths) > 0 {
 		for _, pathPattern := range role.Paths {
-			return filepath.Match(targetFilepath, pathPattern)
+			return filepath.Match(pathPattern, targetFilepath)
 		}
 	}
 	return false, nil
