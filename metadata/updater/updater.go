@@ -407,7 +407,7 @@ func (update *Updater) loadRoot() error {
 		data, err := update.downloadMetadata(metadata.ROOT, update.config.RootMaxLength, strconv.FormatInt(nextVersion, 10))
 		if err != nil {
 			// downloading the root metadata failed for some reason
-			var downloadErr *metadata.ErrDownloadHTTP
+			var downloadErr metadata.ErrDownloadHTTP
 			if errors.As(err, &downloadErr) {
 				if downloadErr.StatusCode != http.StatusNotFound && downloadErr.StatusCode != http.StatusForbidden {
 					// unexpected HTTP status code
