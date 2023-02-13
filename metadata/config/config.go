@@ -31,6 +31,6 @@ func New() *UpdaterConfig {
 		TimestampMaxLength:    16384,   // bytes
 		SnapshotMaxLength:     2000000, // bytes
 		TargetsMaxLength:      5000000, // bytes
-		PrefixTargetsWithHash: true,
+		PrefixTargetsWithHash: false,
 	}
 }
