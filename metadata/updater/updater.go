@@ -368,7 +368,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 	metaInfo := update.trusted.Snapshot.Signed.Meta[fmt.Sprintf("%s.json", roleName)]
 	// extract the length of the target metadata to be downloaded
 	length := metaInfo.Length
-	if length != 0 {
+	if length == 0 {
 		length = update.config.TargetsMaxLength
 	}
 	// extract which target metadata version should be downloaded in case of consistent snapshots
