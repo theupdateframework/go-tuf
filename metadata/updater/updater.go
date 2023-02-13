@@ -211,12 +211,14 @@ func (update *Updater) FindCachedTarget(targetFile *metadata.TargetFiles, filePa
 	// get file content
 	data, err := readFile(targetFilePath)
 	if err != nil {
-		return "", err
+		// do not want to return err, instead we say that there's no cached target available
+		return "", nil
 	}
 	// verify if the length and hashes of this target file match the expected values
 	err = targetFile.VerifyLengthHashes(data)
 	if err != nil {
-		return "", err
+		// do not want to return err, instead we say that there's no cached target available
+		return "", nil
 	}
 	// if all okay, return its path
 	return targetFilePath, nil
@@ -465,6 +467,8 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 		target, ok := targets.Signed.Targets[targetFilePath]
 		if ok {
 			log.Debugf("Found target in current role %s\n", delegation.Role)
+			// Probably not pretty, but populate TargetFiles.Path since this is not handled in fromBytes()
+			target.Path = targetFilePath
 			return &target, nil
 		}
 		// after pre-order check, add current role to set of visited roles
