@@ -138,3 +138,81 @@ func TestTargetsDefaultValues(t *testing.T) {
 	// Signatures
 	assert.Equal(t, []Signature{}, meta.Signatures)
 }
+
+func TestIsDelegatedPath(t *testing.T) {
+	type pathMatch struct {
+		Pattern    []string
+		TargetPath string
+		Expected   bool
+	}
+	// As per - https://theupdateframework.github.io/specification/latest/#pathpattern
+	matches := []pathMatch{
+		// a PATHPATTERN of "targets/*.tgz" would match file paths "targets/foo.tgz" and "targets/bar.tgz", but not "targets/foo.txt".
+		{
+			Pattern:    []string{"targets/*.tgz"},
+			TargetPath: "targets/foo.tgz",
+			Expected:   true,
+		},
+		{
+			Pattern:    []string{"targets/*.tgz"},
+			TargetPath: "targets/bar.tgz",
+			Expected:   true,
+		},
+		{
+			Pattern:    []string{"targets/*.tgz"},
+			TargetPath: "targets/foo.txt",
+			Expected:   false,
+		},
+		// a PATHPATTERN of "foo-version-?.tgz" matches "foo-version-2.tgz" and "foo-version-a.tgz", but not "foo-version-alpha.tgz".
+		{
+			Pattern:    []string{"foo-version-?.tgz"},
+			TargetPath: "foo-version-2.tgz",
+			Expected:   true,
+		},
+		{
+			Pattern:    []string{"foo-version-?.tgz"},
+			TargetPath: "foo-version-a.tgz",
+			Expected:   true,
+		},
+		{
+			Pattern:    []string{"foo-version-?.tgz"},
+			TargetPath: "foo-version-alpha.tgz",
+			Expected:   false,
+		},
+		// a PATHPATTERN of "*.tgz" would match "foo.tgz" and "bar.tgz", but not "targets/foo.tgz"
+		{
+			Pattern:    []string{"*.tgz"},
+			TargetPath: "foo.tgz",
+			Expected:   true,
+		},
+		{
+			Pattern:    []string{"*.tgz"},
+			TargetPath: "bar.tgz",
+			Expected:   true,
+		},
+		{
+			Pattern:    []string{"*.tgz"},
+			TargetPath: "targets/foo.tgz",
+			Expected:   false,
+		},
+		// a PATHPATTERN of "foo.tgz" would match only "foo.tgz"
+		{
+			Pattern:    []string{"foo.tgz"},
+			TargetPath: "foo.tgz",
+			Expected:   true,
+		},
+		{
+			Pattern:    []string{"foo.tgz"},
+			TargetPath: "foosy.tgz",
+			Expected:   false,
+		},
+	}
+	for _, match := range matches {
+		role := &DelegatedRole{
+			Paths: match.Pattern,
+		}
+		ok, err := role.IsDelegatedPath(match.TargetPath)
+		assert.Equal(t, match.Expected, ok)
+		assert.Nil(t, err)
+	}
+}
