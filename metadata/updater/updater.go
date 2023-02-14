@@ -68,7 +68,7 @@ type Updater struct {
 }
 
 // New creates a new Updater instance and loads trusted root metadata
-func New(metadataDir, metadataBaseUrl, targetDir, targetBaseUrl string, f fetcher.Fetcher) (*Updater, error) {
+func New(metadataDir, metadataBaseUrl, targetBaseUrl, targetDir string, f fetcher.Fetcher) (*Updater, error) {
 	// use the built-in download fetcher if nothing is provided
 	if f == nil {
 		f = &fetcher.DefaultFetcher{}
@@ -77,8 +77,8 @@ func New(metadataDir, metadataBaseUrl, targetDir, targetBaseUrl string, f fetche
 	updater := &Updater{
 		metadataDir:     metadataDir,
 		metadataBaseUrl: ensureTrailingSlash(metadataBaseUrl),
-		targetDir:       targetDir,
 		targetBaseUrl:   ensureTrailingSlash(targetBaseUrl),
+		targetDir:       targetDir,
 		config:          config.New(),
 		fetcher:         f,
 	}
