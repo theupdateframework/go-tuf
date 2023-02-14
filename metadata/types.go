@@ -58,7 +58,7 @@ type RootType struct {
 	Expires            time.Time        `json:"expires"`
 	Keys               map[string]*Key  `json:"keys"`
 	Roles              map[string]*Role `json:"roles"`
-	Custom             json.RawMessage  `json:"custom,omitempty"`
+	Custom             *json.RawMessage `json:"custom,omitempty"`
 }
 
 // SnapshotType represents the Signed portion of a snapshot metadata
@@ -68,7 +68,7 @@ type SnapshotType struct {
 	Version     int64                `json:"version"`
 	Expires     time.Time            `json:"expires"`
 	Meta        map[string]MetaFiles `json:"meta"`
-	Custom      json.RawMessage      `json:"custom,omitempty"`
+	Custom      *json.RawMessage     `json:"custom,omitempty"`
 }
 
 // TargetsType represents the Signed portion of a targets metadata
@@ -79,7 +79,7 @@ type TargetsType struct {
 	Expires     time.Time              `json:"expires"`
 	Targets     map[string]TargetFiles `json:"targets"`
 	Delegations *Delegations           `json:"delegations,omitempty"`
-	Custom      json.RawMessage        `json:"custom,omitempty"`
+	Custom      *json.RawMessage       `json:"custom,omitempty"`
 }
 
 // TimestampType represents the Signed portion of a timestamp metadata
@@ -89,15 +89,15 @@ type TimestampType struct {
 	Version     int64                `json:"version"`
 	Expires     time.Time            `json:"expires"`
 	Meta        map[string]MetaFiles `json:"meta"`
-	Custom      json.RawMessage      `json:"custom,omitempty"`
+	Custom      *json.RawMessage     `json:"custom,omitempty"`
 }
 
 // Key represents a key in TUF
 type Key struct {
-	Type   string          `json:"keytype"`
-	Scheme string          `json:"scheme"`
-	Value  KeyVal          `json:"keyval"`
-	Custom json.RawMessage `json:"custom,omitempty"`
+	Type   string           `json:"keytype"`
+	Scheme string           `json:"scheme"`
+	Value  KeyVal           `json:"keyval"`
+	Custom *json.RawMessage `json:"custom,omitempty"`
 	id     string
 	idOnce sync.Once
 }
@@ -118,18 +118,18 @@ type Hashes map[string]HexBytes
 
 // MetaFiles represents the value portion of METAFILES in TUF (used in Snapshot and Timestamp metadata). Used to store information about a particular meta file.
 type MetaFiles struct {
-	Length  int64           `json:"length,omitempty"`
-	Hashes  Hashes          `json:"hashes,omitempty"`
-	Version int64           `json:"version"`
-	Custom  json.RawMessage `json:"custom,omitempty"`
+	Length  int64            `json:"length,omitempty"`
+	Hashes  Hashes           `json:"hashes,omitempty"`
+	Version int64            `json:"version"`
+	Custom  *json.RawMessage `json:"custom,omitempty"`
 }
 
 // TargetFiles represents the value portion of TARGETS in TUF (used Targets metadata). Used to store information about a particular target file.
 type TargetFiles struct {
-	Length int64           `json:"length"`
-	Hashes Hashes          `json:"hashes"`
-	Custom json.RawMessage `json:"custom,omitempty"`
-	Path   string          `json:"-"`
+	Length int64            `json:"length"`
+	Hashes Hashes           `json:"hashes"`
+	Custom *json.RawMessage `json:"custom,omitempty"`
+	Path   string           `json:"-"`
 }
 
 // Delegations is an optional object which represents delegation roles and their corresponding keys
