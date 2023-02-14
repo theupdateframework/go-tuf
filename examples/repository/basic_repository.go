@@ -352,7 +352,7 @@ func main() {
 
 	// Update snapshot to account for changed and new targets(delegatee) metadata
 	roles.Snapshot().Signed.Meta["targets.json"] = *metadata.MetaFile(roles.Targets("targets").Signed.Version)
-	roles.Snapshot().Signed.Meta[delegateeName] = *metadata.MetaFile(1)
+	roles.Snapshot().Signed.Meta[fmt.Sprintf("%s.json", delegateeName)] = *metadata.MetaFile(1)
 	roles.Snapshot().Signed.Version += 1
 
 	// Update timestamp to account for changed snapshot metadata
@@ -587,6 +587,7 @@ func helperGetPathForTarget(name string) (string, string) {
 	if err != nil {
 		panic(fmt.Sprintln("basic_repository.go:", "getting cwd failed", err))
 	}
-	_, dir := filepath.Split(cwd)
-	return filepath.Join(dir, name), filepath.Join(cwd, name)
+	// _, dir := filepath.Split(cwd)
+	// return filepath.Join(dir, name), filepath.Join(cwd, name)
+	return name, filepath.Join(cwd, name)
 }
