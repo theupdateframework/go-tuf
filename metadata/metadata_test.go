@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRootDefaultValues(t *testing.T) {
+func TestDefaultValuesRoot(t *testing.T) {
 	// without setting expiration
 	meta := Root()
 	assert.NotNil(t, meta)
@@ -55,7 +55,7 @@ func TestRootDefaultValues(t *testing.T) {
 	assert.Equal(t, []Signature{}, meta.Signatures)
 }
 
-func TestSnapshotDefaultValues(t *testing.T) {
+func TestDefaultValuesSnapshot(t *testing.T) {
 	// without setting expiration
 	meta := Snapshot()
 	assert.NotNil(t, meta)
@@ -83,7 +83,7 @@ func TestSnapshotDefaultValues(t *testing.T) {
 	assert.Equal(t, []Signature{}, meta.Signatures)
 }
 
-func TestTimestampDefaultValues(t *testing.T) {
+func TestDefaultValuesTimestamp(t *testing.T) {
 	// without setting expiration
 	meta := Timestamp()
 	assert.NotNil(t, meta)
@@ -111,7 +111,7 @@ func TestTimestampDefaultValues(t *testing.T) {
 	assert.Equal(t, []Signature{}, meta.Signatures)
 }
 
-func TestTargetsDefaultValues(t *testing.T) {
+func TestDefaultValuesTargets(t *testing.T) {
 	// without setting expiration
 	meta := Targets()
 	assert.NotNil(t, meta)
@@ -137,6 +137,43 @@ func TestTargetsDefaultValues(t *testing.T) {
 
 	// Signatures
 	assert.Equal(t, []Signature{}, meta.Signatures)
+}
+
+func TestDefaultValuesTargetFile(t *testing.T) {
+	targetFile := TargetFile()
+	assert.NotNil(t, targetFile)
+	assert.Equal(t, int64(0), targetFile.Length)
+	assert.Equal(t, Hashes{}, targetFile.Hashes)
+}
+
+func TestMetaFileDefaultValues(t *testing.T) {
+	version := int64(0)
+	metaFile := MetaFile(version)
+	assert.NotNil(t, metaFile)
+	assert.Equal(t, int64(0), metaFile.Length)
+	assert.Equal(t, Hashes{}, metaFile.Hashes)
+	assert.Equal(t, int64(1), metaFile.Version)
+
+	version = int64(-1)
+	metaFile = MetaFile(version)
+	assert.NotNil(t, metaFile)
+	assert.Equal(t, int64(0), metaFile.Length)
+	assert.Equal(t, Hashes{}, metaFile.Hashes)
+	assert.Equal(t, int64(1), metaFile.Version)
+
+	version = int64(1)
+	metaFile = MetaFile(version)
+	assert.NotNil(t, metaFile)
+	assert.Equal(t, int64(0), metaFile.Length)
+	assert.Equal(t, Hashes{}, metaFile.Hashes)
+	assert.Equal(t, int64(1), metaFile.Version)
+
+	version = int64(2)
+	metaFile = MetaFile(version)
+	assert.NotNil(t, metaFile)
+	assert.Equal(t, int64(0), metaFile.Length)
+	assert.Equal(t, Hashes{}, metaFile.Hashes)
+	assert.Equal(t, int64(2), metaFile.Version)
 }
 
 func TestIsDelegatedPath(t *testing.T) {
@@ -234,4 +271,64 @@ func TestClearSignatures(t *testing.T) {
 	meta.ClearSignatures()
 	// verify signatures is empty
 	assert.Equal(t, []Signature{}, meta.Signatures)
+}
+
+func TestIsExpiredRoot(t *testing.T) {
+	// without setting expiration
+	meta := Root()
+	assert.NotNil(t, meta)
+	// ensure time passed
+	time.Sleep(1 * time.Microsecond)
+	assert.True(t, meta.Signed.IsExpired(time.Now().UTC()))
+
+	// setting expiration in 2 days from now
+	expire := time.Now().AddDate(0, 0, 2).UTC()
+	meta = Root(expire)
+	assert.NotNil(t, meta)
+	assert.False(t, meta.Signed.IsExpired(time.Now().UTC()))
+}
+
+func TestIsExpiredSnapshot(t *testing.T) {
+	// without setting expiration
+	meta := Snapshot()
+	assert.NotNil(t, meta)
+	// ensure time passed
+	time.Sleep(1 * time.Microsecond)
+	assert.True(t, meta.Signed.IsExpired(time.Now().UTC()))
+
+	// setting expiration in 2 days from now
+	expire := time.Now().AddDate(0, 0, 2).UTC()
+	meta = Snapshot(expire)
+	assert.NotNil(t, meta)
+	assert.False(t, meta.Signed.IsExpired(time.Now().UTC()))
+}
+
+func TestIsExpiredTimestamp(t *testing.T) {
+	// without setting expiration
+	meta := Timestamp()
+	assert.NotNil(t, meta)
+	// ensure time passed
+	time.Sleep(1 * time.Microsecond)
+	assert.True(t, meta.Signed.IsExpired(time.Now().UTC()))
+
+	// setting expiration in 2 days from now
+	expire := time.Now().AddDate(0, 0, 2).UTC()
+	meta = Timestamp(expire)
+	assert.NotNil(t, meta)
+	assert.False(t, meta.Signed.IsExpired(time.Now().UTC()))
+}
+
+func TestIsExpiredTargets(t *testing.T) {
+	// without setting expiration
+	meta := Targets()
+	assert.NotNil(t, meta)
+	// ensure time passed
+	time.Sleep(1 * time.Microsecond)
+	assert.True(t, meta.Signed.IsExpired(time.Now().UTC()))
+
+	// setting expiration in 2 days from now
+	expire := time.Now().AddDate(0, 0, 2).UTC()
+	meta = Targets(expire)
+	assert.NotNil(t, meta)
+	assert.False(t, meta.Signed.IsExpired(time.Now().UTC()))
 }
