@@ -51,7 +51,7 @@ func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 			return nil, err
 		}
 		return rsaKey, nil
-	case KeyTypeECDSA_SHA2_P256:
+	case KeyTypeECDSA_SHA2_P256, "ecdsa": // handle "ecdsa" too as python-tuf keys are using it for keytype instead of https://theupdateframework.github.io/specification/latest/index.html#keytype-ecdsa-sha2-nistp256
 		publicKey, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(k.Value.PublicKey))
 		if err != nil {
 			return nil, err
