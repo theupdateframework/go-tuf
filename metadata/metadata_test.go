@@ -216,3 +216,22 @@ func TestIsDelegatedPath(t *testing.T) {
 		assert.Nil(t, err)
 	}
 }
+
+func TestClearSignatures(t *testing.T) {
+	meta := Root()
+	// verify signatures is empty
+	assert.Equal(t, []Signature{}, meta.Signatures)
+	// create a signature
+	sig := &Signature{
+		KeyID:     "keyid",
+		Signature: HexBytes{},
+	}
+	// update the Signatures part
+	meta.Signatures = append(meta.Signatures, *sig)
+	// verify signatures is not empty
+	assert.NotEqual(t, []Signature{}, meta.Signatures)
+	// clear signatures
+	meta.ClearSignatures()
+	// verify signatures is empty
+	assert.Equal(t, []Signature{}, meta.Signatures)
+}
