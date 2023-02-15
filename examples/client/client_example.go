@@ -26,10 +26,10 @@ import (
 
 const (
 	// To experiment with a local repository you can build one with the basic_repository.go example and serve it using a python file server
-	baseURL            = "http://localhost:8000" // "https://jku.github.io/tuf-demo"
+	baseURL            = "http://localhost:8000"
 	baseURLMetadataDir = "metadata"
 	baseURLTargetsDir  = ""
-	targetName         = "basic_repository.go"
+	targetName         = "basic_repo.py"
 	verbosity          = log.InfoLevel
 )
 
@@ -37,77 +37,87 @@ func main() {
 	// set debug level
 	log.SetLevel(verbosity)
 
-	// initialize client with Trust-On-First-Use
-	localMetadataDir, err := InitTofu()
+	// initialize environment - temporary folders, etc.
+	localMetadataDir, err := InitEnvironment()
 	if err != nil {
-		panic(fmt.Sprintln("client_example.go:", "failed to initialize Trust-On-First-Use", err))
+		log.Fatal("Failed to initialize environment: ", err)
+	}
+
+	// initialize client with Trust-On-First-Use
+	err = InitTrustOnFirstUse()
+	if err != nil {
+		log.Fatal("Trust-On-First-Use failed: ", err)
 	}
 
 	// download the desired target
-	err = Download(localMetadataDir, targetName)
+	err = DownloadTarget(localMetadataDir, targetName)
 	if err != nil {
-		panic(fmt.Sprintln("client_example.go:", "failed to download target file", err))
+		log.Fatal("Download failed: ", err)
 	}
-
 }
 
-// InitTofu initialize local trusted metadata (Trust-On-First-Use) and create a
-// directory for downloads
-func InitTofu() (string, error) {
+// InitEnvironment prepares the local environment - temporary folders, etc.
+func InitEnvironment() (string, error) {
 	// get working directory
 	cwd, err := os.Getwd()
 	if err != nil {
-		panic(fmt.Sprintln("client_example.go:", "failed to get current working directory", err))
+		return "", fmt.Errorf("failed to get current working directory: %w", err)
 	}
 
 	// create a temporary folder for storing the demo artifacts
 	tmpDir, err := os.MkdirTemp(cwd, "tmp")
 	if err != nil {
-		panic(fmt.Sprintln("client_example.go:", "failed to create a temporary folder", err))
+		return "", fmt.Errorf("failed to create a temporary folder: %w", err)
 	}
 
 	// create a destination folder for storing the downloaded target
 	err = os.Mkdir(filepath.Join(tmpDir, "download"), 0750)
 	if err != nil {
-		panic(fmt.Sprintln("client_example.go:", "failed to create a download folder", err))
+		return "", fmt.Errorf("failed to create a download folder: %w", err)
+	}
+	return tmpDir, nil
+}
+
+// InitTrustOnFirstUse initialize local trusted metadata (Trust-On-First-Use)
+func InitTrustOnFirstUse() error {
+	// download the initial root metadata so we can bootstrap Trust-On-First-Use
+	rootURL, err := url.JoinPath(baseURL, baseURLMetadataDir, "1.root.json")
+	if err != nil {
+		return fmt.Errorf("failed to create URL path for 1.root.json: %w", err)
 	}
 
-	// download the initial root metadata so we can bootstrap Trust-On-First-Use
-	rootURL, _ := url.JoinPath(baseURL, baseURLMetadataDir, "1.root.json")
 	req, err := http.NewRequest("GET", rootURL, nil)
 	if err != nil {
-		panic(fmt.Sprintln("client_example.go:", "failed to create http request", err))
+		return fmt.Errorf("failed to create http request: %w", err)
 	}
 
 	client := http.DefaultClient
 
 	res, err := client.Do(req)
 	if err != nil {
-		panic(fmt.Sprintln("client_example.go:", "failed to executed the http request", err))
+		return fmt.Errorf("failed to executed the http request: %w", err)
 	}
 
 	defer res.Body.Close()
 
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
-		panic(fmt.Sprintln("client_example.go:", "failed to read the http request body", err))
+		return fmt.Errorf("failed to read the http request body: %w", err)
 	}
 
-	// write the downloaded data content to file
+	// write the downloaded root metadata to file
 	err = os.WriteFile("root.json", data, 0644)
 	if err != nil {
-		panic(fmt.Sprintln("client_example.go:", "failed to write root.json metadata", err))
+		return fmt.Errorf("failed to write root.json metadata: %w", err)
 	}
 
-	log.Info("client_example.go: initialized new root in: ", tmpDir)
-
-	return tmpDir, nil
+	return nil
 }
 
-// Download the target file using Updater. The Updater refreshes the top-level metadata,
+// DownloadTarget downloads the target file using Updater. The Updater refreshes the top-level metadata,
 // get the target information, verifies if the target is already cached, and in case it
 // is not cached, downloads the target file.
-func Download(localMetadataDir, target string) error {
+func DownloadTarget(localMetadataDir, target string) error {
 	metadataBaseURL, _ := url.JoinPath(baseURL, baseURLMetadataDir)
 	targetsBaseURL, _ := url.JoinPath(baseURL, baseURLTargetsDir)
 	// create a new Updater instance
@@ -118,41 +128,37 @@ func Download(localMetadataDir, target string) error {
 		filepath.Join(localMetadataDir, "download"),
 		nil)
 	if err != nil {
-		panic(fmt.Sprintln("client_example.go:", "failed to create Updater instance", err))
+		return fmt.Errorf("failed to create Updater instance: %w", err)
 	}
-
-	log.Info("client_example.go: created a new Updater instance")
 
 	// try to build the top-level metadata
 	err = up.Refresh()
 	if err != nil {
-		panic(fmt.Sprintln("client_example.go:", "failed to Updater.Refresh()", err))
+		return fmt.Errorf("failed to refresh trusted metadata: %w", err)
 	}
-
-	log.Info("client_example.go: updater.Refresh() succeeded")
 
 	// search if the desired target is available
 	targetInfo, err := up.GetTargetInfo(target)
 	if err != nil {
-		panic(fmt.Sprintf("client_example.go: target %s not found - %s\n", target, err))
+		return fmt.Errorf("target %s not found: %w", target, err)
 	}
 
 	// target is available, so let's see if the target is already present locally
 	path, err := up.FindCachedTarget(targetInfo, "")
 	if err != nil {
-		panic(fmt.Sprintln("client_example.go: FindCachedTarget failed", err))
+		return fmt.Errorf("failed while finding a cached target: %w", err)
 	}
 	if path != "" {
-		log.Infof("client_example.go: target %s is already present at - %s\n", target, path)
+		log.Infof("Target %s is already present at - %s\n", target, path)
 	}
 
 	// target is not present locally, so let's try to download it
 	path, err = up.DownloadTarget(targetInfo, "", "")
 	if err != nil {
-		panic(fmt.Sprintf("client_example.go: failed to download target %s - %s\n", target, err))
+		return fmt.Errorf("failed to download target file %s - %w", target, err)
 	}
 	if path != "" {
-		log.Infof("client_example.go: successfully downloaded target %s at - %s\n", target, path)
+		log.Infof("Successfully downloaded target %s at - %s\n", target, path)
 		return nil
 	}
 	return nil
