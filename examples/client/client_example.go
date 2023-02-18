@@ -24,12 +24,12 @@ import (
 	"github.com/rdimitrov/go-tuf-metadata/metadata/updater"
 )
 
+// The following config is used to fetch a target from Jussi's GitHub repository example
 const (
-	// To experiment with a local repository you can build one with the basic_repository.go example and serve it using a python file server
-	baseURL            = "http://localhost:8000"
+	baseURL            = "https://jku.github.io/tuf-demo"
 	baseURLMetadataDir = "metadata"
-	baseURLTargetsDir  = ""
-	targetName         = "basic_repo.py"
+	baseURLTargetsDir  = "targets"
+	targetName         = "file1.txt"
 	verbosity          = log.InfoLevel
 )
 
