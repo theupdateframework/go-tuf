@@ -731,3 +731,446 @@ func (b HexBytes) MarshalJSON() ([]byte, error) {
 func (b HexBytes) String() string {
 	return hex.EncodeToString(b)
 }
+
+func (signed RootType) MarshalJSON() ([]byte, error) {
+	dict := signed.UnrecognizedFields
+	dict["_type"] = signed.Type
+	dict["spec_version"] = signed.SpecVersion
+	dict["consistent_snapshot"] = signed.ConsistentSnapshot
+	dict["version"] = signed.Version
+	dict["expires"] = signed.Expires
+	dict["keys"] = signed.Keys
+	dict["roles"] = signed.Roles
+	if signed.Custom != nil {
+		dict["custom"] = signed.Custom
+	}
+	return json.Marshal(dict)
+}
+
+func (signed *RootType) UnmarshalJSON(data []byte) error {
+	type Alias RootType
+	var s Alias
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	*signed = RootType(s)
+
+	var dict map[string]any
+	if err := json.Unmarshal(data, &dict); err != nil {
+		return err
+	}
+	delete(dict, "_type")
+	delete(dict, "spec_version")
+	delete(dict, "consistent_snapshot")
+	delete(dict, "version")
+	delete(dict, "expires")
+	delete(dict, "keys")
+	delete(dict, "roles")
+	delete(dict, "custom")
+	signed.UnrecognizedFields = dict
+	return nil
+}
+
+func (signed SnapshotType) MarshalJSON() ([]byte, error) {
+	dict := signed.UnrecognizedFields
+	dict["_type"] = signed.Type
+	dict["spec_version"] = signed.SpecVersion
+	dict["version"] = signed.Version
+	dict["expires"] = signed.Expires
+	dict["meta"] = signed.Meta
+	if signed.Custom != nil {
+		dict["custom"] = signed.Custom
+	}
+	return json.Marshal(dict)
+}
+
+func (signed *SnapshotType) UnmarshalJSON(data []byte) error {
+	type Alias SnapshotType
+	var s Alias
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	*signed = SnapshotType(s)
+
+	var dict map[string]any
+	if err := json.Unmarshal(data, &dict); err != nil {
+		return err
+	}
+	delete(dict, "_type")
+	delete(dict, "spec_version")
+	delete(dict, "version")
+	delete(dict, "expires")
+	delete(dict, "meta")
+	delete(dict, "custom")
+	signed.UnrecognizedFields = dict
+	return nil
+}
+
+func (signed TimestampType) MarshalJSON() ([]byte, error) {
+	dict := signed.UnrecognizedFields
+	dict["_type"] = signed.Type
+	dict["spec_version"] = signed.SpecVersion
+	dict["version"] = signed.Version
+	dict["expires"] = signed.Expires
+	dict["meta"] = signed.Meta
+	if signed.Custom != nil {
+		dict["custom"] = signed.Custom
+	}
+	return json.Marshal(dict)
+}
+
+func (signed *TimestampType) UnmarshalJSON(data []byte) error {
+	type Alias TimestampType
+	var s Alias
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	*signed = TimestampType(s)
+
+	var dict map[string]any
+	if err := json.Unmarshal(data, &dict); err != nil {
+		return err
+	}
+	delete(dict, "_type")
+	delete(dict, "spec_version")
+	delete(dict, "version")
+	delete(dict, "expires")
+	delete(dict, "meta")
+	delete(dict, "custom")
+	signed.UnrecognizedFields = dict
+	return nil
+}
+
+func (signed TargetsType) MarshalJSON() ([]byte, error) {
+	dict := signed.UnrecognizedFields
+	dict["_type"] = signed.Type
+	dict["spec_version"] = signed.SpecVersion
+	dict["version"] = signed.Version
+	dict["expires"] = signed.Expires
+	dict["targets"] = signed.Targets
+	if signed.Delegations != nil {
+		dict["delegations"] = signed.Delegations
+	}
+	if signed.Custom != nil {
+		dict["custom"] = signed.Custom
+	}
+	return json.Marshal(dict)
+}
+
+func (signed *TargetsType) UnmarshalJSON(data []byte) error {
+	type Alias TargetsType
+	var s Alias
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	*signed = TargetsType(s)
+
+	var dict map[string]any
+	if err := json.Unmarshal(data, &dict); err != nil {
+		return err
+	}
+	delete(dict, "_type")
+	delete(dict, "spec_version")
+	delete(dict, "version")
+	delete(dict, "expires")
+	delete(dict, "targets")
+	delete(dict, "delegations")
+	delete(dict, "custom")
+	signed.UnrecognizedFields = dict
+	return nil
+}
+
+func (signed MetaFiles) MarshalJSON() ([]byte, error) {
+	dict := signed.UnrecognizedFields
+	if signed.Length != 0 {
+		dict["length"] = signed.Length
+	}
+	if signed.Hashes != nil {
+		dict["hashes"] = signed.Hashes
+	}
+	dict["version"] = signed.Version
+	if signed.Custom != nil {
+		dict["custom"] = signed.Custom
+	}
+	return json.Marshal(dict)
+}
+
+func (signed *MetaFiles) UnmarshalJSON(data []byte) error {
+	type Alias MetaFiles
+	var s Alias
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	*signed = MetaFiles(s)
+
+	var dict map[string]any
+	if err := json.Unmarshal(data, &dict); err != nil {
+		return err
+	}
+	delete(dict, "length")
+	delete(dict, "hashes")
+	delete(dict, "version")
+	delete(dict, "custom")
+	signed.UnrecognizedFields = dict
+	return nil
+}
+
+func (signed TargetFiles) MarshalJSON() ([]byte, error) {
+	dict := signed.UnrecognizedFields
+	dict["length"] = signed.Length
+	dict["hashes"] = signed.Hashes
+	if signed.Custom != nil {
+		dict["custom"] = signed.Custom
+	}
+	return json.Marshal(dict)
+}
+
+func (signed *TargetFiles) UnmarshalJSON(data []byte) error {
+	type Alias TargetFiles
+	var s Alias
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	*signed = TargetFiles(s)
+
+	var dict map[string]any
+	if err := json.Unmarshal(data, &dict); err != nil {
+		return err
+	}
+	delete(dict, "length")
+	delete(dict, "hashes")
+	delete(dict, "custom")
+	signed.UnrecognizedFields = dict
+	return nil
+}
+
+func (k *Key) MarshalJSON() ([]byte, error) {
+	dict := k.UnrecognizedFields
+	dict["keytype"] = k.Type
+	dict["scheme"] = k.Scheme
+	dict["keyval"] = k.Value
+	if k.Custom != nil {
+		dict["custom"] = k.Custom
+	}
+	return json.Marshal(dict)
+}
+
+func (k *Key) UnmarshalJSON(data []byte) error {
+	type Alias Key
+	var a Alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	*k = Key(a)
+
+	var dict map[string]any
+	if err := json.Unmarshal(data, &dict); err != nil {
+		return err
+	}
+	delete(dict, "keytype")
+	delete(dict, "scheme")
+	delete(dict, "keyval")
+	delete(dict, "custom")
+	k.UnrecognizedFields = dict
+	return nil
+}
+
+func (meta *Metadata[T]) MarshalJSON() ([]byte, error) {
+	dict := meta.UnrecognizedFields
+	dict["signed"] = meta.Signed
+	dict["signatures"] = meta.Signatures
+	return json.Marshal(dict)
+}
+
+func (meta *Metadata[T]) UnmarshalJSON(data []byte) error {
+	tmp := any(new(T))
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		return err
+	}
+	switch tmp.(type) {
+	case *RootType:
+		dict := struct {
+			Signed     RootType    `json:"signed"`
+			Signatures []Signature `json:"signatures"`
+		}{}
+		if err := json.Unmarshal(data, &dict); err != nil {
+			return err
+		}
+		var i interface{} = dict.Signed
+		meta.Signed = i.(T)
+		meta.Signatures = dict.Signatures
+	case *SnapshotType:
+		dict := struct {
+			Signed     SnapshotType `json:"signed"`
+			Signatures []Signature  `json:"signatures"`
+		}{}
+		if err := json.Unmarshal(data, &dict); err != nil {
+			return err
+		}
+		var i interface{} = dict.Signed
+		meta.Signed = i.(T)
+		meta.Signatures = dict.Signatures
+	case *TimestampType:
+		dict := struct {
+			Signed     TimestampType `json:"signed"`
+			Signatures []Signature   `json:"signatures"`
+		}{}
+		if err := json.Unmarshal(data, &dict); err != nil {
+			return err
+		}
+		var i interface{} = dict.Signed
+		meta.Signed = i.(T)
+		meta.Signatures = dict.Signatures
+	case *TargetsType:
+		dict := struct {
+			Signed     TargetsType `json:"signed"`
+			Signatures []Signature `json:"signatures"`
+		}{}
+		if err := json.Unmarshal(data, &dict); err != nil {
+			return err
+		}
+		var i interface{} = dict.Signed
+		meta.Signed = i.(T)
+		meta.Signatures = dict.Signatures
+	default:
+		return ErrValue{Msg: "unrecognized metadata type"}
+	}
+	delete(m, "signed")
+	delete(m, "signatures")
+	meta.UnrecognizedFields = m
+	return nil
+}
+
+func (s Signature) MarshalJSON() ([]byte, error) {
+	dict := s.UnrecognizedFields
+	dict["keyid"] = s.KeyID
+	dict["sig"] = s.Signature
+	return json.Marshal(dict)
+}
+
+func (s *Signature) UnmarshalJSON(data []byte) error {
+	type Alias Signature
+	var a Alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	*s = Signature(a)
+
+	var dict map[string]any
+	if err := json.Unmarshal(data, &dict); err != nil {
+		return err
+	}
+	delete(dict, "keyid")
+	delete(dict, "sig")
+	s.UnrecognizedFields = dict
+	return nil
+}
+
+func (kv KeyVal) MarshalJSON() ([]byte, error) {
+	dict := kv.UnrecognizedFields
+	dict["public"] = kv.PublicKey
+	return json.Marshal(dict)
+}
+
+func (kv *KeyVal) UnmarshalJSON(data []byte) error {
+	type Alias KeyVal
+	var a Alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	*kv = KeyVal(a)
+
+	var dict map[string]any
+	if err := json.Unmarshal(data, &dict); err != nil {
+		return err
+	}
+	delete(dict, "public")
+	kv.UnrecognizedFields = dict
+	return nil
+}
+
+func (r *Role) MarshalJSON() ([]byte, error) {
+	dict := r.UnrecognizedFields
+	dict["keyids"] = r.KeyIDs
+	dict["threshold"] = r.Threshold
+	return json.Marshal(dict)
+}
+
+func (r *Role) UnmarshalJSON(data []byte) error {
+	type Alias Role
+	var a Alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	*r = Role(a)
+
+	var dict map[string]any
+	if err := json.Unmarshal(data, &dict); err != nil {
+		return err
+	}
+	delete(dict, "keyids")
+	delete(dict, "threshold")
+	r.UnrecognizedFields = dict
+	return nil
+}
+
+func (d *Delegations) MarshalJSON() ([]byte, error) {
+	dict := d.UnrecognizedFields
+	dict["keys"] = d.Keys
+	dict["roles"] = d.Roles
+	return json.Marshal(dict)
+}
+
+func (d *Delegations) UnmarshalJSON(data []byte) error {
+	type Alias Delegations
+	var a Alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	*d = Delegations(a)
+
+	var dict map[string]any
+	if err := json.Unmarshal(data, &dict); err != nil {
+		return err
+	}
+	delete(dict, "keys")
+	delete(dict, "roles")
+	d.UnrecognizedFields = dict
+	return nil
+}
+
+func (d DelegatedRole) MarshalJSON() ([]byte, error) {
+	dict := d.UnrecognizedFields
+	dict["name"] = d.Name
+	dict["keyids"] = d.KeyIDs
+	dict["threshold"] = d.Threshold
+	dict["terminating"] = d.Terminating
+	dict["paths"] = d.Paths
+	if d.PathHashPrefixes != nil {
+		dict["path_hash_prefixes"] = d.PathHashPrefixes
+	}
+	return json.Marshal(dict)
+}
+
+func (d *DelegatedRole) UnmarshalJSON(data []byte) error {
+	type Alias DelegatedRole
+	var a Alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	*d = DelegatedRole(a)
+
+	var dict map[string]any
+	if err := json.Unmarshal(data, &dict); err != nil {
+		return err
+	}
+	delete(dict, "name")
+	delete(dict, "keyids")
+	delete(dict, "threshold")
+	delete(dict, "terminating")
+	delete(dict, "paths")
+	delete(dict, "path_hash_prefixes")
+	d.UnrecognizedFields = dict
+	return nil
+}
