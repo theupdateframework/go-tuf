@@ -733,7 +733,10 @@ func (b HexBytes) String() string {
 }
 
 func (signed RootType) MarshalJSON() ([]byte, error) {
-	dict := signed.UnrecognizedFields
+	dict := map[string]any{}
+	if signed.UnrecognizedFields != nil {
+		dict = signed.UnrecognizedFields
+	}
 	dict["_type"] = signed.Type
 	dict["spec_version"] = signed.SpecVersion
 	dict["consistent_snapshot"] = signed.ConsistentSnapshot
@@ -772,7 +775,10 @@ func (signed *RootType) UnmarshalJSON(data []byte) error {
 }
 
 func (signed SnapshotType) MarshalJSON() ([]byte, error) {
-	dict := signed.UnrecognizedFields
+	dict := map[string]any{}
+	if signed.UnrecognizedFields != nil {
+		dict = signed.UnrecognizedFields
+	}
 	dict["_type"] = signed.Type
 	dict["spec_version"] = signed.SpecVersion
 	dict["version"] = signed.Version
@@ -807,7 +813,10 @@ func (signed *SnapshotType) UnmarshalJSON(data []byte) error {
 }
 
 func (signed TimestampType) MarshalJSON() ([]byte, error) {
-	dict := signed.UnrecognizedFields
+	dict := map[string]any{}
+	if signed.UnrecognizedFields != nil {
+		dict = signed.UnrecognizedFields
+	}
 	dict["_type"] = signed.Type
 	dict["spec_version"] = signed.SpecVersion
 	dict["version"] = signed.Version
@@ -842,7 +851,10 @@ func (signed *TimestampType) UnmarshalJSON(data []byte) error {
 }
 
 func (signed TargetsType) MarshalJSON() ([]byte, error) {
-	dict := signed.UnrecognizedFields
+	dict := map[string]any{}
+	if signed.UnrecognizedFields != nil {
+		dict = signed.UnrecognizedFields
+	}
 	dict["_type"] = signed.Type
 	dict["spec_version"] = signed.SpecVersion
 	dict["version"] = signed.Version
@@ -881,7 +893,10 @@ func (signed *TargetsType) UnmarshalJSON(data []byte) error {
 }
 
 func (signed MetaFiles) MarshalJSON() ([]byte, error) {
-	dict := signed.UnrecognizedFields
+	dict := map[string]any{}
+	if signed.UnrecognizedFields != nil {
+		dict = signed.UnrecognizedFields
+	}
 	if signed.Length != 0 {
 		dict["length"] = signed.Length
 	}
@@ -916,7 +931,10 @@ func (signed *MetaFiles) UnmarshalJSON(data []byte) error {
 }
 
 func (signed TargetFiles) MarshalJSON() ([]byte, error) {
-	dict := signed.UnrecognizedFields
+	dict := map[string]any{}
+	if signed.UnrecognizedFields != nil {
+		dict = signed.UnrecognizedFields
+	}
 	dict["length"] = signed.Length
 	dict["hashes"] = signed.Hashes
 	if signed.Custom != nil {
@@ -945,7 +963,10 @@ func (signed *TargetFiles) UnmarshalJSON(data []byte) error {
 }
 
 func (k *Key) MarshalJSON() ([]byte, error) {
-	dict := k.UnrecognizedFields
+	dict := map[string]any{}
+	if k.UnrecognizedFields != nil {
+		dict = k.UnrecognizedFields
+	}
 	dict["keytype"] = k.Type
 	dict["scheme"] = k.Scheme
 	dict["keyval"] = k.Value
@@ -976,7 +997,10 @@ func (k *Key) UnmarshalJSON(data []byte) error {
 }
 
 func (meta *Metadata[T]) MarshalJSON() ([]byte, error) {
-	dict := meta.UnrecognizedFields
+	dict := map[string]any{}
+	if meta.UnrecognizedFields != nil {
+		dict = meta.UnrecognizedFields
+	}
 	dict["signed"] = meta.Signed
 	dict["signatures"] = meta.Signatures
 	return json.Marshal(dict)
@@ -1043,7 +1067,10 @@ func (meta *Metadata[T]) UnmarshalJSON(data []byte) error {
 }
 
 func (s Signature) MarshalJSON() ([]byte, error) {
-	dict := s.UnrecognizedFields
+	dict := map[string]any{}
+	if s.UnrecognizedFields != nil {
+		dict = s.UnrecognizedFields
+	}
 	dict["keyid"] = s.KeyID
 	dict["sig"] = s.Signature
 	return json.Marshal(dict)
@@ -1068,7 +1095,10 @@ func (s *Signature) UnmarshalJSON(data []byte) error {
 }
 
 func (kv KeyVal) MarshalJSON() ([]byte, error) {
-	dict := kv.UnrecognizedFields
+	dict := map[string]any{}
+	if kv.UnrecognizedFields != nil {
+		dict = kv.UnrecognizedFields
+	}
 	dict["public"] = kv.PublicKey
 	return json.Marshal(dict)
 }
@@ -1091,7 +1121,10 @@ func (kv *KeyVal) UnmarshalJSON(data []byte) error {
 }
 
 func (r *Role) MarshalJSON() ([]byte, error) {
-	dict := r.UnrecognizedFields
+	dict := map[string]any{}
+	if r.UnrecognizedFields != nil {
+		dict = r.UnrecognizedFields
+	}
 	dict["keyids"] = r.KeyIDs
 	dict["threshold"] = r.Threshold
 	return json.Marshal(dict)
@@ -1116,7 +1149,10 @@ func (r *Role) UnmarshalJSON(data []byte) error {
 }
 
 func (d *Delegations) MarshalJSON() ([]byte, error) {
-	dict := d.UnrecognizedFields
+	dict := map[string]any{}
+	if d.UnrecognizedFields != nil {
+		dict = d.UnrecognizedFields
+	}
 	dict["keys"] = d.Keys
 	dict["roles"] = d.Roles
 	return json.Marshal(dict)
@@ -1141,13 +1177,21 @@ func (d *Delegations) UnmarshalJSON(data []byte) error {
 }
 
 func (d DelegatedRole) MarshalJSON() ([]byte, error) {
-	dict := d.UnrecognizedFields
+	dict := map[string]any{}
+	if d.UnrecognizedFields != nil {
+		dict = d.UnrecognizedFields
+	}
 	dict["name"] = d.Name
 	dict["keyids"] = d.KeyIDs
 	dict["threshold"] = d.Threshold
 	dict["terminating"] = d.Terminating
-	dict["paths"] = d.Paths
-	if d.PathHashPrefixes != nil {
+	// make sure we have only one of the two (per spec)
+	if d.Paths != nil && d.PathHashPrefixes != nil {
+		return nil, ErrValue{Msg: "failed to marshal: not allowed to have both \"paths\" and \"path_hash_prefixes\" present"}
+	}
+	if d.Paths != nil {
+		dict["paths"] = d.Paths
+	} else if d.PathHashPrefixes != nil {
 		dict["path_hash_prefixes"] = d.PathHashPrefixes
 	}
 	return json.Marshal(dict)
