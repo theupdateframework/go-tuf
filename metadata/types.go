@@ -157,6 +157,6 @@ type DelegatedRole struct {
 	Threshold          int            `json:"threshold"`
 	Terminating        bool           `json:"terminating"`
 	PathHashPrefixes   []string       `json:"path_hash_prefixes,omitempty"`
-	Paths              []string       `json:"paths"`
+	Paths              []string       `json:"paths,omitempty"`
 	UnrecognizedFields map[string]any `json:"-"`
 }
