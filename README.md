@@ -52,46 +52,46 @@ The example highlights the following functionality supported by the metadata API
 * writing and reading metadata files
 * root key rotation
 
-## Roadmap
+There's also a [client_example.go](examples/client/client_example.go) which demonstrates how to implement a client using the [updater](metadata/updater/updater.go) package.
+
+* it uses [https://jku.github.io/tuf-demo](https://jku.github.io/tuf-demo), a live TUF repository hosted on GitHub
+* shows an example of how to initialize a client
+* shows an example of how to download a target file
+* it's worth noting that the repository is based on python-tuf so it also highlights the interoperability between the two implementations
+
+## Overview of the implementation
 
 ----------------------------
 
-### :white_check_mark: - Implement the `metadata` API
+### The `metadata` package
 
-* The `metadata` API provides access to a Metadata file abstraction that closely
+* The `metadata` package provides access to a Metadata file abstraction that closely
 follows the TUF specification’s document formats. This API handles de/serialization
 to and from files and bytes, covers also the process to create and verify metadata
 signatures and makes it easier to access and modify metadata content. It is purely
 focused on individual pieces of Metadata and provides no concepts like “repository”
 or “update workflow”.
 
-### :white_check_mark: - Recreate the `basic_repo.py` example
-
-* The example demonstrates how to *manually* create and
-maintain repository metadata using the low-level Metadata API.
-
-### :white_check_mark: - Implement client API - `trustedmetadata` package
+### The `trustedmetadata` package
 
 * A `TrustedMetadata` instance ensures that the collection of metadata in it is valid
 and trusted through the whole client update workflow. It provides easy ways to update
 the metadata with the caller making decisions on what is updated.
 
-### :white_check_mark: - Implement client API - `config` package
+### The `config` package
 
-* The `config` package is used to store ``Updater`` configuration.
+* The `config` package is used to store configuration for an ``Updater`` instance.
 
-### :white_check_mark: - Implement client API - `fetcher` package
+### The `fetcher` package
 
 * The `fetcher` package defines an interface for abstract network download.
 
-### :white_check_mark: - Implement client API - `updater` package
+### The `updater` package
 
 * The `updater` package provides an implementation of the TUF client workflow.
 It provides ways to query and download target files securely, while handling the
 TUF update workflow behind the scenes. It is implemented on top of the Metadata API
 and can be used to implement various TUF clients with relatively little effort.
-
-### :soon: - Implement repository API (standalone package built on top of metadata, to be split into several other tasks)
 
 ## Documentation
 
