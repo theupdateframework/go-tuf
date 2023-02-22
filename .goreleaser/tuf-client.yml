@@ -16,6 +16,7 @@ builds:
       - windows
     goarch:
       - amd64
+      - arm64
     main: ./cmd/tuf-client/
 source:
   enabled: true
