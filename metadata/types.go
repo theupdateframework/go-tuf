@@ -146,7 +146,8 @@ type TargetFiles struct {
 // Delegations is an optional object which represents delegation roles and their corresponding keys
 type Delegations struct {
 	Keys               map[string]*Key `json:"keys"`
-	Roles              []DelegatedRole `json:"roles"`
+	Roles              []DelegatedRole `json:"roles,omitempty"`
+	SuccinctRoles      *SuccinctRoles  `json:"succinct_roles,omitempty"`
 	UnrecognizedFields map[string]any  `json:"-"`
 }
 
@@ -158,5 +159,15 @@ type DelegatedRole struct {
 	Terminating        bool           `json:"terminating"`
 	PathHashPrefixes   []string       `json:"path_hash_prefixes,omitempty"`
 	Paths              []string       `json:"paths,omitempty"`
+	UnrecognizedFields map[string]any `json:"-"`
+}
+
+// SuccinctRoles represents a delegation graph that covers all targets,
+// distributing them uniformly over the delegated roles (i.e. bins) in the graph.
+type SuccinctRoles struct {
+	KeyIDs             []string       `json:"keyids"`
+	Threshold          int            `json:"threshold"`
+	BitLength          int            `json:"bit_length"`
+	NamePrefix         string         `json:"name_prefix"`
 	UnrecognizedFields map[string]any `json:"-"`
 }
