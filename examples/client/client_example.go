@@ -29,7 +29,7 @@ const (
 	baseURL            = "https://jku.github.io/tuf-demo"
 	baseURLMetadataDir = "metadata"
 	baseURLTargetsDir  = "targets"
-	targetName         = "file1.txt"
+	targetName         = "demo/succinctly-delegated-5.txt"
 	verbosity          = log.InfoLevel
 )
 
