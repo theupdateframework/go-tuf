@@ -129,6 +129,7 @@ func InitTrustOnFirstUse(metadataDir string) error {
 func DownloadTarget(localMetadataDir, target string) error {
 	metadataBaseURL, _ := url.JoinPath(baseURL, baseURLMetadataDir)
 	targetsBaseURL, _ := url.JoinPath(baseURL, baseURLTargetsDir)
+
 	// create a new Updater instance
 	up, err := updater.New(
 		localMetadataDir,
@@ -167,9 +168,8 @@ func DownloadTarget(localMetadataDir, target string) error {
 	if err != nil {
 		return fmt.Errorf("failed to download target file %s - %w", target, err)
 	}
-	if path != "" {
-		log.Infof("Successfully downloaded target %s at - %s\n", target, path)
-		return nil
-	}
+
+	log.Infof("Successfully downloaded target %s at - %s\n", target, path)
+
 	return nil
 }

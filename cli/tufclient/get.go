@@ -88,10 +88,8 @@ func GetCmd(target string) error {
 		return fmt.Errorf("failed to download target file %s - %w", target, err)
 	}
 
-	if path != "" {
-		fmt.Printf("Successfully downloaded target %s at - %s\n", target, path)
-		return nil
-	}
+	fmt.Printf("Successfully downloaded target %s at - %s\n", target, path)
+
 	return nil
 }
 
