@@ -342,23 +342,23 @@ func TestCustomField(t *testing.T) {
 	root.Signed.Custom = &testCustomJSON
 	rootJSON, err := root.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"root\",\"spec_version\":\"1.0.31\",\"consistent_snapshot\":true,\"version\":1,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"custom\":{\"test\":true}},\"signatures\":[]}"), rootJSON)
+	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"custom\":{\"test\":true},\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"version\":1},\"signatures\":[]}"), rootJSON)
 
 	targets := Targets(expire)
 	targets.Signed.Custom = &testCustomJSON
 	targetsJSON, err := targets.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"targets\",\"spec_version\":\"1.0.31\",\"version\":1,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"targets\":{},\"custom\":{\"test\":true}},\"signatures\":[]}"), targetsJSON)
+	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"targets\",\"custom\":{\"test\":true},\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"spec_version\":\"1.0.31\",\"targets\":{},\"version\":1},\"signatures\":[]}"), targetsJSON)
 
 	snapshot := Snapshot(expire)
 	snapshot.Signed.Custom = &testCustomJSON
 	snapshotJSON, err := snapshot.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"snapshot\",\"spec_version\":\"1.0.31\",\"version\":1,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"targets.json\":{\"version\":1}},\"custom\":{\"test\":true}},\"signatures\":[]}"), snapshotJSON)
+	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"snapshot\",\"custom\":{\"test\":true},\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"targets.json\":{\"version\":1}},\"spec_version\":\"1.0.31\",\"version\":1},\"signatures\":[]}"), snapshotJSON)
 
 	timestamp := Timestamp(expire)
 	timestamp.Signed.Custom = &testCustomJSON
 	timestampJSON, err := timestamp.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"timestamp\",\"spec_version\":\"1.0.31\",\"version\":1,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"snapshot.json\":{\"version\":1}},\"custom\":{\"test\":true}},\"signatures\":[]}"), timestampJSON)
+	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"timestamp\",\"custom\":{\"test\":true},\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"snapshot.json\":{\"version\":1}},\"spec_version\":\"1.0.31\",\"version\":1},\"signatures\":[]}"), timestampJSON)
 }
