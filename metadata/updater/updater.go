@@ -68,7 +68,13 @@ type Updater struct {
 }
 
 // New creates a new Updater instance and loads trusted root metadata
-func New(metadataDir, metadataBaseUrl, targetBaseUrl, targetDir string, f fetcher.Fetcher) (*Updater, error) {
+func New(metadataDir, metadataBaseUrl, targetBaseUrl, targetDir, trustedRootDir string, f fetcher.Fetcher) (*Updater, error) {
+	// local path of the trusted root metadata file used for bootstrapping
+	rootPath := metadata.ROOT
+	if trustedRootDir != "" {
+		rootPath = filepath.Join(trustedRootDir, rootPath)
+	}
+
 	// use the built-in download fetcher if nothing is provided
 	if f == nil {
 		f = &fetcher.DefaultFetcher{}
@@ -82,8 +88,9 @@ func New(metadataDir, metadataBaseUrl, targetBaseUrl, targetDir string, f fetche
 		config:          config.New(),
 		fetcher:         f,
 	}
+
 	// load the root metadata file used for bootstrapping trust
-	rootBytes, err := updater.loadLocalMetadata(metadata.ROOT)
+	rootBytes, err := updater.loadLocalMetadata(rootPath)
 	if err != nil {
 		return nil, err
 	}
@@ -556,7 +563,7 @@ func (update *Updater) generateTargetFilePath(tf *metadata.TargetFiles) (string,
 
 // loadLocalMetadata reads a local <roleName>.json file and returns its bytes
 func (update *Updater) loadLocalMetadata(roleName string) ([]byte, error) {
-	roleName = fmt.Sprintf("%s.json", url.QueryEscape(roleName))
+	roleName = fmt.Sprintf("%s.json", roleName)
 	return readFile(roleName)
 }
 

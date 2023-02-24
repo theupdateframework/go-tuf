@@ -33,6 +33,15 @@ const (
 	verbosity          = log.InfoLevel
 )
 
+// The following config is used to fetch a target from a local RSTUF deployment
+// const (
+// 	baseURL            = "http://127.0.0.1:8080"
+// 	baseURLMetadataDir = ""
+// 	baseURLTargetsDir  = ""
+// 	targetName         = "file2.tar.gz"
+// 	verbosity          = log.InfoLevel
+// )
+
 func main() {
 	// set debug level
 	log.SetLevel(verbosity)
@@ -44,7 +53,7 @@ func main() {
 	}
 
 	// initialize client with Trust-On-First-Use
-	err = InitTrustOnFirstUse()
+	err = InitTrustOnFirstUse(localMetadataDir)
 	if err != nil {
 		log.Fatal("Trust-On-First-Use failed: ", err)
 	}
@@ -79,7 +88,7 @@ func InitEnvironment() (string, error) {
 }
 
 // InitTrustOnFirstUse initialize local trusted metadata (Trust-On-First-Use)
-func InitTrustOnFirstUse() error {
+func InitTrustOnFirstUse(metadataDir string) error {
 	// download the initial root metadata so we can bootstrap Trust-On-First-Use
 	rootURL, err := url.JoinPath(baseURL, baseURLMetadataDir, "1.root.json")
 	if err != nil {
@@ -106,7 +115,7 @@ func InitTrustOnFirstUse() error {
 	}
 
 	// write the downloaded root metadata to file
-	err = os.WriteFile("root.json", data, 0644)
+	err = os.WriteFile(filepath.Join(metadataDir, "root.json"), data, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write root.json metadata: %w", err)
 	}
@@ -126,6 +135,7 @@ func DownloadTarget(localMetadataDir, target string) error {
 		metadataBaseURL,
 		targetsBaseURL,
 		filepath.Join(localMetadataDir, "download"),
+		localMetadataDir,
 		nil)
 	if err != nil {
 		return fmt.Errorf("failed to create Updater instance: %w", err)
