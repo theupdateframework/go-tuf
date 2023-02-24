@@ -578,7 +578,7 @@ func (role *SuccinctRoles) GetRoles() []string {
 // IsDelegatedRole returns whether the given roleName is in one of
 // the delegated roles that “SuccinctRoles“ represents
 func (role *SuccinctRoles) IsDelegatedRole(roleName string) bool {
-	numberOfBins := int(math.Pow(2, float64(role.BitLength)))
+	numberOfBins := int64(math.Pow(2, float64(role.BitLength)))
 	suffixLen := len(strconv.FormatInt(int64(numberOfBins-1), 16))
 
 	expectedPrefix := fmt.Sprintf("%s-", role.NamePrefix)
@@ -601,7 +601,7 @@ func (role *SuccinctRoles) IsDelegatedRole(roleName string) bool {
 	}
 
 	// check if the bin we calculated is indeed within the range of what we support
-	return (value >= 0) && (int(value) < numberOfBins)
+	return (value >= 0) && (value < numberOfBins)
 }
 
 // fromBytes return a *Metadata[T] object from bytes and verifies
