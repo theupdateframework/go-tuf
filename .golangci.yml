@@ -9,18 +9,16 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 run:
-  # Lint using Go 1.17, since some linters are disabled by default for Go 1.18
-  # until generics are supported.
-  # See https://github.com/golangci/golangci-lint/issues/2649
-  go: "1.17"
-
-linters:
-  disable-all: true
+  linters:
   enable:
-    - staticcheck
     - gofmt
-    - govet
-    - gosimple
-    - unused
-    - typecheck
-    - forbidigo
+    - bodyclose
+    - contextcheck
+    - errname
+    - gocyclo
+    - godot
+    - godox
+    - misspell
+    - stylecheck
+    - whitespace
+    - gocritic

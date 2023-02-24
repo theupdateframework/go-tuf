@@ -26,7 +26,10 @@ All downloaded files are verified by signed metadata.`,
 func Execute() {
 	rootCmd.PersistentFlags().BoolVarP(&Verbosity, "verbose", "v", false, "verbose output")
 	rootCmd.PersistentFlags().StringVarP(&RepositoryURL, "url", "u", "", "URL of the TUF repository")
-	rootCmd.MarkFlagRequired("url")
+	err := rootCmd.MarkFlagRequired("url")
+	if err != nil {
+		os.Exit(1)
+	}
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
