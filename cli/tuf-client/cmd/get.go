@@ -1,4 +1,4 @@
-package tufclient
+package cmd
 
 import (
 	"fmt"
