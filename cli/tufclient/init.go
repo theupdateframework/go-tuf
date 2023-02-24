@@ -46,7 +46,8 @@ func InitializeCmd() error {
 
 	// if there's no root.json file passed, try to download the 1.root.json from the repository URL
 	if rootPath == "" {
-		fmt.Printf("No root.json file was provided. Let's try to download one from %s\n", RepositoryURL)
+
+		fmt.Printf("No root.json file was provided. Trying to download one from %s\n", RepositoryURL)
 		rootPath, err = fetchTrustedRoot(localMetadataDir)
 		if err != nil {
 			return err

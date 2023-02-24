@@ -796,12 +796,10 @@ func (signed *TargetsType) RevokeKey(keyID string, role string) error {
 	}
 	// standard delegated roles
 	if signed.Delegations.Roles != nil {
-		found := false
 		// loop through all delegated roles
 		for i, d := range signed.Delegations.Roles {
 			// if role is found
 			if d.Name == role {
-				found = true
 				// check if keyID is present in keyIDs for that role
 				if !slices.Contains(d.KeyIDs, keyID) {
 					return ErrValue{Msg: fmt.Sprintf("key with id %s is not used by %s", keyID, role)}
@@ -827,9 +825,7 @@ func (signed *TargetsType) RevokeKey(keyID string, role string) error {
 			}
 		}
 		// we haven't found the delegated role
-		if !found {
-			return ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
-		}
+		return ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
 	} else if signed.Delegations.SuccinctRoles != nil {
 		// check if keyID is used by SuccinctRoles role
 		if !slices.Contains(signed.Delegations.SuccinctRoles.KeyIDs, keyID) {
@@ -1127,6 +1123,7 @@ func (key *Key) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &a); err != nil {
 		return err
 	}
+	// nolint
 	*key = Key(a)
 
 	var dict map[string]any
