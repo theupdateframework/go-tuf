@@ -1,3 +1,14 @@
+// Copyright 2022-2023 VMware, Inc.
+//
+// This product is licensed to you under the BSD-2 license (the "License").
+// You may not use this product except in compliance with the BSD-2 License.
+// This product may include a number of subcomponents with separate copyright
+// notices and license terms. Your use of these subcomponents is subject to
+// the terms and conditions of the subcomponent's license, as noted in the
+// LICENSE file.
+//
+// SPDX-License-Identifier: BSD-2-Clause
+
 package cmd
 
 import (
@@ -26,6 +37,10 @@ var getCmd = &cobra.Command{
 	Short:   "Download a target file",
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if RepositoryURL == "" {
+			fmt.Println("Error: required flag(s) \"url\" not set")
+			os.Exit(1)
+		}
 		return GetCmd(args[0])
 	},
 }
@@ -105,8 +120,8 @@ func verifyEnv() (*localConfig, error) {
 	}
 	// start populating what we need
 	env := &localConfig{
-		MetadataDir: filepath.Join(cwd, "metadata"),
-		DownloadDir: filepath.Join(cwd, "download"),
+		MetadataDir: filepath.Join(cwd, DefaultMetadataDir),
+		DownloadDir: filepath.Join(cwd, DefaultDownloadDir),
 		MetadataURL: RepositoryURL,
 		TargetsURL:  targetsURL,
 	}
