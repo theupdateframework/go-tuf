@@ -29,7 +29,7 @@ var RepositoryURL string
 var rootCmd = &cobra.Command{
 	Use:   "tuf-client",
 	Short: "tuf-client - a client-side CLI tool for The Update Framework (TUF)",
-	Long: `tuf-client is a CLI tool that implements the client workflow specified by the The Update Framework (TUF) specification.
+	Long: `tuf-client is a CLI tool that implements the client workflow specified by The Update Framework (TUF) specification.
    
 The tuf-client can be used to query for available targets and to download them in a secure manner.
 

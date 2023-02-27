@@ -32,34 +32,38 @@ by various tech companies and open source organizations.
 
 Please see [TUF's website](https://theupdateframework.com/) for more information about TUF!
 
-## Getting started
+## Overview
 
 ----------------------------
 
-See the [basic_repository.go](examples/repository/basic_repository.go) example which demonstrates how to *manually* create and
-maintain repository metadata using the low-level Metadata API.
+The `go-tuf-metadata` project provides the following functionality:
 
-The example highlights the following functionality supported by the metadata API:
-
-* creation of top-level metadata
-* target file handling
+* creation, reading and writing of metadata
+* easy and straightforward object oriented approach for interacting with metadata
 * consistent snapshots
-* key management (supports ED25519, RSA and ECDSA key types)
-* top-level delegation and signing thresholds
-* metadata verification
-* target delegation
-* in-band and out-of-band metadata signing
-* writing and reading metadata files
-* root key rotation
+* signing and verifying metadata
+* ED25519, RSA and ECDSA key types referenced by the latest TUF specification
+* top-level role delegation
+* target delegation via standard and hash bin delegations
+* use of succinct hash bin delegations which significantly reduce the size of metadata
+* support for unrecognized fields withing the metadata (preserved and accessible through `root.Signed.UnrecognizedFields["some-unknown-field"]`, also used for verifying/signing (if included in the Signed portion of the metadata))
 
-There's also a [client_example.go](examples/client/client_example.go) which demonstrates how to implement a client using the [updater](metadata/updater/updater.go) package.
+## CLI
 
-* it uses [https://jku.github.io/tuf-demo](https://jku.github.io/tuf-demo), a live TUF repository hosted on GitHub
-* shows an example of how to initialize a client
-* shows an example of how to download a target file
-* it's worth noting that the repository is based on python-tuf so it also highlights the interoperability between the two implementations
+----------------------------
 
-## Overview of the implementation
+* [tuf-client](cli/tuf-client/) - a CLI tool that implements the client workflow specified by The Update Framework (TUF) specification. To try it - run `make example-tuf-client-cli`
+
+## Examples
+
+----------------------------
+
+* [basic_repository.go](examples/repository/basic_repository.go) example which demonstrates how to *manually* create and
+maintain repository metadata using the low-level Metadata API. To try it - run `make example-repository` (the artifacts will be located at `examples/repository/`).
+
+* [client_example.go](examples/client/client_example.go) which demonstrates how to implement a client using the [updater](metadata/updater/updater.go) package. To try it - run `make example-client` (the artifacts will be located at `examples/client/`)
+
+## Package details
 
 ----------------------------
 
