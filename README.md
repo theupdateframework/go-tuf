@@ -46,7 +46,7 @@ The `go-tuf-metadata` project provides the following functionality:
 * top-level role delegation
 * target delegation via standard and hash bin delegations
 * use of succinct hash bin delegations which significantly reduce the size of metadata
-* support for unrecognized fields withing the metadata (preserved and accessible through `root.Signed.UnrecognizedFields["some-unknown-field"]`, also used for verifying/signing (if included in the Signed portion of the metadata))
+* support for unrecognized fields within the metadata (preserved and accessible through `root.Signed.UnrecognizedFields["some-unknown-field"]`, also used for verifying/signing (if included in the Signed portion of the metadata))
 
 ## CLI
 
