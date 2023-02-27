@@ -18,34 +18,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	DefaultMetadataDir = "tuf_metadata"
-	DefaultDownloadDir = "tuf_download"
-)
-
 var Verbosity bool
-var RepositoryURL string
 
 var rootCmd = &cobra.Command{
-	Use:   "tuf-client",
-	Short: "tuf-client - a client-side CLI tool for The Update Framework (TUF)",
-	Long: `tuf-client is a CLI tool that implements the client workflow specified by the The Update Framework (TUF) specification.
-   
-The tuf-client can be used to query for available targets and to download them in a secure manner.
-
-All downloaded files are verified by signed metadata.`,
+	Use:   "tuf",
+	Short: "tuf - a repository-side CLI tool for The Update Framework (TUF)",
+	Long:  "tuf - a repository-side CLI tool for The Update Framework (TUF)",
 	Run: func(cmd *cobra.Command, args []string) {
-		// show the help message if no command has been used
-		if len(args) == 0 {
-			cmd.Help()
-			os.Exit(0)
-		}
+
 	},
 }
 
 func Execute() {
 	rootCmd.PersistentFlags().BoolVarP(&Verbosity, "verbose", "v", false, "verbose output")
-	rootCmd.PersistentFlags().StringVarP(&RepositoryURL, "url", "u", "", "URL of the TUF repository")
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

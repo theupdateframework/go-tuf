@@ -1,3 +1,14 @@
+// Copyright 2022-2023 VMware, Inc.
+//
+// This product is licensed to you under the BSD-2 license (the "License").
+// You may not use this product except in compliance with the BSD-2 License.
+// This product may include a number of subcomponents with separate copyright
+// notices and license terms. Your use of these subcomponents is subject to
+// the terms and conditions of the subcomponent's license, as noted in the
+// LICENSE file.
+//
+// SPDX-License-Identifier: BSD-2-Clause
+
 package cmd
 
 import (
@@ -10,6 +21,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var ForceDelete bool
+
 var resetCmd = &cobra.Command{
 	Use:     "reset",
 	Aliases: []string{"r"},
@@ -21,6 +34,7 @@ var resetCmd = &cobra.Command{
 }
 
 func init() {
+	resetCmd.Flags().BoolVarP(&ForceDelete, "force", "f", false, "force delete without waiting for confirmation")
 	rootCmd.AddCommand(resetCmd)
 }
 
@@ -32,12 +46,12 @@ func ResetCmd() error {
 	}
 
 	// folders to delete
-	metadataPath := filepath.Join(cwd, "metadata")
-	downloadPath := filepath.Join(cwd, "download")
+	metadataPath := filepath.Join(cwd, DefaultMetadataDir)
+	downloadPath := filepath.Join(cwd, DefaultDownloadDir)
 
 	// warning: deletes the metadata folder and all of its contents
 	fmt.Printf("Warning: Are you sure you want to delete the \"%s\" folder and all of its contents? (y/n)\n", metadataPath)
-	if askForConfirmation() {
+	if ForceDelete || askForConfirmation() {
 		os.RemoveAll(metadataPath)
 		fmt.Printf("Folder %s was successfully deleted\n", metadataPath)
 	} else {
@@ -46,7 +60,7 @@ func ResetCmd() error {
 
 	// warning: deletes the download folder and all of its contents
 	fmt.Printf("Warning: Are you sure you want to delete the \"%s\" folder and all of its contents? (y/n)\n", downloadPath)
-	if askForConfirmation() {
+	if ForceDelete || askForConfirmation() {
 		os.RemoveAll(downloadPath)
 		fmt.Printf("Folder %s was successfully deleted\n", downloadPath)
 	} else {

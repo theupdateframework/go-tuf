@@ -1,3 +1,14 @@
+// Copyright 2022-2023 VMware, Inc.
+//
+// This product is licensed to you under the BSD-2 license (the "License").
+// You may not use this product except in compliance with the BSD-2 License.
+// This product may include a number of subcomponents with separate copyright
+// notices and license terms. Your use of these subcomponents is subject to
+// the terms and conditions of the subcomponent's license, as noted in the
+// LICENSE file.
+//
+// SPDX-License-Identifier: BSD-2-Clause
+
 package cmd
 
 import (
@@ -22,6 +33,10 @@ var initCmd = &cobra.Command{
 	Short:   "Initialize the client with trusted root.json metadata (Trust-On-First-Use)",
 	Args:    cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if RepositoryURL == "" {
+			fmt.Println("Error: required flag(s) \"url\" not set")
+			os.Exit(1)
+		}
 		return InitializeCmd()
 	},
 }
@@ -89,8 +104,8 @@ func prepareEnvironment() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get current working directory: %w", err)
 	}
-	metadataPath := filepath.Join(cwd, "metadata")
-	downloadPath := filepath.Join(cwd, "download")
+	metadataPath := filepath.Join(cwd, DefaultMetadataDir)
+	downloadPath := filepath.Join(cwd, DefaultDownloadDir)
 
 	// create a folder for storing the artifacts
 	err = os.Mkdir(metadataPath, 0750)
