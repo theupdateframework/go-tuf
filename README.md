@@ -11,7 +11,7 @@
 secure content delivery and updates. It protects against various types of
 supply chain attacks and provides resilience to compromise.
 
-go-tuf-metadata is started from the idea of providing a Go implementation of TUF that is heavily influenced by the
+[go-tuf-metadata](https://github.com/rdimitrov/go-tuf-metadata) is started from the idea of providing a Go implementation of TUF that is heavily influenced by the
 design decisions made in [python-tuf](https://github.com/theupdateframework/python-tuf).
 
 ## About The Update Framework
@@ -36,7 +36,7 @@ Please see [TUF's website](https://theupdateframework.com/) for more information
 
 ----------------------------
 
-The `go-tuf-metadata` project provides the following functionality:
+The [go-tuf-metadata](https://github.com/rdimitrov/go-tuf-metadata) project provides the following functionality:
 
 * creation, reading and writing of metadata
 * easy and straightforward object oriented approach for interacting with metadata
