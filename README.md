@@ -45,7 +45,7 @@ The [go-tuf-metadata](https://github.com/rdimitrov/go-tuf-metadata) project prov
 * ED25519, RSA and ECDSA key types referenced by the latest TUF specification
 * top-level role delegation
 * target delegation via standard and hash bin delegations
-* use of succinct hash bin delegations which significantly reduce the size of metadata
+* support of [succinct hash bin delegations](https://github.com/theupdateframework/taps/blob/master/tap15.md) which significantly reduce the size of metadata
 * support for unrecognized fields within the metadata (i.e. preserved and accessible through `root.Signed.UnrecognizedFields["some-unknown-field"]`, also used for verifying/signing (if included in the Signed portion of the metadata))
 
 ## CLI
