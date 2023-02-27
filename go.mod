@@ -9,7 +9,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.4.0
 	github.com/stretchr/testify v1.8.2
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d
-	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871
+	golang.org/x/crypto v0.6.0
 	golang.org/x/term v0.5.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 )
