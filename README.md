@@ -11,7 +11,7 @@
 secure content delivery and updates. It protects against various types of
 supply chain attacks and provides resilience to compromise.
 
-[go-tuf-metadata](https://github.com/rdimitrov/go-tuf-metadata) is started from the idea of providing a Go implementation of TUF that is heavily influenced by the
+[go-tuf-metadata](https://github.com/rdimitrov/go-tuf-metadata) started from the idea of providing a Go implementation of TUF that is heavily influenced by the
 design decisions made in [python-tuf](https://github.com/theupdateframework/python-tuf).
 
 ## About The Update Framework
@@ -28,7 +28,7 @@ re-implement to fit their needs.
 TUF is hosted by the [Linux Foundation](https://www.linuxfoundation.org/) as
 part of the [Cloud Native Computing Foundation](https://www.cncf.io/) (CNCF)
 and its design is [used in production](https://theupdateframework.io/adoptions/)
-by various tech companies and open source organizations.
+by various tech companies and open-source organizations.
 
 Please see [TUF's website](https://theupdateframework.com/) for more information about TUF!
 
@@ -38,11 +38,11 @@ Please see [TUF's website](https://theupdateframework.com/) for more information
 
 The [go-tuf-metadata](https://github.com/rdimitrov/go-tuf-metadata) project provides the following functionality:
 
-* creation, reading and writing of metadata
-* easy and straightforward object oriented approach for interacting with metadata
+* creation, reading, and writing of metadata
+* an easy object-oriented approach for interacting with metadata
 * consistent snapshots
 * signing and verifying metadata
-* ED25519, RSA and ECDSA key types referenced by the latest TUF specification
+* ED25519, RSA, and ECDSA key types referenced by the latest TUF specification
 * top-level role delegation
 * target delegation via standard and hash bin delegations
 * support of [succinct hash bin delegations](https://github.com/theupdateframework/taps/blob/master/tap15.md) which significantly reduce the size of metadata
@@ -52,16 +52,22 @@ The [go-tuf-metadata](https://github.com/rdimitrov/go-tuf-metadata) project prov
 
 ----------------------------
 
-* [tuf-client](cli/tuf-client/) - a CLI tool that implements the client workflow specified by The Update Framework (TUF) specification. To try it - run `make example-tuf-client-cli`
+* [tuf-client](cli/tuf-client/) - a CLI tool that implements the client workflow specified by The Update Framework (TUF) specification. 
+
+To try it - run `make example-tuf-client-cli`
 
 ## Examples
 
 ----------------------------
 
 * [basic_repository.go](examples/repository/basic_repository.go) example which demonstrates how to *manually* create and
-maintain repository metadata using the low-level Metadata API. To try it - run `make example-repository` (the artifacts will be located at `examples/repository/`).
+maintain repository metadata using the low-level Metadata API.
 
-* [client_example.go](examples/client/client_example.go) which demonstrates how to implement a client using the [updater](metadata/updater/updater.go) package. To try it - run `make example-client` (the artifacts will be located at `examples/client/`)
+To try it - run `make example-repository` (the artifacts will be located at `examples/repository/`).
+
+* [client_example.go](examples/client/client_example.go) which demonstrates how to implement a client using the [updater](metadata/updater/updater.go) package.
+
+To try it - run `make example-client` (the artifacts will be located at `examples/client/`)
 
 ## Package details
 
@@ -71,7 +77,7 @@ maintain repository metadata using the low-level Metadata API. To try it - run `
 
 * The `metadata` package provides access to a Metadata file abstraction that closely
 follows the TUF specification’s document formats. This API handles de/serialization
-to and from files and bytes, covers also the process to create and verify metadata
+to and from files and bytes. It also covers the process of creating and verifying metadata
 signatures and makes it easier to access and modify metadata content. It is purely
 focused on individual pieces of Metadata and provides no concepts like “repository”
 or “update workflow”.
@@ -84,7 +90,7 @@ the metadata with the caller making decisions on what is updated.
 
 ### The `config` package
 
-* The `config` package is used to store configuration for an ``Updater`` instance.
+* The `config` package stores configuration for an ``Updater`` instance.
 
 ### The `fetcher` package
 
@@ -93,7 +99,7 @@ the metadata with the caller making decisions on what is updated.
 ### The `updater` package
 
 * The `updater` package provides an implementation of the TUF client workflow.
-It provides ways to query and download target files securely, while handling the
+It provides ways to query and download target files securely while handling the
 TUF update workflow behind the scenes. It is implemented on top of the Metadata API
 and can be used to implement various TUF clients with relatively little effort.
 

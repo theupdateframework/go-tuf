@@ -37,7 +37,7 @@ All downloaded files are verified by signed metadata.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// show the help message if no command has been used
 		if len(args) == 0 {
-			cmd.Help()
+			_ = cmd.Help()
 			os.Exit(0)
 		}
 	},
