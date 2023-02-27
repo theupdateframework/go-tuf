@@ -1,6 +1,16 @@
 # tuf-client CLI
 
+----------------------------
+
 ## Overview
+
+----------------------------
+
+`tuf-client` is a CLI tool that implements the client workflow specified by The Update Framework (TUF) specification.
+
+The tuf-client can be used to query for available targets and to download them in a secure manner.
+
+All downloaded files are verified by signed metadata.
 
 The CLI provides three commands:
 
@@ -13,6 +23,8 @@ All commands except `reset` require the URL of the TUF repository passed as a fl
 Run `tuf-client help` from the command line to get more detailed usage information.
 
 ## Usage
+
+----------------------------
 
 ```bash
 # Initialize by providing a root.json
