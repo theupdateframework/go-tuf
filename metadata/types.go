@@ -127,11 +127,10 @@ type Hashes map[string]HexBytes
 
 // MetaFiles represents the value portion of METAFILES in TUF (used in Snapshot and Timestamp metadata). Used to store information about a particular meta file.
 type MetaFiles struct {
-	Length             int64            `json:"length,omitempty"`
-	Hashes             Hashes           `json:"hashes,omitempty"`
-	Version            int64            `json:"version"`
-	Custom             *json.RawMessage `json:"custom,omitempty"`
-	UnrecognizedFields map[string]any   `json:"-"`
+	Length             int64          `json:"length,omitempty"`
+	Hashes             Hashes         `json:"hashes,omitempty"`
+	Version            int64          `json:"version"`
+	UnrecognizedFields map[string]any `json:"-"`
 }
 
 // TargetFiles represents the value portion of TARGETS in TUF (used Targets metadata). Used to store information about a particular target file.
