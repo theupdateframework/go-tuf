@@ -1045,9 +1045,6 @@ func (signed MetaFiles) MarshalJSON() ([]byte, error) {
 		dict["hashes"] = signed.Hashes
 	}
 	dict["version"] = signed.Version
-	if signed.Custom != nil {
-		dict["custom"] = signed.Custom
-	}
 	return json.Marshal(dict)
 }
 
@@ -1066,7 +1063,6 @@ func (signed *MetaFiles) UnmarshalJSON(data []byte) error {
 	delete(dict, "length")
 	delete(dict, "hashes")
 	delete(dict, "version")
-	delete(dict, "custom")
 	signed.UnrecognizedFields = dict
 	return nil
 }
