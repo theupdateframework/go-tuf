@@ -27,7 +27,7 @@ build: $(addprefix build-, $(CLIS))
 .PHONY: build-%
 build-%:
 	@echo "Building $*"
-	@go build -o $* cli/$*/main.go
+	@go build -o $* examples/cli/$*/main.go
 
 # Test target
 .PHONY: test
@@ -63,4 +63,12 @@ example-tuf-client-cli: build-tuf-client
 	@sleep 2
 	@./tuf-client get --url https://jku.github.io/tuf-demo/metadata -t https://jku.github.io/tuf-demo/targets demo/succinctly-delegated-5.txt
 
+# Linting target
+.PHONY: clear
+clear:
+	@rm -rf examples/repository/tmp*
+	@rm -rf examples/client/tmp*
+	@rm -rf tuf_download
+	@rm -rf tuf_metadata
+	@rm tuf-client
 

@@ -48,14 +48,6 @@ The [go-tuf-metadata](https://github.com/rdimitrov/go-tuf-metadata) project prov
 * support of [succinct hash bin delegations](https://github.com/theupdateframework/taps/blob/master/tap15.md) which significantly reduce the size of metadata
 * support for unrecognized fields within the metadata (i.e. preserved and accessible through `root.Signed.UnrecognizedFields["some-unknown-field"]`, also used for verifying/signing (if included in the Signed portion of the metadata))
 
-## CLI
-
-----------------------------
-
-* [tuf-client](cli/tuf-client/) - a CLI tool that implements the client workflow specified by The Update Framework (TUF) specification. 
-
-To try it - run `make example-tuf-client-cli`
-
 ## Examples
 
 ----------------------------
@@ -68,6 +60,10 @@ To try it - run `make example-repository` (the artifacts will be located at `exa
 * [client_example.go](examples/client/client_example.go) which demonstrates how to implement a client using the [updater](metadata/updater/updater.go) package.
 
 To try it - run `make example-client` (the artifacts will be located at `examples/client/`)
+
+* [tuf-client CLI](examples/cli/tuf-client/) - a CLI tool that implements the client workflow specified by The Update Framework (TUF) specification.
+
+To try it - run `make example-tuf-client-cli`
 
 ## Package details
 
