@@ -46,7 +46,7 @@ var getCmd = &cobra.Command{
 }
 
 func init() {
-	getCmd.Flags().StringVarP(&targetsURL, "targetsURL", "t", "", "URL of where the target files are hosted")
+	getCmd.Flags().StringVarP(&targetsURL, "turl", "t", "", "URL of where the target files are hosted")
 	rootCmd.AddCommand(getCmd)
 }
 
