@@ -14,8 +14,6 @@ SHELL:=/bin/bash
 
 # Set environment variables
 CLIS:=tuf-client # tuf
-GOLANGCI_LINT_DIR = $(shell pwd)/bin
-GOLANGCI_LINT_BIN = $(GOLANGCI_LINT_DIR)/golangci-lint
 
 # Default target
 .PHONY: default
