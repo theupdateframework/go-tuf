@@ -14,10 +14,16 @@ SHELL:=/bin/bash
 
 # Set environment variables
 CLIS:=tuf-client # tuf
+GOLANGCI_LINT_DIR = $(shell pwd)/bin
+GOLANGCI_LINT_BIN = $(GOLANGCI_LINT_DIR)/golangci-lint
 
 # Default target
 .PHONY: default
 default: build
+
+#####################
+# build section
+#####################
 
 # Build
 .PHONY: build
@@ -29,15 +35,26 @@ build-%:
 	@echo "Building $*"
 	@go build -o $* examples/cli/$*/main.go
 
+#####################
+# test section
+#####################
+
 # Test target
 .PHONY: test
 test: 
-	@go test ./...
+	go test ./...
 
-# Linting target
+#####################
+# lint section
+#####################
+
 .PHONY: lint
 lint: 
-	@golangci-lint run
+	golangci-lint run -n
+
+#####################
+# examples section
+#####################
 
 # Target for demoing the examples/client/client_example.go
 .PHONY: example-client
@@ -55,15 +72,29 @@ example-repository:
 .PHONY: example-tuf-client-cli
 example-tuf-client-cli: build-tuf-client
 	@echo "Clearing any leftover artifacts..."
-	@./tuf-client reset --force
+	./tuf-client reset --force
 	@echo "Initializing the following https://jku.github.io/tuf-demo/ TUF repository"
 	@sleep 2
-	@./tuf-client init --url https://jku.github.io/tuf-demo/metadata
+	./tuf-client init --url https://jku.github.io/tuf-demo/metadata
 	@echo "Downloading the following target file - demo/succinctly-delegated-5.txt"
 	@sleep 2
-	@./tuf-client get --url https://jku.github.io/tuf-demo/metadata -t https://jku.github.io/tuf-demo/targets demo/succinctly-delegated-5.txt
+	./tuf-client get --url https://jku.github.io/tuf-demo/metadata -t https://jku.github.io/tuf-demo/targets demo/succinctly-delegated-5.txt
 
-# Linting target
+# Target for demoing the tuf-client cli with root-signing repo
+.PHONY: example-root-signing
+example-root-signing: build-tuf-client
+	@echo "Clearing any leftover artifacts..."
+	./tuf-client reset --force
+	@echo "Downloading the initial root of trust"
+	@curl -L "https://raw.githubusercontent.com/sigstore/root-signing/main/repository/repository/5.root.json" > root.json
+	@echo "Initializing the following https://github.com/sigstore/root-signing/repository/repository TUF repository"
+	@sleep 2
+	./tuf-client init --url https://raw.githubusercontent.com/sigstore/root-signing/main/repository/repository --file root.json
+	@echo "Downloading the following target file - rekor.pub"
+	@sleep 2
+	./tuf-client get --url https://raw.githubusercontent.com/sigstore/root-signing/main/repository/repository --turl https://raw.githubusercontent.com/sigstore/root-signing/main/targets rekor.pub
+
+# Clear target
 .PHONY: clear
 clear:
 	@rm -rf examples/repository/tmp*
@@ -71,4 +102,5 @@ clear:
 	@rm -rf tuf_download
 	@rm -rf tuf_metadata
 	@rm -f tuf-client
+	@rm -f root.json
 
