@@ -70,5 +70,5 @@ clear:
 	@rm -rf examples/client/tmp*
 	@rm -rf tuf_download
 	@rm -rf tuf_metadata
-	@rm tuf-client
+	@rm -f tuf-client
 
