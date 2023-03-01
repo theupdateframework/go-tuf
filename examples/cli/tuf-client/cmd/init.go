@@ -30,7 +30,7 @@ var rootPath string
 var initCmd = &cobra.Command{
 	Use:     "init",
 	Aliases: []string{"i"},
-	Short:   "Initialize the client with trusted root.json metadata (Trust-On-First-Use)",
+	Short:   "Initialize the client with trusted root.json metadata",
 	Args:    cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if RepositoryURL == "" {

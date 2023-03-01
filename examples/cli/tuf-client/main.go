@@ -12,14 +12,9 @@ package main
 // SPDX-License-Identifier: BSD-2-Clause
 
 import (
-	"fmt"
-	"os"
-
-	tuf "github.com/rdimitrov/go-tuf-metadata/cli/tuf/cmd"
+	tufclient "github.com/rdimitrov/go-tuf-metadata/examples/cli/tuf-client/cmd"
 )
 
 func main() {
-	fmt.Println("Not implemented")
-	os.Exit(1)
-	tuf.Execute()
+	tufclient.Execute()
 }

@@ -14,7 +14,7 @@ All downloaded files are verified by signed metadata.
 
 The CLI provides three commands:
 
-* `tuf-client init` - Initialize the client with trusted root.json metadata (Trust-On-First-Use)
+* `tuf-client init` - Initialize the client with trusted root.json metadata
 * `tuf-client get` - Download a target file
 * `tuf-client reset` - Resets the local environment. Warning: this deletes both the metadata and download folders and all of their contents
 

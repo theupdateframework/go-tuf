@@ -2,7 +2,7 @@
 
 ----------------------------
 
-## Basic repository
+## Repository
 
 ----------------------------
 
@@ -14,7 +14,7 @@ The example highlights the following functionality supported by the metadata API
 * creation of top-level metadata
 * target file handling
 * consistent snapshots
-* key management (supports ED25519, RSA and ECDSA key types)
+* support a mixture of key types - ED25519, RSA and ECDSA
 * top-level delegation and signing thresholds
 * metadata verification
 * target delegation
@@ -22,7 +22,7 @@ The example highlights the following functionality supported by the metadata API
 * writing and reading metadata files
 * root key rotation
 
-## Client example
+## Client
 
 ----------------------------
 There's also a [client_example.go](client/client_example.go) which demonstrates how to implement a client using the [updater](metadata/updater/updater.go) package.
@@ -31,3 +31,13 @@ There's also a [client_example.go](client/client_example.go) which demonstrates 
 * shows an example of how to initialize a client
 * shows an example of how to download a target file
 * the repository is based on python-tuf so it also highlights the interoperability between the two implementations
+
+## CLI tools
+
+----------------------------
+
+The following CLIs are experimental replacements of the CLI tools provided by the go-tuf package. At some point these will be moved to a separate repository.
+
+* [tuf-client](cli/tuf-client/README.md) - a CLI tool that implements the client workflow specified by The Update Framework (TUF) specification
+
+* [tuf](cli/tuf/README.md) - Not implemented
