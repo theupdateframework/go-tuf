@@ -383,7 +383,7 @@ func TestTargetFilesCustomdField(t *testing.T) {
 	targetFile.Custom = &testCustomJSON
 
 	// add the targetfile to targets metadata
-	targets.Signed.Targets["testTarget"] = *targetFile
+	targets.Signed.Targets["testTarget"] = targetFile
 	targetsJSON, err := targets.ToBytes(false)
 	assert.NoError(t, err)
 	fmt.Println(string(targetsJSON))

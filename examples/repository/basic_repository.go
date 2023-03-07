@@ -81,7 +81,7 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintln("basic_repository.go:", "generating target file info failed", err))
 	}
-	roles.Targets("targets").Signed.Targets[targetPath] = *targetFileInfo
+	roles.Targets("targets").Signed.Targets[targetPath] = targetFileInfo
 
 	// Snapshot (consistency)
 	// ----------------------
@@ -305,7 +305,7 @@ func main() {
 	// Create a new targets role, akin to how we created top-level targets above, and
 	// add target file info from above according to the delegatee's responsibility.
 	delegatee := metadata.Targets(helperExpireIn(7))
-	delegatee.Signed.Targets[targetPath] = *targetFileInfo
+	delegatee.Signed.Targets[targetPath] = targetFileInfo
 	roles.SetTargets(delegateeName, delegatee)
 
 	// Delegator
@@ -351,12 +351,12 @@ func main() {
 	roles.Targets("targets").Signed.Version += 1
 
 	// Update snapshot to account for changed and new targets(delegatee) metadata
-	roles.Snapshot().Signed.Meta["targets.json"] = *metadata.MetaFile(roles.Targets("targets").Signed.Version)
-	roles.Snapshot().Signed.Meta[fmt.Sprintf("%s.json", delegateeName)] = *metadata.MetaFile(1)
+	roles.Snapshot().Signed.Meta["targets.json"] = metadata.MetaFile(roles.Targets("targets").Signed.Version)
+	roles.Snapshot().Signed.Meta[fmt.Sprintf("%s.json", delegateeName)] = metadata.MetaFile(1)
 	roles.Snapshot().Signed.Version += 1
 
 	// Update timestamp to account for changed snapshot metadata
-	roles.Timestamp().Signed.Meta["snapshot.json"] = *metadata.MetaFile(roles.Snapshot().Signed.Version)
+	roles.Timestamp().Signed.Meta["snapshot.json"] = metadata.MetaFile(roles.Snapshot().Signed.Version)
 	roles.Timestamp().Signed.Version += 1
 
 	// Sign and write metadata for all changed roles, i.e. all but root

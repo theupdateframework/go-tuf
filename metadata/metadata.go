@@ -78,7 +78,7 @@ func Snapshot(expires ...time.Time) *Metadata[SnapshotType] {
 			SpecVersion: SPECIFICATION_VERSION,
 			Version:     1,
 			Expires:     expires[0],
-			Meta: map[string]MetaFiles{
+			Meta: map[string]*MetaFiles{
 				"targets.json": {
 					Version: 1,
 				},
@@ -101,7 +101,7 @@ func Timestamp(expires ...time.Time) *Metadata[TimestampType] {
 			SpecVersion: SPECIFICATION_VERSION,
 			Version:     1,
 			Expires:     expires[0],
-			Meta: map[string]MetaFiles{
+			Meta: map[string]*MetaFiles{
 				"snapshot.json": {
 					Version: 1,
 				},
@@ -124,7 +124,7 @@ func Targets(expires ...time.Time) *Metadata[TargetsType] {
 			SpecVersion: SPECIFICATION_VERSION,
 			Version:     1,
 			Expires:     expires[0],
-			Targets:     map[string]TargetFiles{},
+			Targets:     map[string]*TargetFiles{},
 		},
 		Signatures: []Signature{},
 	}
@@ -875,8 +875,8 @@ func (b HexBytes) String() string {
 
 func (signed RootType) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
-	if signed.UnrecognizedFields != nil {
-		dict = signed.UnrecognizedFields
+	if len(signed.UnrecognizedFields) != 0 {
+		copyMapValues(signed.UnrecognizedFields, dict)
 	}
 	dict["_type"] = signed.Type
 	dict["spec_version"] = signed.SpecVersion
@@ -913,8 +913,8 @@ func (signed *RootType) UnmarshalJSON(data []byte) error {
 
 func (signed SnapshotType) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
-	if signed.UnrecognizedFields != nil {
-		dict = signed.UnrecognizedFields
+	if len(signed.UnrecognizedFields) != 0 {
+		copyMapValues(signed.UnrecognizedFields, dict)
 	}
 	dict["_type"] = signed.Type
 	dict["spec_version"] = signed.SpecVersion
@@ -947,8 +947,8 @@ func (signed *SnapshotType) UnmarshalJSON(data []byte) error {
 
 func (signed TimestampType) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
-	if signed.UnrecognizedFields != nil {
-		dict = signed.UnrecognizedFields
+	if len(signed.UnrecognizedFields) != 0 {
+		copyMapValues(signed.UnrecognizedFields, dict)
 	}
 	dict["_type"] = signed.Type
 	dict["spec_version"] = signed.SpecVersion
@@ -981,8 +981,8 @@ func (signed *TimestampType) UnmarshalJSON(data []byte) error {
 
 func (signed TargetsType) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
-	if signed.UnrecognizedFields != nil {
-		dict = signed.UnrecognizedFields
+	if len(signed.UnrecognizedFields) != 0 {
+		copyMapValues(signed.UnrecognizedFields, dict)
 	}
 	dict["_type"] = signed.Type
 	dict["spec_version"] = signed.SpecVersion
@@ -1017,15 +1017,16 @@ func (signed *TargetsType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (signed MetaFiles) MarshalJSON() ([]byte, error) {
+func (signed *MetaFiles) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
-	if signed.UnrecognizedFields != nil {
-		dict = signed.UnrecognizedFields
+	if len(signed.UnrecognizedFields) != 0 {
+		copyMapValues(signed.UnrecognizedFields, dict)
 	}
+	// length and hashes are optional
 	if signed.Length != 0 {
 		dict["length"] = signed.Length
 	}
-	if signed.Hashes != nil {
+	if len(signed.Hashes) != 0 {
 		dict["hashes"] = signed.Hashes
 	}
 	dict["version"] = signed.Version
@@ -1051,10 +1052,10 @@ func (signed *MetaFiles) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (signed TargetFiles) MarshalJSON() ([]byte, error) {
+func (signed *TargetFiles) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
-	if signed.UnrecognizedFields != nil {
-		dict = signed.UnrecognizedFields
+	if len(signed.UnrecognizedFields) != 0 {
+		copyMapValues(signed.UnrecognizedFields, dict)
 	}
 	dict["length"] = signed.Length
 	dict["hashes"] = signed.Hashes
@@ -1085,8 +1086,8 @@ func (signed *TargetFiles) UnmarshalJSON(data []byte) error {
 
 func (key *Key) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
-	if key.UnrecognizedFields != nil {
-		dict = key.UnrecognizedFields
+	if len(key.UnrecognizedFields) != 0 {
+		copyMapValues(key.UnrecognizedFields, dict)
 	}
 	dict["keytype"] = key.Type
 	dict["scheme"] = key.Scheme
@@ -1116,8 +1117,8 @@ func (key *Key) UnmarshalJSON(data []byte) error {
 
 func (meta *Metadata[T]) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
-	if meta.UnrecognizedFields != nil {
-		dict = meta.UnrecognizedFields
+	if len(meta.UnrecognizedFields) != 0 {
+		copyMapValues(meta.UnrecognizedFields, dict)
 	}
 	dict["signed"] = meta.Signed
 	dict["signatures"] = meta.Signatures
@@ -1186,8 +1187,8 @@ func (meta *Metadata[T]) UnmarshalJSON(data []byte) error {
 
 func (s Signature) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
-	if s.UnrecognizedFields != nil {
-		dict = s.UnrecognizedFields
+	if len(s.UnrecognizedFields) != 0 {
+		copyMapValues(s.UnrecognizedFields, dict)
 	}
 	dict["keyid"] = s.KeyID
 	dict["sig"] = s.Signature
@@ -1214,8 +1215,8 @@ func (s *Signature) UnmarshalJSON(data []byte) error {
 
 func (kv KeyVal) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
-	if kv.UnrecognizedFields != nil {
-		dict = kv.UnrecognizedFields
+	if len(kv.UnrecognizedFields) != 0 {
+		copyMapValues(kv.UnrecognizedFields, dict)
 	}
 	dict["public"] = kv.PublicKey
 	return json.Marshal(dict)
@@ -1240,8 +1241,8 @@ func (kv *KeyVal) UnmarshalJSON(data []byte) error {
 
 func (role *Role) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
-	if role.UnrecognizedFields != nil {
-		dict = role.UnrecognizedFields
+	if len(role.UnrecognizedFields) != 0 {
+		copyMapValues(role.UnrecognizedFields, dict)
 	}
 	dict["keyids"] = role.KeyIDs
 	dict["threshold"] = role.Threshold
@@ -1268,8 +1269,8 @@ func (role *Role) UnmarshalJSON(data []byte) error {
 
 func (d *Delegations) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
-	if d.UnrecognizedFields != nil {
-		dict = d.UnrecognizedFields
+	if len(d.UnrecognizedFields) != 0 {
+		copyMapValues(d.UnrecognizedFields, dict)
 	}
 	// only one is allowed
 	dict["keys"] = d.Keys
@@ -1302,8 +1303,8 @@ func (d *Delegations) UnmarshalJSON(data []byte) error {
 
 func (role DelegatedRole) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
-	if role.UnrecognizedFields != nil {
-		dict = role.UnrecognizedFields
+	if len(role.UnrecognizedFields) != 0 {
+		copyMapValues(role.UnrecognizedFields, dict)
 	}
 	dict["name"] = role.Name
 	dict["keyids"] = role.KeyIDs
@@ -1345,8 +1346,8 @@ func (role *DelegatedRole) UnmarshalJSON(data []byte) error {
 
 func (role *SuccinctRoles) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
-	if role.UnrecognizedFields != nil {
-		dict = role.UnrecognizedFields
+	if len(role.UnrecognizedFields) != 0 {
+		copyMapValues(role.UnrecognizedFields, dict)
 	}
 	dict["keyids"] = role.KeyIDs
 	dict["threshold"] = role.Threshold
@@ -1373,4 +1374,11 @@ func (role *SuccinctRoles) UnmarshalJSON(data []byte) error {
 	delete(dict, "name_prefix")
 	role.UnrecognizedFields = dict
 	return nil
+}
+
+// copyMapValues copies the values of the src map to dst
+func copyMapValues(src, dst map[string]any) {
+	for k, v := range src {
+		dst[k] = v
+	}
 }
