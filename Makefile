@@ -84,17 +84,17 @@ example-root-signing: build-tuf-client
 	@echo "Clearing any leftover artifacts..."
 	./tuf-client reset --force
 	@echo "Downloading the initial root of trust"
-	@curl -L "https://raw.githubusercontent.com/sigstore/root-signing/main/repository/repository/5.root.json" > root.json
-	@echo "Initializing the following https://github.com/sigstore/root-signing/repository/repository TUF repository"
+	@curl -L "https://sigstore-tuf-root.storage.googleapis.com/5.root.json" > root.json
+	@echo "Initializing the following https://sigstore-tuf-root.storage.googleapis.com TUF repository"
 	@sleep 2
-	./tuf-client init --url https://raw.githubusercontent.com/sigstore/root-signing/main/repository/repository --file root.json
+	./tuf-client init --url https://sigstore-tuf-root.storage.googleapis.com --file root.json
 	@echo "Downloading the following target file - rekor.pub"
 	@sleep 2
-	./tuf-client get --url https://raw.githubusercontent.com/sigstore/root-signing/main/repository/repository --turl https://raw.githubusercontent.com/sigstore/root-signing/main/targets rekor.pub
+	./tuf-client get --url https://sigstore-tuf-root.storage.googleapis.com --turl https://raw.githubusercontent.com/sigstore/root-signing/main/targets rekor.pub
 
-# Clear target
-.PHONY: clear
-clear:
+# Clean target
+.PHONY: clean
+clean:
 	@rm -rf examples/repository/tmp*
 	@rm -rf examples/client/tmp*
 	@rm -rf tuf_download
