@@ -353,7 +353,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 	data, err := update.loadLocalMetadata(roleName)
 	if err != nil {
 		// this means there's no existing local target file so we should proceed downloading it without the need to UpdateDelegatedTargets
-		log.Debugf("Local %s does not exist\n", roleName)
+		log.Debugf("Local %s does not exist", roleName)
 	} else {
 		// successfully read a local targets metadata, so let's try to verify and load it to the trusted metadata set
 		delegatedTargets, err := update.trusted.UpdateDelegatedTargets(data, roleName, parentName)
@@ -361,19 +361,19 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 			// this means targets verification/loading failed
 			if errors.Is(err, metadata.ErrRepository{}) {
 				// local target file is not valid, proceed downloading from remote; note that this error type includes several other subset errors
-				log.Debugf("Local %s is not valid\n", roleName)
+				log.Debugf("Local %s is not valid", roleName)
 			} else {
 				// another error
 				return nil, err
 			}
 		} else {
 			// this means targets verification/loading succeeded
-			log.Debugf("Local %s is valid: not downloading new one\n", roleName)
+			log.Debugf("Local %s is valid: not downloading new one", roleName)
 			return delegatedTargets, nil
 		}
 	}
 	// local "roleName" does not exist or is invalid, update from remote
-	log.Debugf("Failed to load local %s\n", roleName)
+	log.Debugf("Failed to load local %s", roleName)
 	if update.trusted.Snapshot == nil {
 		return nil, fmt.Errorf("trusted snapshot not set")
 	}
@@ -466,7 +466,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 		// skip any visited current role to prevent cycles
 		_, ok := visitedRoleNames[delegation.Role]
 		if ok {
-			log.Debugf("Skipping visited current role %s\n", delegation.Role)
+			log.Debugf("Skipping visited current role %s", delegation.Role)
 			continue
 		}
 		// the metadata for delegation.Role must be downloaded/updated before
@@ -477,7 +477,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 		}
 		target, ok := targets.Signed.Targets[targetFilePath]
 		if ok {
-			log.Debugf("Found target in current role %s\n", delegation.Role)
+			log.Debugf("Found target in current role %s", delegation.Role)
 			// Probably not pretty, but populate TargetFiles.Path since this is not handled in fromBytes()
 			target.Path = targetFilePath
 			return target, nil
@@ -490,7 +490,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 			// delegated roles
 			roles := targets.Signed.Delegations.GetRolesForTarget(targetFilePath)
 			for child, terminating := range roles {
-				log.Debugf("Adding child role %s\n", child)
+				log.Debugf("Adding child role %s", child)
 				childRolesToVisit = append(childRolesToVisit, roleParentTuple{Role: child, Parent: delegation.Role})
 				if terminating {
 					log.Debug("Not backtracking to other roles")
@@ -506,7 +506,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 		}
 	}
 	if len(delegationsToVisit) > 0 {
-		log.Debugf("%d roles left to visit, but allowed at most %d delegations\n",
+		log.Debugf("%d roles left to visit, but allowed at most %d delegations",
 			len(delegationsToVisit),
 			update.config.MaxDelegations)
 	}
@@ -532,7 +532,7 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 		// delete the temporary file if there was an error while writing
 		errRemove := os.Remove(file.Name())
 		if errRemove != nil {
-			log.Debugf("Failed to delete temporary file: %s\n", file.Name())
+			log.Debugf("Failed to delete temporary file: %s", file.Name())
 		}
 		return err
 	}
