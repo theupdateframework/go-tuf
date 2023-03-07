@@ -32,7 +32,7 @@ const (
 	Legacy KDFParameterStrength = iota + 1
 	// Standard defines standard scrypt parameters which is focusing 100ms of computation (N:2^16, r:8, p:1)
 	Standard
-	// OWASP defines OWASP recommendad scrypt parameters (N:2^17, r:8, p:1)
+	// OWASP defines OWASP recommended scrypt parameters (N:2^17, r:8, p:1)
 	OWASP
 )
 
@@ -53,7 +53,7 @@ var (
 		P: 1,
 	}
 
-	// owaspParams defines scrypt parameters recommanded by OWASP
+	// owaspParams defines scrypt parameters recommended by OWASP
 	owaspParams = scryptParams{
 		N: 131072, // 2^17
 		R: 8,
@@ -101,7 +101,8 @@ func newScryptKDF(level KDFParameterStrength) (scryptKDF, error) {
 	case OWASP:
 		params = owaspParams
 	default:
-		return scryptKDF{}, errors.New("unsuppoerted kdf parameters level")
+		// Fallback to default parameters
+		params = defaultParams
 	}
 
 	return scryptKDF{
@@ -234,11 +235,7 @@ func EncryptWithCustomKDFParameters(plaintext, passphrase []byte, kdfLevel KDFPa
 
 // Marshal encrypts the JSON encoding of v using passphrase.
 func Marshal(v interface{}, passphrase []byte) ([]byte, error) {
-	data, err := json.MarshalIndent(v, "", "\t")
-	if err != nil {
-		return nil, err
-	}
-	return Encrypt(data, passphrase)
+	return MarshalWithCustomKDFParameters(v, passphrase, Standard)
 }
 
 // MarshalWithCustomKDFParameters encrypts the JSON encoding of v using passphrase.
