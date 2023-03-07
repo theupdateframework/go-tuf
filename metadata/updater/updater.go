@@ -68,7 +68,7 @@ type Updater struct {
 }
 
 // New creates a new Updater instance and loads trusted root metadata
-func New(metadataDir, metadataBaseUrl, targetBaseUrl, targetDir, trustedRootDir string, f fetcher.Fetcher) (*Updater, error) {
+func New(metadataDir, metadataBaseUrl, targetBaseUrl, targetDir, trustedRootDir string, cfg *config.UpdaterConfig, f fetcher.Fetcher) (*Updater, error) {
 	// local path of the trusted root metadata file used for bootstrapping
 	rootPath := metadata.ROOT
 	if trustedRootDir != "" {
@@ -79,13 +79,14 @@ func New(metadataDir, metadataBaseUrl, targetBaseUrl, targetDir, trustedRootDir 
 	if f == nil {
 		f = &fetcher.DefaultFetcher{}
 	}
+
 	// create an updater instance
 	updater := &Updater{
 		metadataDir:     metadataDir,
 		metadataBaseUrl: ensureTrailingSlash(metadataBaseUrl),
 		targetBaseUrl:   ensureTrailingSlash(targetBaseUrl),
 		targetDir:       targetDir,
-		config:          config.New(),
+		config:          cfg,
 		fetcher:         f,
 	}
 
@@ -180,9 +181,12 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 		}
 		dirName, baseName, ok := strings.Cut(targetFilePath, "/")
 		if !ok {
-			return "", metadata.ErrValue{Msg: fmt.Sprintf("error handling targetFilePath %s, no separator found", targetFilePath)}
+			// <hash>.<target-name>
+			targetFilePath = fmt.Sprintf("%s.%s", hashes, dirName)
+		} else {
+			// <dir-prefix>/<hash>.<target-name>
+			targetFilePath = fmt.Sprintf("%s/%s.%s", dirName, hashes, baseName)
 		}
-		targetFilePath = fmt.Sprintf("%s/%s.%s", dirName, hashes, baseName)
 	}
 	fullURL := fmt.Sprintf("%s%s", targetBaseURL, targetFilePath)
 	data, err := update.fetcher.DownloadFile(fullURL, targetFile.Length)
@@ -198,7 +202,7 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 	if err != nil {
 		return "", err
 	}
-	log.Infof("Downloaded target %s\n", targetFile.Path)
+	log.Infof("Downloaded target %s", targetFile.Path)
 	return filePath, nil
 }
 

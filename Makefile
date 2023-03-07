@@ -90,7 +90,7 @@ example-root-signing: build-tuf-client
 	./tuf-client init --url https://sigstore-tuf-root.storage.googleapis.com --file root.json
 	@echo "Downloading the following target file - rekor.pub"
 	@sleep 2
-	./tuf-client get --url https://sigstore-tuf-root.storage.googleapis.com --turl https://raw.githubusercontent.com/sigstore/root-signing/main/targets rekor.pub
+	./tuf-client get --url https://sigstore-tuf-root.storage.googleapis.com --turl https://sigstore-tuf-root.storage.googleapis.com/targets --prefixed rekor.pub
 
 # Clean target
 .PHONY: clean
