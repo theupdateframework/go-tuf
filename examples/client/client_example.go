@@ -165,7 +165,7 @@ func DownloadTarget(localMetadataDir, target string) error {
 		return fmt.Errorf("failed while finding a cached target: %w", err)
 	}
 	if path != "" {
-		log.Infof("Target %s is already present at - %s\n", target, path)
+		log.Infof("Target %s is already present at - %s", target, path)
 	}
 
 	// target is not present locally, so let's try to download it
@@ -174,7 +174,7 @@ func DownloadTarget(localMetadataDir, target string) error {
 		return fmt.Errorf("failed to download target file %s - %w", target, err)
 	}
 
-	log.Infof("Successfully downloaded target %s at - %s\n", target, path)
+	log.Infof("Successfully downloaded target %s at - %s", target, path)
 
 	return nil
 }

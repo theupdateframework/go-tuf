@@ -50,7 +50,7 @@ func Root(expires ...time.Time) *Metadata[RootType] {
 			Threshold: 1,
 		}
 	}
-	log.Debugf("Created a metadata of type %s\n", ROOT)
+	log.Debugf("Created a metadata of type %s", ROOT)
 	return &Metadata[RootType]{
 		Signed: RootType{
 			Type:               ROOT,
@@ -71,7 +71,7 @@ func Snapshot(expires ...time.Time) *Metadata[SnapshotType] {
 	if len(expires) == 0 {
 		expires = []time.Time{time.Now().UTC()}
 	}
-	log.Debugf("Created a metadata of type %s\n", SNAPSHOT)
+	log.Debugf("Created a metadata of type %s", SNAPSHOT)
 	return &Metadata[SnapshotType]{
 		Signed: SnapshotType{
 			Type:        SNAPSHOT,
@@ -94,7 +94,7 @@ func Timestamp(expires ...time.Time) *Metadata[TimestampType] {
 	if len(expires) == 0 {
 		expires = []time.Time{time.Now().UTC()}
 	}
-	log.Debugf("Created a metadata of type %s\n", TIMESTAMP)
+	log.Debugf("Created a metadata of type %s", TIMESTAMP)
 	return &Metadata[TimestampType]{
 		Signed: TimestampType{
 			Type:        TIMESTAMP,
@@ -117,7 +117,7 @@ func Targets(expires ...time.Time) *Metadata[TargetsType] {
 	if len(expires) == 0 {
 		expires = []time.Time{time.Now().UTC()}
 	}
-	log.Debugf("Created a metadata of type %s\n", TARGETS)
+	log.Debugf("Created a metadata of type %s", TARGETS)
 	return &Metadata[TargetsType]{
 		Signed: TargetsType{
 			Type:        TARGETS,
@@ -142,7 +142,7 @@ func TargetFile() *TargetFiles {
 func MetaFile(version int64) *MetaFiles {
 	if version < 1 {
 		// attempting to set incorrect version
-		log.Debugf("Attempting to set incorrect version of %d for MetaFile\n", version)
+		log.Debugf("Attempting to set incorrect version of %d for MetaFile", version)
 		version = 1
 	}
 	return &MetaFiles{
@@ -168,7 +168,7 @@ func (meta *Metadata[T]) FromFile(name string) (*Metadata[T], error) {
 		return nil, err
 	}
 	*meta = *m
-	log.Debugf("Loaded metadata from file %s\n", name)
+	log.Debugf("Loaded metadata from file %s", name)
 	return meta, nil
 }
 
@@ -194,7 +194,7 @@ func (meta *Metadata[T]) ToBytes(pretty bool) ([]byte, error) {
 
 // ToFile save metadata to file
 func (meta *Metadata[T]) ToFile(name string, pretty bool) error {
-	log.Debugf("Writing metadata to file %s\n", name)
+	log.Debugf("Writing metadata to file %s", name)
 	data, err := meta.ToBytes(pretty)
 	if err != nil {
 		return err
@@ -232,7 +232,7 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	// update the Signatures part
 	meta.Signatures = append(meta.Signatures, *sig)
 	// return the new signature
-	log.Infof("Signed metadata with key ID: %s\n", key.ID())
+	log.Infof("Signed metadata with key ID: %s", key.ID())
 	return sig, nil
 }
 
@@ -245,7 +245,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 	var roleKeyIDs []string
 	var roleThreshold int
 
-	log.Debugf("Verifying %s\n", delegatedRole)
+	log.Debugf("Verifying %s", delegatedRole)
 
 	// collect keys, keyIDs and threshold based on delegator type
 	switch i := i.(type) {
@@ -362,19 +362,19 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 		// verify if the signature for that payload corresponds to the given key
 		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payload)); err != nil {
 			// failed to verify the metadata with that key ID
-			log.Debugf("Failed to verify %s with key ID %s\n", delegatedRole, keyID)
+			log.Debugf("Failed to verify %s with key ID %s", delegatedRole, keyID)
 		} else {
 			// save the verified keyID only if verification passed
 			signingKeys[keyID] = true
-			log.Debugf("Verified %s with key ID %s\n", delegatedRole, keyID)
+			log.Debugf("Verified %s with key ID %s", delegatedRole, keyID)
 		}
 	}
 	// check if the amount of valid signatures is enough
 	if len(signingKeys) < roleThreshold {
-		log.Infof("Verifying %s failed, not enough signatures, got %d, want %d\n", delegatedRole, len(signingKeys), roleThreshold)
+		log.Infof("Verifying %s failed, not enough signatures, got %d, want %d", delegatedRole, len(signingKeys), roleThreshold)
 		return ErrUnsignedMetadata{Msg: fmt.Sprintf("Verifying %s failed, not enough signatures, got %d, want %d", delegatedRole, len(signingKeys), roleThreshold)}
 	}
-	log.Infof("Verified %s successfully\n", delegatedRole)
+	log.Infof("Verified %s successfully", delegatedRole)
 	return nil
 }
 
@@ -437,7 +437,7 @@ func (f *TargetFiles) VerifyLengthHashes(data []byte) error {
 
 // FromFile generate TargetFiles from file
 func (t *TargetFiles) FromFile(localPath string, hashes ...string) (*TargetFiles, error) {
-	log.Debugf("Generating target file from file %s\n", localPath)
+	log.Debugf("Generating target file from file %s", localPath)
 	// open file
 	in, err := os.Open(localPath)
 	if err != nil {
@@ -454,7 +454,7 @@ func (t *TargetFiles) FromFile(localPath string, hashes ...string) (*TargetFiles
 
 // FromBytes generate TargetFiles from bytes
 func (t *TargetFiles) FromBytes(localPath string, data []byte, hashes ...string) (*TargetFiles, error) {
-	log.Debugf("Generating target file from bytes %s\n", localPath)
+	log.Debugf("Generating target file from bytes %s", localPath)
 	var hasher hash.Hash
 	targetFile := &TargetFiles{
 		Hashes: map[string]HexBytes{},
@@ -770,7 +770,7 @@ func (signed *TargetsType) AddKey(key *Key, role string) error {
 					signed.Delegations.Keys[key.ID()] = key // TODO: should we check if we don't accidentally override an existing keyID with another key value?
 					return nil
 				}
-				log.Debugf("Delegated role %s already has keyID %s\n", role, key.ID())
+				log.Debugf("Delegated role %s already has keyID %s", role, key.ID())
 			}
 		}
 	} else if signed.Delegations.SuccinctRoles != nil {
@@ -780,7 +780,7 @@ func (signed *TargetsType) AddKey(key *Key, role string) error {
 			signed.Delegations.Keys[key.ID()] = key // TODO: should we check if we don't accidentally override an existing keyID with another key value?
 			return nil
 		}
-		log.Debugf("SuccinctRoles role already has keyID %s\n", key.ID())
+		log.Debugf("SuccinctRoles role already has keyID %s", key.ID())
 
 	}
 	return ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
