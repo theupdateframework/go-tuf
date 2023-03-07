@@ -17,12 +17,14 @@ import (
 	"path/filepath"
 
 	"github.com/rdimitrov/go-tuf-metadata/metadata"
+	"github.com/rdimitrov/go-tuf-metadata/metadata/config"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/updater"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 var targetsURL string
+var useHashedTargetFiles bool
 
 type localConfig struct {
 	MetadataDir string
@@ -47,6 +49,7 @@ var getCmd = &cobra.Command{
 
 func init() {
 	getCmd.Flags().StringVarP(&targetsURL, "turl", "t", "", "URL of where the target files are hosted")
+	getCmd.Flags().BoolVarP(&useHashedTargetFiles, "prefixed", "p", false, "Use hash-prefixed target files when using consistent snapshots.")
 	rootCmd.AddCommand(getCmd)
 }
 
@@ -62,6 +65,10 @@ func GetCmd(target string) error {
 		return err
 	}
 
+	// updater configuration
+	cfg := config.New() // default config
+	cfg.PrefixTargetsWithHash = useHashedTargetFiles
+
 	// create an Updater instance
 	up, err := updater.New(
 		env.MetadataDir,
@@ -69,6 +76,7 @@ func GetCmd(target string) error {
 		env.TargetsURL,
 		env.DownloadDir,
 		env.MetadataDir,
+		cfg,
 		nil)
 	if err != nil {
 		return fmt.Errorf("failed to create Updater instance: %w", err)

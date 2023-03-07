@@ -21,6 +21,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/rdimitrov/go-tuf-metadata/metadata/config"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/updater"
 )
 
@@ -137,6 +138,7 @@ func DownloadTarget(localMetadataDir, target string) error {
 		targetsBaseURL,
 		filepath.Join(localMetadataDir, "download"),
 		localMetadataDir,
+		config.New(), // default config
 		nil)
 	if err != nil {
 		return fmt.Errorf("failed to create Updater instance: %w", err)
