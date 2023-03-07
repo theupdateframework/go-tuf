@@ -47,9 +47,11 @@ $ tuf-client get --url https://jku.github.io/tuf-demo/metadata demo/succinctly-d
 
 # Get a target by providing a URL of where target files are located
 #
-# Usage: tuf-client get --url <https://path/to/repository/metadata> -t <https://path/to/targetfiles/location> <targetfile_to_download>
+# Usage: tuf-client get --url <https://path/to/repository/metadata> -t <https://path/to/targetfiles/location> <targetfile_to_download> 
 #
-$ tuf-client get --url https://jku.github.io/tuf-demo/metadata -t https://jku.github.io/tuf-demo/targets demo/succinctly-delegated-5.txt
+# Use --nonprefixed for non-prefixed target files
+#
+$ tuf-client get --url https://jku.github.io/tuf-demo/metadata --turl https://jku.github.io/tuf-demo/targets --nonprefixed demo/succinctly-delegated-5.txt
 
 # Reset your local environment
 $ tuf-client reset

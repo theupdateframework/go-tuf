@@ -24,7 +24,7 @@ import (
 )
 
 var targetsURL string
-var useHashedTargetFiles bool
+var useNonHashPrefixedTargetFiles bool
 
 type localConfig struct {
 	MetadataDir string
@@ -49,7 +49,7 @@ var getCmd = &cobra.Command{
 
 func init() {
 	getCmd.Flags().StringVarP(&targetsURL, "turl", "t", "", "URL of where the target files are hosted")
-	getCmd.Flags().BoolVarP(&useHashedTargetFiles, "prefixed", "p", false, "Use hash-prefixed target files when using consistent snapshots.")
+	getCmd.Flags().BoolVarP(&useNonHashPrefixedTargetFiles, "nonprefixed", "", false, "Do not use hash-prefixed target files with consistent snapshots")
 	rootCmd.AddCommand(getCmd)
 }
 
@@ -67,7 +67,7 @@ func GetCmd(target string) error {
 
 	// updater configuration
 	cfg := config.New() // default config
-	cfg.PrefixTargetsWithHash = useHashedTargetFiles
+	cfg.PrefixTargetsWithHash = !useNonHashPrefixedTargetFiles
 
 	// create an Updater instance
 	up, err := updater.New(
