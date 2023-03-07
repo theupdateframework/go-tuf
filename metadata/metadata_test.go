@@ -79,7 +79,7 @@ func TestDefaultValuesSnapshot(t *testing.T) {
 	assert.Equal(t, int64(1), meta.Signed.Version)
 
 	// Targets meta
-	assert.Equal(t, map[string]MetaFiles{"targets.json": {Version: 1}}, meta.Signed.Meta)
+	assert.Equal(t, map[string]*MetaFiles{"targets.json": {Version: 1}}, meta.Signed.Meta)
 
 	// Signatures
 	assert.Equal(t, []Signature{}, meta.Signatures)
@@ -107,7 +107,7 @@ func TestDefaultValuesTimestamp(t *testing.T) {
 	assert.Equal(t, int64(1), meta.Signed.Version)
 
 	// Snapshot meta
-	assert.Equal(t, map[string]MetaFiles{"snapshot.json": {Version: 1}}, meta.Signed.Meta)
+	assert.Equal(t, map[string]*MetaFiles{"snapshot.json": {Version: 1}}, meta.Signed.Meta)
 
 	// Signatures
 	assert.Equal(t, []Signature{}, meta.Signatures)
@@ -135,7 +135,7 @@ func TestDefaultValuesTargets(t *testing.T) {
 	assert.Equal(t, int64(1), meta.Signed.Version)
 
 	// Target files
-	assert.Equal(t, map[string]TargetFiles{}, meta.Signed.Targets)
+	assert.Equal(t, map[string]*TargetFiles{}, meta.Signed.Targets)
 
 	// Signatures
 	assert.Equal(t, []Signature{}, meta.Signatures)
@@ -352,19 +352,19 @@ func TestUnrecognizedField(t *testing.T) {
 	targets.Signed.UnrecognizedFields = testUnrecognizedField
 	targetsJSON, err := targets.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"targets\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"targets\":{},\"test\":\"true\",\"version\":1},\"signatures\":[]}"), targetsJSON)
+	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"targets\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"spec_version\":\"1.0.31\",\"targets\":{},\"test\":\"true\",\"version\":1},\"signatures\":[]}"), targetsJSON)
 
 	snapshot := Snapshot(expire)
 	snapshot.Signed.UnrecognizedFields = testUnrecognizedField
 	snapshotJSON, err := snapshot.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"snapshot\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{},\"meta\":{\"targets.json\":{\"version\":1}},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"targets\":{},\"test\":\"true\",\"version\":1},\"signatures\":[]}"), snapshotJSON)
+	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"snapshot\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"targets.json\":{\"version\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1},\"signatures\":[]}"), snapshotJSON)
 
 	timestamp := Timestamp(expire)
 	timestamp.Signed.UnrecognizedFields = testUnrecognizedField
 	timestampJSON, err := timestamp.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"timestamp\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{},\"meta\":{\"snapshot.json\":{\"version\":1}},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"targets\":{},\"test\":\"true\",\"version\":1},\"signatures\":[]}"), timestampJSON)
+	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"timestamp\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"snapshot.json\":{\"version\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1},\"signatures\":[]}"), timestampJSON)
 }
 
 func TestTargetFilesCustomdField(t *testing.T) {
