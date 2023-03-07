@@ -65,33 +65,33 @@ type RootType struct {
 
 // SnapshotType represents the Signed portion of a snapshot metadata
 type SnapshotType struct {
-	Type               string               `json:"_type"`
-	SpecVersion        string               `json:"spec_version"`
-	Version            int64                `json:"version"`
-	Expires            time.Time            `json:"expires"`
-	Meta               map[string]MetaFiles `json:"meta"`
-	UnrecognizedFields map[string]any       `json:"-"`
+	Type               string                `json:"_type"`
+	SpecVersion        string                `json:"spec_version"`
+	Version            int64                 `json:"version"`
+	Expires            time.Time             `json:"expires"`
+	Meta               map[string]*MetaFiles `json:"meta"`
+	UnrecognizedFields map[string]any        `json:"-"`
 }
 
 // TargetsType represents the Signed portion of a targets metadata
 type TargetsType struct {
-	Type               string                 `json:"_type"`
-	SpecVersion        string                 `json:"spec_version"`
-	Version            int64                  `json:"version"`
-	Expires            time.Time              `json:"expires"`
-	Targets            map[string]TargetFiles `json:"targets"`
-	Delegations        *Delegations           `json:"delegations,omitempty"`
-	UnrecognizedFields map[string]any         `json:"-"`
+	Type               string                  `json:"_type"`
+	SpecVersion        string                  `json:"spec_version"`
+	Version            int64                   `json:"version"`
+	Expires            time.Time               `json:"expires"`
+	Targets            map[string]*TargetFiles `json:"targets"`
+	Delegations        *Delegations            `json:"delegations,omitempty"`
+	UnrecognizedFields map[string]any          `json:"-"`
 }
 
 // TimestampType represents the Signed portion of a timestamp metadata
 type TimestampType struct {
-	Type               string               `json:"_type"`
-	SpecVersion        string               `json:"spec_version"`
-	Version            int64                `json:"version"`
-	Expires            time.Time            `json:"expires"`
-	Meta               map[string]MetaFiles `json:"meta"`
-	UnrecognizedFields map[string]any       `json:"-"`
+	Type               string                `json:"_type"`
+	SpecVersion        string                `json:"spec_version"`
+	Version            int64                 `json:"version"`
+	Expires            time.Time             `json:"expires"`
+	Meta               map[string]*MetaFiles `json:"meta"`
+	UnrecognizedFields map[string]any        `json:"-"`
 }
 
 // Key represents a key in TUF
