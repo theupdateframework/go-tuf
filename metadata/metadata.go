@@ -885,9 +885,6 @@ func (signed RootType) MarshalJSON() ([]byte, error) {
 	dict["expires"] = signed.Expires
 	dict["keys"] = signed.Keys
 	dict["roles"] = signed.Roles
-	if signed.Custom != nil {
-		dict["custom"] = signed.Custom
-	}
 	return json.Marshal(dict)
 }
 
@@ -910,7 +907,6 @@ func (signed *RootType) UnmarshalJSON(data []byte) error {
 	delete(dict, "expires")
 	delete(dict, "keys")
 	delete(dict, "roles")
-	delete(dict, "custom")
 	signed.UnrecognizedFields = dict
 	return nil
 }
@@ -925,9 +921,6 @@ func (signed SnapshotType) MarshalJSON() ([]byte, error) {
 	dict["version"] = signed.Version
 	dict["expires"] = signed.Expires
 	dict["meta"] = signed.Meta
-	if signed.Custom != nil {
-		dict["custom"] = signed.Custom
-	}
 	return json.Marshal(dict)
 }
 
@@ -948,7 +941,6 @@ func (signed *SnapshotType) UnmarshalJSON(data []byte) error {
 	delete(dict, "version")
 	delete(dict, "expires")
 	delete(dict, "meta")
-	delete(dict, "custom")
 	signed.UnrecognizedFields = dict
 	return nil
 }
@@ -963,9 +955,6 @@ func (signed TimestampType) MarshalJSON() ([]byte, error) {
 	dict["version"] = signed.Version
 	dict["expires"] = signed.Expires
 	dict["meta"] = signed.Meta
-	if signed.Custom != nil {
-		dict["custom"] = signed.Custom
-	}
 	return json.Marshal(dict)
 }
 
@@ -986,7 +975,6 @@ func (signed *TimestampType) UnmarshalJSON(data []byte) error {
 	delete(dict, "version")
 	delete(dict, "expires")
 	delete(dict, "meta")
-	delete(dict, "custom")
 	signed.UnrecognizedFields = dict
 	return nil
 }
@@ -1003,9 +991,6 @@ func (signed TargetsType) MarshalJSON() ([]byte, error) {
 	dict["targets"] = signed.Targets
 	if signed.Delegations != nil {
 		dict["delegations"] = signed.Delegations
-	}
-	if signed.Custom != nil {
-		dict["custom"] = signed.Custom
 	}
 	return json.Marshal(dict)
 }
@@ -1028,7 +1013,6 @@ func (signed *TargetsType) UnmarshalJSON(data []byte) error {
 	delete(dict, "expires")
 	delete(dict, "targets")
 	delete(dict, "delegations")
-	delete(dict, "custom")
 	signed.UnrecognizedFields = dict
 	return nil
 }
@@ -1107,9 +1091,6 @@ func (key *Key) MarshalJSON() ([]byte, error) {
 	dict["keytype"] = key.Type
 	dict["scheme"] = key.Scheme
 	dict["keyval"] = key.Value
-	if key.Custom != nil {
-		dict["custom"] = key.Custom
-	}
 	return json.Marshal(dict)
 }
 
@@ -1129,7 +1110,6 @@ func (key *Key) UnmarshalJSON(data []byte) error {
 	delete(dict, "keytype")
 	delete(dict, "scheme")
 	delete(dict, "keyval")
-	delete(dict, "custom")
 	key.UnrecognizedFields = dict
 	return nil
 }
