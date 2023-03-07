@@ -76,7 +76,7 @@ example-tuf-client-cli: build-tuf-client
 	./tuf-client init --url https://jku.github.io/tuf-demo/metadata
 	@echo "Downloading the following target file - demo/succinctly-delegated-5.txt"
 	@sleep 2
-	./tuf-client get --url https://jku.github.io/tuf-demo/metadata -t https://jku.github.io/tuf-demo/targets demo/succinctly-delegated-5.txt
+	./tuf-client get --url https://jku.github.io/tuf-demo/metadata --turl https://jku.github.io/tuf-demo/targets --nonprefixed demo/succinctly-delegated-5.txt
 
 # Target for demoing the tuf-client cli with root-signing repo
 .PHONY: example-root-signing
@@ -90,7 +90,7 @@ example-root-signing: build-tuf-client
 	./tuf-client init --url https://sigstore-tuf-root.storage.googleapis.com --file root.json
 	@echo "Downloading the following target file - rekor.pub"
 	@sleep 2
-	./tuf-client get --url https://sigstore-tuf-root.storage.googleapis.com --turl https://sigstore-tuf-root.storage.googleapis.com/targets --prefixed rekor.pub
+	./tuf-client get --url https://sigstore-tuf-root.storage.googleapis.com --turl https://sigstore-tuf-root.storage.googleapis.com/targets rekor.pub
 
 # Clean target
 .PHONY: clean
