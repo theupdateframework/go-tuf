@@ -13,7 +13,6 @@ package metadata
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -367,7 +366,7 @@ func TestUnrecognizedField(t *testing.T) {
 	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"timestamp\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"snapshot.json\":{\"version\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1},\"signatures\":[]}"), timestampJSON)
 }
 
-func TestTargetFilesCustomdField(t *testing.T) {
+func TestTargetFilesCustomField(t *testing.T) {
 	// fixed expire
 	expire := time.Date(2030, 8, 15, 14, 30, 45, 100, time.UTC)
 
@@ -386,6 +385,5 @@ func TestTargetFilesCustomdField(t *testing.T) {
 	targets.Signed.Targets["testTarget"] = targetFile
 	targetsJSON, err := targets.ToBytes(false)
 	assert.NoError(t, err)
-	fmt.Println(string(targetsJSON))
 	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"targets\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"spec_version\":\"1.0.31\",\"targets\":{\"testTarget\":{\"custom\":{\"test\":true},\"hashes\":{},\"length\":0}},\"version\":1},\"signatures\":[]}"), targetsJSON)
 }
