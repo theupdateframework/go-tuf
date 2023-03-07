@@ -60,7 +60,6 @@ type RootType struct {
 	Expires            time.Time        `json:"expires"`
 	Keys               map[string]*Key  `json:"keys"`
 	Roles              map[string]*Role `json:"roles"`
-	Custom             *json.RawMessage `json:"custom,omitempty"`
 	UnrecognizedFields map[string]any   `json:"-"`
 }
 
@@ -71,7 +70,6 @@ type SnapshotType struct {
 	Version            int64                `json:"version"`
 	Expires            time.Time            `json:"expires"`
 	Meta               map[string]MetaFiles `json:"meta"`
-	Custom             *json.RawMessage     `json:"custom,omitempty"`
 	UnrecognizedFields map[string]any       `json:"-"`
 }
 
@@ -83,7 +81,6 @@ type TargetsType struct {
 	Expires            time.Time              `json:"expires"`
 	Targets            map[string]TargetFiles `json:"targets"`
 	Delegations        *Delegations           `json:"delegations,omitempty"`
-	Custom             *json.RawMessage       `json:"custom,omitempty"`
 	UnrecognizedFields map[string]any         `json:"-"`
 }
 
@@ -94,19 +91,17 @@ type TimestampType struct {
 	Version            int64                `json:"version"`
 	Expires            time.Time            `json:"expires"`
 	Meta               map[string]MetaFiles `json:"meta"`
-	Custom             *json.RawMessage     `json:"custom,omitempty"`
 	UnrecognizedFields map[string]any       `json:"-"`
 }
 
 // Key represents a key in TUF
 type Key struct {
-	Type               string           `json:"keytype"`
-	Scheme             string           `json:"scheme"`
-	Value              KeyVal           `json:"keyval"`
-	Custom             *json.RawMessage `json:"custom,omitempty"`
-	id                 string           `json:"-"`
-	idOnce             sync.Once        `json:"-"`
-	UnrecognizedFields map[string]any   `json:"-"`
+	Type               string         `json:"keytype"`
+	Scheme             string         `json:"scheme"`
+	Value              KeyVal         `json:"keyval"`
+	id                 string         `json:"-"`
+	idOnce             sync.Once      `json:"-"`
+	UnrecognizedFields map[string]any `json:"-"`
 }
 
 type KeyVal struct {
