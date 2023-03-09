@@ -1003,6 +1003,11 @@ func (signed *TargetsType) UnmarshalJSON(data []byte) error {
 	}
 	*signed = TargetsType(s)
 
+	// populate the path field for each target
+	for name, targetFile := range signed.Targets {
+		targetFile.Path = name
+	}
+
 	var dict map[string]any
 	if err := json.Unmarshal(data, &dict); err != nil {
 		return err

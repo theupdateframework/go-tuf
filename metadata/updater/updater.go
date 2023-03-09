@@ -478,8 +478,6 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 		target, ok := targets.Signed.Targets[targetFilePath]
 		if ok {
 			log.Debugf("Found target in current role %s", delegation.Role)
-			// Probably not pretty, but populate TargetFiles.Path since this is not handled in fromBytes()
-			target.Path = targetFilePath
 			return target, nil
 		}
 		// after pre-order check, add current role to set of visited roles
@@ -569,6 +567,11 @@ func (update *Updater) generateTargetFilePath(tf *metadata.TargetFiles) (string,
 func (update *Updater) loadLocalMetadata(roleName string) ([]byte, error) {
 	roleName = fmt.Sprintf("%s.json", roleName)
 	return readFile(roleName)
+}
+
+// GetTopLevelTargets returns the top-level target files
+func (update *Updater) GetTopLevelTargets() map[string]*metadata.TargetFiles {
+	return update.trusted.Targets[metadata.TARGETS].Signed.Targets
 }
 
 // ensureTrailingSlash ensures url ends with a slash
