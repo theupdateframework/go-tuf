@@ -574,6 +574,11 @@ func (update *Updater) GetTopLevelTargets() map[string]*metadata.TargetFiles {
 	return update.trusted.Targets[metadata.TARGETS].Signed.Targets
 }
 
+// GetTrustedMetadataSet returns the trusted metadata set
+func (update *Updater) GetTrustedMetadataSet() trustedmetadata.TrustedMetadata {
+	return *update.trusted
+}
+
 // ensureTrailingSlash ensures url ends with a slash
 func ensureTrailingSlash(url string) string {
 	if strings.HasSuffix(url, "/") {
