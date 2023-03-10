@@ -70,9 +70,19 @@ func New(config *config.UpdaterConfig) (*Updater, error) {
 	// check in case we bootstrap using an already provided root.json byte content
 	if len(updater.cfg.LocalTrustedRootBytes) == 0 {
 		// if not, then we try to load a root.json file from a local path
-		// suffix with root.json in case it's a directory path
-		if !strings.HasSuffix(updater.cfg.LocalTrustedRootPath, fmt.Sprintf("%s.json", metadata.ROOT)) {
-			updater.cfg.LocalTrustedRootPath = filepath.Join(updater.cfg.LocalTrustedRootPath, fmt.Sprintf("%s.json", metadata.ROOT))
+		// trim the extension in case it's a filename path
+		fileInfo, err := os.Stat(updater.cfg.LocalTrustedRootPath)
+		if err != nil {
+			return nil, err
+		}
+		if fileInfo.IsDir() {
+			// directory path, add "root" to it
+			updater.cfg.LocalTrustedRootPath = filepath.Join(updater.cfg.LocalTrustedRootPath, metadata.ROOT)
+		} else {
+			// file path, remove ".json" from it
+			if strings.HasSuffix(updater.cfg.LocalTrustedRootPath, fmt.Sprintf("%s.json", metadata.ROOT)) {
+				updater.cfg.LocalTrustedRootPath = strings.TrimSuffix(updater.cfg.LocalTrustedRootPath, ".json")
+			}
 		}
 		// load the root metadata file used for bootstrapping trust
 		rootBytes, err := updater.loadLocalMetadata(updater.cfg.LocalTrustedRootPath)
@@ -231,7 +241,7 @@ func (update *Updater) FindCachedTarget(targetFile *metadata.TargetFiles, filePa
 // loadTimestamp load local and remote timestamp metadata
 func (update *Updater) loadTimestamp() error {
 	// try to read local timestamp
-	data, err := update.loadLocalMetadata(metadata.TIMESTAMP)
+	data, err := update.loadLocalMetadata(filepath.Join(update.cfg.LocalMetadataDir, metadata.TIMESTAMP))
 	if err != nil {
 		// this means there's no existing local timestamp so we should proceed downloading it without the need to UpdateTimestamp
 		log.Debug("Local timestamp does not exist")
@@ -239,7 +249,8 @@ func (update *Updater) loadTimestamp() error {
 		// local timestamp exists, let's try to verify it and load it to the trusted metadata set
 		_, err := update.trusted.UpdateTimestamp(data)
 		if err != nil {
-			if errors.Is(err, metadata.ErrRepository{}) {
+			var tmpErr metadata.ErrRepository
+			if errors.As(err, &tmpErr) {
 				// local timestamp is not valid, proceed downloading from remote; note that this error type includes several other subset errors
 				log.Debug("Local timestamp is not valid")
 			} else {
@@ -258,7 +269,8 @@ func (update *Updater) loadTimestamp() error {
 	// try to verify and load the newly downloaded timestamp
 	_, err = update.trusted.UpdateTimestamp(data)
 	if err != nil {
-		if errors.Is(err, metadata.ErrEqualVersionNumber{}) {
+		var tmpErr metadata.ErrEqualVersionNumber
+		if errors.As(err, &tmpErr) {
 			// if the new timestamp version is the same as current, discard the
 			// new timestamp; this is normal and it shouldn't raise any error
 			return nil
@@ -278,7 +290,7 @@ func (update *Updater) loadTimestamp() error {
 // loadSnapshot load local (and if needed remote) snapshot metadata
 func (update *Updater) loadSnapshot() error {
 	// try to read local snapshot
-	data, err := update.loadLocalMetadata(metadata.SNAPSHOT)
+	data, err := update.loadLocalMetadata(filepath.Join(update.cfg.LocalMetadataDir, metadata.SNAPSHOT))
 	if err != nil {
 		// this means there's no existing local snapshot so we should proceed downloading it without the need to UpdateSnapshot
 		log.Debug("Local snapshot does not exist")
@@ -287,7 +299,8 @@ func (update *Updater) loadSnapshot() error {
 		_, err = update.trusted.UpdateSnapshot(data, true)
 		if err != nil {
 			// this means snapshot verification/loading failed
-			if errors.Is(err, metadata.ErrRepository{}) {
+			var tmpErr metadata.ErrRepository
+			if errors.As(err, &tmpErr) {
 				// local snapshot is not valid, proceed downloading from remote; note that this error type includes several other subset errors
 				log.Debug("Local snapshot is not valid")
 			} else {
@@ -343,7 +356,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 		return role, nil
 	}
 	// try to read local targets
-	data, err := update.loadLocalMetadata(roleName)
+	data, err := update.loadLocalMetadata(filepath.Join(update.cfg.LocalMetadataDir, roleName))
 	if err != nil {
 		// this means there's no existing local target file so we should proceed downloading it without the need to UpdateDelegatedTargets
 		log.Debugf("Local %s does not exist", roleName)
@@ -352,7 +365,8 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 		delegatedTargets, err := update.trusted.UpdateDelegatedTargets(data, roleName, parentName)
 		if err != nil {
 			// this means targets verification/loading failed
-			if errors.Is(err, metadata.ErrRepository{}) {
+			var tmpErr metadata.ErrRepository
+			if errors.As(err, &tmpErr) {
 				// local target file is not valid, proceed downloading from remote; note that this error type includes several other subset errors
 				log.Debugf("Local %s is not valid", roleName)
 			} else {
@@ -413,9 +427,9 @@ func (update *Updater) loadRoot() error {
 		data, err := update.downloadMetadata(metadata.ROOT, update.cfg.RootMaxLength, strconv.FormatInt(nextVersion, 10))
 		if err != nil {
 			// downloading the root metadata failed for some reason
-			var downloadErr metadata.ErrDownloadHTTP
-			if errors.As(err, &downloadErr) {
-				if downloadErr.StatusCode != http.StatusNotFound && downloadErr.StatusCode != http.StatusForbidden {
+			var tmpErr metadata.ErrDownloadHTTP
+			if errors.As(err, &tmpErr) {
+				if tmpErr.StatusCode != http.StatusNotFound && tmpErr.StatusCode != http.StatusForbidden {
 					// unexpected HTTP status code
 					return err
 				}
@@ -564,7 +578,7 @@ func (update *Updater) generateTargetFilePath(tf *metadata.TargetFiles) (string,
 
 // loadLocalMetadata reads a local <roleName>.json file and returns its bytes
 func (update *Updater) loadLocalMetadata(roleName string) ([]byte, error) {
-	return readFile(roleName)
+	return readFile(fmt.Sprintf("%s.json", roleName))
 }
 
 // GetTopLevelTargets returns the top-level target files
