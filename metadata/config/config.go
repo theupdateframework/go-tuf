@@ -11,26 +11,52 @@
 
 package config
 
+import (
+	"fmt"
+
+	"github.com/rdimitrov/go-tuf-metadata/metadata"
+	"github.com/rdimitrov/go-tuf-metadata/metadata/fetcher"
+)
+
 type UpdaterConfig struct {
-	MaxRootRotations      int64
-	MaxDelegations        int
-	RootMaxLength         int64
-	TimestampMaxLength    int64
-	SnapshotMaxLength     int64
-	TargetsMaxLength      int64
+	// TUF configuration
+	MaxRootRotations   int64
+	MaxDelegations     int
+	RootMaxLength      int64
+	TimestampMaxLength int64
+	SnapshotMaxLength  int64
+	TargetsMaxLength   int64
+	// Updater configuration
+	Fetcher               fetcher.Fetcher
+	LocalTrustedRootPath  string
+	LocalMetadataDir      string
+	LocalTargetsDir       string
+	RemoteMetadataURL     string
+	RemoteTargetsURL      string
+	DisableLocalCache     bool
 	PrefixTargetsWithHash bool
 }
 
 // New creates a new UpdaterConfig instance used by the Updater to
 // store configuration
-func New() *UpdaterConfig {
+func New(rootPath ...string) *UpdaterConfig {
+	// if no rootPath is provided, default to looking for the root.json in the current working directory
+	trustedRootPath := fmt.Sprintf("%s.json", metadata.ROOT)
+	if len(rootPath) != 0 {
+		trustedRootPath = rootPath[0]
+	}
 	return &UpdaterConfig{
-		MaxRootRotations:      32,
-		MaxDelegations:        32,
-		RootMaxLength:         512000,  // bytes
-		TimestampMaxLength:    16384,   // bytes
-		SnapshotMaxLength:     2000000, // bytes
-		TargetsMaxLength:      5000000, // bytes
-		PrefixTargetsWithHash: true,    // use hash-prefixed target files with consistent snapshots
+		// TUF configuration
+		MaxRootRotations:   32,
+		MaxDelegations:     32,
+		RootMaxLength:      512000,  // bytes
+		TimestampMaxLength: 16384,   // bytes
+		SnapshotMaxLength:  2000000, // bytes
+		TargetsMaxLength:   5000000, // bytes
+		// Updater configuration
+		Fetcher:               &fetcher.DefaultFetcher{}, // use the default built-in download fetcher
+		LocalTrustedRootPath:  trustedRootPath,           // local path to trusted root.json
+		DisableLocalCache:     false,                     // enable local caching of trusted metadata
+		PrefixTargetsWithHash: true,                      // use hash-prefixed target files with consistent snapshots
 	}
 }

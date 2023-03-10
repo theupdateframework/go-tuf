@@ -25,18 +25,12 @@ import (
 
 	"github.com/rdimitrov/go-tuf-metadata/metadata"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/config"
-	"github.com/rdimitrov/go-tuf-metadata/metadata/fetcher"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/trustedmetadata"
 	log "github.com/sirupsen/logrus"
 )
 
 // Client update workflow implementation
-
-type roleParentTuple struct {
-	Role   string
-	Parent string
-}
-
+//
 // The "Updater" provides an implementation of the TUF client workflow (ref. https://theupdateframework.github.io/specification/latest/#detailed-client-workflow).
 // "Updater" provides an API to query available targets and to download them in a
 // secure manner: All downloaded files are verified by signed metadata.
@@ -58,40 +52,27 @@ type roleParentTuple struct {
 //   - DownloadTarget() downloads a target file and ensures it is
 //     verified correct by the metadata.
 type Updater struct {
-	metadataDir     string
-	metadataBaseUrl string
-	targetDir       string
-	targetBaseUrl   string
-	trusted         *trustedmetadata.TrustedMetadata
-	config          *config.UpdaterConfig
-	fetcher         fetcher.Fetcher
+	trusted *trustedmetadata.TrustedMetadata
+	cfg     *config.UpdaterConfig
+}
+
+type roleParentTuple struct {
+	Role   string
+	Parent string
 }
 
 // New creates a new Updater instance and loads trusted root metadata
-func New(metadataDir, metadataBaseUrl, targetBaseUrl, targetDir, trustedRootDir string, cfg *config.UpdaterConfig, f fetcher.Fetcher) (*Updater, error) {
-	// local path of the trusted root metadata file used for bootstrapping
-	rootPath := metadata.ROOT
-	if trustedRootDir != "" {
-		rootPath = filepath.Join(trustedRootDir, rootPath)
-	}
-
-	// use the built-in download fetcher if nothing is provided
-	if f == nil {
-		f = &fetcher.DefaultFetcher{}
-	}
-
+func New(config *config.UpdaterConfig) (*Updater, error) {
 	// create an updater instance
 	updater := &Updater{
-		metadataDir:     metadataDir,
-		metadataBaseUrl: ensureTrailingSlash(metadataBaseUrl),
-		targetBaseUrl:   ensureTrailingSlash(targetBaseUrl),
-		targetDir:       targetDir,
-		config:          cfg,
-		fetcher:         f,
+		cfg: config,
 	}
-
+	// suffix with root.json in case it's a directory path
+	if !strings.HasSuffix(updater.cfg.LocalTrustedRootPath, fmt.Sprintf("%s.json", metadata.ROOT)) {
+		updater.cfg.LocalTrustedRootPath = filepath.Join(updater.cfg.LocalTrustedRootPath, fmt.Sprintf("%s.json", metadata.ROOT))
+	}
 	// load the root metadata file used for bootstrapping trust
-	rootBytes, err := updater.loadLocalMetadata(rootPath)
+	rootBytes, err := updater.loadLocalMetadata(updater.cfg.LocalTrustedRootPath)
 	if err != nil {
 		return nil, err
 	}
@@ -163,16 +144,16 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 		}
 	}
 	if targetBaseURL == "" {
-		if update.targetBaseUrl == "" {
+		if update.cfg.RemoteTargetsURL == "" {
 			return "", metadata.ErrValue{Msg: "targetBaseURL must be set in either DownloadTarget() or the Updater struct"}
 		}
-		targetBaseURL = update.targetBaseUrl
+		targetBaseURL = ensureTrailingSlash(update.cfg.RemoteTargetsURL)
 	} else {
 		targetBaseURL = ensureTrailingSlash(targetBaseURL)
 	}
 	targetFilePath := targetFile.Path
 	consistentSnapshot := update.trusted.Root.Signed.ConsistentSnapshot
-	if consistentSnapshot && update.config.PrefixTargetsWithHash {
+	if consistentSnapshot && update.cfg.PrefixTargetsWithHash {
 		hashes := ""
 		// get first hex value of hashes
 		for _, v := range targetFile.Hashes {
@@ -189,7 +170,7 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 		}
 	}
 	fullURL := fmt.Sprintf("%s%s", targetBaseURL, targetFilePath)
-	data, err := update.fetcher.DownloadFile(fullURL, targetFile.Length)
+	data, err := update.cfg.Fetcher.DownloadFile(fullURL, targetFile.Length)
 	if err != nil {
 		return "", err
 	}
@@ -258,7 +239,7 @@ func (update *Updater) loadTimestamp() error {
 		// all okay, local timestamp exists and it is valid, nevertheless proceed with downloading from remote
 	}
 	// load from remote (whether local load succeeded or not)
-	data, err = update.downloadMetadata(metadata.TIMESTAMP, update.config.TimestampMaxLength, "")
+	data, err = update.downloadMetadata(metadata.TIMESTAMP, update.cfg.TimestampMaxLength, "")
 	if err != nil {
 		return err
 	}
@@ -317,7 +298,7 @@ func (update *Updater) loadSnapshot() error {
 	// extract the length of the snapshot metadata to be downloaded
 	length := snapshotMeta.Length
 	if length == 0 {
-		length = update.config.SnapshotMaxLength
+		length = update.cfg.SnapshotMaxLength
 	}
 	// extract which snapshot version should be downloaded in case of consistent snapshots
 	version := ""
@@ -382,7 +363,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 	// extract the length of the target metadata to be downloaded
 	length := metaInfo.Length
 	if length == 0 {
-		length = update.config.TargetsMaxLength
+		length = update.cfg.TargetsMaxLength
 	}
 	// extract which target metadata version should be downloaded in case of consistent snapshots
 	version := ""
@@ -413,11 +394,11 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 func (update *Updater) loadRoot() error {
 	// calculate boundaries
 	lowerBound := update.trusted.Root.Signed.Version + 1
-	upperBound := lowerBound + update.config.MaxRootRotations
+	upperBound := lowerBound + update.cfg.MaxRootRotations
 
 	// loop until we find the latest available version of root (download -> verify -> load -> persist)
 	for nextVersion := lowerBound; nextVersion <= upperBound; nextVersion++ {
-		data, err := update.downloadMetadata(metadata.ROOT, update.config.RootMaxLength, strconv.FormatInt(nextVersion, 10))
+		data, err := update.downloadMetadata(metadata.ROOT, update.cfg.RootMaxLength, strconv.FormatInt(nextVersion, 10))
 		if err != nil {
 			// downloading the root metadata failed for some reason
 			var downloadErr metadata.ErrDownloadHTTP
@@ -459,7 +440,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 	}}
 	visitedRoleNames := map[string]bool{}
 	// pre-order depth-first traversal of the graph of target delegations
-	for len(visitedRoleNames) <= update.config.MaxDelegations && len(delegationsToVisit) > 0 {
+	for len(visitedRoleNames) <= update.cfg.MaxDelegations && len(delegationsToVisit) > 0 {
 		// pop the role name from the top of the stack
 		delegation := delegationsToVisit[len(delegationsToVisit)-1]
 		delegationsToVisit = delegationsToVisit[:len(delegationsToVisit)-1]
@@ -506,7 +487,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 	if len(delegationsToVisit) > 0 {
 		log.Debugf("%d roles left to visit, but allowed at most %d delegations",
 			len(delegationsToVisit),
-			update.config.MaxDelegations)
+			update.cfg.MaxDelegations)
 	}
 	// if this point is reached then target is not found, return nil
 	return nil, fmt.Errorf("target %s not found", targetFilePath)
@@ -514,7 +495,12 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 
 // persistMetadata writes metadata to disk atomically to avoid data loss
 func (update *Updater) persistMetadata(roleName string, data []byte) error {
-	fileName := filepath.Join(update.metadataDir, fmt.Sprintf("%s.json", url.QueryEscape(roleName)))
+	// do not persist the metadata if we have disabled local caching
+	if update.cfg.DisableLocalCache {
+		return nil
+	}
+	// caching enabled, proceed with persisting the metadata locally
+	fileName := filepath.Join(update.cfg.LocalMetadataDir, fmt.Sprintf("%s.json", url.QueryEscape(roleName)))
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -544,28 +530,27 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 
 // downloadMetadata download a metadata file and return it as bytes
 func (update *Updater) downloadMetadata(roleName string, length int64, version string) ([]byte, error) {
-	urlPath := update.metadataBaseUrl
+	urlPath := ensureTrailingSlash(update.cfg.RemoteMetadataURL)
 	// build urlPath
 	if version == "" {
 		urlPath = fmt.Sprintf("%s%s.json", urlPath, url.QueryEscape(roleName))
 	} else {
 		urlPath = fmt.Sprintf("%s%s.%s.json", urlPath, version, url.QueryEscape(roleName))
 	}
-	return update.fetcher.DownloadFile(urlPath, length)
+	return update.cfg.Fetcher.DownloadFile(urlPath, length)
 }
 
 // generateTargetFilePath generates path from TargetFiles
 func (update *Updater) generateTargetFilePath(tf *metadata.TargetFiles) (string, error) {
-	if update.targetDir == "" {
+	if update.cfg.LocalTargetsDir == "" {
 		return "", metadata.ErrValue{Msg: "target_dir must be set if filepath is not given"}
 	}
 	// Use URL encoded target path as filename
-	return url.JoinPath(update.targetDir, url.QueryEscape(tf.Path))
+	return url.JoinPath(update.cfg.LocalTargetsDir, url.QueryEscape(tf.Path))
 }
 
 // loadLocalMetadata reads a local <roleName>.json file and returns its bytes
 func (update *Updater) loadLocalMetadata(roleName string) ([]byte, error) {
-	roleName = fmt.Sprintf("%s.json", roleName)
 	return readFile(roleName)
 }
 
