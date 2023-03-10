@@ -67,17 +67,22 @@ func New(config *config.UpdaterConfig) (*Updater, error) {
 	updater := &Updater{
 		cfg: config,
 	}
-	// suffix with root.json in case it's a directory path
-	if !strings.HasSuffix(updater.cfg.LocalTrustedRootPath, fmt.Sprintf("%s.json", metadata.ROOT)) {
-		updater.cfg.LocalTrustedRootPath = filepath.Join(updater.cfg.LocalTrustedRootPath, fmt.Sprintf("%s.json", metadata.ROOT))
+	// check in case we bootstrap using an already provided root.json byte content
+	if len(updater.cfg.LocalTrustedRootBytes) == 0 {
+		// if not, then we try to load a root.json file from a local path
+		// suffix with root.json in case it's a directory path
+		if !strings.HasSuffix(updater.cfg.LocalTrustedRootPath, fmt.Sprintf("%s.json", metadata.ROOT)) {
+			updater.cfg.LocalTrustedRootPath = filepath.Join(updater.cfg.LocalTrustedRootPath, fmt.Sprintf("%s.json", metadata.ROOT))
+		}
+		// load the root metadata file used for bootstrapping trust
+		rootBytes, err := updater.loadLocalMetadata(updater.cfg.LocalTrustedRootPath)
+		if err != nil {
+			return nil, err
+		}
+		updater.cfg.LocalTrustedRootBytes = rootBytes
 	}
-	// load the root metadata file used for bootstrapping trust
-	rootBytes, err := updater.loadLocalMetadata(updater.cfg.LocalTrustedRootPath)
-	if err != nil {
-		return nil, err
-	}
-	// create a new trusted metadata instance
-	trustedMetadataSet, err := trustedmetadata.New(rootBytes)
+	// create a new trusted metadata instance using the trusted root.json
+	trustedMetadataSet, err := trustedmetadata.New(updater.cfg.LocalTrustedRootBytes)
 	if err != nil {
 		return nil, err
 	}
