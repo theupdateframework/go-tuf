@@ -27,10 +27,11 @@ import (
 
 // The following config is used to fetch a target from Jussi's GitHub repository example
 const (
-	metadataURL = "https://jku.github.io/tuf-demo/metadata"
-	targetsURL  = "https://jku.github.io/tuf-demo/targets"
-	targetName  = "demo/succinctly-delegated-5.txt"
-	verbosity   = log.InfoLevel
+	metadataURL          = "https://jku.github.io/tuf-demo/metadata"
+	targetsURL           = "https://jku.github.io/tuf-demo/targets"
+	targetName           = "demo/succinctly-delegated-5.txt"
+	verbosity            = log.InfoLevel
+	generateRandomFolder = false
 )
 
 func main() {
@@ -58,22 +59,26 @@ func main() {
 
 // InitEnvironment prepares the local environment - temporary folders, etc.
 func InitEnvironment() (string, error) {
+	var tmpDir string
 	// get working directory
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current working directory: %w", err)
 	}
-	// create a temporary folder for storing the demo artifacts
-	tmpDir, err := os.MkdirTemp(cwd, "tmp")
-	if err != nil {
-		return "", fmt.Errorf("failed to create a temporary folder: %w", err)
+	if generateRandomFolder {
+		tmpDir = filepath.Join(cwd, "tmp")
+		// create a temporary folder for storing the demo artifacts
+		os.Mkdir(tmpDir, 0750)
+	} else {
+		// create a temporary folder for storing the demo artifacts
+		tmpDir, err = os.MkdirTemp(cwd, "tmp")
+		if err != nil {
+			return "", fmt.Errorf("failed to create a temporary folder: %w", err)
+		}
 	}
 
 	// create a destination folder for storing the downloaded target
-	err = os.Mkdir(filepath.Join(tmpDir, "download"), 0750)
-	if err != nil {
-		return "", fmt.Errorf("failed to create a download folder: %w", err)
-	}
+	os.Mkdir(filepath.Join(tmpDir, "download"), 0750)
 	return tmpDir, nil
 }
 
