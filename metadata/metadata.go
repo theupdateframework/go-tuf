@@ -14,6 +14,7 @@ package metadata
 import (
 	"bytes"
 	"crypto"
+	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/binary"
@@ -433,6 +434,24 @@ func (f *TargetFiles) VerifyLengthHashes(data []byte) error {
 		return err
 	}
 	return nil
+}
+
+// Equal checks whether the source target file matches another
+func (source *TargetFiles) Equal(expected TargetFiles) bool {
+	if source.Length == expected.Length && source.Hashes.Equal(expected.Hashes) {
+		return true
+	}
+	return false
+}
+
+// EqualFromBytes checks whether the source target file matches another (from bytes)
+func (source *TargetFiles) EqualFromBytes(expectedBytes []byte) bool {
+	// create target file from bytes
+	expected, err := TargetFile().FromBytes("", expectedBytes)
+	if err == nil && source.Equal(*expected) {
+		return true
+	}
+	return false
 }
 
 // FromFile generate TargetFiles from file
@@ -1386,4 +1405,20 @@ func copyMapValues(src, dst map[string]any) {
 	for k, v := range src {
 		dst[k] = v
 	}
+}
+
+// Equal checks whether one hash set equals another
+func (source Hashes) Equal(expected Hashes) bool {
+	hashChecked := false
+	for typ, hash := range expected {
+		if h, ok := source[typ]; ok {
+			// hash type match found
+			hashChecked = true
+			if !hmac.Equal(h, hash) {
+				// hash values don't match
+				return false
+			}
+		}
+	}
+	return hashChecked
 }
