@@ -29,6 +29,7 @@ type UpdaterConfig struct {
 	// Updater configuration
 	Fetcher               fetcher.Fetcher
 	LocalTrustedRootPath  string
+	LocalTrustedRootBytes []byte
 	LocalMetadataDir      string
 	LocalTargetsDir       string
 	RemoteMetadataURL     string
