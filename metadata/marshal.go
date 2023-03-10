@@ -552,3 +552,10 @@ func (b HexBytes) MarshalJSON() ([]byte, error) {
 func (b HexBytes) String() string {
 	return hex.EncodeToString(b)
 }
+
+// copyMapValues copies the values of the src map to dst
+func copyMapValues(src, dst map[string]any) {
+	for k, v := range src {
+		dst[k] = v
+	}
+}
