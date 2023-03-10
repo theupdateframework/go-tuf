@@ -27,40 +27,30 @@ import (
 
 // The following config is used to fetch a target from Jussi's GitHub repository example
 const (
-	baseURL            = "https://jku.github.io/tuf-demo"
-	baseURLMetadataDir = "metadata"
-	baseURLTargetsDir  = "targets"
-	targetName         = "demo/succinctly-delegated-5.txt"
-	verbosity          = log.InfoLevel
+	metadataURL = "https://jku.github.io/tuf-demo/metadata"
+	targetsURL  = "https://jku.github.io/tuf-demo/targets"
+	targetName  = "demo/succinctly-delegated-5.txt"
+	verbosity   = log.InfoLevel
 )
-
-// The following config is used to fetch a target from a local RSTUF deployment
-// const (
-// 	baseURL            = "http://127.0.0.1:8080"
-// 	baseURLMetadataDir = ""
-// 	baseURLTargetsDir  = ""
-// 	targetName         = "file2.tar.gz"
-// 	verbosity          = log.InfoLevel
-// )
 
 func main() {
 	// set debug level
 	log.SetLevel(verbosity)
 
 	// initialize environment - temporary folders, etc.
-	localMetadataDir, err := InitEnvironment()
+	metadataDir, err := InitEnvironment()
 	if err != nil {
 		log.Fatal("Failed to initialize environment: ", err)
 	}
 
 	// initialize client with Trust-On-First-Use
-	err = InitTrustOnFirstUse(localMetadataDir)
+	err = InitTrustOnFirstUse(metadataDir)
 	if err != nil {
 		log.Fatal("Trust-On-First-Use failed: ", err)
 	}
 
 	// download the desired target
-	err = DownloadTarget(localMetadataDir, targetName)
+	err = DownloadTarget(metadataDir, targetName)
 	if err != nil {
 		log.Fatal("Download failed: ", err)
 	}
@@ -73,7 +63,6 @@ func InitEnvironment() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get current working directory: %w", err)
 	}
-
 	// create a temporary folder for storing the demo artifacts
 	tmpDir, err := os.MkdirTemp(cwd, "tmp")
 	if err != nil {
@@ -90,8 +79,14 @@ func InitEnvironment() (string, error) {
 
 // InitTrustOnFirstUse initialize local trusted metadata (Trust-On-First-Use)
 func InitTrustOnFirstUse(metadataDir string) error {
+	// check if there's already a local root.json available for bootstrapping trust
+	_, err := os.Stat(filepath.Join(metadataDir, "root.json"))
+	if err == nil {
+		return nil
+	}
+
 	// download the initial root metadata so we can bootstrap Trust-On-First-Use
-	rootURL, err := url.JoinPath(baseURL, baseURLMetadataDir, "1.root.json")
+	rootURL, err := url.JoinPath(metadataURL, "1.root.json")
 	if err != nil {
 		return fmt.Errorf("failed to create URL path for 1.root.json: %w", err)
 	}
@@ -128,15 +123,12 @@ func InitTrustOnFirstUse(metadataDir string) error {
 // get the target information, verifies if the target is already cached, and in case it
 // is not cached, downloads the target file.
 func DownloadTarget(localMetadataDir, target string) error {
-	metadataBaseURL, _ := url.JoinPath(baseURL, baseURLMetadataDir)
-	targetsBaseURL, _ := url.JoinPath(baseURL, baseURLTargetsDir)
-
 	// create updater configuration
 	cfg := config.New(localMetadataDir) // default config
 	cfg.LocalMetadataDir = localMetadataDir
 	cfg.LocalTargetsDir = filepath.Join(localMetadataDir, "download")
-	cfg.RemoteMetadataURL = metadataBaseURL
-	cfg.RemoteTargetsURL = targetsBaseURL
+	cfg.RemoteMetadataURL = metadataURL
+	cfg.RemoteTargetsURL = targetsURL
 	cfg.PrefixTargetsWithHash = false // do not use hash-prefixed target files with consistent snapshots
 
 	// create a new Updater instance
