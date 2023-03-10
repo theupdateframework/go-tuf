@@ -135,17 +135,17 @@ func (update *Updater) GetTargetInfo(targetPath string) (*metadata.TargetFiles, 
 }
 
 // DownloadTarget downloads the target file specified by targetFile
-func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath, targetBaseURL string) (string, error) {
+func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath, targetBaseURL string) (string, []byte, error) {
 	var err error
 	if filePath == "" {
 		filePath, err = update.generateTargetFilePath(targetFile)
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
 	}
 	if targetBaseURL == "" {
 		if update.cfg.RemoteTargetsURL == "" {
-			return "", metadata.ErrValue{Msg: "targetBaseURL must be set in either DownloadTarget() or the Updater struct"}
+			return "", nil, metadata.ErrValue{Msg: "targetBaseURL must be set in either DownloadTarget() or the Updater struct"}
 		}
 		targetBaseURL = ensureTrailingSlash(update.cfg.RemoteTargetsURL)
 	} else {
@@ -172,30 +172,37 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 	fullURL := fmt.Sprintf("%s%s", targetBaseURL, targetFilePath)
 	data, err := update.cfg.Fetcher.DownloadFile(fullURL, targetFile.Length)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	err = targetFile.VerifyLengthHashes(data)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	// write the data content to file
-	err = os.WriteFile(filePath, data, 0644)
-	if err != nil {
-		return "", err
+
+	// do not persist the target file if cache is disabled
+	if !update.cfg.DisableLocalCache {
+		err = os.WriteFile(filePath, data, 0644)
+		if err != nil {
+			return "", nil, err
+		}
 	}
 	log.Infof("Downloaded target %s", targetFile.Path)
-	return filePath, nil
+	return filePath, data, nil
 }
 
 // FindCachedTarget checks whether a local file is an up to date target
-func (update *Updater) FindCachedTarget(targetFile *metadata.TargetFiles, filePath string) (string, error) {
+func (update *Updater) FindCachedTarget(targetFile *metadata.TargetFiles, filePath string) (string, []byte, error) {
 	var err error
 	targetFilePath := ""
+	// do not look for cached target file if cache is disabled
+	if update.cfg.DisableLocalCache {
+		return "", nil, nil
+	}
 	// get its path if not provided
 	if filePath == "" {
 		targetFilePath, err = update.generateTargetFilePath(targetFile)
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
 	} else {
 		targetFilePath = filePath
@@ -204,16 +211,16 @@ func (update *Updater) FindCachedTarget(targetFile *metadata.TargetFiles, filePa
 	data, err := readFile(targetFilePath)
 	if err != nil {
 		// do not want to return err, instead we say that there's no cached target available
-		return "", nil
+		return "", nil, nil
 	}
 	// verify if the length and hashes of this target file match the expected values
 	err = targetFile.VerifyLengthHashes(data)
 	if err != nil {
 		// do not want to return err, instead we say that there's no cached target available
-		return "", nil
+		return "", nil, nil
 	}
 	// if all okay, return its path
-	return targetFilePath, nil
+	return targetFilePath, data, nil
 }
 
 // loadTimestamp load local and remote timestamp metadata
@@ -542,8 +549,9 @@ func (update *Updater) downloadMetadata(roleName string, length int64, version s
 
 // generateTargetFilePath generates path from TargetFiles
 func (update *Updater) generateTargetFilePath(tf *metadata.TargetFiles) (string, error) {
-	if update.cfg.LocalTargetsDir == "" {
-		return "", metadata.ErrValue{Msg: "target_dir must be set if filepath is not given"}
+	// LocalTargetsDir can be omitted if caching is disabled
+	if update.cfg.LocalTargetsDir == "" && !update.cfg.DisableLocalCache {
+		return "", metadata.ErrValue{Msg: "LocalTargetsDir must be set if filepath is not given"}
 	}
 	// Use URL encoded target path as filename
 	return url.JoinPath(update.cfg.LocalTargetsDir, url.QueryEscape(tf.Path))
