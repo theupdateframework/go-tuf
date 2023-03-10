@@ -787,13 +787,6 @@ func (source Hashes) Equal(expected Hashes) bool {
 	return hashChecked
 }
 
-// copyMapValues copies the values of the src map to dst
-func copyMapValues(src, dst map[string]any) {
-	for k, v := range src {
-		dst[k] = v
-	}
-}
-
 // verifyLength verifies if the passed data has the corresponding length
 func verifyLength(data []byte, length int64) error {
 	len, err := io.Copy(io.Discard, bytes.NewReader(data))
