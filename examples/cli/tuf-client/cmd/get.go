@@ -66,8 +66,7 @@ func GetCmd(target string) error {
 	}
 
 	// updater configuration
-	cfg := config.New() // default config
-	cfg.LocalTrustedRootPath = env.MetadataDir
+	cfg := config.New(env.MetadataDir) // default config
 	cfg.LocalMetadataDir = env.MetadataDir
 	cfg.LocalTargetsDir = env.DownloadDir
 	cfg.RemoteMetadataURL = env.MetadataURL

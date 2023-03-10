@@ -133,7 +133,6 @@ func DownloadTarget(localMetadataDir, target string) error {
 
 	// create updater configuration
 	cfg := config.New(localMetadataDir) // default config
-	// cfg.LocalTrustedRootPath = localMetadataDir
 	cfg.LocalMetadataDir = localMetadataDir
 	cfg.LocalTargetsDir = filepath.Join(localMetadataDir, "download")
 	cfg.RemoteMetadataURL = metadataBaseURL
