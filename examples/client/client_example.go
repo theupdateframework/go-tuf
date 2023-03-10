@@ -131,18 +131,17 @@ func DownloadTarget(localMetadataDir, target string) error {
 	metadataBaseURL, _ := url.JoinPath(baseURL, baseURLMetadataDir)
 	targetsBaseURL, _ := url.JoinPath(baseURL, baseURLTargetsDir)
 
-	cfg := config.New()               // default config
+	// create updater configuration
+	cfg := config.New(localMetadataDir) // default config
+	// cfg.LocalTrustedRootPath = localMetadataDir
+	cfg.LocalMetadataDir = localMetadataDir
+	cfg.LocalTargetsDir = filepath.Join(localMetadataDir, "download")
+	cfg.RemoteMetadataURL = metadataBaseURL
+	cfg.RemoteTargetsURL = targetsBaseURL
 	cfg.PrefixTargetsWithHash = false // do not use hash-prefixed target files with consistent snapshots
 
 	// create a new Updater instance
-	up, err := updater.New(
-		localMetadataDir,
-		metadataBaseURL,
-		targetsBaseURL,
-		filepath.Join(localMetadataDir, "download"),
-		localMetadataDir,
-		cfg,
-		nil)
+	up, err := updater.New(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create Updater instance: %w", err)
 	}

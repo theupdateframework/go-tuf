@@ -67,17 +67,15 @@ func GetCmd(target string) error {
 
 	// updater configuration
 	cfg := config.New() // default config
+	cfg.LocalTrustedRootPath = env.MetadataDir
+	cfg.LocalMetadataDir = env.MetadataDir
+	cfg.LocalTargetsDir = env.DownloadDir
+	cfg.RemoteMetadataURL = env.MetadataURL
+	cfg.RemoteTargetsURL = env.TargetsURL
 	cfg.PrefixTargetsWithHash = !useNonHashPrefixedTargetFiles
 
 	// create an Updater instance
-	up, err := updater.New(
-		env.MetadataDir,
-		env.MetadataURL,
-		env.TargetsURL,
-		env.DownloadDir,
-		env.MetadataDir,
-		cfg,
-		nil)
+	up, err := updater.New(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create Updater instance: %w", err)
 	}
