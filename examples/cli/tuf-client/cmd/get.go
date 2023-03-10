@@ -92,7 +92,7 @@ func GetCmd(target string) error {
 	}
 
 	// target is available, so let's see if the target is already present locally
-	path, err := up.FindCachedTarget(targetInfo, "")
+	path, _, err := up.FindCachedTarget(targetInfo, "")
 	if err != nil {
 		return fmt.Errorf("failed while finding a cached target: %w", err)
 	}
@@ -103,7 +103,7 @@ func GetCmd(target string) error {
 	}
 
 	// target is not present locally, so let's try to download it
-	path, err = up.DownloadTarget(targetInfo, "", "")
+	path, _, err = up.DownloadTarget(targetInfo, "", "")
 	if err != nil {
 		return fmt.Errorf("failed to download target file %s - %w", target, err)
 	}
