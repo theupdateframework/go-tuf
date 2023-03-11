@@ -443,16 +443,6 @@ func (source *TargetFiles) Equal(expected TargetFiles) bool {
 	return false
 }
 
-// EqualFromBytes checks whether the source target file matches another (from bytes)
-func (source *TargetFiles) EqualFromBytes(expectedBytes []byte) bool {
-	// create target file from bytes
-	expected, err := TargetFile().FromBytes("", expectedBytes)
-	if err == nil && source.Equal(*expected) {
-		return true
-	}
-	return false
-}
-
 // FromFile generate TargetFiles from file
 func (t *TargetFiles) FromFile(localPath string, hashes ...string) (*TargetFiles, error) {
 	log.Debugf("Generating target file from file %s", localPath)
