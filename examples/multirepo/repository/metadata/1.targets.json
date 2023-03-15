@@ -1,0 +1,34 @@
+{
+	"signed": {
+		"_type": "targets",
+		"expires": "2023-05-14T16:36:50.822761Z",
+		"spec_version": "1.0.31",
+		"targets": {
+			"map.json": {
+				"hashes": {
+					"sha256": "c3ff474341f3d79dbacfb6e6a2a1c1352e2aecc034e12e8a395b3e3de69475f3"
+				},
+				"length": 548
+			},
+			"root-signing-github/root.json": {
+				"hashes": {
+					"sha256": "e2a930b2d1d4053dd56e8faf66fd113658545d522e35d222ccf58fea87ccccf4"
+				},
+				"length": 6388
+			},
+			"root-signing-google/root.json": {
+				"hashes": {
+					"sha256": "e2a930b2d1d4053dd56e8faf66fd113658545d522e35d222ccf58fea87ccccf4"
+				},
+				"length": 6388
+			}
+		},
+		"version": 1
+	},
+	"signatures": [
+		{
+			"keyid": "57291d507f3efabdb8586ea85775e03425c723870a001a335b97fb6325ec98fe",
+			"sig": "e8747c1d0dc481e993e505f16eedfaa62804756d5269a894ea72d145997ead021371f2e22e56927aae2cbc530cb6c86a7c5e31c4e7dd26bcb43adf3f73d08504"
+		}
+	]
+}

@@ -1,0 +1,21 @@
+
+{
+  "repositories": {
+    "root-signing-google": ["https://sigstore-tuf-root.storage.googleapis.com"],
+    "root-signing-github":   ["https://raw.githubusercontent.com/sigstore/root-signing/main/repository/repository"]
+  },
+  "mapping": [
+    {
+      "paths":        ["*.pem"],
+      "repositories": ["root-signing-google", "root-signing-github"],
+      "threshold": 2,
+      "terminating":  false
+    },
+    {
+      "paths":        ["*"],
+      "repositories": ["root-signing-github"],
+      "terminating": true,
+      "threshold": 1
+    }
+  ]
+}
