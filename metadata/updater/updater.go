@@ -63,40 +63,28 @@ type roleParentTuple struct {
 
 // New creates a new Updater instance and loads trusted root metadata
 func New(config *config.UpdaterConfig) (*Updater, error) {
-	// create an updater instance
-	updater := &Updater{
-		cfg: config,
-	}
-	// check in case we bootstrap using an already provided root.json byte content
-	if len(updater.cfg.LocalTrustedRootBytes) == 0 {
-		// if not, then we try to load a root.json file from a local path
-		// trim the extension in case it's a filename path
-		fileInfo, err := os.Stat(updater.cfg.LocalTrustedRootPath)
-		if err != nil {
-			return nil, err
-		}
-		if fileInfo.IsDir() {
-			// directory path, add "root" to it
-			updater.cfg.LocalTrustedRootPath = filepath.Join(updater.cfg.LocalTrustedRootPath, metadata.ROOT)
-		} else {
-			// file path, remove ".json" from it
-			if strings.HasSuffix(updater.cfg.LocalTrustedRootPath, fmt.Sprintf("%s.json", metadata.ROOT)) {
-				updater.cfg.LocalTrustedRootPath = strings.TrimSuffix(updater.cfg.LocalTrustedRootPath, ".json")
-			}
-		}
-		// load the root metadata file used for bootstrapping trust
-		rootBytes, err := updater.loadLocalMetadata(updater.cfg.LocalTrustedRootPath)
-		if err != nil {
-			return nil, err
-		}
-		updater.cfg.LocalTrustedRootBytes = rootBytes
+	// make sure the trusted root metadata and remote URL were provided
+	if len(config.LocalTrustedRoot) == 0 || len(config.RemoteMetadataURL) == 0 {
+		return nil, fmt.Errorf("no initial trusted root metadata or remote URL provided")
 	}
 	// create a new trusted metadata instance using the trusted root.json
-	trustedMetadataSet, err := trustedmetadata.New(updater.cfg.LocalTrustedRootBytes)
+	trustedMetadataSet, err := trustedmetadata.New(config.LocalTrustedRoot)
 	if err != nil {
 		return nil, err
 	}
-	updater.trusted = trustedMetadataSet
+	// create an updater instance
+	updater := &Updater{
+		cfg:     config,
+		trusted: trustedMetadataSet, // save trusted metadata set
+	}
+	// ensure paths exist, doesn't do anything if caching is disabled
+	err = updater.cfg.EnsurePathsExist()
+	if err != nil {
+		return nil, err
+	}
+	// persist the initial root metadata to the local metadata folder
+	updater.persistMetadata(metadata.ROOT, updater.cfg.LocalTrustedRoot)
+	// all okay, return the updater instance
 	return updater, nil
 }
 

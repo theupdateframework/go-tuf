@@ -12,9 +12,9 @@
 package config
 
 import (
-	"fmt"
+	"net/url"
+	"os"
 
-	"github.com/rdimitrov/go-tuf-metadata/metadata"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/fetcher"
 )
 
@@ -28,8 +28,7 @@ type UpdaterConfig struct {
 	TargetsMaxLength   int64
 	// Updater configuration
 	Fetcher               fetcher.Fetcher
-	LocalTrustedRootPath  string
-	LocalTrustedRootBytes []byte
+	LocalTrustedRoot      []byte
 	LocalMetadataDir      string
 	LocalTargetsDir       string
 	RemoteMetadataURL     string
@@ -40,11 +39,11 @@ type UpdaterConfig struct {
 
 // New creates a new UpdaterConfig instance used by the Updater to
 // store configuration
-func New(rootPath ...string) *UpdaterConfig {
-	// if no rootPath is provided, default to looking for the root.json in the current working directory
-	trustedRootPath := fmt.Sprintf("%s.json", metadata.ROOT)
-	if len(rootPath) != 0 {
-		trustedRootPath = rootPath[0]
+func New(remoteURL string, rootBytes []byte) (*UpdaterConfig, error) {
+	// Default URL for target files - <metadata-url>/targets
+	targetsURL, err := url.JoinPath(remoteURL, "targets")
+	if err != nil {
+		return nil, err
 	}
 	return &UpdaterConfig{
 		// TUF configuration
@@ -56,8 +55,23 @@ func New(rootPath ...string) *UpdaterConfig {
 		TargetsMaxLength:   5000000, // bytes
 		// Updater configuration
 		Fetcher:               &fetcher.DefaultFetcher{}, // use the default built-in download fetcher
-		LocalTrustedRootPath:  trustedRootPath,           // local path to trusted root.json
+		LocalTrustedRoot:      rootBytes,                 // trusted root.json
+		RemoteMetadataURL:     remoteURL,                 // URL of where the TUF metadata is
+		RemoteTargetsURL:      targetsURL,                // URL of where the target files should be downloaded from
 		DisableLocalCache:     false,                     // enable local caching of trusted metadata
 		PrefixTargetsWithHash: true,                      // use hash-prefixed target files with consistent snapshots
+	}, nil
+}
+
+func (cfg *UpdaterConfig) EnsurePathsExist() error {
+	if cfg.DisableLocalCache {
+		return nil
 	}
+	for _, path := range []string{cfg.LocalMetadataDir, cfg.LocalTargetsDir} {
+		err := os.MkdirAll(path, os.ModePerm)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
