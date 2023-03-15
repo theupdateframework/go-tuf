@@ -64,12 +64,19 @@ func GetCmd(target string) error {
 	if err != nil {
 		return err
 	}
+	// read the trusted root metadata
+	rootBytes, err := os.ReadFile(filepath.Join(env.MetadataDir, "root.json"))
+	if err != nil {
+		return err
+	}
 
 	// updater configuration
-	cfg := config.New(env.MetadataDir) // default config
+	cfg, err := config.New(env.MetadataURL, rootBytes) // default config
+	if err != nil {
+		return err
+	}
 	cfg.LocalMetadataDir = env.MetadataDir
 	cfg.LocalTargetsDir = env.DownloadDir
-	cfg.RemoteMetadataURL = env.MetadataURL
 	cfg.RemoteTargetsURL = env.TargetsURL
 	cfg.PrefixTargetsWithHash = !useNonHashPrefixedTargetFiles
 

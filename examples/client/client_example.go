@@ -128,11 +128,17 @@ func InitTrustOnFirstUse(metadataDir string) error {
 // get the target information, verifies if the target is already cached, and in case it
 // is not cached, downloads the target file.
 func DownloadTarget(localMetadataDir, target string) error {
+	rootBytes, err := os.ReadFile(filepath.Join(localMetadataDir, "root.json"))
+	if err != nil {
+		return err
+	}
 	// create updater configuration
-	cfg := config.New(localMetadataDir) // default config
+	cfg, err := config.New(metadataURL, rootBytes) // default config
+	if err != nil {
+		return err
+	}
 	cfg.LocalMetadataDir = localMetadataDir
 	cfg.LocalTargetsDir = filepath.Join(localMetadataDir, "download")
-	cfg.RemoteMetadataURL = metadataURL
 	cfg.RemoteTargetsURL = targetsURL
 	cfg.PrefixTargetsWithHash = false // do not use hash-prefixed target files with consistent snapshots
 
