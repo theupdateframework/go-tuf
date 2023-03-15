@@ -66,6 +66,12 @@ example-repository:
 	@echo "Executing the following example - repository/basic_repository.go"
 	@cd examples/repository/ && go run .
 
+# Target for demoing the examples/multirepo/client/client_example.go
+.PHONY: example-multirepo
+example-multirepo:
+	@echo "Executing the following example - multirepo/client/client_example.go"
+	@cd examples/multirepo/client/ && go run .
+
 # Target for demoing the tuf-client cli
 .PHONY: example-tuf-client-cli
 example-tuf-client-cli: build-tuf-client
@@ -95,6 +101,9 @@ example-root-signing: build-tuf-client
 # Clean target
 .PHONY: clean
 clean:
+	@rm -rf examples/multirepo/client/bootstrap/
+	@rm -rf examples/multirepo/client/download/
+	@rm -rf examples/multirepo/client/metadata/
 	@rm -rf examples/repository/tmp*
 	@rm -rf examples/client/tmp*
 	@rm -rf tuf_download

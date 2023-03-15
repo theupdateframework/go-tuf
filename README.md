@@ -65,6 +65,10 @@ To try it - run `make example-client` (the artifacts will be located at `example
 
 To try it - run `make example-tuf-client-cli`
 
+* [multi-repository client example (TAP4)](examples/multirepo/client/client_example.go) which demonstrates how to implement a multi-repository TUF client using the [multirepo](metadata/multirepo/multirepo.go) package.
+
+To try it - run `make example-multirepo`
+
 ## Package details
 
 ----------------------------
@@ -98,6 +102,10 @@ the metadata with the caller making decisions on what is updated.
 It provides ways to query and download target files securely while handling the
 TUF update workflow behind the scenes. It is implemented on top of the Metadata API
 and can be used to implement various TUF clients with relatively little effort.
+
+### The `multirepo` package
+
+* The `multirepo` package provides an implementation of [TAP 4 - Multiple repository consensus on entrusted targets](https://github.com/theupdateframework/taps/blob/master/tap4.md). It provides a secure search for particular targets across multiple repositories. It provides the functionality for how multiple repositories with separate roots of trust can be required to sign off on the same targets, effectively creating an AND relation and ensuring any files obtained can be trusted. It offers a way to initialize multiple repositories using a `map.json` file and also mechanisms to query and download target files securely. It is implemented on top of the Updater API and can be used to implement various multi-repository TUF clients with relatively little effort.
 
 ## Documentation
 
