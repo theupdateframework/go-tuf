@@ -107,7 +107,7 @@ func (client *MultiRepoClient) initTUFClients() error {
 		metadataDir := filepath.Join(client.cfg.LocalMetadataDir, repoName)
 
 		// location of where the target files will be downloaded (propagated to each client from the multi-repo config)
-		// WARNING: Do note that using a single folder for storing targets from various repositories might lead to a conflict
+		// WARNING: Do note that using a single folder for storing targets from various repositories as it might lead to a conflict
 		targetsDir := client.cfg.LocalTargetsDir
 		if len(client.cfg.LocalTargetsDir) == 0 {
 			// if it was not set, create a targets folder under each repository so there's no chance of conflict
@@ -173,9 +173,9 @@ func (client *MultiRepoClient) GetTopLevelTargets() (map[string]*MultiRepoTarget
 					// update the repo list only
 					val.Repositories = append(val.Repositories, repo)
 				} else {
-					// target files for same target name but from different repositories don't match
+					// target files have the same target name but have different target infos
 					// TODO: decide if this should raise an error
-					return nil, fmt.Errorf("target info conflict for same target file name")
+					return nil, fmt.Errorf("target name conflict")
 				}
 			} else {
 				// new target file, so save it
@@ -216,21 +216,17 @@ func (client *MultiRepoClient) GetTargetInfo(targetPath string) (*metadata.Targe
 						if err != nil {
 							// failed to get target info for the given target
 							// there's probably no such target
-							// no need to proceed if this is a terminating mapping
-							if eachMap.Terminating {
-								return nil, nil, fmt.Errorf("failed to get target info for %s", targetPath)
-							}
-							// proceed trying to get target info from the next repository
+							// skip the rest and proceed trying to get target info from the next repository
 							continue
 						}
-						// if there's no target info saved yet, save it and
+						// if there's no target info saved yet, save it
 						if targetInfo == nil && newTargetInfo != nil {
 							targetInfo = newTargetInfo
-							threshold += 1 // this should definitely just make threshold equals to 1
+							threshold += 1
 							repositories = append(repositories, repoName)
 							continue
 						}
-						// compare the existing one with the new one
+						// compare the existing one with what we got
 						if targetInfo.Equal(*newTargetInfo) {
 							// they are equal, so we just bump the threshold counter
 							threshold += 1
@@ -242,8 +238,11 @@ func (client *MultiRepoClient) GetTargetInfo(targetPath string) (*metadata.Targe
 							}
 							continue
 						}
+						// at this point there was a target info with that name in this repository but it didn't match
+						// proceed with searching for this target in the next repository
 					}
-					// exit if we have matched threshold
+					// we went through all repositories listed in that mapping
+					// exit if we have matched the threshold
 					if eachMap.Threshold <= threshold {
 						// we have enough repositories with matching target infos so safely return
 						return targetInfo, repositories, nil
@@ -264,6 +263,7 @@ func (client *MultiRepoClient) GetTargetInfo(targetPath string) (*metadata.Targe
 			break
 		}
 	}
+	// looped through all mappings and there was nothing, not even a terminating one
 	return nil, nil, fmt.Errorf("target info not found")
 }
 
