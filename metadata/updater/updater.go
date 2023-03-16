@@ -83,7 +83,10 @@ func New(config *config.UpdaterConfig) (*Updater, error) {
 		return nil, err
 	}
 	// persist the initial root metadata to the local metadata folder
-	updater.persistMetadata(metadata.ROOT, updater.cfg.LocalTrustedRoot)
+	err = updater.persistMetadata(metadata.ROOT, updater.cfg.LocalTrustedRoot)
+	if err != nil {
+		return nil, err
+	}
 	// all okay, return the updater instance
 	return updater, nil
 }
