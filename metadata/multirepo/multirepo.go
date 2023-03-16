@@ -270,13 +270,25 @@ func (client *MultiRepoClient) GetTargetInfo(targetPath string) (*metadata.Targe
 // DownloadTarget downloads the target file specified by targetFile
 func (client *MultiRepoClient) DownloadTarget(repos []string, targetFile *metadata.TargetFiles, filePath, targetBaseURL string) (string, []byte, error) {
 	for _, repoName := range repos {
-		targetPath, targetBytes, err := client.TUFClients[repoName].DownloadTarget(targetFile, filePath, targetBaseURL)
+		// see if the target is already present locally
+		targetPath, targetBytes, err := client.TUFClients[repoName].FindCachedTarget(targetFile, filePath)
 		if err != nil {
+			return "", nil, err
+		}
+		if len(targetPath) != 0 && len(targetBytes) != 0 {
+			// we already got the target for this target info cached locally, so return it
+			log.Info(fmt.Sprintf("Target %s already present locally from %s", targetFile.Path, repoName))
+			return targetPath, targetBytes, nil
+		}
+		// not present locally, so let's try to download it
+		targetPath, targetBytes, err = client.TUFClients[repoName].DownloadTarget(targetFile, filePath, targetBaseURL)
+		if err != nil {
+			// TODO: decide if we should error if one repository serves the expected target info, but we fail to download the actual target
 			// try downloading the target from the next available repository
 			continue
 		}
-		log.Info(fmt.Sprintf("Downloaded target %s from %s", targetFile.Path, repoName))
 		// we got the target for this target info, so return it
+		log.Info(fmt.Sprintf("Downloaded target %s from %s", targetFile.Path, repoName))
 		return targetPath, targetBytes, nil
 	}
 	// error out as we haven't succeeded downloading the target file
