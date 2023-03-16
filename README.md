@@ -47,6 +47,8 @@ The [go-tuf-metadata](https://github.com/rdimitrov/go-tuf-metadata) project prov
 * target delegation via standard and hash bin delegations
 * support of [succinct hash bin delegations](https://github.com/theupdateframework/taps/blob/master/tap15.md) which significantly reduce the size of metadata
 * support for unrecognized fields within the metadata (i.e. preserved and accessible through `root.Signed.UnrecognizedFields["some-unknown-field"]`, also used for verifying/signing (if included in the Signed portion of the metadata))
+* TUF client API
+* TUF multi-repository client API (implements [TAP 4 - Multiple repository consensus on entrusted targets](https://github.com/theupdateframework/taps/blob/master/tap4.md))
 
 ## Examples
 
