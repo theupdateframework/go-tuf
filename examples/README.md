@@ -32,6 +32,16 @@ There's also a [client_example.go](client/client_example.go) which demonstrates 
 * shows an example of how to download a target file
 * the repository is based on python-tuf so it also highlights the interoperability between the two implementations
 
+## Multi-repository client
+
+----------------------------
+There's a [client_example.go](multirepo/client/client_example.go) which demonstrates how to implement a multi-repository client using the [multirepo](metadata/multirepo/multirepo.go) package which implements [TAP 4 - Multiple repository consensus on entrusted targets](https://github.com/theupdateframework/taps/blob/master/tap4.md). The example consists of the following:
+
+* The `map.json` along with the root files for each repository are distributed via a trusted repository used for initialization
+  * The metadata, these target files and the script generating them are located in the [examples/multirepo/repository](../repository/) folder
+* These files are then used to bootstrap the multi-repository TUF client
+* Shows the API provided by the `multirepo` package
+
 ## CLI tools
 
 ----------------------------

@@ -24,10 +24,8 @@ import (
 )
 
 const (
-	// metadataURL          = "https://raw.githubusercontent.com/rdimitrov/go-tuf-metadata/main/examples/multirepo/repository/metadata"
-	// targetsURL           = "https://raw.githubusercontent.com/rdimitrov/go-tuf-metadata/main/examples/multirepo/repository/targets"
-	metadataURL          = "http://localhost:8000/metadata"
-	targetsURL           = "http://localhost:8000/targets"
+	metadataURL          = "https://raw.githubusercontent.com/rdimitrov/go-tuf-metadata/main/examples/multirepo/repository/metadata"
+	targetsURL           = "https://raw.githubusercontent.com/rdimitrov/go-tuf-metadata/main/examples/multirepo/repository/targets"
 	verbosity            = log.InfoLevel
 	generateRandomFolder = false
 )
