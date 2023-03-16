@@ -65,7 +65,7 @@ func InitEnvironment() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get current working directory: %w", err)
 	}
-	if generateRandomFolder {
+	if !generateRandomFolder {
 		tmpDir = filepath.Join(cwd, "tmp")
 		// create a temporary folder for storing the demo artifacts
 		os.Mkdir(tmpDir, 0750)
