@@ -12,6 +12,12 @@
       "terminating":  false
     },
     {
+      "paths":        ["*.json"],
+      "repositories": ["root-signing-google"],
+      "threshold": 1,
+      "terminating":  false
+    },
+    {
       "paths":        ["*"],
       "repositories": ["root-signing-github"],
       "terminating": true,
