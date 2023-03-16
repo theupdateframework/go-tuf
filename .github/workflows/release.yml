@@ -19,7 +19,7 @@ jobs:
         uses: arnested/go-version-action@e5d43166205a4555e639cc70a8f14f1270c85d08
         id: go-version
       - name: Set up Go
-        uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568
+        uses: actions/setup-go@4d34df0c2316fe8122ab82dc22947d607c0c91f9
         with:
           go-version: ${{ steps.go-version.outputs.minimal }}
       - name: Run GoReleaser
