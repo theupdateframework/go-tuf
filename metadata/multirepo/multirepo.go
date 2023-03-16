@@ -218,7 +218,7 @@ func (client *MultiRepoClient) GetTargetInfo(targetPath string) (*metadata.Targe
 							// there's probably no such target
 							// no need to proceed if this is a terminating mapping
 							if eachMap.Terminating {
-								return nil, nil, fmt.Errorf("failed to get target info for", targetPath)
+								return nil, nil, fmt.Errorf("failed to get target info for %s", targetPath)
 							}
 							// proceed trying to get target info from the next repository
 							continue
@@ -280,7 +280,7 @@ func (client *MultiRepoClient) DownloadTarget(repos []string, targetFile *metada
 		return targetPath, targetBytes, nil
 	}
 	// error out as we haven't succeeded downloading the target file
-	return "", nil, fmt.Errorf("failed to download target file ", targetFile.Path)
+	return "", nil, fmt.Errorf("failed to download target file %s", targetFile.Path)
 }
 
 func (client *MultiRepoClient) getRoot(name string) ([]byte, error) {
