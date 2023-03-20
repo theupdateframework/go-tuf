@@ -32,7 +32,7 @@ func (e ErrUnsignedMetadata) Error() string {
 
 // ErrUnsignedMetadata is a subset of ErrRepository
 func (e ErrUnsignedMetadata) Is(target error) bool {
-	return target == ErrRepository{}
+	return target == ErrRepository{} || target == ErrUnsignedMetadata{}
 }
 
 // ErrBadVersionNumber - An error for metadata that contains an invalid version number
@@ -46,7 +46,7 @@ func (e ErrBadVersionNumber) Error() string {
 
 // ErrBadVersionNumber is a subset of ErrRepository
 func (e ErrBadVersionNumber) Is(target error) bool {
-	return target == ErrRepository{}
+	return target == ErrRepository{} || target == ErrBadVersionNumber{}
 }
 
 // ErrEqualVersionNumber - An error for metadata containing a previously verified version number
@@ -60,7 +60,7 @@ func (e ErrEqualVersionNumber) Error() string {
 
 // ErrEqualVersionNumber is a subset of both ErrRepository and ErrBadVersionNumber
 func (e ErrEqualVersionNumber) Is(target error) bool {
-	return target == ErrRepository{} || target == ErrBadVersionNumber{}
+	return target == ErrRepository{} || target == ErrBadVersionNumber{} || target == ErrEqualVersionNumber{}
 }
 
 // ErrExpiredMetadata - Indicate that a TUF Metadata file has expired
@@ -74,7 +74,7 @@ func (e ErrExpiredMetadata) Error() string {
 
 // ErrExpiredMetadata is a subset of ErrRepository
 func (e ErrExpiredMetadata) Is(target error) bool {
-	return target == ErrRepository{}
+	return target == ErrRepository{} || target == ErrExpiredMetadata{}
 }
 
 // ErrLengthOrHashMismatch - An error while checking the length and hash values of an object
@@ -88,7 +88,7 @@ func (e ErrLengthOrHashMismatch) Error() string {
 
 // ErrLengthOrHashMismatch is a subset of ErrRepository
 func (e ErrLengthOrHashMismatch) Is(target error) bool {
-	return target == ErrRepository{}
+	return target == ErrRepository{} || target == ErrLengthOrHashMismatch{}
 }
 
 // Download errors
@@ -113,7 +113,7 @@ func (e ErrDownloadLengthMismatch) Error() string {
 
 // ErrDownloadLengthMismatch is a subset of ErrDownload
 func (e ErrDownloadLengthMismatch) Is(target error) bool {
-	return target == ErrDownload{}
+	return target == ErrDownload{} || target == ErrDownloadLengthMismatch{}
 }
 
 // ErrDownloadHTTP - Returned by Fetcher interface implementations for HTTP errors
@@ -128,7 +128,7 @@ func (e ErrDownloadHTTP) Error() string {
 
 // ErrDownloadHTTP is a subset of ErrDownload
 func (e ErrDownloadHTTP) Is(target error) bool {
-	return target == ErrDownload{}
+	return target == ErrDownload{} || target == ErrDownloadHTTP{}
 }
 
 // ValueError
