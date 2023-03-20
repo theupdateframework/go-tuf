@@ -63,7 +63,7 @@ func NewConfig(repoMap []byte, roots map[string][]byte) (*MultiRepoConfig, error
 		// check if we have a trusted root metadata for this repository
 		_, ok := roots[repo]
 		if !ok {
-			return nil, fmt.Errorf("no trusted root metadata provided for repository", repo)
+			return nil, fmt.Errorf("no trusted root metadata provided for repository - %s", repo)
 		}
 	}
 
@@ -100,7 +100,7 @@ func (client *MultiRepoClient) initTUFClients() error {
 		// i.e <client.cfg.BootstrapDir>/<repo-name>/root.json
 		rootBytes, ok := client.cfg.TrustedRoots[repoName]
 		if !ok {
-			return fmt.Errorf("failed to get trusted root metadata from config for repository", repoName)
+			return fmt.Errorf("failed to get trusted root metadata from config for repository - %s", repoName)
 		}
 
 		// path of where each of the repository's metadata files will be persisted
