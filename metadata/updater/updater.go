@@ -240,8 +240,7 @@ func (update *Updater) loadTimestamp() error {
 		// local timestamp exists, let's try to verify it and load it to the trusted metadata set
 		_, err := update.trusted.UpdateTimestamp(data)
 		if err != nil {
-			var tmpErr metadata.ErrRepository
-			if errors.As(err, &tmpErr) {
+			if errors.Is(err, metadata.ErrRepository{}) {
 				// local timestamp is not valid, proceed downloading from remote; note that this error type includes several other subset errors
 				log.Debug("Local timestamp is not valid")
 			} else {
@@ -260,8 +259,7 @@ func (update *Updater) loadTimestamp() error {
 	// try to verify and load the newly downloaded timestamp
 	_, err = update.trusted.UpdateTimestamp(data)
 	if err != nil {
-		var tmpErr metadata.ErrEqualVersionNumber
-		if errors.As(err, &tmpErr) {
+		if errors.Is(err, metadata.ErrEqualVersionNumber{}) {
 			// if the new timestamp version is the same as current, discard the
 			// new timestamp; this is normal and it shouldn't raise any error
 			return nil
@@ -290,8 +288,7 @@ func (update *Updater) loadSnapshot() error {
 		_, err = update.trusted.UpdateSnapshot(data, true)
 		if err != nil {
 			// this means snapshot verification/loading failed
-			var tmpErr metadata.ErrRepository
-			if errors.As(err, &tmpErr) {
+			if errors.Is(err, metadata.ErrRepository{}) {
 				// local snapshot is not valid, proceed downloading from remote; note that this error type includes several other subset errors
 				log.Debug("Local snapshot is not valid")
 			} else {
@@ -356,8 +353,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 		delegatedTargets, err := update.trusted.UpdateDelegatedTargets(data, roleName, parentName)
 		if err != nil {
 			// this means targets verification/loading failed
-			var tmpErr metadata.ErrRepository
-			if errors.As(err, &tmpErr) {
+			if errors.Is(err, metadata.ErrRepository{}) {
 				// local target file is not valid, proceed downloading from remote; note that this error type includes several other subset errors
 				log.Debugf("Local %s is not valid", roleName)
 			} else {
