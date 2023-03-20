@@ -48,7 +48,7 @@ test:
 
 .PHONY: lint
 lint: 
-	golangci-lint run -n
+	golangci-lint run
 
 #####################
 # examples section
