@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -35,14 +36,14 @@ func main() {
 
 	// Bootstrap TUF
 	fmt.Printf("Bootstrapping the initial TUF repo - fetching map.json file and necessary trusted root files\n\n")
-	targetsDir, err := BootstrapTUF() // returns the path to map.json and the trusted root files
+	mapBytes, trustedRoots, err := BootstrapTUF() // returns the map.json and the trusted root files
 	if err != nil {
 		panic(err)
 	}
 
 	// Initialize the multi-repository TUF client
 	fmt.Printf("Initializing the multi-repository TUF client with the given map.json file\n\n")
-	client, err := InitMultiRepoTUF(targetsDir)
+	client, err := InitMultiRepoTUF(mapBytes, trustedRoots)
 	if err != nil {
 		panic(err)
 	}
@@ -69,30 +70,33 @@ func main() {
 	}
 }
 
-func BootstrapTUF() (string, error) {
+// BootstrapTUF returns the map file and the related trusted root metadata files
+func BootstrapTUF() ([]byte, map[string][]byte, error) {
+	trustedRoots := map[string][]byte{}
+	mapBytes := []byte{}
 	// get working directory
 	cwd, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("failed to get current working directory: %w", err)
+		return nil, nil, fmt.Errorf("failed to get current working directory: %w", err)
 	}
-
 	targetsDir := filepath.Join(cwd, "bootstrap/targets")
+
 	// ensure the necessary folder layout
 	err = os.MkdirAll(targetsDir, os.ModePerm)
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 
 	// read the trusted root metadata
 	rootBytes, err := os.ReadFile(filepath.Join(cwd, "root.json"))
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 
 	// create updater configuration
 	cfg, err := config.New(metadataURL, rootBytes) // default config
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 	cfg.LocalMetadataDir = filepath.Join(cwd, "bootstrap")
 	cfg.LocalTargetsDir = targetsDir
@@ -101,42 +105,55 @@ func BootstrapTUF() (string, error) {
 	// create a new Updater instance
 	up, err := updater.New(cfg)
 	if err != nil {
-		return "", fmt.Errorf("failed to create Updater instance: %w", err)
+		return nil, nil, fmt.Errorf("failed to create Updater instance: %w", err)
 	}
 
-	// try to build the top-level metadata
+	// build the top-level metadata
 	err = up.Refresh()
 	if err != nil {
-		return "", fmt.Errorf("failed to refresh trusted metadata: %w", err)
+		return nil, nil, fmt.Errorf("failed to refresh trusted metadata: %w", err)
 	}
+
+	// download all target files
 	for name, targetInfo := range up.GetTopLevelTargets() {
 		// see if the target is already present locally
 		path, _, err := up.FindCachedTarget(targetInfo, "")
 		if err != nil {
-			return "", fmt.Errorf("failed while finding a cached target: %w", err)
+			return nil, nil, fmt.Errorf("failed while finding a cached target: %w", err)
 		}
 		if path != "" {
 			log.Infof("Target %s is already present at - %s", name, path)
 		}
+
 		// target is not present locally, so let's try to download it
 		// keeping the same path layout as its target path
 		expectedTargetLocation := filepath.Join(targetsDir, name)
 		dirName, _ := filepath.Split(expectedTargetLocation)
 		err = os.MkdirAll(dirName, os.ModePerm)
 		if err != nil {
-			return "", err
+			return nil, nil, err
 		}
-		// download targets
-		path, _, err = up.DownloadTarget(targetInfo, expectedTargetLocation, "")
+
+		// download targets (we don't have to actually store them other than for the sake of the example)
+		path, bytes, err := up.DownloadTarget(targetInfo, expectedTargetLocation, "")
 		if err != nil {
-			return "", fmt.Errorf("failed to download target file %s - %w", name, err)
+			return nil, nil, fmt.Errorf("failed to download target file %s - %w", name, err)
+		}
+
+		// populate the return values
+		if name == "map.json" {
+			mapBytes = bytes
+		} else {
+			repositoryName := strings.Split(name, string(os.PathSeparator))
+			trustedRoots[repositoryName[0]] = bytes
 		}
 		log.Infof("Successfully downloaded target %s at - %s", name, path)
 	}
-	return cfg.LocalTargetsDir, nil
+
+	return mapBytes, trustedRoots, nil
 }
 
-func InitMultiRepoTUF(bootstrapDir string) (*multirepo.MultiRepoClient, error) {
+func InitMultiRepoTUF(mapBytes []byte, trustedRoots map[string][]byte) (*multirepo.MultiRepoClient, error) {
 	// get working directory
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -144,7 +161,7 @@ func InitMultiRepoTUF(bootstrapDir string) (*multirepo.MultiRepoClient, error) {
 	}
 
 	// create a new configuration for a multi-repository client
-	cfg, err := multirepo.NewConfig(bootstrapDir)
+	cfg, err := multirepo.NewConfig(mapBytes, trustedRoots)
 	if err != nil {
 		return nil, err
 	}

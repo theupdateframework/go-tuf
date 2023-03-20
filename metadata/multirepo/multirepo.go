@@ -12,10 +12,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const (
-	DefaultRepoMapFileName = "map.json"
-)
-
 // The following represent the map file described in TAP 4
 type Mapping struct {
 	Paths        []string `json:"paths"`
@@ -32,7 +28,7 @@ type MultiRepoMapType struct {
 // MultiRepoConfig represents the configuration for a set of trusted TUF clients
 type MultiRepoConfig struct {
 	RepoMap           *MultiRepoMapType
-	BootstrapDir      string
+	TrustedRoots      map[string][]byte
 	LocalMetadataDir  string
 	LocalTargetsDir   string
 	DisableLocalCache bool
@@ -50,27 +46,35 @@ type MultiRepoTargetFiles struct {
 }
 
 // NewConfig returns configuration for a multi-repo TUF client
-func NewConfig(bootstrapDir string) (*MultiRepoConfig, error) {
-	// verify the provided path is a directory
-	fileInfo, err := os.Stat(bootstrapDir)
-	if err != nil {
+func NewConfig(repoMap []byte, roots map[string][]byte) (*MultiRepoConfig, error) {
+	// error if we don't have the necessary arguments
+	if len(repoMap) == 0 || len(roots) == 0 {
+		return nil, fmt.Errorf("failed to create multi-repository config: no map file and/or trusted root metadata is provided")
+	}
+
+	// unmarshal the map file (note: should we expect/support unrecognized values here?)
+	var mapFile *MultiRepoMapType
+	if err := json.Unmarshal(repoMap, &mapFile); err != nil {
 		return nil, err
 	}
-	if !fileInfo.IsDir() {
-		return nil, fmt.Errorf("provided bootstrap path is not a directory")
+
+	// make sure we have enough trusted root metadata files provided based on the repository list
+	for repo := range mapFile.Repositories {
+		// check if we have a trusted root metadata for this repository
+		_, ok := roots[repo]
+		if !ok {
+			return nil, fmt.Errorf("no trusted root metadata provided for repository", repo)
+		}
 	}
+
 	return &MultiRepoConfig{
-		BootstrapDir: bootstrapDir,
+		RepoMap:      mapFile,
+		TrustedRoots: roots,
 	}, nil
 }
 
 // New returns a multi-repository TUF client. All repositories described in the provided map file are initialized too
 func New(config *MultiRepoConfig) (*MultiRepoClient, error) {
-	// make sure the bootstrap path was provided (location of the map file and trusted root files for each repository)
-	if len(config.BootstrapDir) == 0 {
-		return nil, fmt.Errorf("no bootstrap directory provided")
-	}
-
 	// create a multi repo client instance
 	client := &MultiRepoClient{
 		cfg:        config,
@@ -86,11 +90,7 @@ func New(config *MultiRepoConfig) (*MultiRepoClient, error) {
 
 // initTUFClients loop through all repositories listed in the map file and create a TUF client for each
 func (client *MultiRepoClient) initTUFClients() error {
-	// read and load the map file into config
-	err := client.loadMap()
-	if err != nil {
-		return err
-	}
+
 	// loop through each repository listed in the map file and initialize it
 	for repoName, repoURL := range client.cfg.RepoMap.Repositories {
 		log.Infof("Initializing %s - %s", repoName, repoURL[0])
@@ -98,9 +98,9 @@ func (client *MultiRepoClient) initTUFClients() error {
 		// get the trusted root file from the location specified in the map file relevant to its path
 		// NOTE: the root.json file is expected to be in a folder named after the repository it corresponds to placed in the same folder as the map file
 		// i.e <client.cfg.BootstrapDir>/<repo-name>/root.json
-		rootBytes, err := client.getRoot(repoName)
-		if err != nil {
-			return err
+		rootBytes, ok := client.cfg.TrustedRoots[repoName]
+		if !ok {
+			return fmt.Errorf("failed to get trusted root metadata from config for repository", repoName)
 		}
 
 		// path of where each of the repository's metadata files will be persisted
@@ -115,7 +115,7 @@ func (client *MultiRepoClient) initTUFClients() error {
 		}
 
 		// ensure paths exist, doesn't do anything if caching is disabled
-		err = client.cfg.EnsurePathsExist()
+		err := client.cfg.EnsurePathsExist()
 		if err != nil {
 			return err
 		}
@@ -293,23 +293,6 @@ func (client *MultiRepoClient) DownloadTarget(repos []string, targetFile *metada
 	}
 	// error out as we haven't succeeded downloading the target file
 	return "", nil, fmt.Errorf("failed to download target file %s", targetFile.Path)
-}
-
-func (client *MultiRepoClient) getRoot(name string) ([]byte, error) {
-	return os.ReadFile(filepath.Join(client.cfg.BootstrapDir, name, "root.json"))
-}
-
-func (client *MultiRepoClient) loadMap() error {
-	// read the map file
-	mapBytes, err := os.ReadFile(filepath.Join(client.cfg.BootstrapDir, DefaultRepoMapFileName))
-	if err != nil {
-		return err
-	}
-	// unmarshal the map file
-	if err := json.Unmarshal(mapBytes, &client.cfg.RepoMap); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (cfg *MultiRepoConfig) EnsurePathsExist() error {
