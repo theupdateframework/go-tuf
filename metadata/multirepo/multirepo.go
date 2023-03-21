@@ -37,12 +37,7 @@ type MultiRepoConfig struct {
 // MultiRepoClient represents a multi-repository TUF client
 type MultiRepoClient struct {
 	TUFClients map[string]*updater.Updater
-	cfg        *MultiRepoConfig
-}
-
-type MultiRepoTargetFiles struct {
-	Repositories []string
-	TargetFile   *metadata.TargetFiles
+	Config     *MultiRepoConfig
 }
 
 // NewConfig returns configuration for a multi-repo TUF client
@@ -77,7 +72,7 @@ func NewConfig(repoMap []byte, roots map[string][]byte) (*MultiRepoConfig, error
 func New(config *MultiRepoConfig) (*MultiRepoClient, error) {
 	// create a multi repo client instance
 	client := &MultiRepoClient{
-		cfg:        config,
+		Config:     config,
 		TUFClients: map[string]*updater.Updater{},
 	}
 
@@ -92,30 +87,30 @@ func New(config *MultiRepoConfig) (*MultiRepoClient, error) {
 func (client *MultiRepoClient) initTUFClients() error {
 
 	// loop through each repository listed in the map file and initialize it
-	for repoName, repoURL := range client.cfg.RepoMap.Repositories {
+	for repoName, repoURL := range client.Config.RepoMap.Repositories {
 		log.Infof("Initializing %s - %s", repoName, repoURL[0])
 
 		// get the trusted root file from the location specified in the map file relevant to its path
 		// NOTE: the root.json file is expected to be in a folder named after the repository it corresponds to placed in the same folder as the map file
 		// i.e <client.cfg.BootstrapDir>/<repo-name>/root.json
-		rootBytes, ok := client.cfg.TrustedRoots[repoName]
+		rootBytes, ok := client.Config.TrustedRoots[repoName]
 		if !ok {
 			return fmt.Errorf("failed to get trusted root metadata from config for repository - %s", repoName)
 		}
 
 		// path of where each of the repository's metadata files will be persisted
-		metadataDir := filepath.Join(client.cfg.LocalMetadataDir, repoName)
+		metadataDir := filepath.Join(client.Config.LocalMetadataDir, repoName)
 
 		// location of where the target files will be downloaded (propagated to each client from the multi-repo config)
 		// WARNING: Do note that using a single folder for storing targets from various repositories as it might lead to a conflict
-		targetsDir := client.cfg.LocalTargetsDir
-		if len(client.cfg.LocalTargetsDir) == 0 {
+		targetsDir := client.Config.LocalTargetsDir
+		if len(client.Config.LocalTargetsDir) == 0 {
 			// if it was not set, create a targets folder under each repository so there's no chance of conflict
 			targetsDir = filepath.Join(metadataDir, "targets")
 		}
 
 		// ensure paths exist, doesn't do anything if caching is disabled
-		err := client.cfg.EnsurePathsExist()
+		err := client.Config.EnsurePathsExist()
 		if err != nil {
 			return err
 		}
@@ -127,7 +122,7 @@ func (client *MultiRepoClient) initTUFClients() error {
 		}
 		cfg.LocalMetadataDir = metadataDir
 		cfg.LocalTargetsDir = targetsDir
-		cfg.DisableLocalCache = client.cfg.DisableLocalCache // propagate global cache policy
+		cfg.DisableLocalCache = client.Config.DisableLocalCache // propagate global cache policy
 
 		// create a new Updater instance for each repository
 		repoTUFClient, err := updater.New(cfg)
@@ -156,37 +151,37 @@ func (client *MultiRepoClient) Refresh() error {
 }
 
 // GetTopLevelTargets returns the top-level target files for all repositories
-func (client *MultiRepoClient) GetTopLevelTargets() (map[string]*MultiRepoTargetFiles, error) {
+func (client *MultiRepoClient) GetTopLevelTargets() (map[string]*metadata.TargetFiles, error) {
 	// collection of all target files for all clients
-	result := map[string]*MultiRepoTargetFiles{}
+	result := map[string]*metadata.TargetFiles{}
+
 	// loop through each repository
-	for repo, tufClient := range client.TUFClients {
-		// get top level targets for each repository
-		targetFiles := tufClient.GetTopLevelTargets()
-		// loop through all top level targets for this client
-		for targetName, targetFile := range targetFiles {
+	for _, tufClient := range client.TUFClients {
+		// loop through the top level targets for each repository
+		for targetName := range tufClient.GetTopLevelTargets() {
+			// see if this target should be kept, this goes through the TAP4 search algorithm\
+			targetInfo, _, err := client.GetTargetInfo(targetName)
+			if err != nil {
+				// we skip saving this target since there's no way/policy do download it with this map.json file
+				// possible causes like not enough repositories for that threshold, target info mismatch, etc.
+				return nil, err
+			}
 			// check if this target file is already present in the collection
 			if val, ok := result[targetName]; ok {
 				// target file is already present
-				if val.TargetFile.Equal(*targetFile) {
-					// same target file present in multiple repositories
-					// update the repo list only
-					val.Repositories = append(val.Repositories, repo)
-				} else {
+				if !val.Equal(*targetInfo) {
 					// target files have the same target name but have different target infos
-					// TODO: decide if this should raise an error
+					// this means the map.json file allows downloading two different target infos mapped to the same target name
+					// TODO: confirm if this should raise an error
 					return nil, fmt.Errorf("target name conflict")
 				}
+				// same target info, no need to do anything
 			} else {
-				// new target file, so save it
-				result[targetName] = &MultiRepoTargetFiles{
-					Repositories: []string{repo},
-					TargetFile:   targetFile,
-				}
+				// save the target
+				result[targetName] = targetInfo
 			}
 		}
 	}
-	// went over all clients, so the collection should be complete
 	return result, nil
 }
 
@@ -196,7 +191,7 @@ func (client *MultiRepoClient) GetTopLevelTargets() (map[string]*MultiRepoTarget
 func (client *MultiRepoClient) GetTargetInfo(targetPath string) (*metadata.TargetFiles, []string, error) {
 	terminated := false
 	// loop through each mapping
-	for _, eachMap := range client.cfg.RepoMap.Mapping {
+	for _, eachMap := range client.Config.RepoMap.Mapping {
 		// loop through each path for this mapping
 		for _, pathPattern := range eachMap.Paths {
 			// check if the targetPath matches each path mapping
