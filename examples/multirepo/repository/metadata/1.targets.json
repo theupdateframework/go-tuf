@@ -1,7 +1,7 @@
 {
 	"signed": {
 		"_type": "targets",
-		"expires": "2023-05-20T15:42:30.466401Z",
+		"expires": "2023-05-20T15:49:58.909128Z",
 		"spec_version": "1.0.31",
 		"targets": {
 			"map.json": {
@@ -10,13 +10,13 @@
 				},
 				"length": 660
 			},
-			"root-signing-github/root.json": {
+			"sigstore-tuf-root/root.json": {
 				"hashes": {
 					"sha256": "e2a930b2d1d4053dd56e8faf66fd113658545d522e35d222ccf58fea87ccccf4"
 				},
 				"length": 6388
 			},
-			"root-signing-google/root.json": {
+			"staging/root.json": {
 				"hashes": {
 					"sha256": "e2a930b2d1d4053dd56e8faf66fd113658545d522e35d222ccf58fea87ccccf4"
 				},
@@ -27,8 +27,8 @@
 	},
 	"signatures": [
 		{
-			"keyid": "511a1263f9509a25164656d6f698af86091b29be5380cd41abaae71c1cba819c",
-			"sig": "fadf810b70828bf18aad739ca3ece35778aaa7f6fb66860909d3d7d7163d066174b13cc6acf8c00b7290d9b837019b321913afbcbccea2c4ccb40ae290f57c06"
+			"keyid": "128e64cc09b91f12cf47f50753899e8bc923015bd4d3481665c50541dd1b611a",
+			"sig": "da6430ebf417ffaf320b3faf8a1f95aaa94c44a0d8666c64f47aa291d5a45b79041ac5308291edc6169aa5401d18afbb88f36b777d416118b3c5d98634751208"
 		}
 	]
 }

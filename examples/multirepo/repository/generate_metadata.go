@@ -35,7 +35,7 @@ func main() {
 	roles.SetTargets("targets", targets)
 
 	// Add each target to Targets metadata
-	for _, targetName := range []string{"targets/map.json", "targets/root-signing-google/root.json", "targets/root-signing-github/root.json"} {
+	for _, targetName := range []string{"targets/map.json", "targets/sigstore-tuf-root/root.json", "targets/staging/root.json"} {
 		targetPath, localPath := helperGetPathForTarget(targetName)
 		targetFileInfo, err := metadata.TargetFile().FromFile(localPath, "sha256")
 		if err != nil {
