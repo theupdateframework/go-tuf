@@ -1,14 +1,14 @@
 {
 	"signed": {
 		"_type": "targets",
-		"expires": "2023-05-15T17:38:24.13436Z",
+		"expires": "2023-05-20T15:42:30.466401Z",
 		"spec_version": "1.0.31",
 		"targets": {
 			"map.json": {
 				"hashes": {
-					"sha256": "96e72e1b639d4ef467c31a5f90574584dd694d7cb364e1817932fa61ce5238f9"
+					"sha256": "2891d477c44f4a77b9adb15a5e1392136cb75ca015daac96d1322b2dadcc82f0"
 				},
-				"length": 692
+				"length": 660
 			},
 			"root-signing-github/root.json": {
 				"hashes": {
@@ -27,8 +27,8 @@
 	},
 	"signatures": [
 		{
-			"keyid": "aff624eb56d315d26b56a1471e087b8b4a53812cfd07060774fc6b5d210994fb",
-			"sig": "e6144a6d49fddb3b55edc75ebb988c87292955e4cce3c10ee81ede5c4b1c3ab700e93de04331eeff9d5c15d31b1e296ac66d4ec4dee3b9f3f722fb39fd5ea50a"
+			"keyid": "511a1263f9509a25164656d6f698af86091b29be5380cd41abaae71c1cba819c",
+			"sig": "fadf810b70828bf18aad739ca3ece35778aaa7f6fb66860909d3d7d7163d066174b13cc6acf8c00b7290d9b837019b321913afbcbccea2c4ccb40ae290f57c06"
 		}
 	]
 }
