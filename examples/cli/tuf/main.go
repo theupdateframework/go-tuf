@@ -1,5 +1,3 @@
-package main
-
 // Copyright 2022-2023 VMware, Inc.
 //
 // This product is licensed to you under the BSD-2 license (the "License").
@@ -10,6 +8,8 @@ package main
 // LICENSE file.
 //
 // SPDX-License-Identifier: BSD-2-Clause
+
+package main
 
 import (
 	"fmt"
