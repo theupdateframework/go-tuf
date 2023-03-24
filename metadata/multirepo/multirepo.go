@@ -21,6 +21,7 @@ import (
 	"github.com/rdimitrov/go-tuf-metadata/metadata/config"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/updater"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 )
 
 // The following represent the map file described in TAP 4
@@ -49,6 +50,11 @@ type MultiRepoConfig struct {
 type MultiRepoClient struct {
 	TUFClients map[string]*updater.Updater
 	Config     *MultiRepoConfig
+}
+
+type targetMatch struct {
+	targetInfo   *metadata.TargetFiles
+	repositories []string
 }
 
 // NewConfig returns configuration for a multi-repo TUF client
@@ -214,10 +220,9 @@ func (client *MultiRepoClient) GetTargetInfo(targetPath string) (*metadata.Targe
 				if patternMatched {
 					// if there's a pattern match, loop through all of the repositories listed for that mapping
 					// and verify if all serve the same target infos
-					var targetInfo *metadata.TargetFiles
-					var repositories []string
-					threshold := 0
+					var matchedTargetGroups []targetMatch
 					for _, repoName := range eachMap.Repositories {
+						// get target info from that repository
 						newTargetInfo, err := client.TUFClients[repoName].GetTargetInfo(targetPath)
 						if err != nil {
 							// failed to get target info for the given target
@@ -225,33 +230,53 @@ func (client *MultiRepoClient) GetTargetInfo(targetPath string) (*metadata.Targe
 							// skip the rest and proceed trying to get target info from the next repository
 							continue
 						}
-						// if there's no target info saved yet, save it
-						if targetInfo == nil && newTargetInfo != nil {
-							targetInfo = newTargetInfo
-							threshold += 1
-							repositories = append(repositories, repoName)
-							continue
-						}
-						// compare the existing one with what we got
-						if targetInfo.Equal(*newTargetInfo) {
-							// they are equal, so we just bump the threshold counter
-							threshold += 1
-							repositories = append(repositories, repoName)
-							// try to do an early exit
-							if eachMap.Threshold <= threshold {
-								// we have enough repositories with matching target infos so safely return
-								return targetInfo, repositories, nil
+						found := false
+						// loop through all target infos we found so far
+						for i, target := range matchedTargetGroups {
+							// see if we already have found one like that
+							if target.targetInfo.Equal(*newTargetInfo) {
+								found = true
+								// if so, update its repository list
+								if slices.Contains(target.repositories, repoName) {
+									// we have a duplicate repository listed in the mapping
+									// decide if we should error out here
+									// nevertheless we won't take it into account when we calculate the threshold
+								} else {
+									// a new repository vouched for this target
+									matchedTargetGroups[i].repositories = append(target.repositories, repoName)
+								}
 							}
-							continue
 						}
-						// at this point there was a target info with that name in this repository but it didn't match
+						// this target as not part of the list so far, so we should add it
+						if !found {
+							matchedTargetGroups = append(matchedTargetGroups, targetMatch{
+								targetInfo:   newTargetInfo,
+								repositories: []string{repoName},
+							})
+						}
 						// proceed with searching for this target in the next repository
 					}
 					// we went through all repositories listed in that mapping
-					// exit if we have matched the threshold
-					if eachMap.Threshold <= threshold {
-						// we have enough repositories with matching target infos so safely return
-						return targetInfo, repositories, nil
+					// lets see if we have matched the threshold consensus for the given target file
+					var result *targetMatch
+					for _, target := range matchedTargetGroups {
+						// compare thresholds for each target info we found with the value stated for its mapping
+						if len(target.repositories) >= eachMap.Threshold {
+							// this target has enough repositories signed for it
+							if result != nil {
+								// it seems there's more than one target info matching the threshold for this mapping
+								// it is a conflict since it's impossible to establish a consensus which of the found targets
+								// we should actually trust, so we error out
+								return nil, nil, fmt.Errorf("more than one target info matching the necessary threshold value")
+							} else {
+								// this is the first target we found matching the necessary threshold so save it
+								result = &target
+							}
+						}
+					}
+					// search finished, see if we have found a matching target
+					if result != nil {
+						return result.targetInfo, result.repositories, nil
 					}
 					// if we are here, we haven't found enough target infos to match the threshold number
 					// for this mapping

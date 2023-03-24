@@ -57,7 +57,7 @@ func main() {
 
 	// Get target info for the given target
 	fmt.Printf("Searching for a target using the multi-repository TUF client\n\n")
-	targetInfo, repositories, err := client.GetTargetInfo("rekor.pubi") // rekor.pub trusted_root.json fulcio_v1.crt.pem
+	targetInfo, repositories, err := client.GetTargetInfo("rekor.pub") // rekor.pub trusted_root.json fulcio_v1.crt.pem
 	if err != nil {
 		panic(err)
 	}
