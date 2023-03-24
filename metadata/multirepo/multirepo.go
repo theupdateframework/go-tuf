@@ -176,7 +176,7 @@ func (client *MultiRepoClient) GetTopLevelTargets() (map[string]*metadata.Target
 	for _, tufClient := range client.TUFClients {
 		// loop through the top level targets for each repository
 		for targetName := range tufClient.GetTopLevelTargets() {
-			// see if this target should be kept, this goes through the TAP4 search algorithm\
+			// see if this target should be kept, this goes through the TAP4 search algorithm
 			targetInfo, _, err := client.GetTargetInfo(targetName)
 			if err != nil {
 				// we skip saving this target since there's no way/policy do download it with this map.json file
