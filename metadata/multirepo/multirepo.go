@@ -219,7 +219,7 @@ func (client *MultiRepoClient) GetTargetInfo(targetPath string) (*metadata.Targe
 			} else {
 				if patternMatched {
 					// if there's a pattern match, loop through all of the repositories listed for that mapping
-					// and verify if all serve the same target infos
+					// and see if we can find a consensus among them to cover the threshold for that mapping
 					var matchedTargetGroups []targetMatch
 					for _, repoName := range eachMap.Repositories {
 						// get target info from that repository
