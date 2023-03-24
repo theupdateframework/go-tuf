@@ -35,7 +35,7 @@ The directories contain the following files:
 `go-tuf` is tested on Go versions 1.18.
 
 ```bash
-go get github.com/theupdateframework/go-tuf/cmd/tuf
+go install github.com/theupdateframework/go-tuf/cmd/tuf@latest
 ```
 
 ### Commands
