@@ -2601,7 +2601,8 @@ func (rs *RepoSuite) TestOfflineFlow(c *C) {
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
 	c.Assert(r.Init(false), IsNil)
-	_, err = r.GenKey("root")
+	// Use ECDSA because it has a newline which is a difference between JSON and cJSON.
+	_, err = r.GenKeyWithSchemeAndExpires("root", data.DefaultExpires("root"), data.KeySchemeECDSA_SHA2_P256)
 	c.Assert(err, IsNil)
 
 	// Get the payload to sign
@@ -2621,15 +2622,14 @@ func (rs *RepoSuite) TestOfflineFlow(c *C) {
 	}
 
 	// Sign the payload
-	signed := data.Signed{Signed: payload}
-	_, err = r.SignPayload("targets", &signed)
+	_, err = r.SignRaw("targets", payload)
 	c.Assert(err, Equals, ErrNoKeys{"targets"})
-	numKeys, err := r.SignPayload("root", &signed)
+	signatures, err := r.SignRaw("root", payload)
 	c.Assert(err, IsNil)
-	c.Assert(numKeys, Equals, 1)
+	c.Assert(len(signatures), Equals, 1)
 
 	// Add the payload signatures back
-	for _, sig := range signed.Signatures {
+	for _, sig := range signatures {
 		// This method checks that the signature verifies!
 		err = r.AddOrUpdateSignature("root.json", sig)
 		c.Assert(err, IsNil)

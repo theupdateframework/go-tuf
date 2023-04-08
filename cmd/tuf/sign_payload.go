@@ -7,7 +7,6 @@ import (
 
 	"github.com/flynn/go-docopt"
 	tuf "github.com/theupdateframework/go-tuf"
-	tufdata "github.com/theupdateframework/go-tuf/data"
 )
 
 func init() {
@@ -25,19 +24,18 @@ func cmdSignPayload(args *docopt.Args, repo *tuf.Repo) error {
 	if err != nil {
 		return err
 	}
-	signed := tufdata.Signed{Signed: payload, Signatures: make([]tufdata.Signature, 0)}
 
-	numKeys, err := repo.SignPayload(args.String["--role"], &signed)
+	signatures, err := repo.SignRaw(args.String["--role"], payload)
 	if err != nil {
 		return err
 	}
+	fmt.Fprintln(os.Stderr, "tuf: signed")
 
-	bytes, err := json.Marshal(signed.Signatures)
+	bytes, err := json.Marshal(signatures)
 	if err != nil {
 		return err
 	}
 	fmt.Fprint(os.Stdout, string(bytes))
 
-	fmt.Fprintln(os.Stderr, "tuf: signed with", numKeys, "key(s)")
 	return nil
 }
