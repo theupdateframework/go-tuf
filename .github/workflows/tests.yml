@@ -45,7 +45,7 @@ jobs:
         run: go test -race -covermode atomic -coverprofile='profile.cov' ./...
 
       - name: Send coverage
-        uses: shogo82148/actions-goveralls@31ee804b8576ae49f6dc3caa22591bc5080e7920
+        uses: shogo82148/actions-goveralls@df920a6a2468668dfcf71a0b43817f89eaa5ea04
         with:
           path-to-profile: profile.cov
           flag-name: Go-${{ matrix.go-version }}
