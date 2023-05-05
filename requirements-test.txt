@@ -1,5 +1,5 @@
 iso8601==1.1.0
-requests==2.29.0
+requests==2.30.0
 securesystemslib==0.28.0
 six==1.16.0
 tuf==2.0.0
