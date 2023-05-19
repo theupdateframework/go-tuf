@@ -7,7 +7,7 @@ require (
 	github.com/flynn/go-docopt v0.0.0-20140912013429-f6dd2ebbb31e
 	github.com/google/gofuzz v1.2.0
 	github.com/secure-systems-lab/go-securesystemslib v0.6.0
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.3
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d
 	golang.org/x/crypto v0.9.0
 	golang.org/x/term v0.8.0
