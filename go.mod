@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/secure-systems-lab/go-securesystemslib v0.6.0
 	github.com/sigstore/sigstore v1.6.4
-	github.com/sirupsen/logrus v1.9.2
+	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.3
 	golang.org/x/crypto v0.9.0
