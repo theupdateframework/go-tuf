@@ -4,35 +4,29 @@ updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
       time: "10:00"
     commit-message:
       prefix: "chore"
       include: "scope"
-    # Disable version updates, but not security updates:
-    # https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/configuring-dependabot-security-updates#overriding-the-default-behavior-with-a-configuration-file
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 10
   # Monitor Github Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
       time: "10:00"
     commit-message:
       prefix: "chore"
       include: "scope"
-    # Disable version updates, but not security updates:
-    # https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/configuring-dependabot-security-updates#overriding-the-default-behavior-with-a-configuration-file
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 10
   # Monitor Python test dependencies
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
       time: "10:00"
     commit-message:
       prefix: "chore"
       include: "scope"
-    # Disable version updates, but not security updates:
-    # https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/configuring-dependabot-security-updates#overriding-the-default-behavior-with-a-configuration-file
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 10
