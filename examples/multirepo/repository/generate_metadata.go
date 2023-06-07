@@ -128,6 +128,12 @@ func main() {
 		}
 	}
 
+	// Save the created root metadata in the client folder, this is the initial trusted root metadata
+	err = roles.Root().ToFile(filepath.Join(cwd, "../../client/root.json"), true)
+	if err != nil {
+		panic(fmt.Sprintln("generate_metadata.go:", "saving trusted root metadata to client folder failed", err))
+	}
+
 	// Verify that metadata is signed correctly
 	// Verify root
 	err = roles.Root().VerifyDelegate("root", roles.Root())
