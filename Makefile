@@ -40,7 +40,7 @@ build-%:
 # Test target
 .PHONY: test
 test: 
-	go test ./...
+	go test -race -covermode atomic ./...
 
 #####################
 # lint section
@@ -53,6 +53,10 @@ lint:
 #####################
 # examples section
 #####################
+
+# Target for running all examples
+.PHONY: example-all
+example-all: example-client example-repository example-multirepo example-tuf-client-cli example-root-signing
 
 # Target for demoing the examples/client/client_example.go
 .PHONY: example-client
