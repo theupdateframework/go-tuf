@@ -51,11 +51,11 @@ func main() {
 	}
 
 	// Create Snapshot metadata
-	snapshot := metadata.Snapshot(helperExpireIn(60))
+	snapshot := metadata.Snapshot(helperExpireIn(365))
 	roles.SetSnapshot(snapshot)
 
 	// Create Timestamp metadata
-	timestamp := metadata.Timestamp(helperExpireIn(60))
+	timestamp := metadata.Timestamp(helperExpireIn(365))
 	roles.SetTimestamp(timestamp)
 
 	// Create Root metadata

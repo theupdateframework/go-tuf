@@ -1,7 +1,7 @@
 {
 	"signed": {
 		"_type": "targets",
-		"expires": "2023-05-20T15:49:58.909128Z",
+		"expires": "2023-08-06T11:12:34.64229Z",
 		"spec_version": "1.0.31",
 		"targets": {
 			"map.json": {
@@ -27,8 +27,8 @@
 	},
 	"signatures": [
 		{
-			"keyid": "128e64cc09b91f12cf47f50753899e8bc923015bd4d3481665c50541dd1b611a",
-			"sig": "da6430ebf417ffaf320b3faf8a1f95aaa94c44a0d8666c64f47aa291d5a45b79041ac5308291edc6169aa5401d18afbb88f36b777d416118b3c5d98634751208"
+			"keyid": "409fb816e403e0c00646665eac21cb8adfab8e318272ca7589b2d1fc0bccb255",
+			"sig": "0d98c104942b74b7ec0720451ee113ffa5604a1090b0c862660f9deb25bd1d923accb8205772b392cc0d2866c1b303a2830e918fdbc8c00441e70e66445cd90b"
 		}
 	]
 }

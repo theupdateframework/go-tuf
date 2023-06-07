@@ -1,7 +1,7 @@
 {
 	"signed": {
 		"_type": "timestamp",
-		"expires": "2023-05-20T15:49:58.910995Z",
+		"expires": "2024-06-06T11:12:34.649455Z",
 		"meta": {
 			"snapshot.json": {
 				"version": 1
@@ -12,8 +12,8 @@
 	},
 	"signatures": [
 		{
-			"keyid": "f9478d73eea06b1392cd3e8802b5e048c98e31ddd53b2a39c06f89d1fb1fb8aa",
-			"sig": "238bbbe39de87f2c3bb8334f369654336eda54ccadd95cd4a101175d6c6d5ca33941c2c9b930b4e7038672705cd668c7e3d17ad72dda566002d2fef2c9481f0e"
+			"keyid": "0a5842e65e9c8c428354f40708435de6793ac379a275effe40d6358be2de835c",
+			"sig": "c9a551e1de0b3753e93bdd176d172239cb33997281446d205f03293ecdd092b2e223a0b5e925e7188786011ee02950c095a44c53004711adf7b8e0340e70bb05"
 		}
 	]
 }
