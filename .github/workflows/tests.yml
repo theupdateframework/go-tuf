@@ -47,6 +47,9 @@ jobs:
         with:
           flags: Go-${{ matrix.go-version }}
 
+      - name: Run all examples # not exactly right to test functionality in such a way but it does act as a set of end to end test cases for the time being, nevertheless should be updated
+        run: make example-all
+
   golangci:
     strategy:
       matrix:
