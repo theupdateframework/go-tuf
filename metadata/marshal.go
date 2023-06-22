@@ -169,7 +169,7 @@ func (signed *TargetsType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (signed *MetaFiles) MarshalJSON() ([]byte, error) {
+func (signed MetaFiles) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
 	if len(signed.UnrecognizedFields) != 0 {
 		copyMapValues(signed.UnrecognizedFields, dict)
@@ -204,7 +204,7 @@ func (signed *MetaFiles) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (signed *TargetFiles) MarshalJSON() ([]byte, error) {
+func (signed TargetFiles) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
 	if len(signed.UnrecognizedFields) != 0 {
 		copyMapValues(signed.UnrecognizedFields, dict)
@@ -236,7 +236,7 @@ func (signed *TargetFiles) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (key *Key) MarshalJSON() ([]byte, error) {
+func (key Key) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
 	if len(key.UnrecognizedFields) != 0 {
 		copyMapValues(key.UnrecognizedFields, dict)
@@ -391,7 +391,7 @@ func (kv *KeyVal) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (role *Role) MarshalJSON() ([]byte, error) {
+func (role Role) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
 	if len(role.UnrecognizedFields) != 0 {
 		copyMapValues(role.UnrecognizedFields, dict)
@@ -419,7 +419,7 @@ func (role *Role) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (d *Delegations) MarshalJSON() ([]byte, error) {
+func (d Delegations) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
 	if len(d.UnrecognizedFields) != 0 {
 		copyMapValues(d.UnrecognizedFields, dict)
@@ -496,7 +496,7 @@ func (role *DelegatedRole) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (role *SuccinctRoles) MarshalJSON() ([]byte, error) {
+func (role SuccinctRoles) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
 	if len(role.UnrecognizedFields) != 0 {
 		copyMapValues(role.UnrecognizedFields, dict)
