@@ -334,38 +334,52 @@ func TestIsExpiredTargets(t *testing.T) {
 	assert.False(t, meta.Signed.IsExpired(time.Now().UTC()))
 }
 
-func TestUnrecognizedField(t *testing.T) {
+func TestUnrecognizedFieldRolesSigned(t *testing.T) {
 	// fixed expire
 	expire := time.Date(2030, 8, 15, 14, 30, 45, 100, time.UTC)
 
 	// unrecognized field to test
+	// added to the Signed portion of each role type
 	testUnrecognizedField := map[string]any{"test": "true"}
 
 	root := Root(expire)
 	root.Signed.UnrecognizedFields = testUnrecognizedField
 	rootJSON, err := root.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1},\"signatures\":[]}"), rootJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1}}"), rootJSON)
 
 	targets := Targets(expire)
 	targets.Signed.UnrecognizedFields = testUnrecognizedField
 	targetsJSON, err := targets.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"targets\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"spec_version\":\"1.0.31\",\"targets\":{},\"test\":\"true\",\"version\":1},\"signatures\":[]}"), targetsJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"targets\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"spec_version\":\"1.0.31\",\"targets\":{},\"test\":\"true\",\"version\":1}}"), targetsJSON)
 
 	snapshot := Snapshot(expire)
 	snapshot.Signed.UnrecognizedFields = testUnrecognizedField
 	snapshotJSON, err := snapshot.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"snapshot\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"targets.json\":{\"version\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1},\"signatures\":[]}"), snapshotJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"snapshot\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"targets.json\":{\"version\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1}}"), snapshotJSON)
 
 	timestamp := Timestamp(expire)
 	timestamp.Signed.UnrecognizedFields = testUnrecognizedField
 	timestampJSON, err := timestamp.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"timestamp\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"snapshot.json\":{\"version\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1},\"signatures\":[]}"), timestampJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"timestamp\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"snapshot.json\":{\"version\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1}}"), timestampJSON)
 }
+func TestUnrecognizedFieldGenericMetadata(t *testing.T) {
+	// fixed expire
+	expire := time.Date(2030, 8, 15, 14, 30, 45, 100, time.UTC)
 
+	// unrecognized field to test
+	// added to the generic metadata type
+	testUnrecognizedField := map[string]any{"test": "true"}
+
+	root := Root(expire)
+	root.UnrecognizedFields = testUnrecognizedField
+	rootJSON, err := root.ToBytes(false)
+	assert.NoError(t, err)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"version\":1},\"test\":\"true\"}"), rootJSON)
+}
 func TestTargetFilesCustomField(t *testing.T) {
 	// fixed expire
 	expire := time.Date(2030, 8, 15, 14, 30, 45, 100, time.UTC)
@@ -385,5 +399,5 @@ func TestTargetFilesCustomField(t *testing.T) {
 	targets.Signed.Targets["testTarget"] = targetFile
 	targetsJSON, err := targets.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signed\":{\"_type\":\"targets\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"spec_version\":\"1.0.31\",\"targets\":{\"testTarget\":{\"custom\":{\"test\":true},\"hashes\":{},\"length\":0}},\"version\":1},\"signatures\":[]}"), targetsJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"targets\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"spec_version\":\"1.0.31\",\"targets\":{\"testTarget\":{\"custom\":{\"test\":true},\"hashes\":{},\"length\":0}},\"version\":1}}"), targetsJSON)
 }

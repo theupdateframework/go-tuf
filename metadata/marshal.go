@@ -267,7 +267,7 @@ func (key *Key) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (meta *Metadata[T]) MarshalJSON() ([]byte, error) {
+func (meta Metadata[T]) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
 	if len(meta.UnrecognizedFields) != 0 {
 		copyMapValues(meta.UnrecognizedFields, dict)
