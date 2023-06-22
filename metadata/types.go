@@ -13,7 +13,6 @@ package metadata
 
 import (
 	"encoding/json"
-	"sync"
 	"time"
 )
 
@@ -100,7 +99,6 @@ type Key struct {
 	Scheme             string         `json:"scheme"`
 	Value              KeyVal         `json:"keyval"`
 	id                 string         `json:"-"`
-	idOnce             sync.Once      `json:"-"`
 	UnrecognizedFields map[string]any `json:"-"`
 }
 
