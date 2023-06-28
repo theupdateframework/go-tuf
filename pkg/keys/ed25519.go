@@ -32,8 +32,15 @@ type ed25519Verifier struct {
 	key       *data.PublicKey
 }
 
-func (e *ed25519Verifier) Public() string {
-	return string(e.PublicKey)
+func (e *ed25519Verifier) Public() (string, error) {
+	publicKey, err := json.Marshal(ed25519Verifier{
+		PublicKey: data.HexBytes(e.PublicKey),
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return string(publicKey), nil
 }
 
 func (e *ed25519Verifier) Verify(msg, sig []byte) error {
@@ -43,8 +50,22 @@ func (e *ed25519Verifier) Verify(msg, sig []byte) error {
 	return nil
 }
 
-func (e *ed25519Verifier) MarshalPublicKey() *data.PublicKey {
-	return e.key
+func (e *ed25519Verifier) MarshalPublicKey() (*data.PublicKey, error) {
+	publicKey, err := json.Marshal(ed25519Verifier{
+		PublicKey: data.HexBytes(e.PublicKey),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	key := &data.PublicKey{
+		Type:       data.KeyTypeEd25519,
+		Scheme:     data.KeySchemeEd25519,
+		Algorithms: data.HashAlgorithms,
+		Value:      publicKey,
+	}
+
+	return key, nil
 }
 
 func (e *ed25519Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
@@ -150,12 +171,18 @@ func (e *ed25519Signer) UnmarshalPrivateKey(key *data.PrivateKey) error {
 	return nil
 }
 
-func (e *ed25519Signer) PublicData() *data.PublicKey {
-	keyValBytes, _ := json.Marshal(ed25519Verifier{PublicKey: []byte(e.PrivateKey.Public().(ed25519.PublicKey))})
+func (e *ed25519Signer) PublicData() (*data.PublicKey, error) {
+	keyValBytes, err := json.Marshal(ed25519Verifier{
+		PublicKey: []byte(e.PrivateKey.Public().(ed25519.PublicKey)),
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	return &data.PublicKey{
 		Type:       data.KeyTypeEd25519,
 		Scheme:     data.KeySchemeEd25519,
 		Algorithms: data.HashAlgorithms,
 		Value:      keyValBytes,
-	}
+	}, nil
 }

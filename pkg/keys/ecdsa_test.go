@@ -25,7 +25,8 @@ func (ECDSASuite) TestSignVerify(c *C) {
 	msg := []byte("foo")
 	sig, err := signer.SignMessage(msg)
 	c.Assert(err, IsNil)
-	publicData := signer.PublicData()
+	publicData, err := signer.PublicData()
+	c.Assert(err, IsNil)
 	pubKey, err := GetVerifier(publicData)
 	c.Assert(err, IsNil)
 	c.Assert(pubKey.Verify(msg, sig), IsNil)
@@ -37,7 +38,8 @@ func (ECDSASuite) TestECDSAVerifyMismatchMessage(c *C) {
 	msg := []byte("foo")
 	sig, err := signer.SignMessage(msg)
 	c.Assert(err, IsNil)
-	publicData := signer.PublicData()
+	publicData, err := signer.PublicData()
+	c.Assert(err, IsNil)
 	pubKey, err := GetVerifier(publicData)
 	c.Assert(err, IsNil)
 	c.Assert(pubKey.Verify([]byte("notfoo"), sig), ErrorMatches, "tuf: ecdsa signature verification failed")
@@ -52,7 +54,9 @@ func (ECDSASuite) TestECDSAVerifyMismatchPubKey(c *C) {
 
 	signerNew, err := GenerateEcdsaKey()
 	c.Assert(err, IsNil)
-	pubKey, err := GetVerifier(signerNew.PublicData())
+	publicKey, err := signerNew.PublicData()
+	c.Assert(err, IsNil)
+	pubKey, err := GetVerifier(publicKey)
 	c.Assert(err, IsNil)
 	c.Assert(pubKey.Verify([]byte("notfoo"), sig), ErrorMatches, "tuf: ecdsa signature verification failed")
 }
@@ -82,10 +86,13 @@ func (ECDSASuite) TestSignVerifyDeprecatedFails(c *C) {
 func (ECDSASuite) TestMarshalUnmarshalPublicKey(c *C) {
 	signer, err := GenerateEcdsaKey()
 	c.Assert(err, IsNil)
-	publicData := signer.PublicData()
+	publicData, err := signer.PublicData()
+	c.Assert(err, IsNil)
 	pubKey, err := GetVerifier(publicData)
 	c.Assert(err, IsNil)
-	c.Assert(pubKey.MarshalPublicKey(), DeepEquals, publicData)
+	publicKey, err := pubKey.MarshalPublicKey()
+	c.Assert(err, IsNil)
+	c.Assert(publicKey, DeepEquals, publicData)
 }
 
 func (ECDSASuite) TestMarshalUnmarshalPrivateKey(c *C) {
@@ -106,7 +113,8 @@ func (ECDSASuite) TestUnmarshalECDSA(c *C) {
 	c.Assert(err, IsNil)
 
 	signer := &ecdsaSigner{priv}
-	goodKey := signer.PublicData()
+	goodKey, err := signer.PublicData()
+	c.Assert(err, IsNil)
 
 	verifier := NewEcdsaVerifier()
 	c.Assert(verifier.UnmarshalPublicKey(goodKey), IsNil)

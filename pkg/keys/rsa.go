@@ -35,15 +35,14 @@ type rsaVerifier struct {
 	key       *data.PublicKey
 }
 
-func (p *rsaVerifier) Public() string {
+func (p *rsaVerifier) Public() (string, error) {
 	// This is already verified to succeed when unmarshalling a public key.
 	r, err := x509.MarshalPKIXPublicKey(p.rsaKey)
 	if err != nil {
-		// TODO: Gracefully handle these errors.
-		// See https://github.com/theupdateframework/go-tuf/issues/363
-		panic(err)
+		return "", err
 	}
-	return string(r)
+
+	return string(r), nil
 }
 
 func (p *rsaVerifier) Verify(msg, sigBytes []byte) error {
@@ -52,8 +51,9 @@ func (p *rsaVerifier) Verify(msg, sigBytes []byte) error {
 	return rsa.VerifyPSS(p.rsaKey, crypto.SHA256, hash[:], sigBytes, &rsa.PSSOptions{})
 }
 
-func (p *rsaVerifier) MarshalPublicKey() *data.PublicKey {
-	return p.key
+func (p *rsaVerifier) MarshalPublicKey() (*data.PublicKey, error) {
+	// add verification?
+	return p.key, nil
 }
 
 func (p *rsaVerifier) UnmarshalPublicKey(key *data.PublicKey) error {
@@ -91,14 +91,20 @@ type rsaPrivateKeyValue struct {
 	Public  *PKIXPublicKey `json:"public"`
 }
 
-func (s *rsaSigner) PublicData() *data.PublicKey {
-	keyValBytes, _ := json.Marshal(rsaVerifier{PublicKey: &PKIXPublicKey{PublicKey: s.Public()}})
+func (s *rsaSigner) PublicData() (*data.PublicKey, error) {
+	keyValBytes, err := json.Marshal(rsaVerifier{
+		PublicKey: &PKIXPublicKey{PublicKey: s.Public()},
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	return &data.PublicKey{
 		Type:       data.KeyTypeRSASSA_PSS_SHA256,
 		Scheme:     data.KeySchemeRSASSA_PSS_SHA256,
 		Algorithms: data.HashAlgorithms,
 		Value:      keyValBytes,
-	}
+	}, nil
 }
 
 func (s *rsaSigner) SignMessage(message []byte) ([]byte, error) {
@@ -107,7 +113,11 @@ func (s *rsaSigner) SignMessage(message []byte) ([]byte, error) {
 }
 
 func (s *rsaSigner) ContainsID(id string) bool {
-	return s.PublicData().ContainsID(id)
+	publicData, err := s.PublicData()
+	if err != nil {
+		return false
+	}
+	return publicData.ContainsID(id)
 }
 
 func (s *rsaSigner) MarshalPrivateKey() (*data.PrivateKey, error) {

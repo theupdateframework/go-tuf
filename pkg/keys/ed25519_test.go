@@ -18,6 +18,10 @@ type Ed25519Suite struct{}
 
 var _ = Suite(&Ed25519Suite{})
 
+func (Ed25519Suite) TestMarshalEd25519(c *C) {
+
+}
+
 func (Ed25519Suite) TestUnmarshalEd25519(c *C) {
 	pub, _, err := ed25519.GenerateKey(strings.NewReader("00001-deterministic-buffer-for-key-generation"))
 	c.Assert(err, IsNil)
@@ -33,6 +37,7 @@ func (Ed25519Suite) TestUnmarshalEd25519(c *C) {
 		Algorithms: data.HashAlgorithms,
 		Value:      publicKey,
 	}
+
 	verifier := NewEd25519Verifier()
 	c.Assert(verifier.UnmarshalPublicKey(badKey), IsNil)
 }
@@ -92,7 +97,8 @@ func (Ed25519Suite) TestSignVerify(c *C) {
 	msg := []byte("foo")
 	sig, err := signer.SignMessage(msg)
 	c.Assert(err, IsNil)
-	publicData := signer.PublicData()
+	publicData, err := signer.PublicData()
+	c.Assert(err, IsNil)
 	pubKey, err := GetVerifier(publicData)
 	c.Assert(err, IsNil)
 	c.Assert(pubKey.Verify(msg, sig), IsNil)

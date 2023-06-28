@@ -21,7 +21,8 @@ func (RsaSuite) TestSignVerify(c *C) {
 	msg := []byte("foo")
 	sig, err := signer.SignMessage(msg)
 	c.Assert(err, IsNil)
-	publicData := signer.PublicData()
+	publicData, err := signer.PublicData()
+	c.Assert(err, IsNil)
 	pubKey, err := GetVerifier(publicData)
 	c.Assert(err, IsNil)
 	c.Assert(pubKey.Verify(msg, sig), IsNil)
@@ -33,7 +34,8 @@ func (RsaSuite) TestRSAVerifyMismatchMessage(c *C) {
 	msg := []byte("foo")
 	sig, err := signer.SignMessage(msg)
 	c.Assert(err, IsNil)
-	publicData := signer.PublicData()
+	publicData, err := signer.PublicData()
+	c.Assert(err, IsNil)
 	pubKey, err := GetVerifier(publicData)
 	c.Assert(err, IsNil)
 	c.Assert(pubKey.Verify([]byte("notfoo"), sig), ErrorMatches, "crypto/rsa: verification error")
@@ -49,7 +51,10 @@ func (RsaSuite) TestRSAVerifyMismatchPubKey(c *C) {
 	signerNew, err := GenerateRsaKey()
 	c.Assert(err, IsNil)
 
-	pubKey, err := GetVerifier(signerNew.PublicData())
+	publicData, err := signerNew.PublicData()
+	c.Assert(err, IsNil)
+
+	pubKey, err := GetVerifier(publicData)
 	c.Assert(err, IsNil)
 	c.Assert(pubKey.Verify([]byte("notfoo"), sig), ErrorMatches, "crypto/rsa: verification error")
 }
@@ -57,10 +62,12 @@ func (RsaSuite) TestRSAVerifyMismatchPubKey(c *C) {
 func (RsaSuite) TestMarshalUnmarshalPublicKey(c *C) {
 	signer, err := GenerateRsaKey()
 	c.Assert(err, IsNil)
-	publicData := signer.PublicData()
+	publicData, err := signer.PublicData()
+	c.Assert(err, IsNil)
 	pubKey, err := GetVerifier(publicData)
 	c.Assert(err, IsNil)
-	c.Assert(pubKey.MarshalPublicKey(), DeepEquals, publicData)
+	publicKey, err := pubKey.MarshalPublicKey()
+	c.Assert(publicKey, DeepEquals, publicData)
 }
 
 func (RsaSuite) TestMarshalUnmarshalPrivateKey(c *C) {
@@ -95,7 +102,8 @@ func (ECDSASuite) TestUnmarshalRSAPublicKey(c *C) {
 	c.Assert(err, IsNil)
 
 	signer := &rsaSigner{priv.PrivateKey}
-	goodKey := signer.PublicData()
+	goodKey, err := signer.PublicData()
+	c.Assert(err, IsNil)
 
 	verifier := newRsaVerifier()
 	c.Assert(verifier.UnmarshalPublicKey(goodKey), IsNil)
