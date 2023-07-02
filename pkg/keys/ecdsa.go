@@ -44,7 +44,7 @@ func (p *EcdsaVerifier) Public() string {
 	// This is already verified to succeed when unmarshalling a public key.
 	r, err := x509.MarshalPKIXPublicKey(p.ecdsaKey)
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("tuf: error marshalling key: %w", err))
 	}
 
 	return string(r)
