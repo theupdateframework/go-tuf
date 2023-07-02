@@ -77,7 +77,7 @@ func (ECDSASuite) TestSignVerifyDeprecatedFails(c *C) {
 	}
 
 	_, err = GetVerifier(publicData)
-	c.Assert(err, ErrorMatches, "tuf: error unmarshalling key: invalid PEM value")
+	c.Assert(err, ErrorMatches, "tuf: error unmarshalling key. invalid PEM value")
 }
 
 func (ECDSASuite) TestMarshalUnmarshalPublicKey(c *C) {

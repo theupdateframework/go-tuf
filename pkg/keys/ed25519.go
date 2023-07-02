@@ -37,7 +37,7 @@ func (e *ed25519Verifier) Public() string {
 		PublicKey: data.HexBytes(e.PublicKey),
 	})
 	if err != nil {
-		panic(fmt.Errorf("tuf: error marshalling key: %w", err))
+		panic(fmt.Errorf("tuf: error unmarshalling key. %w", err))
 	}
 
 	return string(publicKey)
@@ -55,7 +55,7 @@ func (e *ed25519Verifier) MarshalPublicKey() *data.PublicKey {
 		PublicKey: data.HexBytes(e.PublicKey),
 	})
 	if err != nil {
-		panic(fmt.Errorf("tuf: error marshalling key: %w", err))
+		panic(fmt.Errorf("tuf: error unmarshalling key. %w", err))
 	}
 
 	key := &data.PublicKey{
@@ -176,7 +176,7 @@ func (e *ed25519Signer) PublicData() *data.PublicKey {
 		PublicKey: []byte(e.PrivateKey.Public().(ed25519.PublicKey)),
 	})
 	if err != nil {
-		panic(fmt.Errorf("tuf: error marshalling key: %w", err))
+		panic(fmt.Errorf("tuf: error unmarshalling key. %w", err))
 	}
 
 	return &data.PublicKey{

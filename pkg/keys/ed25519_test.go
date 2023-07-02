@@ -18,10 +18,6 @@ type Ed25519Suite struct{}
 
 var _ = Suite(&Ed25519Suite{})
 
-func (Ed25519Suite) TestMarshalEd25519(c *C) {
-
-}
-
 func (Ed25519Suite) TestUnmarshalEd25519(c *C) {
 	pub, _, err := ed25519.GenerateKey(strings.NewReader("00001-deterministic-buffer-for-key-generation"))
 	c.Assert(err, IsNil)
