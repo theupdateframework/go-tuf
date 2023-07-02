@@ -30,10 +30,10 @@ type Verifier interface {
 	UnmarshalPublicKey(key *data.PublicKey) error
 
 	// MarshalPublicKey returns the data.PublicKey object associated with the verifier.
-	MarshalPublicKey() (*data.PublicKey, error)
+	MarshalPublicKey() *data.PublicKey
 
 	// This is the public string used as a unique identifier for the verifier instance.
-	Public() (string, error)
+	Public() string
 
 	// Verify takes a message and signature, all as byte slices,
 	// and determines whether the signature is valid for the given
@@ -49,7 +49,7 @@ type Signer interface {
 	UnmarshalPrivateKey(key *data.PrivateKey) error
 
 	// Returns the public data.PublicKey from the private key
-	PublicData() (*data.PublicKey, error)
+	PublicData() *data.PublicKey
 
 	// Sign returns the signature of the message.
 	// The signer is expected to do its own hashing, so the full message will be

@@ -25,8 +25,7 @@ func (ECDSASuite) TestSignVerify(c *C) {
 	msg := []byte("foo")
 	sig, err := signer.SignMessage(msg)
 	c.Assert(err, IsNil)
-	publicData, err := signer.PublicData()
-	c.Assert(err, IsNil)
+	publicData := signer.PublicData()
 	pubKey, err := GetVerifier(publicData)
 	c.Assert(err, IsNil)
 	c.Assert(pubKey.Verify(msg, sig), IsNil)
@@ -38,8 +37,7 @@ func (ECDSASuite) TestECDSAVerifyMismatchMessage(c *C) {
 	msg := []byte("foo")
 	sig, err := signer.SignMessage(msg)
 	c.Assert(err, IsNil)
-	publicData, err := signer.PublicData()
-	c.Assert(err, IsNil)
+	publicData := signer.PublicData()
 	pubKey, err := GetVerifier(publicData)
 	c.Assert(err, IsNil)
 	c.Assert(pubKey.Verify([]byte("notfoo"), sig), ErrorMatches, "tuf: ecdsa signature verification failed")
@@ -54,8 +52,7 @@ func (ECDSASuite) TestECDSAVerifyMismatchPubKey(c *C) {
 
 	signerNew, err := GenerateEcdsaKey()
 	c.Assert(err, IsNil)
-	publicKey, err := signerNew.PublicData()
-	c.Assert(err, IsNil)
+	publicKey := signerNew.PublicData()
 	pubKey, err := GetVerifier(publicKey)
 	c.Assert(err, IsNil)
 	c.Assert(pubKey.Verify([]byte("notfoo"), sig), ErrorMatches, "tuf: ecdsa signature verification failed")
@@ -86,12 +83,10 @@ func (ECDSASuite) TestSignVerifyDeprecatedFails(c *C) {
 func (ECDSASuite) TestMarshalUnmarshalPublicKey(c *C) {
 	signer, err := GenerateEcdsaKey()
 	c.Assert(err, IsNil)
-	publicData, err := signer.PublicData()
-	c.Assert(err, IsNil)
+	publicData := signer.PublicData()
 	pubKey, err := GetVerifier(publicData)
 	c.Assert(err, IsNil)
-	publicKey, err := pubKey.MarshalPublicKey()
-	c.Assert(err, IsNil)
+	publicKey := pubKey.MarshalPublicKey()
 	c.Assert(publicKey, DeepEquals, publicData)
 }
 
@@ -113,8 +108,7 @@ func (ECDSASuite) TestUnmarshalECDSA(c *C) {
 	c.Assert(err, IsNil)
 
 	signer := &ecdsaSigner{priv}
-	goodKey, err := signer.PublicData()
-	c.Assert(err, IsNil)
+	goodKey := signer.PublicData()
 
 	verifier := NewEcdsaVerifier()
 	c.Assert(verifier.UnmarshalPublicKey(goodKey), IsNil)

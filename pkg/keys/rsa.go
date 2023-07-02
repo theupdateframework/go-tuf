@@ -35,14 +35,14 @@ type rsaVerifier struct {
 	key       *data.PublicKey
 }
 
-func (p *rsaVerifier) Public() (string, error) {
+func (p *rsaVerifier) Public() string {
 	// This is already verified to succeed when unmarshalling a public key.
 	r, err := x509.MarshalPKIXPublicKey(p.rsaKey)
 	if err != nil {
-		return "", err
+		panic(err)
 	}
 
-	return string(r), nil
+	return string(r)
 }
 
 func (p *rsaVerifier) Verify(msg, sigBytes []byte) error {
@@ -51,9 +51,8 @@ func (p *rsaVerifier) Verify(msg, sigBytes []byte) error {
 	return rsa.VerifyPSS(p.rsaKey, crypto.SHA256, hash[:], sigBytes, &rsa.PSSOptions{})
 }
 
-func (p *rsaVerifier) MarshalPublicKey() (*data.PublicKey, error) {
-	// add verification?
-	return p.key, nil
+func (p *rsaVerifier) MarshalPublicKey() *data.PublicKey {
+	return p.key
 }
 
 func (p *rsaVerifier) UnmarshalPublicKey(key *data.PublicKey) error {
@@ -91,12 +90,12 @@ type rsaPrivateKeyValue struct {
 	Public  *PKIXPublicKey `json:"public"`
 }
 
-func (s *rsaSigner) PublicData() (*data.PublicKey, error) {
+func (s *rsaSigner) PublicData() *data.PublicKey {
 	keyValBytes, err := json.Marshal(rsaVerifier{
 		PublicKey: &PKIXPublicKey{PublicKey: s.Public()},
 	})
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	return &data.PublicKey{
@@ -104,7 +103,7 @@ func (s *rsaSigner) PublicData() (*data.PublicKey, error) {
 		Scheme:     data.KeySchemeRSASSA_PSS_SHA256,
 		Algorithms: data.HashAlgorithms,
 		Value:      keyValBytes,
-	}, nil
+	}
 }
 
 func (s *rsaSigner) SignMessage(message []byte) ([]byte, error) {
@@ -113,10 +112,8 @@ func (s *rsaSigner) SignMessage(message []byte) ([]byte, error) {
 }
 
 func (s *rsaSigner) ContainsID(id string) bool {
-	publicData, err := s.PublicData()
-	if err != nil {
-		return false
-	}
+	publicData := s.PublicData()
+
 	return publicData.ContainsID(id)
 }
 

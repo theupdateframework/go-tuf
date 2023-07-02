@@ -40,14 +40,14 @@ type EcdsaVerifier struct {
 	key       *data.PublicKey
 }
 
-func (p *EcdsaVerifier) Public() (string, error) {
+func (p *EcdsaVerifier) Public() string {
 	// This is already verified to succeed when unmarshalling a public key.
 	r, err := x509.MarshalPKIXPublicKey(p.ecdsaKey)
 	if err != nil {
-		return "", err
+		panic(err)
 	}
 
-	return string(r), nil
+	return string(r)
 }
 
 func (p *EcdsaVerifier) Verify(msg, sigBytes []byte) error {
@@ -59,8 +59,8 @@ func (p *EcdsaVerifier) Verify(msg, sigBytes []byte) error {
 	return nil
 }
 
-func (p *EcdsaVerifier) MarshalPublicKey() (*data.PublicKey, error) {
-	return p.key, nil
+func (p *EcdsaVerifier) MarshalPublicKey() *data.PublicKey {
+	return p.key
 }
 
 func (p *EcdsaVerifier) UnmarshalPublicKey(key *data.PublicKey) error {
@@ -98,7 +98,7 @@ type ecdsaPrivateKeyValue struct {
 	Public  *PKIXPublicKey `json:"public"`
 }
 
-func (s *ecdsaSigner) PublicData() (*data.PublicKey, error) {
+func (s *ecdsaSigner) PublicData() *data.PublicKey {
 	// This uses a trusted public key JSON format with a trusted Public value.
 	keyValBytes, _ := json.Marshal(EcdsaVerifier{PublicKey: &PKIXPublicKey{PublicKey: s.Public()}})
 	return &data.PublicKey{
@@ -106,7 +106,7 @@ func (s *ecdsaSigner) PublicData() (*data.PublicKey, error) {
 		Scheme:     data.KeySchemeECDSA_SHA2_P256,
 		Algorithms: data.HashAlgorithms,
 		Value:      keyValBytes,
-	}, nil
+	}
 }
 
 func (s *ecdsaSigner) SignMessage(message []byte) ([]byte, error) {
