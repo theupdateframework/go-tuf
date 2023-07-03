@@ -123,7 +123,7 @@ type Root struct {
 func NewRoot() *Root {
 	return &Root{
 		Type:               "root",
-		SpecVersion:        "1.0",
+		SpecVersion:        "1.0.0",
 		Expires:            DefaultExpires("root"),
 		Keys:               make(map[string]*PublicKey),
 		Roles:              make(map[string]*Role),
@@ -199,7 +199,7 @@ type Snapshot struct {
 func NewSnapshot() *Snapshot {
 	return &Snapshot{
 		Type:        "snapshot",
-		SpecVersion: "1.0",
+		SpecVersion: "1.0.0",
 		Expires:     DefaultExpires("snapshot"),
 		Meta:        make(SnapshotFiles),
 	}
@@ -319,7 +319,7 @@ func (d *DelegatedRole) UnmarshalJSON(b []byte) error {
 func NewTargets() *Targets {
 	return &Targets{
 		Type:        "targets",
-		SpecVersion: "1.0",
+		SpecVersion: "1.0.0",
 		Expires:     DefaultExpires("targets"),
 		Targets:     make(TargetFiles),
 	}
@@ -341,7 +341,7 @@ type Timestamp struct {
 func NewTimestamp() *Timestamp {
 	return &Timestamp{
 		Type:        "timestamp",
-		SpecVersion: "1.0",
+		SpecVersion: "1.0.0",
 		Expires:     DefaultExpires("timestamp"),
 		Meta:        make(TimestampFiles),
 	}

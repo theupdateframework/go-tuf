@@ -245,7 +245,7 @@ func TestCustomField(t *testing.T) {
 
 	root := Root{
 		Type:               "root",
-		SpecVersion:        "1.0",
+		SpecVersion:        "1.0.0",
 		Keys:               make(map[string]*PublicKey),
 		Roles:              make(map[string]*Role),
 		ConsistentSnapshot: true,
@@ -253,35 +253,35 @@ func TestCustomField(t *testing.T) {
 	}
 	rootJSON, err := json.Marshal(&root)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"_type\":\"root\",\"spec_version\":\"1.0\",\"version\":0,\"expires\":\"0001-01-01T00:00:00Z\",\"keys\":{},\"roles\":{},\"custom\":{\"test\":true},\"consistent_snapshot\":true}"), rootJSON)
+	assert.Equal(t, []byte("{\"_type\":\"root\",\"spec_version\":\"1.0.0\",\"version\":0,\"expires\":\"0001-01-01T00:00:00Z\",\"keys\":{},\"roles\":{},\"custom\":{\"test\":true},\"consistent_snapshot\":true}"), rootJSON)
 
 	targets := Targets{
 		Type:        "targets",
-		SpecVersion: "1.0",
+		SpecVersion: "1.0.0",
 		Targets:     make(TargetFiles),
 		Custom:      &testCustomJSON,
 	}
 	targetsJSON, err := json.Marshal(&targets)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"_type\":\"targets\",\"spec_version\":\"1.0\",\"version\":0,\"expires\":\"0001-01-01T00:00:00Z\",\"targets\":{},\"custom\":{\"test\":true}}"), targetsJSON)
+	assert.Equal(t, []byte("{\"_type\":\"targets\",\"spec_version\":\"1.0.0\",\"version\":0,\"expires\":\"0001-01-01T00:00:00Z\",\"targets\":{},\"custom\":{\"test\":true}}"), targetsJSON)
 
 	snapshot := Snapshot{
 		Type:        "snapshot",
-		SpecVersion: "1.0",
+		SpecVersion: "1.0.0",
 		Meta:        make(SnapshotFiles),
 		Custom:      &testCustomJSON,
 	}
 	snapshotJSON, err := json.Marshal(&snapshot)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"_type\":\"snapshot\",\"spec_version\":\"1.0\",\"version\":0,\"expires\":\"0001-01-01T00:00:00Z\",\"meta\":{},\"custom\":{\"test\":true}}"), snapshotJSON)
+	assert.Equal(t, []byte("{\"_type\":\"snapshot\",\"spec_version\":\"1.0.0\",\"version\":0,\"expires\":\"0001-01-01T00:00:00Z\",\"meta\":{},\"custom\":{\"test\":true}}"), snapshotJSON)
 
 	timestamp := Timestamp{
 		Type:        "timestamp",
-		SpecVersion: "1.0",
+		SpecVersion: "1.0.0",
 		Meta:        make(TimestampFiles),
 		Custom:      &testCustomJSON,
 	}
 	timestampJSON, err := json.Marshal(&timestamp)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"_type\":\"timestamp\",\"spec_version\":\"1.0\",\"version\":0,\"expires\":\"0001-01-01T00:00:00Z\",\"meta\":{},\"custom\":{\"test\":true}}"), timestampJSON)
+	assert.Equal(t, []byte("{\"_type\":\"timestamp\",\"spec_version\":\"1.0.0\",\"version\":0,\"expires\":\"0001-01-01T00:00:00Z\",\"meta\":{},\"custom\":{\"test\":true}}"), timestampJSON)
 }
