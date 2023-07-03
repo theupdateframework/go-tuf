@@ -1,7 +1,7 @@
 {
 	"signed": {
 		"_type": "root",
-		"spec_version": "1.0",
+		"spec_version": "1.0.0",
 		"version": 5,
 		"expires": "2100-01-01T00:00:00Z",
 		"keys": {
@@ -81,7 +81,7 @@
 	"signatures": [
 		{
 			"keyid": "b2403f96ae9b1089d8cbc15bbc35e9acbacd7984571f951b43aab56aedcfa84f",
-			"sig": "bd2edde6ba4f5cb3a0cc28dca272e2fc0be691575082479f86b82cea4e541a686a0c132c3a7eca231a5782e52e629df92f8f3f89a5b1f57e8b5368986bddfa0e"
+			"sig": "f00ed727edbbb6f4f7d4bc78f0558dd3743bb07d339d74c94d9474d0a534578b1078ff3a100d394c7d745fcc7a586a593fe0613a683953562e24d37358bbfe06"
 		}
 	]
 }

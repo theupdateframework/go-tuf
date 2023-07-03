@@ -1,7 +1,7 @@
 {
 	"signed": {
 		"_type": "targets",
-		"spec_version": "1.0",
+		"spec_version": "1.0.0",
 		"version": 4,
 		"expires": "2100-01-01T00:00:00Z",
 		"targets": {
@@ -34,7 +34,7 @@
 	"signatures": [
 		{
 			"keyid": "bc8f087663855564b358ddf314d5932ab920af17bd1df2f58b397afd82d76dc1",
-			"sig": "7bfe0a63ee324034807b5341336d9d2d64e9ef3936086577b5bbcc6d021b4656bd6bf14d817bbb3908e4dcb05391d1b4031b527c14d942c2d1e38275d5ff1308"
+			"sig": "4431d809faeaa97437c9e5d57d50a7aca098f1980530bb5e372e37ca15a3cffae35bf4ab9d1a6cdc40c727ffb278435698564b51402c9692bd4e7ea3dc3bce09"
 		}
 	]
 }

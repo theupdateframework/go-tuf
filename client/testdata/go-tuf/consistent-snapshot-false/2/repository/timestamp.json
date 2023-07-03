@@ -1,14 +1,14 @@
 {
 	"signed": {
 		"_type": "timestamp",
-		"spec_version": "1.0",
+		"spec_version": "1.0.0",
 		"version": 3,
 		"expires": "2100-01-01T00:00:00Z",
 		"meta": {
 			"snapshot.json": {
-				"length": 617,
+				"length": 619,
 				"hashes": {
-					"sha512": "70d2f64bc810a0ae1c827c28eed47304c3a9c57402447d129aa3ac851d809a48bd0421aaa99e9e49055984e77f221510415cf27aca8f30f4db1767d6b7bd6024"
+					"sha512": "1540ceb428799601d0391e5944df29a64e0412eab1679d79c1d1e342e59697c5ca5b856ed7d93cd6c485bc32163bb4919e90341f0050fa3a21f4de6bea487fad"
 				},
 				"version": 3
 			}
@@ -17,7 +17,7 @@
 	"signatures": [
 		{
 			"keyid": "aa3255b4e8e17e566d2bdbea0e5842978f9fa1d2fa9ec76ae76b146164acbfc8",
-			"sig": "22367ebcf7c5265260b288e9fec6110257b8c8745af25f2b14c5d347ddab94f46893926bdd37c58d142089419708e446c5e3c1af5c47c51187fe69ca95038605"
+			"sig": "064409992a2f10632527e238a8607ebf7f31ee8acbe380011395b731543a8ca7bca10c2a1dcb878951f2db28fb51c9eea631c737be1a1abf82454895d970dd04"
 		}
 	]
 }

@@ -1,7 +1,7 @@
 {
 	"signed": {
 		"_type": "root",
-		"spec_version": "1.0",
+		"spec_version": "1.0.0",
 		"version": 2,
 		"expires": "2100-01-01T00:00:00Z",
 		"keys": {
@@ -81,11 +81,11 @@
 	"signatures": [
 		{
 			"keyid": "b2403f96ae9b1089d8cbc15bbc35e9acbacd7984571f951b43aab56aedcfa84f",
-			"sig": "7ac71619b21fe3a076fbbf3e17f92177c5374f005c32f1818e7c92eee107e3c726ccf906e800878035a9caf7679610147d72cb515cd76164b08b5c8bf93c0f0e"
+			"sig": "6b0e444ac9529d36a33934f0be2f6595fb391b8a0c760209c7b1c03ffb7dc2956222bc1d7e7090c39b2f240bcf7efaf62be6ed89214aaa012518030d5b48c501"
 		},
 		{
 			"keyid": "ce72db3f938914205461a415c9b7b91267a2079df991fd6283aa8461988c1add",
-			"sig": "e560f386c0c270bb44cedda965ad21526e65162b41a2c30d84fb3a80f58913432e8dc74e5e7b0635ccdf51a2b951dae3b0ba28b4aac4088641a2b2cd2933dd04"
+			"sig": "33d6239618de7ced11fc3027e4badab53448bf70ed4928b4fac465b9d95cfc9e7449531908913774f94d0797c738b7b82528c061be1f5b450aa50215ac7bbd0e"
 		}
 	]
 }
