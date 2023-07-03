@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/theupdateframework/go-tuf/data"
 	"github.com/theupdateframework/go-tuf/encrypted"
+	"github.com/theupdateframework/go-tuf/internal/fsutil"
 	"github.com/theupdateframework/go-tuf/internal/sets"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/util"
@@ -196,18 +198,44 @@ type persistedKeys struct {
 	Data      json.RawMessage `json:"data"`
 }
 
+type StoreOpts struct {
+	Logger   *log.Logger
+	PassFunc util.PassphraseFunc
+}
+
 func FileSystemStore(dir string, p util.PassphraseFunc) LocalStore {
 	return &fileSystemStore{
 		dir:            dir,
 		passphraseFunc: p,
+		logger:         log.New(io.Discard, "", 0),
 		signerForKeyID: make(map[string]keys.Signer),
 		keyIDsForRole:  make(map[string][]string),
 	}
 }
 
+func FileSystemStoreWithOpts(dir string, opts ...StoreOpts) LocalStore {
+	store := &fileSystemStore{
+		dir:            dir,
+		passphraseFunc: nil,
+		logger:         log.New(io.Discard, "", 0),
+		signerForKeyID: make(map[string]keys.Signer),
+		keyIDsForRole:  make(map[string][]string),
+	}
+	for _, opt := range opts {
+		if opt.Logger != nil {
+			store.logger = opt.Logger
+		}
+		if opt.PassFunc != nil {
+			store.passphraseFunc = opt.PassFunc
+		}
+	}
+	return store
+}
+
 type fileSystemStore struct {
 	dir            string
 	passphraseFunc util.PassphraseFunc
+	logger         *log.Logger
 
 	signerForKeyID map[string]keys.Signer
 	keyIDsForRole  map[string][]string
@@ -219,19 +247,6 @@ func (f *fileSystemStore) repoDir() string {
 
 func (f *fileSystemStore) stagedDir() string {
 	return filepath.Join(f.dir, "staged")
-}
-
-func isMetaFile(e os.DirEntry) (bool, error) {
-	if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
-		return false, nil
-	}
-
-	info, err := e.Info()
-	if err != nil {
-		return false, err
-	}
-
-	return info.Mode().IsRegular(), nil
 }
 
 func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
@@ -246,7 +261,7 @@ func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 	}
 
 	for _, e := range committed {
-		imf, err := isMetaFile(e)
+		imf, err := fsutil.IsMetaFile(e)
 		if err != nil {
 			return nil, err
 		}
@@ -263,7 +278,7 @@ func (f *fileSystemStore) GetMeta() (map[string]json.RawMessage, error) {
 	}
 
 	for _, e := range staged {
-		imf, err := isMetaFile(e)
+		imf, err := fsutil.IsMetaFile(e)
 		if err != nil {
 			return nil, err
 		}
@@ -538,7 +553,7 @@ func (f *fileSystemStore) ChangePassphrase(role string) error {
 	keys, _, err := f.loadPrivateKeys(role)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Printf("Failed to change passphrase. Missing keys file for %s role. \n", role)
+			f.logger.Printf("Failed to change passphrase. Missing keys file for %s role. \n", role)
 		}
 		return err
 	}
@@ -560,7 +575,7 @@ func (f *fileSystemStore) ChangePassphrase(role string) error {
 	if err := util.AtomicallyWriteFile(f.keysPath(role), append(data, '\n'), 0600); err != nil {
 		return err
 	}
-	fmt.Printf("Successfully changed passphrase for %s keys file\n", role)
+	f.logger.Printf("Successfully changed passphrase for %s keys file\n", role)
 	return nil
 }
 

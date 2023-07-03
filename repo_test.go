@@ -3,11 +3,13 @@ package tuf
 import (
 	"bytes"
 	"crypto"
+	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -1421,7 +1423,12 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 	// Test changing the passphrase
 	// 1. Create a secure store with a passphrase (create new object and temp folder so we discard any previous state)
 	tmp = newTmpDir(c)
-	store = FileSystemStore(tmp.path, testPassphraseFunc)
+	var logBytes bytes.Buffer
+	storeOpts := StoreOpts{
+		Logger:   log.New(&logBytes, "", 0),
+		PassFunc: testPassphraseFunc,
+	}
+	store = FileSystemStoreWithOpts(tmp.path, storeOpts)
 
 	// 1.5. Changing passphrase works for top-level and delegated roles.
 	r, err := NewRepo(store)
@@ -1432,6 +1439,7 @@ func (rs *RepoSuite) TestKeyPersistence(c *C) {
 
 	// 2. Test changing the passphrase when the keys file does not exist - should FAIL
 	c.Assert(store.(PassphraseChanger).ChangePassphrase("root"), NotNil)
+	c.Assert(strings.Contains(logBytes.String(), "Missing keys file"), Equals, true)
 
 	// 3. Generate a new key
 	signer, err = keys.GenerateEd25519Key()
@@ -2036,6 +2044,14 @@ func (rs *RepoSuite) TestDelegations(c *C) {
 		t, err := r.targets(delegator)
 		c.Assert(err, IsNil)
 
+		// Check if there are no delegations.
+		if t.Delegations == nil {
+			if delegatedRoles != nil {
+				c.Fatal("expected delegated roles on delegator")
+			}
+			return
+		}
+
 		// Check that delegated roles are copied verbatim.
 		c.Assert(t.Delegations.Roles, DeepEquals, delegatedRoles)
 
@@ -2585,7 +2601,8 @@ func (rs *RepoSuite) TestOfflineFlow(c *C) {
 	r, err := NewRepo(local)
 	c.Assert(err, IsNil)
 	c.Assert(r.Init(false), IsNil)
-	_, err = r.GenKey("root")
+	// Use ECDSA because it has a newline which is a difference between JSON and cJSON.
+	_, err = r.GenKeyWithSchemeAndExpires("root", data.DefaultExpires("root"), data.KeySchemeECDSA_SHA2_P256)
 	c.Assert(err, IsNil)
 
 	// Get the payload to sign
@@ -2605,15 +2622,14 @@ func (rs *RepoSuite) TestOfflineFlow(c *C) {
 	}
 
 	// Sign the payload
-	signed := data.Signed{Signed: payload}
-	_, err = r.SignPayload("targets", &signed)
+	_, err = r.SignRaw("targets", payload)
 	c.Assert(err, Equals, ErrNoKeys{"targets"})
-	numKeys, err := r.SignPayload("root", &signed)
+	signatures, err := r.SignRaw("root", payload)
 	c.Assert(err, IsNil)
-	c.Assert(numKeys, Equals, 1)
+	c.Assert(len(signatures), Equals, 1)
 
 	// Add the payload signatures back
-	for _, sig := range signed.Signatures {
+	for _, sig := range signatures {
 		// This method checks that the signature verifies!
 		err = r.AddOrUpdateSignature("root.json", sig)
 		c.Assert(err, IsNil)
@@ -2647,7 +2663,8 @@ func (rs *RepoSuite) TestSnapshotWithInvalidRoot(c *C) {
 	local.SetMeta("root.json", b)
 
 	// Snapshotting should fail.
-	c.Assert(r.Snapshot(), Equals, ErrInsufficientSignatures{"root.json", verify.ErrInvalid})
+	c.Assert(r.Snapshot(), Equals, ErrInsufficientSignatures{
+		"root.json", verify.ErrRoleThreshold{Expected: 1, Actual: 0}})
 
 	// Correctly sign root
 	c.Assert(r.Sign("root.json"), IsNil)
@@ -2704,4 +2721,32 @@ func (rs *RepoSuite) TestTargetMetadataLength(c *C) {
 	var length int64
 	c.Assert(json.Unmarshal(lengthMsg, &length), IsNil)
 	c.Assert(length, Equals, int64(0))
+}
+
+func (rs *RepoSuite) TestDeprecatedHexEncodedKeysFails(c *C) {
+	files := map[string][]byte{"foo.txt": []byte("foo")}
+	local := MemoryStore(make(map[string]json.RawMessage), files)
+	r, err := NewRepo(local)
+	c.Assert(err, IsNil)
+
+	r.Init(false)
+	// Add a root key with hex-encoded ecdsa format
+	signer, err := keys.GenerateEcdsaKey()
+	c.Assert(err, IsNil)
+	type deprecatedP256Verifier struct {
+		PublicKey data.HexBytes `json:"public"`
+	}
+	pub := signer.PublicKey
+	keyValBytes, err := json.Marshal(&deprecatedP256Verifier{PublicKey: elliptic.Marshal(pub.Curve, pub.X, pub.Y)})
+	c.Assert(err, IsNil)
+	publicData := &data.PublicKey{
+		Type:       data.KeyTypeECDSA_SHA2_P256,
+		Scheme:     data.KeySchemeECDSA_SHA2_P256,
+		Algorithms: data.HashAlgorithms,
+		Value:      keyValBytes,
+	}
+	err = r.AddVerificationKey("root", publicData)
+	c.Assert(err, IsNil)
+	// TODO: AddVerificationKey does no validation, so perform a sign operation.
+	c.Assert(r.Sign("root.json"), ErrorMatches, "tuf: error unmarshalling key: invalid PEM value")
 }

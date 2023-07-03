@@ -13,6 +13,6 @@ jobs:
     runs-on: "ubuntu-latest"
     steps:
       - name:
-        uses: amannn/action-semantic-pull-request@91682d013dea3ff257520b9b68c9cb93ced4fe9b
+        uses: amannn/action-semantic-pull-request@c3cd5d1ea3580753008872425915e343e351ab54
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

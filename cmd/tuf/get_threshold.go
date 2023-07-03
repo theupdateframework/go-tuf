@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/flynn/go-docopt"
 	"github.com/theupdateframework/go-tuf"
@@ -23,6 +24,6 @@ func cmdGetThreshold(args *docopt.Args, repo *tuf.Repo) error {
 		return err
 	}
 
-	fmt.Println("The threshold for", role, "role is", threshold)
+	fmt.Fprintf(os.Stdout, "The threshold for %s role is %d", role, threshold)
 	return nil
 }

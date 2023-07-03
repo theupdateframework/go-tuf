@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 
 	docopt "github.com/flynn/go-docopt"
 	tuf "github.com/theupdateframework/go-tuf/client"
@@ -32,7 +33,7 @@ See "tuf-client help <command>" for more information on a specific command.
 
 	if cmd == "help" {
 		if len(cmdArgs) == 0 { // `tuf-client help`
-			fmt.Println(usage)
+			fmt.Fprint(os.Stdout, usage)
 			return
 		} else { // `tuf-client help <command>`
 			cmd = cmdArgs[0]

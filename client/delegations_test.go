@@ -226,17 +226,27 @@ func TestPersistedMeta(t *testing.T) {
 			p, err := c.local.GetMeta()
 			assert.Nil(t, err)
 			persisted := copyStore(p)
+			persistedLocal := copyStore(c.localMeta)
 			// trim non targets metas
 			for _, notTargets := range []string{"root.json", "snapshot.json", "timestamp.json"} {
 				delete(persisted, notTargets)
+				delete(persistedLocal, notTargets)
 			}
 			for _, targets := range tt.targets {
+				// Test local store
 				storedVersion, err := versionOfStoredTargets(targets.name, persisted)
 				assert.Equal(t, targets.version, storedVersion)
 				assert.Nil(t, err)
 				delete(persisted, targets.name)
+
+				// Test localMeta
+				storedVersion, err = versionOfStoredTargets(targets.name, persistedLocal)
+				assert.Equal(t, targets.version, storedVersion)
+				assert.Nil(t, err)
+				delete(persistedLocal, targets.name)
 			}
 			assert.Empty(t, persisted)
+			assert.Empty(t, persistedLocal)
 		})
 	}
 }

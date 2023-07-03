@@ -9,11 +9,12 @@ jobs:
       matrix: ${{ steps.versions.outputs.matrix }}
     steps:
       - uses: actions/checkout@v3
-      - uses: arnested/go-version-action@6d27c5921683f55415260f7a285d330ddb146fa2
+      - uses: arnested/go-version-action@07a3c271151243461cae54bc473636f4b6c9b5d8
         id: versions
 
   run:
     strategy:
+      fail-fast: false # Keep running if one leg fails.
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         go-version: ${{ fromJSON(needs.get-go-versions.outputs.matrix) }}
@@ -24,12 +25,12 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Setup - Go ${{ matrix.go-version }}
-        uses: actions/setup-go@268d8c0ca0432bb2cf416faae41297df9d262d7f
+        uses: actions/setup-go@fac708d6674e30b6ba41289acaab6d4b75aa0753
         with:
           go-version: ${{ matrix.go-version }}
 
       - name: Setup - Python
-        uses: actions/setup-python@b55428b1882923874294fa556849718a1d7f2ca5
+        uses: actions/setup-python@bd6b4b6205c4dbad673328db7b31b7fab9e241c0
         with:
           python-version: "3.10"
           cache: "pip"
@@ -44,7 +45,7 @@ jobs:
         run: go test -race -covermode atomic -coverprofile='profile.cov' ./...
 
       - name: Send coverage
-        uses: shogo82148/actions-goveralls@31ee804b8576ae49f6dc3caa22591bc5080e7920
+        uses: shogo82148/actions-goveralls@df920a6a2468668dfcf71a0b43817f89eaa5ea04
         with:
           path-to-profile: profile.cov
           flag-name: Go-${{ matrix.go-version }}
@@ -58,12 +59,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: get-go-versions
     steps:
-      - uses: actions/setup-go@268d8c0ca0432bb2cf416faae41297df9d262d7f
+      - uses: actions/setup-go@fac708d6674e30b6ba41289acaab6d4b75aa0753
         with:
           go-version: ${{ matrix.go-version }}
       - uses: actions/checkout@v3
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@537aa1903e5d359d0b27dbc19ddd22c5087f3fbc
+        uses: golangci/golangci-lint-action@639cd343e1d3b897ff35927a75193d57cfcba299
         with:
-          version: v1.49.0
-          args: --timeout 3m
+          version: v1.51 # has to be pinned and thus manually updated due to https://github.com/golangci/golangci-lint-action/blob/6a290f7d5d488e1e423b0b37fe802c822ca2c08c/README.md?plain=1#L108
+          args: --timeout 5m --verbose

@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -31,15 +32,19 @@ import (
 func Test(t *testing.T) { TestingT(t) }
 
 type ClientSuite struct {
-	store       tuf.LocalStore
-	repo        *tuf.Repo
-	local       LocalStore
-	remote      *fakeRemoteStore
-	expiredTime time.Time
-	keyIDs      map[string][]string
+	store        tuf.LocalStore
+	repo         *tuf.Repo
+	local        LocalStore
+	remote       RemoteStore
+	expiredTime  time.Time
+	keyIDs       map[string][]string
+	useFileStore bool
+	// Only used with FileStore
+	tmpDir string
 }
 
-var _ = Suite(&ClientSuite{})
+var _ = Suite(&ClientSuite{useFileStore: false})
+var _ = Suite(&ClientSuite{useFileStore: true})
 
 func newFakeRemoteStore() *fakeRemoteStore {
 	return &fakeRemoteStore{
@@ -67,6 +72,66 @@ func (f *fakeRemoteStore) get(name string, store map[string]*fakeFile) (io.ReadC
 		return nil, 0, ErrNotFound{name}
 	}
 	return file, file.size, nil
+}
+
+// These are helper methods for manipulating the internals of the Stores
+// because the set/delete methods are not part of the Interface, we need to
+// switch on the underlying implementation.
+// Also readMeta method is convenience for ease of testing.
+func (s *ClientSuite) setRemoteMeta(path string, data []byte) error {
+	switch impl := s.remote.(type) {
+	case *fakeRemoteStore:
+		impl.meta[path] = newFakeFile(data)
+		return nil
+	case *FileRemoteStore:
+		return impl.addMeta(path, data)
+	default:
+		return fmt.Errorf("non-supoprted RemoteStore, got %+v", impl)
+	}
+}
+
+func (s *ClientSuite) setRemoteTarget(path string, data []byte) error {
+	switch impl := s.remote.(type) {
+	case *fakeRemoteStore:
+		impl.targets[path] = newFakeFile(data)
+		return nil
+	case *FileRemoteStore:
+		return impl.addTarget(path, data)
+	default:
+		return fmt.Errorf("non-supoprted RemoteStore, got %+v", impl)
+	}
+}
+
+func (s *ClientSuite) deleteMeta(path string) error {
+	switch impl := s.remote.(type) {
+	case *fakeRemoteStore:
+		delete(impl.meta, path)
+		return nil
+	case *FileRemoteStore:
+		return impl.deleteMeta(path)
+	default:
+		return fmt.Errorf("non-supported RemoteStore, got %+v", impl)
+	}
+}
+
+func (s *ClientSuite) deleteTarget(path string) error {
+	switch impl := s.remote.(type) {
+	case *fakeRemoteStore:
+		delete(impl.targets, path)
+		return nil
+	case *FileRemoteStore:
+		return impl.deleteTarget(path)
+	default:
+		return fmt.Errorf("non-supported RemoteStore, got %+v", impl)
+	}
+}
+
+func (s *ClientSuite) readMeta(name string) ([]byte, error) {
+	stream, _, err := s.remote.GetMeta(name)
+	if err != nil {
+		return nil, err
+	}
+	return io.ReadAll(stream)
 }
 
 func newFakeFile(b []byte) *fakeFile {
@@ -118,13 +183,26 @@ func (s *ClientSuite) SetUpTest(c *C) {
 	c.Assert(s.repo.Commit(), IsNil)
 
 	// create a remote store containing valid repo files
-	s.remote = newFakeRemoteStore()
+	if s.useFileStore {
+		s.remote, s.tmpDir, err = newTestFileStoreFS()
+		if err != nil {
+			c.Fatalf("failed to create new FileStore: %v", err)
+		}
+	} else {
+		s.remote = newFakeRemoteStore()
+	}
 	s.syncRemote(c)
 	for path, data := range targetFiles {
-		s.remote.targets[path] = newFakeFile(data)
+		s.setRemoteTarget(path, data)
 	}
 
 	s.expiredTime = time.Now().Add(time.Hour)
+}
+
+func (s *ClientSuite) TearDownTest(c *C) {
+	if s.tmpDir != "" {
+		rmrf(s.tmpDir, c.Logf)
+	}
 }
 
 func (s *ClientSuite) genKey(c *C, role string) []string {
@@ -163,7 +241,9 @@ func (s *ClientSuite) syncRemote(c *C) {
 	meta, err := s.store.GetMeta()
 	c.Assert(err, IsNil)
 	for name, data := range meta {
-		s.remote.meta[name] = newFakeFile(data)
+		if err := s.setRemoteMeta(name, data); err != nil {
+			panic(fmt.Sprintf("setMetadata failed: %v", err))
+		}
 	}
 }
 
@@ -252,7 +332,7 @@ func (s *ClientSuite) TestInitAllowsExpired(c *C) {
 	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 	client := NewClient(MemoryLocalStore(), s.remote)
-	bytes, err := io.ReadAll(s.remote.meta["root.json"])
+	bytes, err := s.readMeta("root.json")
 	c.Assert(err, IsNil)
 	s.withMetaExpired(func() {
 		c.Assert(client.Init(bytes), IsNil)
@@ -261,7 +341,7 @@ func (s *ClientSuite) TestInitAllowsExpired(c *C) {
 
 func (s *ClientSuite) TestInit(c *C) {
 	client := NewClient(MemoryLocalStore(), s.remote)
-	bytes, err := io.ReadAll(s.remote.meta["root.json"])
+	bytes, err := s.readMeta("root.json")
 	c.Assert(err, IsNil)
 	dataSigned := &data.Signed{}
 	c.Assert(json.Unmarshal(bytes, dataSigned), IsNil)
@@ -272,7 +352,7 @@ func (s *ClientSuite) TestInit(c *C) {
 	_, err = client.Update()
 	c.Assert(err, Equals, ErrNoRootKeys)
 
-	// check Init() returns ErrInvalid when the root's signature is
+	// check Init() returns ErrRoleThreshold when the root's signature is
 	// invalid
 	// modify root and marshal without regenerating signatures
 	root.Version = root.Version + 1
@@ -281,12 +361,36 @@ func (s *ClientSuite) TestInit(c *C) {
 	dataSigned.Signed = rootBytes
 	dataBytes, err := json.Marshal(dataSigned)
 	c.Assert(err, IsNil)
-	c.Assert(client.Init(dataBytes), Equals, verify.ErrInvalid)
+	c.Assert(client.Init(dataBytes), Equals, verify.ErrRoleThreshold{
+		Expected: 1, Actual: 0})
 
 	// check Update() does not return ErrNoRootKeys after initialization
 	c.Assert(client.Init(bytes), IsNil)
 	_, err = client.Update()
 	c.Assert(err, IsNil)
+}
+
+// This is a regression test for https://github.com/theupdateframework/go-tuf/issues/370
+// where a single invalid signature resulted in an early return.
+// Instead, the client should have continued and counted the number
+// of valid signatures, ignoring the incorrect one.
+func (s *ClientSuite) TestExtraRootSignaturesOnInit(c *C) {
+	client := NewClient(MemoryLocalStore(), s.remote)
+	bytes, err := s.readMeta("root.json")
+	c.Assert(err, IsNil)
+	dataSigned := &data.Signed{}
+	c.Assert(json.Unmarshal(bytes, dataSigned), IsNil)
+
+	// check Init() succeeds when an extra invalid signature was
+	// added to the root.
+	dataSigned.Signatures = append(dataSigned.Signatures,
+		data.Signature{
+			KeyID:     dataSigned.Signatures[0].KeyID,
+			Signature: make([]byte, ed25519.SignatureSize),
+		})
+	dataBytes, err := json.Marshal(dataSigned)
+	c.Assert(err, IsNil)
+	c.Assert(client.Init(dataBytes), IsNil)
 }
 
 func (s *ClientSuite) TestFirstUpdate(c *C) {
@@ -299,11 +403,11 @@ func (s *ClientSuite) TestFirstUpdate(c *C) {
 func (s *ClientSuite) TestMissingRemoteMetadata(c *C) {
 	client := s.newClient(c)
 
-	delete(s.remote.meta, "targets.json")
+	s.deleteMeta("targets.json")
 	_, err := client.Update()
 	c.Assert(err, Equals, ErrMissingRemoteMetadata{"targets.json"})
 
-	delete(s.remote.meta, "timestamp.json")
+	s.deleteMeta("timestamp.json")
 	_, err = client.Update()
 	c.Assert(err, Equals, ErrMissingRemoteMetadata{"timestamp.json"})
 }
@@ -376,6 +480,44 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	}
 }
 
+// This is a regression test for https://github.com/theupdateframework/go-tuf/issues/370
+// where a single invalid signature resulted in an early return.
+// Instead, the client should have continued and counted the number
+// of valid signatures, ignoring the incorrect one.
+func (s *ClientSuite) TestExtraSignaturesOnRootUpdate(c *C) {
+	client := s.newClient(c)
+
+	// Add an extra root key to update the root to a new version.
+	s.genKey(c, "root")
+	// update metadata
+	c.Assert(s.repo.Sign("targets.json"), IsNil)
+	c.Assert(s.repo.Snapshot(), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
+	s.syncRemote(c)
+
+	// Add an extra signature to the new remote root.
+	bytes, err := s.readMeta("root.json")
+	c.Assert(err, IsNil)
+	dataSigned := &data.Signed{}
+	c.Assert(json.Unmarshal(bytes, dataSigned), IsNil)
+	dataSigned.Signatures = append(dataSigned.Signatures,
+		data.Signature{
+			KeyID:     dataSigned.Signatures[0].KeyID,
+			Signature: make([]byte, ed25519.SignatureSize),
+		})
+	dataBytes, err := json.Marshal(dataSigned)
+	c.Assert(err, IsNil)
+	s.setRemoteMeta("root.json", dataBytes)
+	s.setRemoteMeta("2.root.json", dataBytes)
+
+	// check Update() succeeds when an extra invalid signature was
+	// added to the root.
+	_, err = client.Update()
+	c.Assert(err, IsNil)
+	c.Assert(client.rootVer, Equals, int64(2))
+}
+
 // startTUFRepoServer starts a HTTP server to serve a TUF Repo.
 func startTUFRepoServer(baseDir string, relPath string) (net.Listener, error) {
 	serverDir := filepath.Join(baseDir, relPath)
@@ -438,9 +580,11 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 		// Fails updating root from version 1 to version 3 when versions 1 and 3 are expired but version 2 is not expired.
 		{"testdata/Published3Times_keyrotated_latestrootexpired", ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int64{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// Fails updating root from version 1 to version 2 when old root 1 did not sign off on it (nth root didn't sign off n+1).
-		{"testdata/Published2Times_keyrotated_invalidOldRootSignature", errors.New("tuf: signature verification failed"), map[string]int64{}},
+		// TODO(asraa): This testcase should have revoked the old key!
+		// https://github.com/theupdateframework/go-tuf/issues/417
+		{"testdata/Published2Times_keyrotated_invalidOldRootSignature", nil, map[string]int64{}},
 		// Fails updating root from version 1 to version 2 when the new root 2 did not sign itself (n+1th root didn't sign off n+1)
-		{"testdata/Published2Times_keyrotated_invalidNewRootSignature", errors.New("tuf: signature verification failed"), map[string]int64{}},
+		{"testdata/Published2Times_keyrotated_invalidNewRootSignature", verify.ErrRoleThreshold{Expected: 1, Actual: 0}, map[string]int64{}},
 		// Fails updating root to 2.root.json when the value of the version field inside it is 1 (rollback attack prevention).
 		{"testdata/Published1Time_backwardRootVersion", verify.ErrWrongVersion(verify.ErrWrongVersion{Given: 1, Expected: 2}), map[string]int64{}},
 		// Fails updating root to 2.root.json when the value of the version field inside it is 3 (rollforward attack prevention).
@@ -774,7 +918,7 @@ func (s *ClientSuite) TestLocalExpired(c *C) {
 }
 
 func (s *ClientSuite) TestTimestampTooLarge(c *C) {
-	s.remote.meta["timestamp.json"] = newFakeFile(make([]byte, defaultTimestampDownloadLimit+1))
+	s.setRemoteMeta("timestamp.json", make([]byte, defaultTimestampDownloadLimit+1))
 	_, err := s.newClient(c).Update()
 	c.Assert(err, Equals, ErrMetaTooLarge{"timestamp.json", defaultTimestampDownloadLimit + 1, defaultTimestampDownloadLimit})
 }
@@ -896,12 +1040,13 @@ func (s *ClientSuite) TestUpdateMixAndMatchAttack(c *C) {
 	c.Assert(s.repo.AddTargetWithExpires("foo.txt", nil, expires), IsNil)
 	c.Assert(s.repo.Snapshot(), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
 	client := s.updatedClient(c)
 
 	// grab the remote targets.json
-	oldTargets, ok := s.remote.meta["targets.json"]
-	if !ok {
+	oldTargets, err := s.readMeta("targets.json")
+	if err != nil {
 		c.Fatal("missing remote targets.json")
 	}
 
@@ -909,23 +1054,24 @@ func (s *ClientSuite) TestUpdateMixAndMatchAttack(c *C) {
 	c.Assert(s.repo.AddTargetWithExpires("bar.txt", nil, expires), IsNil)
 	c.Assert(s.repo.Snapshot(), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
 	s.syncRemote(c)
-	newTargets, ok := s.remote.meta["targets.json"]
-	if !ok {
+	newTargets, err := s.readMeta("targets.json")
+	if err != nil {
 		c.Fatal("missing remote targets.json")
 	}
-	s.remote.meta["targets.json"] = oldTargets
+	s.setRemoteMeta("targets.json", oldTargets)
 
 	// check update returns ErrWrongSize for targets.json
-	_, err := client.Update()
-	c.Assert(err, DeepEquals, ErrWrongSize{"targets.json", oldTargets.size, newTargets.size})
+	_, err = client.Update()
+	c.Assert(err, DeepEquals, ErrWrongSize{"targets.json", int64(len(oldTargets)), int64(len(newTargets))})
 
 	// do the same but keep the size the same
 	c.Assert(s.repo.RemoveTargetWithExpires("foo.txt", expires), IsNil)
 	c.Assert(s.repo.Snapshot(), IsNil)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncRemote(c)
-	s.remote.meta["targets.json"] = oldTargets
+	s.setRemoteMeta("targets.json", oldTargets)
 
 	// check update returns ErrWrongHash
 	_, err = client.Update()
@@ -936,8 +1082,8 @@ func (s *ClientSuite) TestUpdateReplayAttack(c *C) {
 	client := s.updatedClient(c)
 
 	// grab the remote timestamp.json
-	oldTimestamp, ok := s.remote.meta["timestamp.json"]
-	if !ok {
+	oldTimestamp, err := s.readMeta("timestamp.json")
+	if err != nil {
 		c.Fatal("missing remote timestamp.json")
 	}
 
@@ -946,12 +1092,12 @@ func (s *ClientSuite) TestUpdateReplayAttack(c *C) {
 	c.Assert(version > 0, Equals, true)
 	c.Assert(s.repo.Timestamp(), IsNil)
 	s.syncRemote(c)
-	_, err := client.Update()
+	_, err = client.Update()
 	c.Assert(err, IsNil)
 	c.Assert(client.timestampVer > version, Equals, true)
 
 	// replace remote timestamp.json with the old one
-	s.remote.meta["timestamp.json"] = oldTimestamp
+	s.setRemoteMeta("timestamp.json", oldTimestamp)
 
 	// check update returns ErrLowVersion
 	_, err = client.Update()
@@ -962,6 +1108,41 @@ func (s *ClientSuite) TestUpdateReplayAttack(c *C) {
 			Current: client.timestampVer,
 		},
 	})
+}
+
+func (s *ClientSuite) TestUpdateForkTimestamp(c *C) {
+	client := s.updatedClient(c)
+
+	// grab the remote timestamp.json
+	oldTimestamp, err := s.readMeta("timestamp.json")
+	if err != nil {
+		c.Fatal("missing remote timestamp.json")
+	}
+
+	// generate a new timestamp and sync with the client
+	version := client.timestampVer
+	c.Assert(version > 0, Equals, true)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	s.syncRemote(c)
+	_, err = client.Update()
+	c.Assert(err, IsNil)
+	newVersion := client.timestampVer
+	c.Assert(newVersion > version, Equals, true)
+
+	// generate a new, different timestamp with the *same version*
+	s.setRemoteMeta("timestamp.json", oldTimestamp)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(client.timestampVer, Equals, newVersion) // double-check: same version?
+	s.syncRemote(c)
+
+	oldMeta, err := client.local.GetMeta()
+	c.Assert(err, IsNil)
+	_, err = client.Update()
+	c.Assert(err, IsNil) // no error: the targets.json version didn't change, so there was no update!
+	// Client shouldn't update!
+	newMeta, err := client.local.GetMeta()
+	c.Assert(err, IsNil)
+	c.Assert(oldMeta, DeepEquals, newMeta)
 }
 
 func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
@@ -998,6 +1179,7 @@ func (s *ClientSuite) TestUpdateTamperedTargets(c *C) {
 	c.Assert(err, IsNil)
 	s.store.SetMeta("targets.json", tamperedJSON)
 	s.store.Commit(false, nil, nil)
+	c.Assert(s.repo.Timestamp(), IsNil) // unless timestamp changes, the client doesn't even look at "targets.json"
 	s.syncRemote(c)
 	_, err = client.Update()
 	c.Assert(err, DeepEquals, ErrWrongSize{"targets.json", int64(len(tamperedJSON)), int64(len(targetsJSON))})
@@ -1041,6 +1223,125 @@ func (s *ClientSuite) TestUpdateHTTP(c *C) {
 	}
 }
 
+// TestRollbackSnapshot tests a rollback version of snapshot.
+func (s *ClientSuite) TestRollbackSnapshot(c *C) {
+	client := s.updatedClient(c)
+
+	// generate a new snapshot & timestamp v2 and sync with the client
+	version := client.snapshotVer
+	c.Assert(version > 0, Equals, true)
+	c.Assert(s.repo.Snapshot(), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
+	s.syncRemote(c)
+	_, err := client.Update()
+	c.Assert(err, IsNil)
+	c.Assert(client.snapshotVer > version, Equals, true)
+
+	// replace remote snapshot.json with old version and timestamp again.
+	s.repo.SetSnapshotVersion(version)
+	c.Assert(s.repo.Snapshot(), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
+	s.syncRemote(c)
+
+	// check update returns ErrLowVersion
+	_, err = client.Update()
+
+	c.Assert(err, DeepEquals, verify.ErrLowVersion{
+		Actual:  version,
+		Current: client.snapshotVer,
+	})
+}
+
+func (s *ClientSuite) TestRollbackTopLevelTargets(c *C) {
+	client := s.updatedClient(c)
+
+	// generate a new targets and sync with the client
+	version := client.targetsVer
+	c.Assert(version > 0, Equals, true)
+	s.addRemoteTarget(c, "bar.txt")
+	_, err := client.Update()
+	c.Assert(err, IsNil)
+	c.Assert(client.targetsVer > version, Equals, true)
+
+	// replace remote snapshot.json with old version and timestamp again.
+	s.repo.SetTargetsVersion(version)
+	c.Assert(s.repo.Snapshot(), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
+	s.syncRemote(c)
+
+	// check update returns ErrLowVersion
+	_, err = client.Update()
+	c.Assert(err, DeepEquals, verify.ErrLowVersion{
+		Actual:  version,
+		Current: client.targetsVer,
+	})
+}
+
+func (s *ClientSuite) TestRollbackDelegatedTargets(c *C) {
+	client := s.updatedClient(c)
+	// add a delegation
+	signer, err := keys.GenerateEd25519Key()
+	c.Assert(err, IsNil)
+	role := data.DelegatedRole{
+		Name:      "role",
+		KeyIDs:    signer.PublicData().IDs(),
+		Paths:     []string{"bar.txt", "baz.txt"},
+		Threshold: 1,
+	}
+	s.store.SaveSigner("role", signer)
+	s.repo.AddDelegatedRole("targets", role, []*data.PublicKey{signer.PublicData()})
+	s.repo.AddTargetToPreferredRole("bar.txt", nil, "role")
+	c.Assert(s.repo.Snapshot(), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
+	s.syncRemote(c)
+
+	// save v1 delegation
+	meta, err := s.store.GetMeta()
+	c.Assert(err, IsNil)
+	oldRole, ok := meta["role.json"]
+	if !ok {
+		c.Fatal("missing role.json")
+	}
+	// update client and verify download delegated target
+	_, err = client.Update()
+	c.Assert(err, IsNil)
+	var dest testDestination
+	c.Assert(client.Download("bar.txt", &dest), IsNil)
+
+	// update delegation to v2
+	s.repo.AddTargetToPreferredRole("baz.txt", nil, "role")
+	c.Assert(s.repo.Snapshot(), IsNil)
+	c.Assert(s.repo.Timestamp(), IsNil)
+	c.Assert(s.repo.Commit(), IsNil)
+	s.syncRemote(c)
+
+	// update client and verify download v2 delegated target
+	_, err = client.Update()
+	c.Assert(err, IsNil)
+	c.Assert(dest.Delete(), IsNil)
+	c.Assert(client.Download("baz.txt", &dest), IsNil)
+
+	// rollback role.json version.
+	c.Assert(s.store.SetMeta("role.json", oldRole), IsNil)
+	repo, err := tuf.NewRepo(s.store)
+	c.Assert(err, IsNil)
+	c.Assert(repo.Snapshot(), IsNil)
+	c.Assert(repo.Timestamp(), IsNil)
+	c.Assert(repo.Commit(), IsNil)
+	s.syncRemote(c)
+
+	// check update returns ErrLowVersion
+	_, err = client.Update()
+	c.Assert(err, DeepEquals, verify.ErrLowVersion{
+		Actual:  1,
+		Current: 2,
+	})
+}
+
 type testDestination struct {
 	bytes.Buffer
 	deleted bool
@@ -1060,7 +1361,7 @@ func (s *ClientSuite) TestDownloadUnknownTarget(c *C) {
 
 func (s *ClientSuite) TestDownloadNoExist(c *C) {
 	client := s.updatedClient(c)
-	delete(s.remote.targets, "foo.txt")
+	s.deleteTarget("foo.txt")
 	var dest testDestination
 	c.Assert(client.Download("foo.txt", &dest), Equals, ErrNotFound{"foo.txt"})
 	c.Assert(dest.deleted, Equals, true)
@@ -1079,29 +1380,24 @@ func (s *ClientSuite) TestDownloadOK(c *C) {
 
 func (s *ClientSuite) TestDownloadWrongSize(c *C) {
 	client := s.updatedClient(c)
-	remoteFile := &fakeFile{buf: bytes.NewReader([]byte("wrong-size")), size: 10}
-	s.remote.targets["foo.txt"] = remoteFile
+	// Update with a file that's incorrect size.
+	s.setRemoteTarget("foo.txt", []byte("wrong-size"))
 	var dest testDestination
 	c.Assert(client.Download("foo.txt", &dest), DeepEquals, ErrWrongSize{"foo.txt", 10, 3})
-	c.Assert(remoteFile.bytesRead, Equals, 0)
 	c.Assert(dest.deleted, Equals, true)
 }
 
 func (s *ClientSuite) TestDownloadTargetTooLong(c *C) {
 	client := s.updatedClient(c)
-	remoteFile := s.remote.targets["foo.txt"]
-	remoteFile.buf = bytes.NewReader([]byte("foo-ooo"))
+	s.setRemoteTarget("foo.txt", []byte("foo-ooo"))
 	var dest testDestination
-	c.Assert(client.Download("foo.txt", &dest), IsNil)
-	c.Assert(remoteFile.bytesRead, Equals, 3)
-	c.Assert(dest.deleted, Equals, false)
-	c.Assert(dest.String(), Equals, "foo")
+	c.Assert(client.Download("foo.txt", &dest), DeepEquals, ErrWrongSize{"foo.txt", 7, 3})
+	c.Assert(dest.deleted, Equals, true)
 }
 
 func (s *ClientSuite) TestDownloadTargetTooShort(c *C) {
 	client := s.updatedClient(c)
-	remoteFile := s.remote.targets["foo.txt"]
-	remoteFile.buf = bytes.NewReader([]byte("fo"))
+	s.setRemoteTarget("foo.txt", []byte("fo"))
 	var dest testDestination
 	c.Assert(client.Download("foo.txt", &dest), DeepEquals, ErrWrongSize{"foo.txt", 2, 3})
 	c.Assert(dest.deleted, Equals, true)
@@ -1109,8 +1405,7 @@ func (s *ClientSuite) TestDownloadTargetTooShort(c *C) {
 
 func (s *ClientSuite) TestDownloadTargetCorruptData(c *C) {
 	client := s.updatedClient(c)
-	remoteFile := s.remote.targets["foo.txt"]
-	remoteFile.buf = bytes.NewReader([]byte("corrupt"))
+	s.setRemoteTarget("foo.txt", []byte("ooo"))
 	var dest testDestination
 	assertWrongHash(c, client.Download("foo.txt", &dest))
 	c.Assert(dest.deleted, Equals, true)

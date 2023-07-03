@@ -58,7 +58,7 @@ See "tuf help <command>" for more information on a specific command
 
 	if cmd == "help" {
 		if len(cmdArgs) == 0 { // `tuf help`
-			fmt.Println(usage)
+			fmt.Fprint(os.Stdout, usage)
 			return
 		} else { // `tuf help <command>`
 			cmd = cmdArgs[0]
@@ -115,7 +115,11 @@ func runCommand(name string, args []string, dir string, insecure bool) error {
 	if !insecure {
 		p = getPassphrase
 	}
-	repo, err := tuf.NewRepo(tuf.FileSystemStore(dir, p))
+	logger := log.New(os.Stdout, "", 0)
+	storeOpts := tuf.StoreOpts{Logger: logger, PassFunc: p}
+
+	repo, err := tuf.NewRepoWithOpts(tuf.FileSystemStoreWithOpts(dir, storeOpts),
+		tuf.WithLogger(logger))
 	if err != nil {
 		return err
 	}

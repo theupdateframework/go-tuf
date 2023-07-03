@@ -16,6 +16,7 @@ builds:
       - windows
     goarch:
       - amd64
+      - arm64
     main: ./cmd/tuf/
 source:
   enabled: true
@@ -23,7 +24,7 @@ changelog:
   use: github
   groups:
     - title: "Breaking changes"
-      regexp: "^.*BREAKING CHANGE[(\\w)]*:+.*$"
+      regexp: "^.*(?:BREAKING CHANGE)|![(\\w)]*:+.*$"
       order: 0
     - title: Features
       regexp: "^.*feat[(\\w)]*:+.*$"

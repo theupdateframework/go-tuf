@@ -26,7 +26,7 @@ func (s *mockSigner) PublicData() *data.PublicKey {
 	return &data.PublicKey{
 		Type:       "mock",
 		Scheme:     "mock",
-		Algorithms: []string{"mock"},
+		Algorithms: []data.HashAlgorithm{"mock"},
 		Value:      s.value,
 	}
 }
