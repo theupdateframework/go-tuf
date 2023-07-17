@@ -16,15 +16,15 @@ import (
 	"testing"
 	"time"
 
+	tuf "github.com/DataDog/go-tuf"
+	"github.com/DataDog/go-tuf/data"
+	"github.com/DataDog/go-tuf/internal/sets"
+	"github.com/DataDog/go-tuf/pkg/keys"
+	"github.com/DataDog/go-tuf/sign"
+	"github.com/DataDog/go-tuf/util"
+	"github.com/DataDog/go-tuf/verify"
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/stretchr/testify/assert"
-	tuf "github.com/theupdateframework/go-tuf"
-	"github.com/theupdateframework/go-tuf/data"
-	"github.com/theupdateframework/go-tuf/internal/sets"
-	"github.com/theupdateframework/go-tuf/pkg/keys"
-	"github.com/theupdateframework/go-tuf/sign"
-	"github.com/theupdateframework/go-tuf/util"
-	"github.com/theupdateframework/go-tuf/verify"
 	. "gopkg.in/check.v1"
 )
 
@@ -370,7 +370,7 @@ func (s *ClientSuite) TestInit(c *C) {
 	c.Assert(err, IsNil)
 }
 
-// This is a regression test for https://github.com/theupdateframework/go-tuf/issues/370
+// This is a regression test for https://github.com/DataDog/go-tuf/issues/370
 // where a single invalid signature resulted in an early return.
 // Instead, the client should have continued and counted the number
 // of valid signatures, ignoring the incorrect one.
@@ -480,7 +480,7 @@ func (s *ClientSuite) TestNewRoot(c *C) {
 	}
 }
 
-// This is a regression test for https://github.com/theupdateframework/go-tuf/issues/370
+// This is a regression test for https://github.com/DataDog/go-tuf/issues/370
 // where a single invalid signature resulted in an early return.
 // Instead, the client should have continued and counted the number
 // of valid signatures, ignoring the incorrect one.
@@ -581,7 +581,7 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 		{"testdata/Published3Times_keyrotated_latestrootexpired", ErrDecodeFailed{File: "root.json", Err: verify.ErrExpired{}}, map[string]int64{"root": 2, "timestamp": 1, "snapshot": 1, "targets": 1}},
 		// Fails updating root from version 1 to version 2 when old root 1 did not sign off on it (nth root didn't sign off n+1).
 		// TODO(asraa): This testcase should have revoked the old key!
-		// https://github.com/theupdateframework/go-tuf/issues/417
+		// https://github.com/DataDog/go-tuf/issues/417
 		{"testdata/Published2Times_keyrotated_invalidOldRootSignature", nil, map[string]int64{}},
 		// Fails updating root from version 1 to version 2 when the new root 2 did not sign itself (n+1th root didn't sign off n+1)
 		{"testdata/Published2Times_keyrotated_invalidNewRootSignature", verify.ErrRoleThreshold{Expected: 1, Actual: 0}, map[string]int64{}},
@@ -1546,7 +1546,7 @@ func (s *StateLessSuite) TestRejectsMultiSignaturesSameKeyDifferentIDs(c *C) {
 	// This test checks that the TUF client
 	// will not accept a root rotation
 	// signed twice with Alice's key with different key IDs each time.
-	// This test was failing with https://github.com/theupdateframework/go-tuf/tree/ac7b5d7bce18cca5a84a28b021bd6372f450b35b
+	// This test was failing with https://github.com/DataDog/go-tuf/tree/ac7b5d7bce18cca5a84a28b021bd6372f450b35b
 	// because the signature verification code was assuming that the key IDs used in the metadata
 	// were the same as the one the TUF library of the client would generate,
 	// breaking the security of threshold signatures.
@@ -1574,7 +1574,7 @@ func (s *StateLessSuite) TestRejectsMultiSignaturesSameKeyDifferentIDs(c *C) {
 	}
 
 	// reproduces how IDs were computed in
-	// https://github.com/theupdateframework/go-tuf/blob/8e84384bebe3/data/types.go#L50
+	// https://github.com/DataDog/go-tuf/blob/8e84384bebe3/data/types.go#L50
 	oldTUFIDs := func(k *data.PublicKey) []string {
 		bytes, _ := cjson.EncodeCanonical(k)
 		digest := sha256.Sum256(bytes)

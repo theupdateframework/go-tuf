@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	tuf "github.com/theupdateframework/go-tuf"
-	client "github.com/theupdateframework/go-tuf/client"
-	"github.com/theupdateframework/go-tuf/util"
+	tuf "github.com/DataDog/go-tuf"
+	client "github.com/DataDog/go-tuf/client"
+	"github.com/DataDog/go-tuf/util"
 	. "gopkg.in/check.v1"
 )
 
@@ -169,7 +169,7 @@ func (InteropSuite) TestPythonClientGoGenerated(c *C) {
 }
 
 // This is a regression test for issue
-// https://github.com/theupdateframework/go-tuf/issues/402
+// https://github.com/DataDog/go-tuf/issues/402
 func (InteropSuite) TestPythonClientGoGeneratedNullDelegations(c *C) {
 	// clone the Python client if necessary
 	cwd, err := os.Getwd()

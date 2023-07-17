@@ -9,8 +9,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/DataDog/go-tuf/data"
 	fuzz "github.com/google/gofuzz"
-	"github.com/theupdateframework/go-tuf/data"
 	. "gopkg.in/check.v1"
 )
 

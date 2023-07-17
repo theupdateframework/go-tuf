@@ -12,12 +12,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/theupdateframework/go-tuf/data"
-	"github.com/theupdateframework/go-tuf/encrypted"
-	"github.com/theupdateframework/go-tuf/internal/fsutil"
-	"github.com/theupdateframework/go-tuf/internal/sets"
-	"github.com/theupdateframework/go-tuf/pkg/keys"
-	"github.com/theupdateframework/go-tuf/util"
+	"github.com/DataDog/go-tuf/data"
+	"github.com/DataDog/go-tuf/encrypted"
+	"github.com/DataDog/go-tuf/internal/fsutil"
+	"github.com/DataDog/go-tuf/internal/sets"
+	"github.com/DataDog/go-tuf/pkg/keys"
+	"github.com/DataDog/go-tuf/util"
 )
 
 type LocalStore interface {

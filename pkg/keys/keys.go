@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/theupdateframework/go-tuf/data"
+	"github.com/DataDog/go-tuf/data"
 )
 
 // MaxJSONKeySize defines the maximum length of a JSON payload.

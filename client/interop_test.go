@@ -9,10 +9,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/theupdateframework/go-tuf/util"
+	"github.com/DataDog/go-tuf/util"
 	. "gopkg.in/check.v1"
 
-	goTufGenerator "github.com/theupdateframework/go-tuf/client/testdata/go-tuf/generator"
+	goTufGenerator "github.com/DataDog/go-tuf/client/testdata/go-tuf/generator"
 )
 
 type InteropSuite struct{}

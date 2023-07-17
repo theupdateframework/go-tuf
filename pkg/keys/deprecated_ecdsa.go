@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/theupdateframework/go-tuf/data"
+	"github.com/DataDog/go-tuf/data"
 )
 
 func NewDeprecatedEcdsaVerifier() Verifier {

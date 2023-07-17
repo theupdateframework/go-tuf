@@ -13,7 +13,7 @@ Speedy communication makes contributors happy!
 - Please review all PRs within five business days (of course, it's okay if you're OOO).
 - Please use the review checklist below.
 - We should make sure there's an assigned reviewer for every PR which has passing tests.
-  
+
 Versioning:
 
 - go-tuf releases follow [SemVer](https://semver.org/) with the following modification:
@@ -30,7 +30,7 @@ Project management:
   - Feel free to ping open issues to check on them.
   - Use the "assignee" field to indicate when you are working on an issue.
   - Use GitHub issue labels to describe the issue (exact labels are still changing, so just look through and add those that seem like a good fit).
-- Before publishing a new minor release, there should be an associated [GitHub project](https://github.com/theupdateframework/go-tuf/projects?type=beta) to track issues.
+- Before publishing a new minor release, there should be an associated [GitHub project](https://github.com/DataDog/go-tuf/projects?type=beta) to track issues.
 - We will develop more process around project management after we get through the v0.4.0 release.
 
 ## Review checklist

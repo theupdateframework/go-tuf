@@ -3,14 +3,14 @@ package set_ecdsa
 import (
 	"errors"
 
-	"github.com/theupdateframework/go-tuf/data"
-	"github.com/theupdateframework/go-tuf/pkg/keys"
+	"github.com/DataDog/go-tuf/data"
+	"github.com/DataDog/go-tuf/pkg/keys"
 )
 
 /*
 	Importing this package will allow support for both hex-encoded ECDSA
 	verifiers and PEM-encoded ECDSA verifiers.
-	Note that this package imports "github.com/theupdateframework/go-tuf/pkg/keys"
+	Note that this package imports "github.com/DataDog/go-tuf/pkg/keys"
 	and overrides the ECDSA verifier loaded at init time in that package.
 */
 

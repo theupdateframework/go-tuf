@@ -5,9 +5,9 @@ import (
 	"os"
 	"text/tabwriter"
 
+	tuf "github.com/DataDog/go-tuf/client"
 	"github.com/dustin/go-humanize"
 	"github.com/flynn/go-docopt"
-	tuf "github.com/theupdateframework/go-tuf/client"
 )
 
 func init() {

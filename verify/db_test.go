@@ -3,9 +3,9 @@ package verify
 import (
 	"testing"
 
+	"github.com/DataDog/go-tuf/data"
+	"github.com/DataDog/go-tuf/pkg/keys"
 	"github.com/stretchr/testify/assert"
-	"github.com/theupdateframework/go-tuf/data"
-	"github.com/theupdateframework/go-tuf/pkg/keys"
 )
 
 func TestDelegationsDB(t *testing.T) {

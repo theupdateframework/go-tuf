@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	tuf "github.com/DataDog/go-tuf"
 	"github.com/flynn/go-docopt"
-	tuf "github.com/theupdateframework/go-tuf"
 )
 
 func init() {

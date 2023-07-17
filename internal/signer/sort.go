@@ -3,7 +3,7 @@ package signer
 import (
 	"sort"
 
-	"github.com/theupdateframework/go-tuf/pkg/keys"
+	"github.com/DataDog/go-tuf/pkg/keys"
 )
 
 // ByIDs implements sort.Interface for []keys.Signer based on

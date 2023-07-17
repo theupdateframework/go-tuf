@@ -5,9 +5,9 @@ import (
 	"log"
 	"os"
 
+	tuf "github.com/DataDog/go-tuf/client"
+	tuf_leveldbstore "github.com/DataDog/go-tuf/client/leveldbstore"
 	docopt "github.com/flynn/go-docopt"
-	tuf "github.com/theupdateframework/go-tuf/client"
-	tuf_leveldbstore "github.com/theupdateframework/go-tuf/client/leveldbstore"
 )
 
 func main() {

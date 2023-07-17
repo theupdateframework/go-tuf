@@ -5,15 +5,15 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/DataDog/go-tuf"
 	"github.com/flynn/go-docopt"
-	"github.com/theupdateframework/go-tuf"
 )
 
 func init() {
 	register("set-threshold", cmdSetThreshold, `
 usage: tuf set-threshold <role> <threshold>
 
-Set the threshold for a role.  
+Set the threshold for a role.
 `)
 }
 

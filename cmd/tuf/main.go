@@ -11,9 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	tuf "github.com/DataDog/go-tuf"
+	"github.com/DataDog/go-tuf/util"
 	docopt "github.com/flynn/go-docopt"
-	tuf "github.com/theupdateframework/go-tuf"
-	"github.com/theupdateframework/go-tuf/util"
 	"golang.org/x/term"
 )
 

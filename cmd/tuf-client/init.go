@@ -4,8 +4,8 @@ import (
 	"io"
 	"os"
 
+	tuf "github.com/DataDog/go-tuf/client"
 	"github.com/flynn/go-docopt"
-	tuf "github.com/theupdateframework/go-tuf/client"
 )
 
 func init() {

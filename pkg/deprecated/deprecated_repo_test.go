@@ -8,11 +8,11 @@ import (
 	"encoding/json"
 	"testing"
 
+	repo "github.com/DataDog/go-tuf"
+	"github.com/DataDog/go-tuf/data"
+	_ "github.com/DataDog/go-tuf/pkg/deprecated/set_ecdsa"
+	"github.com/DataDog/go-tuf/pkg/keys"
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
-	repo "github.com/theupdateframework/go-tuf"
-	"github.com/theupdateframework/go-tuf/data"
-	_ "github.com/theupdateframework/go-tuf/pkg/deprecated/set_ecdsa"
-	"github.com/theupdateframework/go-tuf/pkg/keys"
 	. "gopkg.in/check.v1"
 )
 

@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/DataDog/go-tuf"
 	"github.com/flynn/go-docopt"
-	"github.com/theupdateframework/go-tuf"
 )
 
 func init() {
 	register("get-threshold", cmdGetThreshold, `
 usage: tuf get-threshold <role>
 
-Gets the threshold for a role.  
+Gets the threshold for a role.
 `)
 }
 

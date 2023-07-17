@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/DataDog/go-tuf"
+	"github.com/DataDog/go-tuf/data"
 	"github.com/flynn/go-docopt"
-	"github.com/theupdateframework/go-tuf"
-	"github.com/theupdateframework/go-tuf/data"
 )
 
 func init() {

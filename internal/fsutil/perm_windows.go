@@ -10,7 +10,7 @@ import (
 // UNIX-like permission bits. By setting the UNIX-like permission bits
 // on a Windows system only read/write by all users can be achieved.
 // See this issue for tracking and more details:
-// https://github.com/theupdateframework/go-tuf/issues/360
+// https://github.com/DataDog/go-tuf/issues/360
 // Currently this method will always return nil.
 func EnsureMaxPermissions(fi os.FileInfo, perm os.FileMode) error {
 	return nil

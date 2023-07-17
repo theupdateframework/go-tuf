@@ -3,9 +3,9 @@ package targets
 import (
 	"testing"
 
+	"github.com/DataDog/go-tuf/data"
+	"github.com/DataDog/go-tuf/verify"
 	"github.com/stretchr/testify/assert"
-	"github.com/theupdateframework/go-tuf/data"
-	"github.com/theupdateframework/go-tuf/verify"
 )
 
 var (

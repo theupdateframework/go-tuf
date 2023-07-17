@@ -13,16 +13,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DataDog/go-tuf/data"
+	"github.com/DataDog/go-tuf/internal/roles"
+	"github.com/DataDog/go-tuf/internal/sets"
+	"github.com/DataDog/go-tuf/internal/signer"
+	"github.com/DataDog/go-tuf/pkg/keys"
+	"github.com/DataDog/go-tuf/pkg/targets"
+	"github.com/DataDog/go-tuf/sign"
+	"github.com/DataDog/go-tuf/util"
+	"github.com/DataDog/go-tuf/verify"
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
-	"github.com/theupdateframework/go-tuf/data"
-	"github.com/theupdateframework/go-tuf/internal/roles"
-	"github.com/theupdateframework/go-tuf/internal/sets"
-	"github.com/theupdateframework/go-tuf/internal/signer"
-	"github.com/theupdateframework/go-tuf/pkg/keys"
-	"github.com/theupdateframework/go-tuf/pkg/targets"
-	"github.com/theupdateframework/go-tuf/sign"
-	"github.com/theupdateframework/go-tuf/util"
-	"github.com/theupdateframework/go-tuf/verify"
 )
 
 const (
@@ -1112,7 +1112,7 @@ func (r *Repo) AddTargetsToPreferredRole(paths []string, custom json.RawMessage,
 
 func (r *Repo) AddTargetsWithDigest(digest string, digestAlg string, length int64, path string, custom json.RawMessage) error {
 	// TODO: Rename this to AddTargetWithDigest
-	// https://github.com/theupdateframework/go-tuf/issues/242
+	// https://github.com/DataDog/go-tuf/issues/242
 
 	expires := data.DefaultExpires("targets")
 	path = util.NormalizeTarget(path)
@@ -1230,7 +1230,7 @@ func (r *Repo) AddTargetsWithExpiresToPreferredRole(paths []string, custom json.
 
 	if len(updatedTargetsMeta) == 0 {
 		// This is potentially unexpected behavior kept for backwards compatibility.
-		// See https://github.com/theupdateframework/go-tuf/issues/243
+		// See https://github.com/DataDog/go-tuf/issues/243
 		t, err := r.topLevelTargets()
 		if err != nil {
 			return err
@@ -1503,7 +1503,7 @@ func (r *Repo) fileHashes() (map[string]data.Hashes, error) {
 
 			if roleName != "root" {
 				// Scalability issue: Commit/fileHashes loads all targets metadata into memory
-				// https://github.com/theupdateframework/go-tuf/issues/245
+				// https://github.com/DataDog/go-tuf/issues/245
 				t, err := r.targets(roleName)
 				if err != nil {
 					return nil, err

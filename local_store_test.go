@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/DataDog/go-tuf/pkg/keys"
 	"github.com/stretchr/testify/assert"
-	"github.com/theupdateframework/go-tuf/pkg/keys"
 )
 
 func TestLocalStoreSigners(t *testing.T) {
