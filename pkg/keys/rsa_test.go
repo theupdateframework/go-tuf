@@ -49,9 +49,7 @@ func (RsaSuite) TestRSAVerifyMismatchPubKey(c *C) {
 	signerNew, err := GenerateRsaKey()
 	c.Assert(err, IsNil)
 
-	publicData := signerNew.PublicData()
-
-	pubKey, err := GetVerifier(publicData)
+	pubKey, err := GetVerifier(signerNew.PublicData())
 	c.Assert(err, IsNil)
 	c.Assert(pubKey.Verify([]byte("notfoo"), sig), ErrorMatches, "crypto/rsa: verification error")
 }
@@ -62,8 +60,7 @@ func (RsaSuite) TestMarshalUnmarshalPublicKey(c *C) {
 	publicData := signer.PublicData()
 	pubKey, err := GetVerifier(publicData)
 	c.Assert(err, IsNil)
-	publicKey := pubKey.MarshalPublicKey()
-	c.Assert(publicKey, DeepEquals, publicData)
+	c.Assert(pubKey.MarshalPublicKey(), DeepEquals, publicData)
 }
 
 func (RsaSuite) TestMarshalUnmarshalPrivateKey(c *C) {
@@ -99,7 +96,6 @@ func (ECDSASuite) TestUnmarshalRSAPublicKey(c *C) {
 
 	signer := &rsaSigner{priv.PrivateKey}
 	goodKey := signer.PublicData()
-	c.Assert(err, IsNil)
 
 	verifier := newRsaVerifier()
 	c.Assert(verifier.UnmarshalPublicKey(goodKey), IsNil)

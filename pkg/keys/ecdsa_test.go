@@ -52,8 +52,7 @@ func (ECDSASuite) TestECDSAVerifyMismatchPubKey(c *C) {
 
 	signerNew, err := GenerateEcdsaKey()
 	c.Assert(err, IsNil)
-	publicKey := signerNew.PublicData()
-	pubKey, err := GetVerifier(publicKey)
+	pubKey, err := GetVerifier(signerNew.PublicData())
 	c.Assert(err, IsNil)
 	c.Assert(pubKey.Verify([]byte("notfoo"), sig), ErrorMatches, "tuf: ecdsa signature verification failed")
 }
@@ -77,7 +76,7 @@ func (ECDSASuite) TestSignVerifyDeprecatedFails(c *C) {
 	}
 
 	_, err = GetVerifier(publicData)
-	c.Assert(err, ErrorMatches, "tuf: error unmarshalling key. invalid PEM value")
+	c.Assert(err, ErrorMatches, "tuf: error unmarshalling key: invalid PEM value")
 }
 
 func (ECDSASuite) TestMarshalUnmarshalPublicKey(c *C) {
@@ -86,8 +85,7 @@ func (ECDSASuite) TestMarshalUnmarshalPublicKey(c *C) {
 	publicData := signer.PublicData()
 	pubKey, err := GetVerifier(publicData)
 	c.Assert(err, IsNil)
-	publicKey := pubKey.MarshalPublicKey()
-	c.Assert(publicKey, DeepEquals, publicData)
+	c.Assert(pubKey.MarshalPublicKey(), DeepEquals, publicData)
 }
 
 func (ECDSASuite) TestMarshalUnmarshalPrivateKey(c *C) {

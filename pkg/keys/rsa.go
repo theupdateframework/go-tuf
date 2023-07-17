@@ -39,9 +39,8 @@ func (p *rsaVerifier) Public() string {
 	// This is already verified to succeed when unmarshalling a public key.
 	r, err := x509.MarshalPKIXPublicKey(p.rsaKey)
 	if err != nil {
-		panic(fmt.Errorf("tuf: error unmarshalling key. %w", err))
+		panic(fmt.Errorf("tuf: error unmarshalling key: %w", err))
 	}
-
 	return string(r)
 }
 
@@ -95,7 +94,7 @@ func (s *rsaSigner) PublicData() *data.PublicKey {
 		PublicKey: &PKIXPublicKey{PublicKey: s.Public()},
 	})
 	if err != nil {
-		panic(fmt.Errorf("tuf: error unmarshalling key. %w", err))
+		panic(fmt.Errorf("tuf: error unmarshalling key: %w", err))
 	}
 
 	return &data.PublicKey{
@@ -112,9 +111,7 @@ func (s *rsaSigner) SignMessage(message []byte) ([]byte, error) {
 }
 
 func (s *rsaSigner) ContainsID(id string) bool {
-	publicData := s.PublicData()
-
-	return publicData.ContainsID(id)
+	return s.PublicData().ContainsID(id)
 }
 
 func (s *rsaSigner) MarshalPrivateKey() (*data.PrivateKey, error) {

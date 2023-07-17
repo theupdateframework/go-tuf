@@ -33,7 +33,6 @@ func (Ed25519Suite) TestUnmarshalEd25519(c *C) {
 		Algorithms: data.HashAlgorithms,
 		Value:      publicKey,
 	}
-
 	verifier := NewEd25519Verifier()
 	c.Assert(verifier.UnmarshalPublicKey(badKey), IsNil)
 }

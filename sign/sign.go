@@ -21,9 +21,7 @@ func MakeSignatures(canonical []byte, k keys.Signer) ([]data.Signature, error) {
 		return nil, err
 	}
 
-	publicData := k.PublicData()
-
-	ids := publicData.IDs()
+	ids := k.PublicData().IDs()
 	signatures := make([]data.Signature, 0, len(ids))
 	for _, id := range ids {
 		signatures = append(signatures, data.Signature{
@@ -51,8 +49,7 @@ func Sign(s *data.Signed, k keys.Signer) error {
 	}
 	signatures := make([]data.Signature, 0, size+1)
 	for _, oldSig := range s.Signatures {
-		publicData := k.PublicData()
-		if !publicData.ContainsID(oldSig.KeyID) {
+		if !k.PublicData().ContainsID(oldSig.KeyID) {
 			signatures = append(signatures, oldSig)
 		}
 	}

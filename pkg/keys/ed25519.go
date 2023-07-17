@@ -33,14 +33,7 @@ type ed25519Verifier struct {
 }
 
 func (e *ed25519Verifier) Public() string {
-	publicKey, err := json.Marshal(ed25519Verifier{
-		PublicKey: data.HexBytes(e.PublicKey),
-	})
-	if err != nil {
-		panic(fmt.Errorf("tuf: error unmarshalling key. %w", err))
-	}
-
-	return string(publicKey)
+	return string(e.PublicKey)
 }
 
 func (e *ed25519Verifier) Verify(msg, sig []byte) error {
@@ -51,14 +44,7 @@ func (e *ed25519Verifier) Verify(msg, sig []byte) error {
 }
 
 func (e *ed25519Verifier) MarshalPublicKey() *data.PublicKey {
-	key := &data.PublicKey{
-		Type:       data.KeyTypeEd25519,
-		Scheme:     data.KeySchemeEd25519,
-		Algorithms: data.HashAlgorithms,
-		Value:      json.RawMessage(e.PublicKey),
-	}
-
-	return key
+	return e.key
 }
 
 func (e *ed25519Verifier) UnmarshalPublicKey(key *data.PublicKey) error {
