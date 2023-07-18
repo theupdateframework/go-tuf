@@ -1,9 +1,9 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
+	"errors"
 
+	"github.com/flynn/go-docopt"
 	"github.com/theupdateframework/go-tuf"
 )
 
@@ -13,7 +13,8 @@ usage: tuf remove-key [--expires=<days>] <role> <id>
 
 Remove a signing key
 
-The key will be removed from the root metadata file and if the key is present in 
+Before the key is removed the key will be first revoked
+The key will then be removed from the root metadata file and if the key is present in 
 "keys" directory it will also be removed 
 
 Options:
