@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
@@ -493,10 +494,18 @@ func (c *Client) getDelegationPathFromRaw(snapshot *data.Snapshot, delegatedTarg
 		return nil, err
 	}
 	for targetPath := range targets.Targets {
+		// Gets target file from remote store
 		_, resp, err := c.getTargetFileMetaDelegationPath(targetPath, snapshot)
 		// We only need to test one targets file:
 		// - If it is valid, it means the delegated targets has been validated
 		// - If it is not, the delegated targets isn't valid
+		if errors.As(err, &ErrMissingRemoteMetadata{}) {
+			// As this function is used to fill the local store cache, the targets
+			// will be downloaded from the remote store as the local store cache is
+			// empty, meaning that the delegated targets may not exist anymore. In
+			// that case, ignore it.
+			return nil, nil
+		}
 		return resp, err
 	}
 	return nil, nil
