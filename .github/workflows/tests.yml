@@ -51,12 +51,11 @@ jobs:
           flag-name: Go-${{ matrix.go-version }}
           parallel: true
 
-  golangci:
+  checks:
     strategy:
       matrix:
         go-version: ${{ fromJSON(needs.get-go-versions.outputs.matrix) }}
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     needs: get-go-versions
     steps:
       - uses: actions/setup-go@fac708d6674e30b6ba41289acaab6d4b75aa0753
@@ -68,3 +67,8 @@ jobs:
         with:
           version: v1.51 # has to be pinned and thus manually updated due to https://github.com/golangci/golangci-lint-action/blob/6a290f7d5d488e1e423b0b37fe802c822ca2c08c/README.md?plain=1#L108
           args: --timeout 5m --verbose
+      - name: govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: ${{ matrix.go-version }}
+          go-package: ./...
