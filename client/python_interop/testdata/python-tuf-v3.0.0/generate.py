@@ -14,12 +14,9 @@ import shutil
 from pathlib import Path
 from typing import Dict
 
-import securesystemslib.util
-
 from securesystemslib.keys import generate_ed25519_key
-from securesystemslib.signer import SSlibSigner
+from securesystemslib.signer import SSlibSigner, SSlibKey
 from tuf.api.metadata import (
-    Key,
     Metadata,
     MetaFile,
     Role,
@@ -43,11 +40,14 @@ def make_targets(target_dir: Path, consistent_snapshot: bool) -> Dict[str, Targe
     for target in (Path("file1.txt"), Path("dir/file2.txt")):
         target_fspath = target_dir / target
         target_fspath.parent.mkdir(parents=True, exist_ok=True)
-        target_fspath.write_text(target.name)  # file contents are the file name
-        target_file_info = TargetFile.from_file(str(target), str(target_fspath))
+        # file contents are the file name
+        target_fspath.write_text(target.name)
+        target_file_info = TargetFile.from_file(
+            str(target), str(target_fspath))
         if consistent_snapshot:
             digest = next(iter(target_file_info.hashes.values()))
-            shutil.move(target_fspath, target_fspath.parent / f"{digest}.{target.name}")
+            shutil.move(target_fspath, target_fspath.parent /
+                        f"{digest}.{target.name}")
         targets[str(target)] = target_file_info
     return targets
 
@@ -93,9 +93,10 @@ def make_test_repo(repo_dir: Path, consistent_snapshot: bool):
         spec_version=SPEC_VERSION,
         expires=EXPIRY,
         keys={
-            key["keyid"]: Key.from_securesystemslib_key(key) for key in keys.values()
+            key["keyid"]: SSlibKey.from_securesystemslib_key(key) for key in keys.values()
         },
-        roles={role: Role([key["keyid"]], threshold=1) for role, key in keys.items()},
+        roles={role: Role([key["keyid"]], threshold=1)
+               for role, key in keys.items()},
         consistent_snapshot=consistent_snapshot,
     )
     roles["root"] = Metadata[Root](root_metadata, {})
