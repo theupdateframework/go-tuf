@@ -3,6 +3,10 @@
 //
 // It uses scrypt derive a key from the passphrase and the NaCl secret box
 // cipher for authenticated encryption.
+//
+// Deprecated: The encrypted package from go-tuf is already moved to
+// https://github.com/secure-systems-lab/go-securesystemslib and will be deprecated here.
+// Use github.com/secure-systems-lab/go-securesystemslib/encrypted instead.
 package encrypted
 
 import (
