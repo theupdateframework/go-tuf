@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
+	"github.com/secure-systems-lab/go-securesystemslib/encrypted"
 	"github.com/theupdateframework/go-tuf/data"
-	"github.com/theupdateframework/go-tuf/encrypted"
 	"github.com/theupdateframework/go-tuf/internal/sets"
 	"github.com/theupdateframework/go-tuf/pkg/keys"
 	"github.com/theupdateframework/go-tuf/pkg/targets"
