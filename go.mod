@@ -1,6 +1,6 @@
 module github.com/rdimitrov/go-tuf-metadata
 
-go 1.19
+go 1.20
 
 require (
 	github.com/secure-systems-lab/go-securesystemslib v0.7.0

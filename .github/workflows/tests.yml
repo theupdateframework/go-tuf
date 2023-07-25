@@ -50,12 +50,11 @@ jobs:
       - name: Run all examples # not exactly right to test functionality in such a way but it does act as a set of end to end test cases for the time being, nevertheless should be updated
         run: make example-all
 
-  golangci:
+  checks:
     strategy:
       matrix:
         go-version: ${{ fromJSON(needs.get-go-versions.outputs.matrix) }}
-        os: [ubuntu-latest] # , macos-latest, windows-latest] Enable later so we don't waste github actions resources
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     needs: get-go-versions
     steps:
       - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
@@ -67,3 +66,8 @@ jobs:
         with:
           version: v1.51 # has to be pinned and thus manually updated due to https://github.com/golangci/golangci-lint-action/blob/6a290f7d5d488e1e423b0b37fe802c822ca2c08c/README.md?plain=1#L108
           args: --timeout 5m --verbose
+      - name: govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: ${{ matrix.go-version }}
+          go-package: ./...
