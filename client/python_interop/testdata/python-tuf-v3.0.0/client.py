@@ -11,8 +11,6 @@ import argparse
 from typing import List
 from pathlib import Path
 
-import tuf.api
-
 from tuf.ngclient import Updater
 
 
@@ -35,7 +33,8 @@ def update_client(repo: str, targets: List[str]):
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Retrieve file from TUF repository.")
+    parser = argparse.ArgumentParser(
+        description="Retrieve file from TUF repository.")
 
     parser.add_argument(
         "-r",
