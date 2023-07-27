@@ -6,9 +6,8 @@ import (
 
 	"github.com/flynn/go-docopt"
 	"github.com/theupdateframework/go-tuf"
-
-
 )
+
 func init() {
 	register("remove-key", cmdRemoveKey, `
 usage: tuf remove-key [--expires=<days>] <role> <id>
@@ -27,12 +26,12 @@ Options:
 func cmdRemoveKey(args *docopt.Args, repo *tuf.Repo) error {
 	role := args.String["<roles>"]
 	keyID := args.String["<id>"]
-	if err := repo.RevokeKey(role, keyID); err != nil{
+	if err := repo.RevokeKey(role, keyID); err != nil {
 		return err
 	}
 	keyPath := filepath.Join("keys", keyID)
-	if _ , err := os.Stat(keyPath); err==nil{
-		if err := os.Remove(keyPath); err != nil{
+	if _, err := os.Stat(keyPath); err == nil {
+		if err := os.Remove(keyPath); err != nil {
 			return err
 		}
 	}
