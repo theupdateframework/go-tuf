@@ -13,14 +13,14 @@ import (
 
 func init() {
 	register("add-signatures", cmdAddSignature, `
-usage: tuf add-signatures --signatures=<sig_file> [--format=<format>] [--key-id=<key-id>] <metadata>
+usage: tuf add-signatures [--signatures <sig_file>] [--format=<format>] [--key-id=<key-id>] <metadata>
 
 Adds signatures (the output of "sign-payload") to the given role metadata file.
 
 If the signature does not verify, it will not be added.
 
 Options:
-  --signatures=<sig_file>  the path to the file containing the signature(s)
+  --signatures=<sig_file>   The path to the file containing the signatures to add. If not present, the contents are read from stdin
   --format=<format>    One of 'json', 'hex', or 'base64'. Defaults to 'json'
   --key-id=<key-id>    The key-id of the signature being added. Only required if the format is not 'json'
 `)
@@ -30,9 +30,20 @@ func cmdAddSignature(args *docopt.Args, repo *tuf.Repo) error {
 	roleFilename := args.String["<metadata>"]
 
 	f := args.String["--signatures"]
-	sigBytes, err := os.ReadFile(f)
-	if err != nil {
-		return err
+	var sigBytes []byte
+	var err error
+	if f != "" {
+		sigBytes, err = os.ReadFile(f)
+		if err != nil {
+			return err
+		}
+	} else {
+		var input string
+		_, err := fmt.Scan(&input)
+		if err != nil {
+			return err
+		}
+		sigBytes = []byte(input)
 	}
 	sigs := []data.Signature{}
 	switch args.String["--format"] {
