@@ -159,7 +159,7 @@ See also `tuf add-signatures`.
 Adds signatures (the output of `tuf sign-payload`) to the given role metadata file.
 
 If the signature does not verify, it will not be added. Signature can be a json file
-or passed in via `stdin`.
+or json passed in via `stdin`.
 
 #### `tuf status --valid-at <date> <role>`
 
