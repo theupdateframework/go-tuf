@@ -663,6 +663,10 @@ test data [README.md](client/python_interop/testdata/README.md) for details).
 
 Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for contribution guidelines before making your first contribution!
 
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/...)
+
+Users wishing to use remote IDEs can also make use of [Gitpod](https://www.gitpod.io/) to make changes to this project.
+
 ## Comparison to other implementations
 
 There are TUF implementations in a variety of programming languages. Some other Go implementations of TUF include:
