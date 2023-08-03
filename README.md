@@ -64,6 +64,14 @@ Revoke a signing key
 The key will be removed from the root metadata file, but the key will remain in the
 "keys" directory if present.
 
+#### `tuf remove-key [--expires=<days>] <role> <id>`
+
+Remove a signing key
+
+Before the key is removed the key will be first revoked
+The key will then be removed from the root metadata file and if the key is present in 
+"keys" directory it will also be removed.  
+
 #### `tuf add [<path>...]`
 
 Hashes files in the `staged/targets` directory at the given path(s), then
@@ -659,4 +667,3 @@ Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for contribution guidelines b
 There are TUF implementations in a variety of programming languages. Some other Go implementations of TUF include:
 
 * [Notary](https://github.com/notaryproject/notary): A version of TUF designed specifically for publishing and managing trusted collections of content. It was used by Docker Content Trust, and has since been superseded by the [Notation](https://github.com/notaryproject/notation) project. In contrast, go-tuf is a direct implementation of TUF and has been updated to conform to 1.0.0 of the TUF specification.
-
