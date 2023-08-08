@@ -21,6 +21,6 @@ func init() {
 	}
 	// store a mapping for both data.KeyTypeECDSA_SHA2_P256_OLD_FMT and data.KeyTypeECDSA_SHA2_P256
 	// in case a client is verifying using both the old non-compliant format and a newly generated root
-	keys.VerifierMap.Store(data.KeyTypeECDSA_SHA2_P256, keys.NewEcdsaVerifier)                   // compliant verifier
-	keys.VerifierMap.Store(data.KeyTypeECDSA_SHA2_P256_OLD_FMT, keys.NewDeprecatedEcdsaVerifier) // non-compliant verifier
+	keys.VerifierMap.Store(data.KeyTypeECDSA_SHA2_P256, keys.NewDeprecatedEcdsaVerifier)         // compliant format
+	keys.VerifierMap.Store(data.KeyTypeECDSA_SHA2_P256_OLD_FMT, keys.NewDeprecatedEcdsaVerifier) // deprecated format
 }
