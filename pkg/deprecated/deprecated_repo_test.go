@@ -32,18 +32,19 @@ func genKey(c *C, r *repo.Repo, role string) []string {
 // Deprecated ecdsa key support: Support verification against roots that were
 // signed with hex-encoded ecdsa keys.
 func (rs *RepoSuite) TestDeprecatedHexEncodedKeysSucceed(c *C) {
+	type deprecatedP256Verifier struct {
+		PublicKey data.HexBytes `json:"public"`
+	}
 	files := map[string][]byte{"foo.txt": []byte("foo")}
 	local := repo.MemoryStore(make(map[string]json.RawMessage), files)
 	r, err := repo.NewRepo(local)
 	c.Assert(err, IsNil)
 
 	r.Init(false)
-	// Add a root key with hex-encoded ecdsa format
+
+	// Add a root key with hex-encoded ecdsa format - compliant "ecdsa"
 	signer, err := keys.GenerateEcdsaKey()
 	c.Assert(err, IsNil)
-	type deprecatedP256Verifier struct {
-		PublicKey data.HexBytes `json:"public"`
-	}
 	pub := signer.PublicKey
 	keyValBytes, err := json.Marshal(&deprecatedP256Verifier{PublicKey: elliptic.Marshal(pub.Curve, pub.X, pub.Y)})
 	c.Assert(err, IsNil)
@@ -55,6 +56,22 @@ func (rs *RepoSuite) TestDeprecatedHexEncodedKeysSucceed(c *C) {
 	}
 	err = r.AddVerificationKey("root", publicData)
 	c.Assert(err, IsNil)
+
+	// Add a root key with hex-encoded ecdsa format - deprecated "ecdsa-sha2-nistp256"
+	signerDeprecated, err := keys.GenerateEcdsaKey()
+	c.Assert(err, IsNil)
+	pubDeprecated := signerDeprecated.PublicKey
+	keyValBytesDeprecated, err := json.Marshal(&deprecatedP256Verifier{PublicKey: elliptic.Marshal(pubDeprecated.Curve, pubDeprecated.X, pubDeprecated.Y)})
+	c.Assert(err, IsNil)
+	publicDataDeprecated := &data.PublicKey{
+		Type:       data.KeyTypeECDSA_SHA2_P256_OLD_FMT,
+		Scheme:     data.KeySchemeECDSA_SHA2_P256,
+		Algorithms: data.HashAlgorithms,
+		Value:      keyValBytesDeprecated,
+	}
+	err = r.AddVerificationKey("root", publicDataDeprecated)
+	c.Assert(err, IsNil)
+
 	// Add other keys as normal
 	genKey(c, r, "targets")
 	genKey(c, r, "snapshot")
@@ -73,6 +90,14 @@ func (rs *RepoSuite) TestDeprecatedHexEncodedKeysSucceed(c *C) {
 		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
 			KeyID:     id,
 			Signature: rootSig}), IsNil)
+	}
+
+	rootSigDeprecated, err := signerDeprecated.PrivateKey.Sign(rand.Reader, hash[:], crypto.SHA256)
+	c.Assert(err, IsNil)
+	for _, id := range publicDataDeprecated.IDs() {
+		c.Assert(r.AddOrUpdateSignature("root.json", data.Signature{
+			KeyID:     id,
+			Signature: rootSigDeprecated}), IsNil)
 	}
 
 	// Committing should succeed because the deprecated key pkg is added.

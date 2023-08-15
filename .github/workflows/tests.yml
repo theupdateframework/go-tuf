@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Setup - Go ${{ matrix.go-version }}
-        uses: actions/setup-go@fac708d6674e30b6ba41289acaab6d4b75aa0753
+        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -45,7 +45,7 @@ jobs:
         run: go test -race -covermode atomic -coverprofile='profile.cov' ./...
 
       - name: Send coverage
-        uses: shogo82148/actions-goveralls@df920a6a2468668dfcf71a0b43817f89eaa5ea04
+        uses: shogo82148/actions-goveralls@7b1bd2871942af030d707d6574e5f684f9891fb2
         with:
           path-to-profile: profile.cov
           flag-name: Go-${{ matrix.go-version }}
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: get-go-versions
     steps:
-      - uses: actions/setup-go@fac708d6674e30b6ba41289acaab6d4b75aa0753
+      - uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe
         with:
           go-version: ${{ matrix.go-version }}
       - uses: actions/checkout@v3
@@ -71,4 +71,4 @@ jobs:
         uses: golang/govulncheck-action@v1
         with:
           go-version-input: ${{ matrix.go-version }}
-          go-package: ./...
+          go-package: -json ./...
