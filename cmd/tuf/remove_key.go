@@ -17,7 +17,6 @@ Remove a signing key
 Before the key is removed the key will be first revoked
 The key will then be removed from the root metadata file and if the key is present in 
 "keys" directory it will also be removed
-
 Options:
   --expires=<days>   Set the root metadata file to expire <days> days from now.
 `)
