@@ -27,24 +27,9 @@ func cmdRemoveKey(args *docopt.Args, repo *tuf.Repo) error {
 	role := args.String["<roles>"]
 	keyID := args.String["<id>"]
 
-	// Extract the --ecpires option value
-	expires, _ := args.Int("--expires")
-
-	// Revoke the key 
-	if err := repo.RevokeKey(role, keyID); err != nil {
+	err := cmdRevokeKey(args, repo)
+	if err != nil {
 		return err
-	}
-
-	// Update expiration vaalue if --expires is provided 
-	if expires > 0 {
-		rooMetadata := repo.Root()
-		if rootMetadata != nil {
-			newExpires := time.Now().Add(time.Duration(expires) * 24 * time.Hour)
-			rootMetadata.Expires = &newExpires 
-			if err := repo.Commit(); err != nil {
-				return err
-			}
-		}
 	}
 
 	keyPath := filepath.Join("keys", keyID)
