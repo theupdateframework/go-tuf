@@ -2,19 +2,47 @@
 	"signatures": [
 		{
 			"keyid": "282612f348dcd7fe3f19e0f890e89fad48d45335deeb91deef92873934e6fe6d",
-			"sig": "6cffed26499edcb7ee99e885675c3d9c9570d93b78ecba23f71c791dc8cc171db925e2d2105fbb4167e52b947ed08f1441ce536dccd2535957200be63735a2286784d1005d55216b4b1aa6fd0af767d1f003545c1e44ac5208ff592699e8bb36f9c74c8f90cea1893c94f975f78d058f00c97f6fef7b5aed66402cd6e71853d6"
+			"sig": "80cd125a4b128c9508df8bc6f71ad2ed9896a9e7afccd53fca9e7dbc2f02db69c3ae712234d3730c929d891fa035bdf059736e7debf62cbac6f0e8d22ab0c5de3b3e47b249eb0d41dea66d9fda9588893cde824a95614129263b6fed72fafb21cd7114e603fe3a30e3871e9eb5b5029e3e9a8353190f1bcb332a81ec211a93eb"
 		}
 	],
 	"signed": {
 		"_type": "targets",
+		"delegations": {
+			"keys": {
+				"c8022fa1e9b9cb239a6b362bbdffa9649e61ad2cb699d2e4bc4fdf7930a0e64a": {
+					"keyid_hash_algorithms": [
+						"sha256",
+						"sha512"
+					],
+					"keytype": "ed25519",
+					"keyval": {
+						"public": "fcf224e55fa226056adf113ef1eb3d55e308b75b321c8c8316999d8c4fd9e0d9"
+					},
+					"scheme": "ed25519"
+				}
+			},
+			"roles": [
+				{
+					"keyids": [
+						"c8022fa1e9b9cb239a6b362bbdffa9649e61ad2cb699d2e4bc4fdf7930a0e64a"
+					],
+					"name": "role1",
+					"paths": [
+						"file3.txt"
+					],
+					"terminating": false,
+					"threshold": 1
+				}
+			]
+		},
 		"expires": "2030-08-15T14:30:45.0000001Z",
 		"spec_version": "1.0.31",
 		"targets": {
-			"metadata_api_test.go": {
+			"file1.txt": {
 				"hashes": {
-					"sha256": "232ba4f8db1c6e83472f5457a81d9ea03f2db8686dc36161a42e6c809a0a449a"
+					"sha256": "65b8c67f51c993d898250f40aa57a317d854900b3a04895464313e48785440da"
 				},
-				"length": 19564
+				"length": 31
 			}
 		},
 		"version": 1
