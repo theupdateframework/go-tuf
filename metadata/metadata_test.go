@@ -29,13 +29,13 @@ const TEST_REPOSITORY_DATA = "../testutils/repository_data/repository/metadata"
 
 var fixedExpire = time.Date(2030, 8, 15, 14, 30, 45, 100, time.UTC)
 
-func getSignatureByKeyID(signatures []Signature, keyID string) HexBytes {
-	for _, sig := range signatures {
+func getSignatureByKeyID(signatures []Signature, keyID string) (HexBytes, int) {
+	for i, sig := range signatures {
 		if sig.KeyID == keyID {
-			return sig.Signature
+			return sig.Signature, i
 		}
 	}
-	return []byte{}
+	return []byte{}, 0
 }
 
 func TestDefaultValuesRoot(t *testing.T) {

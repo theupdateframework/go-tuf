@@ -17,6 +17,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/sha512"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -514,7 +515,7 @@ func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) 
 		// hash bin delegations - calculate the hash of the filepath to determine in which bin to find the target.
 		targetFilepathHash := sha256.Sum256([]byte(targetFilepath))
 		for _, pathHashPrefix := range role.PathHashPrefixes {
-			if strings.HasPrefix(string(targetFilepathHash[:]), pathHashPrefix) {
+			if strings.HasPrefix(base64.URLEncoding.EncodeToString(targetFilepathHash[:]), pathHashPrefix) {
 				return true, nil
 			}
 		}
@@ -573,8 +574,7 @@ func (role *SuccinctRoles) GetRolesForTarget(targetFilepath string) map[string]b
 // GetRoles returns the names of all different delegated roles
 func (role *SuccinctRoles) GetRoles() []string {
 	res := []string{}
-	numberOfBins := int(math.Pow(2, float64(role.BitLength)))
-	suffixLen := len(strconv.FormatInt(int64(numberOfBins-1), 16))
+	suffixLen, numberOfBins := role.GetSuffixLen()
 
 	for binNumber := 0; binNumber < numberOfBins; binNumber++ {
 		suffix := fmt.Sprintf("%0*x", suffixLen, binNumber)
@@ -583,11 +583,15 @@ func (role *SuccinctRoles) GetRoles() []string {
 	return res
 }
 
+func (role *SuccinctRoles) GetSuffixLen() (int, int) {
+	numberOfBins := int(math.Pow(2, float64(role.BitLength)))
+	return len(strconv.FormatInt(int64(numberOfBins-1), 16)), numberOfBins
+}
+
 // IsDelegatedRole returns whether the given roleName is in one of
 // the delegated roles that “SuccinctRoles“ represents
 func (role *SuccinctRoles) IsDelegatedRole(roleName string) bool {
-	numberOfBins := int64(math.Pow(2, float64(role.BitLength)))
-	suffixLen := len(strconv.FormatInt(int64(numberOfBins-1), 16))
+	suffixLen, numberOfBins := role.GetSuffixLen()
 
 	expectedPrefix := fmt.Sprintf("%s-", role.NamePrefix)
 
@@ -609,7 +613,7 @@ func (role *SuccinctRoles) IsDelegatedRole(roleName string) bool {
 	}
 
 	// check if the bin we calculated is indeed within the range of what we support
-	return (value >= 0) && (value < numberOfBins)
+	return (value >= 0) && (value < int64(numberOfBins))
 }
 
 // AddKey adds new signing key for delegated role "role"
@@ -674,9 +678,11 @@ func (signed *TargetsType) AddKey(key *Key, role string) error {
 	// standard delegated roles
 	if signed.Delegations.Roles != nil {
 		// loop through all delegated roles
+		isDelegatedRole := false
 		for i, d := range signed.Delegations.Roles {
 			// if role is found
 			if d.Name == role {
+				isDelegatedRole = true
 				// add key if keyID is not already part of keyIDs for that role
 				if !slices.Contains(d.KeyIDs, key.ID()) {
 					signed.Delegations.Roles[i].KeyIDs = append(signed.Delegations.Roles[i].KeyIDs, key.ID())
@@ -685,6 +691,9 @@ func (signed *TargetsType) AddKey(key *Key, role string) error {
 				}
 				log.Debugf("Delegated role %s already has keyID %s", role, key.ID())
 			}
+		}
+		if !isDelegatedRole {
+			return ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
 		}
 	} else if signed.Delegations.SuccinctRoles != nil {
 		// add key if keyID is not already part of keyIDs for the SuccinctRoles role
@@ -696,7 +705,8 @@ func (signed *TargetsType) AddKey(key *Key, role string) error {
 		log.Debugf("SuccinctRoles role already has keyID %s", key.ID())
 
 	}
-	return ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
+	signed.Delegations.Keys[key.ID()] = key // TODO: should we check if we don't accidentally override an existing keyID with another key value?
+	return nil
 }
 
 // RevokeKey revokes key from delegated role "role" and updates the delegations key store

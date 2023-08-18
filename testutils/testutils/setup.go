@@ -22,6 +22,7 @@ import (
 var (
 	TempDir     string
 	RepoDir     string
+	TargetsDir  string
 	KeystoreDir string
 )
 
@@ -40,6 +41,17 @@ func SetupTestDirs() error {
 		log.Debugf("failed to get absolute path: %v", err)
 	}
 	err = Copy(absPath, RepoDir)
+	if err != nil {
+		log.Debugf("failed to copy metadata to %s: %v", RepoDir, err)
+		return err
+	}
+
+	TargetsDir = fmt.Sprintf("%s/repository_data/repository/targets", TempDir)
+	targetsPath, err := filepath.Abs("../testutils/repository_data/repository/targets")
+	if err != nil {
+		log.Debugf("failed to get absolute targets path: %v", err)
+	}
+	err = Copy(targetsPath, TargetsDir)
 	if err != nil {
 		log.Debugf("failed to copy metadata to %s: %v", RepoDir, err)
 		return err
