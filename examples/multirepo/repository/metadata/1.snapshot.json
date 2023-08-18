@@ -1,7 +1,13 @@
 {
+	"signatures": [
+		{
+			"keyid": "77125d9b43085072ce2856643e74027811993bbab141b08359edca28f17d21f5",
+			"sig": "700a65bb8d85965a64df3bd7f6563bc9ff8bdcd1a636fe6f7e90c85536000af70e918a8d4cecbf01f67bcaab04858b2fb144068479dbdf0b01c8fbc7492abc06"
+		}
+	],
 	"signed": {
 		"_type": "snapshot",
-		"expires": "2024-06-06T11:12:34.649453Z",
+		"expires": "2024-08-17T12:10:30.266619Z",
 		"meta": {
 			"targets.json": {
 				"version": 1
@@ -9,11 +15,5 @@
 		},
 		"spec_version": "1.0.31",
 		"version": 1
-	},
-	"signatures": [
-		{
-			"keyid": "700464ea12f4cb5f06a7512c75b73c0b6eeb2cd42854b085eed5b3c993607cba",
-			"sig": "56c0125cb1897e23014cd6be60b756536ca0aacf299d155bd39849b5f43aa5c22730eeb90c6c36659678253ab43b2ce34f8d73b93f8d40176941dc57bff1420a"
-		}
-	]
+	}
 }
