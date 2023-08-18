@@ -1,0 +1,103 @@
+# Copyright 2022-2023 VMware, Inc.
+#
+# This product is licensed to you under the BSD-2 license (the "License").
+# You may not use this product except in compliance with the BSD-2 License.
+# This product may include a number of subcomponents with separate copyright
+# notices and license terms. Your use of these subcomponents is subject to
+# the terms and conditions of the subcomponent's license, as noted in the
+# LICENSE file.
+#
+# SPDX-License-Identifier: BSD-2-Clause
+on:
+  workflow_call:
+name: Examples # not exactly right to test functionality in such a way but it does act as a set of end to end test cases for the time being, nevertheless should be updated
+jobs:
+  get-go-versions:
+    name: Collect available Go versions
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.versions.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: arnested/go-version-action@b556f8d91b644164318c709d28b9083eaf0c064d
+        id: versions
+  client:
+    strategy:
+      fail-fast: false # Keep running if one leg fails.
+      matrix:
+        os: [ubuntu-latest] # , macos-latest, windows-latest] Enable later so we don't waste github actions resources
+        go-version: ${{ fromJSON(needs.get-go-versions.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    needs: get-go-versions
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup - Go ${{ matrix.go-version }}
+        uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
+        with:
+          go-version: ${{ matrix.go-version }}
+      - run: make example-client
+  repository:
+    strategy:
+      fail-fast: false # Keep running if one leg fails.
+      matrix:
+        os: [ubuntu-latest] # , macos-latest, windows-latest] Enable later so we don't waste github actions resources
+        go-version: ${{ fromJSON(needs.get-go-versions.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    needs: get-go-versions
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup - Go ${{ matrix.go-version }}
+        uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
+        with:
+          go-version: ${{ matrix.go-version }}
+      - run: make example-repository
+  multirepo:
+    strategy:
+      fail-fast: false # Keep running if one leg fails.
+      matrix:
+        os: [ubuntu-latest] # , macos-latest, windows-latest] Enable later so we don't waste github actions resources
+        go-version: ${{ fromJSON(needs.get-go-versions.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    needs: get-go-versions
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup - Go ${{ matrix.go-version }}
+        uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
+        with:
+          go-version: ${{ matrix.go-version }}
+      - run: make example-multirepo
+  tuf-client-cli:
+    strategy:
+      fail-fast: false # Keep running if one leg fails.
+      matrix:
+        os: [ubuntu-latest] # , macos-latest, windows-latest] Enable later so we don't waste github actions resources
+        go-version: ${{ fromJSON(needs.get-go-versions.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    needs: get-go-versions
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup - Go ${{ matrix.go-version }}
+        uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
+        with:
+          go-version: ${{ matrix.go-version }}
+      - run: make example-tuf-client-cli
+  root-signing:
+    strategy:
+      fail-fast: false # Keep running if one leg fails.
+      matrix:
+        os: [ubuntu-latest] # , macos-latest, windows-latest] Enable later so we don't waste github actions resources
+        go-version: ${{ fromJSON(needs.get-go-versions.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    needs: get-go-versions
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup - Go ${{ matrix.go-version }}
+        uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
+        with:
+          go-version: ${{ matrix.go-version }}
+      - run: make example-root-signing

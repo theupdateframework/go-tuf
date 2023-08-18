@@ -23,6 +23,7 @@ jobs:
         id: versions
 
   run:
+    name: Run
     strategy:
       fail-fast: false # Keep running if one leg fails.
       matrix:
@@ -47,10 +48,8 @@ jobs:
         with:
           flags: Go-${{ matrix.go-version }}
 
-      - name: Run all examples # not exactly right to test functionality in such a way but it does act as a set of end to end test cases for the time being, nevertheless should be updated
-        run: make example-all
-
   checks:
+    name: Checks and linters
     strategy:
       matrix:
         go-version: ${{ fromJSON(needs.get-go-versions.outputs.matrix) }}

@@ -19,3 +19,5 @@ name: CI
 jobs:
   tests:
     uses: ./.github/workflows/tests.yml
+  examples:
+    uses: ./.github/workflows/examples.yml
