@@ -29,7 +29,7 @@ import (
 const (
 	metadataURL          = "https://jku.github.io/tuf-demo/metadata"
 	targetsURL           = "https://jku.github.io/tuf-demo/targets"
-	targetName           = "demo/succinctly-delegated-5.txt"
+	targetName           = "file1.txt"
 	verbosity            = log.InfoLevel
 	generateRandomFolder = false
 )
