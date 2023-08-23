@@ -34,7 +34,10 @@ import (
 
 func TestMain(m *testing.M) {
 
-	err := testutils.SetupTestDirs()
+	repoPath := "../testutils/repository_data/repository/metadata"
+	targetsPath := "../testutils/repository_data/repository/targets"
+	keystorePath := "../testutils/repository_data/keystore"
+	err := testutils.SetupTestDirs(repoPath, targetsPath, keystorePath)
 	defer testutils.Cleanup()
 
 	if err != nil {
@@ -283,14 +286,14 @@ func TestToFromBytes(t *testing.T) {
 	// Case 1: test noncompact by overriding the default serializer.
 	snapshotBytesWant, err := snapshot.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, string(data), string(snapshotBytesWant))
+	assert.Equal(t, data, snapshotBytesWant)
 
 	// Case 2: test compact by using the default serializer.
 	snapshot2, err := Snapshot().FromBytes(snapshotBytesWant)
 	assert.NoError(t, err)
 	snapshotBytesActual, err := snapshot2.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, string(snapshotBytesWant), string(snapshotBytesActual))
+	assert.Equal(t, snapshotBytesWant, snapshotBytesActual)
 
 	// TARGETS
 	data, err = os.ReadFile(testutils.RepoDir + "/targets.json")
@@ -301,14 +304,14 @@ func TestToFromBytes(t *testing.T) {
 	// Case 1: test noncompact by overriding the default serializer.
 	targetsBytesWant, err := targets.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, string(data), string(targetsBytesWant))
+	assert.Equal(t, data, targetsBytesWant)
 
 	// Case 2: test compact by using the default serializer.
 	targets2, err := Targets().FromBytes(targetsBytesWant)
 	assert.NoError(t, err)
 	targetsBytesActual, err := targets2.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, string(targetsBytesWant), string(targetsBytesActual))
+	assert.Equal(t, targetsBytesWant, targetsBytesActual)
 
 	// TIMESTAMP
 	data, err = os.ReadFile(testutils.RepoDir + "/timestamp.json")
@@ -319,14 +322,14 @@ func TestToFromBytes(t *testing.T) {
 	// Case 1: test noncompact by overriding the default serializer.
 	timestampBytesWant, err := timestamp.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, string(data), string(timestampBytesWant))
+	assert.Equal(t, data, timestampBytesWant)
 
 	// Case 2: test compact by using the default serializer.
 	timestamp2, err := Timestamp().FromBytes(timestampBytesWant)
 	assert.NoError(t, err)
 	timestampBytesActual, err := timestamp2.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, string(timestampBytesWant), string(timestampBytesActual))
+	assert.Equal(t, timestampBytesWant, timestampBytesActual)
 
 }
 
@@ -421,6 +424,7 @@ func TestKeyVerifyFailures(t *testing.T) {
 	// Load sample metadata (timestamp)
 	timestamp, err := Timestamp().FromFile(testutils.RepoDir + "/timestamp.json")
 	assert.NoError(t, err)
+
 	timestampSig, _ := getSignatureByKeyID(timestamp.Signatures, timestampKeyID)
 	data, err := timestamp.Signed.MarshalJSON()
 	assert.NoError(t, err)
@@ -780,6 +784,15 @@ func TestLengthAndHashValidation(t *testing.T) {
 
 	snapshotMetafile := timestamp.Signed.Meta["snapshot.json"]
 	assert.NotNil(t, snapshotMetafile)
+
+	snapshotData, err := os.ReadFile(testutils.RepoDir + "/snapshot.json")
+	assert.NoError(t, err)
+	h32 := sha256.Sum256(snapshotData)
+	h := h32[:]
+	snapshotMetafile.Hashes = map[string]HexBytes{
+		"sha256": h,
+	}
+	snapshotMetafile.Length = 652
 
 	data, err := os.ReadFile(testutils.RepoDir + "/snapshot.json")
 	assert.NoError(t, err)

@@ -26,7 +26,7 @@ var (
 	KeystoreDir string
 )
 
-func SetupTestDirs() error {
+func SetupTestDirs(repoPath string, targetsPath string, keystorePath string) error {
 	tmp := os.TempDir()
 	var err error
 	TempDir, err = os.MkdirTemp(tmp, "0750")
@@ -36,7 +36,7 @@ func SetupTestDirs() error {
 	}
 
 	RepoDir = fmt.Sprintf("%s/repository_data/repository", TempDir)
-	absPath, err := filepath.Abs("../testutils/repository_data/repository/metadata")
+	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
 		log.Debugf("failed to get absolute path: %v", err)
 	}
@@ -47,11 +47,11 @@ func SetupTestDirs() error {
 	}
 
 	TargetsDir = fmt.Sprintf("%s/repository_data/repository/targets", TempDir)
-	targetsPath, err := filepath.Abs("../testutils/repository_data/repository/targets")
+	targetsAbsPath, err := filepath.Abs(targetsPath)
 	if err != nil {
 		log.Debugf("failed to get absolute targets path: %v", err)
 	}
-	err = Copy(targetsPath, TargetsDir)
+	err = Copy(targetsAbsPath, TargetsDir)
 	if err != nil {
 		log.Debugf("failed to copy metadata to %s: %v", RepoDir, err)
 		return err
@@ -62,7 +62,7 @@ func SetupTestDirs() error {
 	if err != nil {
 		log.Debugf("failed to create keystore dir %s: %v", KeystoreDir, err)
 	}
-	absPath, err = filepath.Abs("../testutils/repository_data/keystore")
+	absPath, err = filepath.Abs(keystorePath)
 	if err != nil {
 		log.Debugf("failed to get absolute path: %v", err)
 	}
