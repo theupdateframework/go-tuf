@@ -84,9 +84,9 @@ example-tuf-client-cli: build-tuf-client
 	@echo "Initializing the following https://jku.github.io/tuf-demo/ TUF repository"
 	@sleep 2
 	./tuf-client init --url https://jku.github.io/tuf-demo/metadata
-	@echo "Downloading the following target file - demo/succinctly-delegated-5.txt"
+	@echo "Downloading the following target file - file1.txt"
 	@sleep 2
-	./tuf-client get --url https://jku.github.io/tuf-demo/metadata --turl https://jku.github.io/tuf-demo/targets --nonprefixed demo/succinctly-delegated-5.txt
+	./tuf-client get --url https://jku.github.io/tuf-demo/metadata --turl https://jku.github.io/tuf-demo/targets file1.txt
 
 # Target for demoing the tuf-client cli with root-signing repo
 .PHONY: example-root-signing
