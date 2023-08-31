@@ -45,6 +45,7 @@ func New(remoteURL string, rootBytes []byte) (*UpdaterConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &UpdaterConfig{
 		// TUF configuration
 		MaxRootRotations:   32,
@@ -67,11 +68,12 @@ func (cfg *UpdaterConfig) EnsurePathsExist() error {
 	if cfg.DisableLocalCache {
 		return nil
 	}
+
 	for _, path := range []string{cfg.LocalMetadataDir, cfg.LocalTargetsDir} {
-		err := os.MkdirAll(path, os.ModePerm)
-		if err != nil {
+		if err := os.MkdirAll(path, os.ModePerm); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
