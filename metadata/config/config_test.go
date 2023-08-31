@@ -12,79 +12,133 @@
 package config
 
 import (
-	"fmt"
+	"net/url"
 	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/rdimitrov/go-tuf-metadata/metadata/fetcher"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewUpdaterConfig(t *testing.T) {
-
-	remoteURL := "somepath"
-	rootBytes := []byte("somerootbytes")
-
-	updaterConfig, err := New(remoteURL, rootBytes)
-
-	assert.NoError(t, err)
-	assert.NotNil(t, updaterConfig)
-	assert.NotNil(t, updaterConfig.Fetcher)
-
-	assert.Equal(t, 32, updaterConfig.MaxDelegations)
-	assert.Equal(t, int64(32), updaterConfig.MaxRootRotations)
-	assert.Equal(t, int64(512000), updaterConfig.RootMaxLength)
-	assert.Equal(t, int64(16384), updaterConfig.TimestampMaxLength)
-	assert.Equal(t, int64(2000000), updaterConfig.SnapshotMaxLength)
-	assert.Equal(t, int64(5000000), updaterConfig.TargetsMaxLength)
-	assert.Equal(t, false, updaterConfig.DisableLocalCache)
-	assert.Equal(t, true, updaterConfig.PrefixTargetsWithHash)
-	assert.Equal(t, updaterConfig.RemoteMetadataURL, remoteURL)
-	assert.Equal(t, updaterConfig.LocalTrustedRoot, rootBytes)
-	assert.Equal(t, updaterConfig.RemoteTargetsURL, remoteURL+"/targets")
-	assert.Empty(t, updaterConfig.LocalMetadataDir)
-	assert.Empty(t, updaterConfig.LocalTargetsDir)
+	// setup testing table (tt) and create subtest for each entry
+	for _, tt := range []struct {
+		name      string
+		desc      string
+		remoteURL string
+		rootBytes []byte
+		config    *UpdaterConfig
+		wantErr   error
+	}{
+		{
+			name:      "success",
+			desc:      "No errors expected",
+			remoteURL: "somepath",
+			rootBytes: []byte("somerootbytes"),
+			config: &UpdaterConfig{
+				MaxRootRotations:      32,
+				MaxDelegations:        32,
+				RootMaxLength:         512000,
+				TimestampMaxLength:    16384,
+				SnapshotMaxLength:     2000000,
+				TargetsMaxLength:      5000000,
+				Fetcher:               &fetcher.DefaultFetcher{},
+				LocalTrustedRoot:      []byte("somerootbytes"),
+				RemoteMetadataURL:     "somepath",
+				RemoteTargetsURL:      "somepath/targets",
+				DisableLocalCache:     false,
+				PrefixTargetsWithHash: true,
+			},
+			wantErr: nil,
+		},
+		{
+			name:      "invalid character in URL",
+			desc:      "Invalid ASCII control sequence in input",
+			remoteURL: string([]byte{0x7f}),
+			rootBytes: []byte("somerootbytes"),
+			config:    nil,
+			wantErr:   &url.Error{}, // just make sure this is non-nil, url pkg has no exported errors
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			// this will only be printed if run in verbose mode or if test fails
+			t.Logf("Desc: %s", tt.desc)
+			// run the function under test
+			updaterConfig, err := New(tt.remoteURL, tt.rootBytes)
+			// special case if we expect no error
+			if tt.wantErr == nil {
+				assert.NoErrorf(t, err, "expected no erro but got %v", err)
+				assert.EqualExportedValuesf(t, *tt.config, *updaterConfig, "expected %#+v but got %#+v", tt.config, updaterConfig)
+				return
+			}
+			// compare the error with our expected error
+			assert.Nilf(t, updaterConfig, "expected nil but got %#+v", updaterConfig)
+			assert.Errorf(t, err, "expected %v but got %v", tt.wantErr, err)
+		})
+	}
 }
 
 func TestEnsurePathsExist(t *testing.T) {
-
-	remoteURL := "somepath"
-	rootBytes := []byte("somerootbytes")
-
-	updaterConfig, err := New(remoteURL, rootBytes)
-	assert.NoError(t, err)
-	assert.NotNil(t, updaterConfig)
-
-	err = updaterConfig.EnsurePathsExist()
-	assert.Error(t, err, "mkdir : no such file or directory")
-
-	tmp := os.TempDir()
-	metadataPath := fmt.Sprintf("%s/metadata", tmp)
-	targetsPath := fmt.Sprintf("%s/targets", tmp)
-
-	assert.NoDirExists(t, metadataPath)
-	assert.NoDirExists(t, targetsPath)
-
-	updaterConfig.LocalMetadataDir = metadataPath
-	updaterConfig.LocalTargetsDir = targetsPath
-
-	updaterConfig.DisableLocalCache = true
-	err = updaterConfig.EnsurePathsExist()
-	assert.NoError(t, err)
-	assert.NoDirExists(t, metadataPath)
-	assert.NoDirExists(t, targetsPath)
-
-	updaterConfig.DisableLocalCache = false
-	err = updaterConfig.EnsurePathsExist()
-	assert.NoError(t, err)
-
-	assert.DirExists(t, metadataPath)
-	assert.DirExists(t, targetsPath)
-
-	err = os.RemoveAll(metadataPath)
-	assert.NoError(t, err)
-	assert.NoDirExists(t, metadataPath)
-
-	err = os.RemoveAll(targetsPath)
-	assert.NoError(t, err)
-	assert.NoDirExists(t, targetsPath)
+	// setup testing table (tt) and create subtest for each entry
+	for _, tt := range []struct {
+		name    string
+		desc    string
+		config  *UpdaterConfig
+		setup   func(t *testing.T, cfg *UpdaterConfig)
+		wantErr error
+	}{
+		{
+			name: "success",
+			desc: "No errors expected",
+			config: &UpdaterConfig{
+				DisableLocalCache: false,
+			},
+			setup: func(t *testing.T, cfg *UpdaterConfig) {
+				t.Helper()
+				tmp := t.TempDir()
+				cfg.LocalTargetsDir = filepath.Join(tmp, "targets")
+				cfg.LocalMetadataDir = filepath.Join(tmp, "metadata")
+			},
+			wantErr: nil,
+		},
+		{
+			name: "path not exist",
+			desc: "No local directories error",
+			config: &UpdaterConfig{
+				DisableLocalCache: false,
+			},
+			setup: func(t *testing.T, cfg *UpdaterConfig) {
+				t.Helper()
+			},
+			wantErr: os.ErrNotExist,
+		},
+		{
+			name: "no local cache",
+			desc: "Test if method no-op works",
+			config: &UpdaterConfig{
+				DisableLocalCache: true,
+			},
+			setup: func(t *testing.T, cfg *UpdaterConfig) {
+				t.Helper()
+			},
+			wantErr: nil,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			// this will only be printed if run in verbose mode or if test fails
+			t.Logf("Desc: %s", tt.desc)
+			// run special test setup in case it is needed for any subtest
+			tt.setup(t, tt.config)
+			// run the method under test
+			err := tt.config.EnsurePathsExist()
+			// special case if we expect no error
+			if tt.wantErr == nil {
+				assert.NoErrorf(t, err, "expected no error but got %v", err)
+				return
+			}
+			// compare the error with our expected error
+			assert.ErrorIsf(t, err, tt.wantErr, "expected %v but got %v", tt.wantErr, err)
+		})
+	}
 }
