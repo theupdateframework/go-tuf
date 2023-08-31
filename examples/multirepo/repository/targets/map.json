@@ -1,7 +1,7 @@
 
 {
   "repositories": {
-    "sigstore-tuf-root": ["https://sigstore-tuf-root.storage.googleapis.com"],
+    "sigstore-tuf-root": ["https://tuf-repo-cdn.sigstore.dev"],
     "staging":   ["https://raw.githubusercontent.com/sigstore/root-signing/main/repository/repository"]
   },
   "mapping": [
