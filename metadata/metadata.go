@@ -33,7 +33,6 @@ import (
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/sigstore/sigstore/pkg/signature"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
 )
 
@@ -51,7 +50,7 @@ func Root(expires ...time.Time) *Metadata[RootType] {
 			Threshold: 1,
 		}
 	}
-	log.Debugf("Created a metadata of type %s", ROOT)
+	log.V(5).Info("Created metadata", "type", ROOT)
 	return &Metadata[RootType]{
 		Signed: RootType{
 			Type:               ROOT,
@@ -72,7 +71,7 @@ func Snapshot(expires ...time.Time) *Metadata[SnapshotType] {
 	if len(expires) == 0 {
 		expires = []time.Time{time.Now().UTC()}
 	}
-	log.Debugf("Created a metadata of type %s", SNAPSHOT)
+	log.V(5).Info("Created metadata", "type", SNAPSHOT)
 	return &Metadata[SnapshotType]{
 		Signed: SnapshotType{
 			Type:        SNAPSHOT,
@@ -95,7 +94,7 @@ func Timestamp(expires ...time.Time) *Metadata[TimestampType] {
 	if len(expires) == 0 {
 		expires = []time.Time{time.Now().UTC()}
 	}
-	log.Debugf("Created a metadata of type %s", TIMESTAMP)
+	log.V(5).Info("Created metadata", "type", TIMESTAMP)
 	return &Metadata[TimestampType]{
 		Signed: TimestampType{
 			Type:        TIMESTAMP,
@@ -118,7 +117,7 @@ func Targets(expires ...time.Time) *Metadata[TargetsType] {
 	if len(expires) == 0 {
 		expires = []time.Time{time.Now().UTC()}
 	}
-	log.Debugf("Created a metadata of type %s", TARGETS)
+	log.V(5).Info("Created metadata", "type", TARGETS)
 	return &Metadata[TargetsType]{
 		Signed: TargetsType{
 			Type:        TARGETS,
@@ -143,7 +142,7 @@ func TargetFile() *TargetFiles {
 func MetaFile(version int64) *MetaFiles {
 	if version < 1 {
 		// attempting to set incorrect version
-		log.Debugf("Attempting to set incorrect version of %d for MetaFile", version)
+		log.V(5).Info("Attempting to set incorrect version for MetaFile", "version", version)
 		version = 1
 	}
 	return &MetaFiles{
@@ -169,7 +168,7 @@ func (meta *Metadata[T]) FromFile(name string) (*Metadata[T], error) {
 		return nil, err
 	}
 	*meta = *m
-	log.Debugf("Loaded metadata from file %s", name)
+	log.V(5).Info("Loaded metadata from file", "name", name)
 	return meta, nil
 }
 
@@ -180,13 +179,13 @@ func (meta *Metadata[T]) FromBytes(data []byte) (*Metadata[T], error) {
 		return nil, err
 	}
 	*meta = *m
-	log.Debug("Loaded metadata from bytes")
+	log.V(5).Info("Loaded metadata from bytes")
 	return meta, nil
 }
 
 // ToBytes serialize metadata to bytes
 func (meta *Metadata[T]) ToBytes(pretty bool) ([]byte, error) {
-	log.Debug("Writing metadata to bytes")
+	log.V(5).Info("Writing metadata to bytes")
 	if pretty {
 		return json.MarshalIndent(*meta, "", "\t")
 	}
@@ -195,7 +194,7 @@ func (meta *Metadata[T]) ToBytes(pretty bool) ([]byte, error) {
 
 // ToFile save metadata to file
 func (meta *Metadata[T]) ToFile(name string, pretty bool) error {
-	log.Debugf("Writing metadata to file %s", name)
+	log.V(5).Info("Writing metadata to file", "name", name)
 	data, err := meta.ToBytes(pretty)
 	if err != nil {
 		return err
@@ -233,7 +232,7 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	// update the Signatures part
 	meta.Signatures = append(meta.Signatures, *sig)
 	// return the new signature
-	log.Infof("Signed metadata with key ID: %s", key.ID())
+	log.V(4).Info("Signed metadata with key", "ID", key.ID())
 	return sig, nil
 }
 
@@ -246,7 +245,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 	var roleKeyIDs []string
 	var roleThreshold int
 
-	log.Debugf("Verifying %s", delegatedRole)
+	log.V(5).Info("Verifying", "role", delegatedRole)
 
 	// collect keys, keyIDs and threshold based on delegator type
 	switch i := i.(type) {
@@ -363,19 +362,19 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 		// verify if the signature for that payload corresponds to the given key
 		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payload)); err != nil {
 			// failed to verify the metadata with that key ID
-			log.Debugf("Failed to verify %s with key ID %s", delegatedRole, keyID)
+			log.V(5).Info("Failed to verify %s with key ID %s", delegatedRole, keyID)
 		} else {
 			// save the verified keyID only if verification passed
 			signingKeys[keyID] = true
-			log.Debugf("Verified %s with key ID %s", delegatedRole, keyID)
+			log.V(5).Info("Verified with key", "role", delegatedRole, "ID", keyID)
 		}
 	}
 	// check if the amount of valid signatures is enough
 	if len(signingKeys) < roleThreshold {
-		log.Infof("Verifying %s failed, not enough signatures, got %d, want %d", delegatedRole, len(signingKeys), roleThreshold)
+		log.V(4).Info("Verifying failed, not enough signatures", "role", delegatedRole, "got", len(signingKeys), "want", roleThreshold)
 		return ErrUnsignedMetadata{Msg: fmt.Sprintf("Verifying %s failed, not enough signatures, got %d, want %d", delegatedRole, len(signingKeys), roleThreshold)}
 	}
-	log.Infof("Verified %s successfully", delegatedRole)
+	log.V(4).Info("Verified successfully", "role", delegatedRole)
 	return nil
 }
 
@@ -446,7 +445,7 @@ func (source *TargetFiles) Equal(expected TargetFiles) bool {
 
 // FromFile generate TargetFiles from file
 func (t *TargetFiles) FromFile(localPath string, hashes ...string) (*TargetFiles, error) {
-	log.Debugf("Generating target file from file %s", localPath)
+	log.V(5).Info("Generating target file from file", "path", localPath)
 	// open file
 	in, err := os.Open(localPath)
 	if err != nil {
@@ -463,7 +462,7 @@ func (t *TargetFiles) FromFile(localPath string, hashes ...string) (*TargetFiles
 
 // FromBytes generate TargetFiles from bytes
 func (t *TargetFiles) FromBytes(localPath string, data []byte, hashes ...string) (*TargetFiles, error) {
-	log.Debugf("Generating target file from bytes %s", localPath)
+	log.V(5).Info("Generating target file from bytes", "path", localPath)
 	var hasher hash.Hash
 	targetFile := &TargetFiles{
 		Hashes: map[string]HexBytes{},
@@ -499,7 +498,7 @@ func (t *TargetFiles) FromBytes(localPath string, data []byte, hashes ...string)
 
 // ClearSignatures clears Signatures
 func (meta *Metadata[T]) ClearSignatures() {
-	log.Debug("Cleared signatures")
+	log.V(5).Info("Cleared signatures")
 	meta.Signatures = []Signature{}
 }
 
@@ -689,7 +688,7 @@ func (signed *TargetsType) AddKey(key *Key, role string) error {
 					signed.Delegations.Keys[key.ID()] = key // TODO: should we check if we don't accidentally override an existing keyID with another key value?
 					return nil
 				}
-				log.Debugf("Delegated role %s already has keyID %s", role, key.ID())
+				log.V(5).Info("Delegated role already has keyID", "role", role, "ID", key.ID())
 			}
 		}
 		if !isDelegatedRole {
@@ -702,7 +701,7 @@ func (signed *TargetsType) AddKey(key *Key, role string) error {
 			signed.Delegations.Keys[key.ID()] = key // TODO: should we check if we don't accidentally override an existing keyID with another key value?
 			return nil
 		}
-		log.Debugf("SuccinctRoles role already has keyID %s", key.ID())
+		log.V(5).Info("SuccinctRoles role already has keyID", "ID", key.ID())
 
 	}
 	signed.Delegations.Keys[key.ID()] = key // TODO: should we check if we don't accidentally override an existing keyID with another key value?

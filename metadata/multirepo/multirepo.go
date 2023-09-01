@@ -20,7 +20,6 @@ import (
 	"github.com/rdimitrov/go-tuf-metadata/metadata"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/config"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/updater"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
 )
 
@@ -102,10 +101,11 @@ func New(config *MultiRepoConfig) (*MultiRepoClient, error) {
 
 // initTUFClients loop through all repositories listed in the map file and create a TUF client for each
 func (client *MultiRepoClient) initTUFClients() error {
+	log := metadata.GetLogger()
 
 	// loop through each repository listed in the map file and initialize it
 	for repoName, repoURL := range client.Config.RepoMap.Repositories {
-		log.Infof("Initializing %s - %s", repoName, repoURL[0])
+		log.V(4).Info("Initializing", "name", repoName, "url", repoURL[0])
 
 		// get the trusted root file from the location specified in the map file relevant to its path
 		// NOTE: the root.json file is expected to be in a folder named after the repository it corresponds to placed in the same folder as the map file
@@ -149,16 +149,18 @@ func (client *MultiRepoClient) initTUFClients() error {
 
 		// save the client
 		client.TUFClients[repoName] = repoTUFClient
-		log.Debugf("Successfully initialized %s - %s", repoName, repoURL)
+		log.V(5).Info("Successfully initialized", "name", repoName, "url", repoURL)
 	}
 	return nil
 }
 
 // Refresh refreshes all repository clients
 func (client *MultiRepoClient) Refresh() error {
+	log := metadata.GetLogger()
+
 	// loop through each initialized TUF client and refresh it
 	for name, repoTUFClient := range client.TUFClients {
-		log.Infof("Refreshing %s", name)
+		log.V(4).Info("Refreshing", "name", name)
 		err := repoTUFClient.Refresh()
 		if err != nil {
 			return err
@@ -300,6 +302,8 @@ func (client *MultiRepoClient) GetTargetInfo(targetPath string) (*metadata.Targe
 
 // DownloadTarget downloads the target file specified by targetFile
 func (client *MultiRepoClient) DownloadTarget(repos []string, targetFile *metadata.TargetFiles, filePath, targetBaseURL string) (string, []byte, error) {
+	log := metadata.GetLogger()
+
 	for _, repoName := range repos {
 		// see if the target is already present locally
 		targetPath, targetBytes, err := client.TUFClients[repoName].FindCachedTarget(targetFile, filePath)
@@ -308,7 +312,7 @@ func (client *MultiRepoClient) DownloadTarget(repos []string, targetFile *metada
 		}
 		if len(targetPath) != 0 && len(targetBytes) != 0 {
 			// we already got the target for this target info cached locally, so return it
-			log.Info(fmt.Sprintf("Target %s already present locally from %s", targetFile.Path, repoName))
+			log.V(4).Info("Target already present locally from repo", "target", targetFile.Path, "repo", repoName)
 			return targetPath, targetBytes, nil
 		}
 		// not present locally, so let's try to download it
@@ -319,7 +323,7 @@ func (client *MultiRepoClient) DownloadTarget(repos []string, targetFile *metada
 			continue
 		}
 		// we got the target for this target info, so return it
-		log.Info(fmt.Sprintf("Downloaded target %s from %s", targetFile.Path, repoName))
+		log.V(4).Info("Downloaded target from repo", "target", targetFile.Path, "repo", repoName)
 		return targetPath, targetBytes, nil
 	}
 	// error out as we haven't succeeded downloading the target file

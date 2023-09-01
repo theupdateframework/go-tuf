@@ -13,12 +13,14 @@ package main
 
 import (
 	"fmt"
+	stdlog "log"
 	"os"
 	"path/filepath"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/go-logr/stdr"
 
+	"github.com/rdimitrov/go-tuf-metadata/metadata"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/config"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/multirepo"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/updater"
@@ -27,12 +29,13 @@ import (
 const (
 	metadataURL = "https://raw.githubusercontent.com/rdimitrov/go-tuf-metadata/main/examples/multirepo/repository/metadata"
 	targetsURL  = "https://raw.githubusercontent.com/rdimitrov/go-tuf-metadata/main/examples/multirepo/repository/targets"
-	verbosity   = log.InfoLevel
+	verbosity   = 4
 )
 
 func main() {
-	// set debug level
-	log.SetLevel(verbosity)
+	// set logger to stdout with info level
+	metadata.SetLogger(stdr.New(stdlog.New(os.Stdout, "multirepo_client_example", stdlog.LstdFlags)))
+	stdr.SetVerbosity(verbosity)
 
 	// Bootstrap TUF
 	fmt.Printf("Bootstrapping the initial TUF repo - fetching map.json file and necessary trusted root files\n\n")
@@ -72,6 +75,8 @@ func main() {
 
 // BootstrapTUF returns the map file and the related trusted root metadata files
 func BootstrapTUF() ([]byte, map[string][]byte, error) {
+	log := metadata.GetLogger()
+
 	trustedRoots := map[string][]byte{}
 	mapBytes := []byte{}
 	// get working directory
@@ -122,7 +127,7 @@ func BootstrapTUF() ([]byte, map[string][]byte, error) {
 			return nil, nil, fmt.Errorf("failed while finding a cached target: %w", err)
 		}
 		if path != "" {
-			log.Infof("Target %s is already present at - %s", name, path)
+			log.V(4).Info("Target is already present", "target", name, "path", path)
 		}
 
 		// target is not present locally, so let's try to download it
@@ -147,7 +152,7 @@ func BootstrapTUF() ([]byte, map[string][]byte, error) {
 			repositoryName := strings.Split(name, string(os.PathSeparator))
 			trustedRoots[repositoryName[0]] = bytes
 		}
-		log.Infof("Successfully downloaded target %s at - %s", name, path)
+		log.V(4).Info("Successfully downloaded target", "target", name, "path", path)
 	}
 
 	return mapBytes, trustedRoots, nil

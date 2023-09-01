@@ -13,8 +13,11 @@ package cmd
 
 import (
 	"fmt"
+	stdlog "log"
+	"os"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/go-logr/stdr"
+	"github.com/rdimitrov/go-tuf-metadata/metadata"
 	"github.com/spf13/cobra"
 )
 
@@ -33,9 +36,10 @@ func init() {
 }
 
 func InitializeCmd() error {
-	// handle verbosity level
+	// set logger and debug verbosity level
+	metadata.SetLogger(stdr.New(stdlog.New(os.Stdout, "ini_cmd", stdlog.LstdFlags)))
 	if Verbosity {
-		log.SetLevel(log.DebugLevel)
+		stdr.SetVerbosity(5)
 	}
 
 	fmt.Println("Initialization successful")

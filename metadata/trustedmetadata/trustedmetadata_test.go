@@ -22,7 +22,6 @@ import (
 	"github.com/rdimitrov/go-tuf-metadata/testutils/testutils"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sigstore/sigstore/pkg/signature"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/maps"
 )
@@ -30,40 +29,49 @@ import (
 var allRoles map[string][]byte
 
 func setAllRolesBytes(path string) {
+	log := metadata.GetLogger()
+
 	allRoles = make(map[string][]byte)
 	root, err := os.ReadFile(fmt.Sprintf("%s/root.json", path))
 	if err != nil {
-		log.Fatalf("failed to root bytes: %v", err)
+		log.Error(err, "failed to root bytes")
+		os.Exit(1)
 	}
 	allRoles[metadata.ROOT] = root
 	targets, err := os.ReadFile(fmt.Sprintf("%s/targets.json", path))
 	if err != nil {
-		log.Fatalf("failed to targets bytes: %v", err)
+		log.Error(err, "failed to targets bytes")
+		os.Exit(1)
 	}
 	allRoles[metadata.TARGETS] = targets
 	snapshot, err := os.ReadFile(fmt.Sprintf("%s/snapshot.json", path))
 	if err != nil {
-		log.Fatalf("failed to snapshot bytes: %v", err)
+		log.Error(err, "failed to snapshot bytes")
+		os.Exit(1)
 	}
 	allRoles[metadata.SNAPSHOT] = snapshot
 	timestamp, err := os.ReadFile(fmt.Sprintf("%s/timestamp.json", path))
 	if err != nil {
-		log.Fatalf("failed to timestamp bytes: %v", err)
+		log.Error(err, "failed to timestamp bytes")
+		os.Exit(1)
 	}
 	allRoles[metadata.TIMESTAMP] = timestamp
 	role1, err := os.ReadFile(fmt.Sprintf("%s/role1.json", path))
 	if err != nil {
-		log.Fatalf("failed to role1 bytes: %v", err)
+		log.Error(err, "failed to role1 bytes")
+		os.Exit(1)
 	}
 	allRoles["role1"] = role1
 	role2, err := os.ReadFile(fmt.Sprintf("%s/role2.json", path))
 	if err != nil {
-		log.Fatalf("failed to role2 bytes: %v", err)
+		log.Error(err, "failed to role2 bytes")
+		os.Exit(1)
 	}
 	allRoles["role2"] = role2
 }
 
 func TestMain(m *testing.M) {
+	log := metadata.GetLogger()
 
 	repoPath := "../../testutils/repository_data/repository/metadata"
 	keystorePath := "../../testutils/repository_data/keystore"
@@ -72,7 +80,8 @@ func TestMain(m *testing.M) {
 	defer testutils.Cleanup()
 
 	if err != nil {
-		log.Fatalf("failed to setup test dirs: %v", err)
+		log.Error(err, "failed to setup test dirs")
+		os.Exit(1)
 	}
 	setAllRolesBytes(testutils.RepoDir)
 	m.Run()
@@ -81,20 +90,22 @@ func TestMain(m *testing.M) {
 type modifyRoot func(*metadata.Metadata[metadata.RootType])
 
 func modifyRootMetadata(fn modifyRoot) ([]byte, error) {
+	log := metadata.GetLogger()
+
 	root, err := metadata.Root().FromBytes(allRoles[metadata.ROOT])
 	if err != nil {
-		log.Debugf("failed to create root metadata from bytes: %v", err)
+		log.Error(err, "failed to create root metadata from bytes")
 	}
 	fn(root)
 
 	signer, err := signature.LoadSignerFromPEMFile(testutils.KeystoreDir+"/root_key", crypto.SHA256, cryptoutils.SkipPassword)
 	if err != nil {
-		log.Debugf("failed to load signer from pem file: %v", err)
+		log.Error(err, "failed to load signer from pem file")
 	}
 	root.ClearSignatures()
 	_, err = root.Sign(signer)
 	if err != nil {
-		log.Debugf("failed to sign root: %v", err)
+		log.Error(err, "failed to sign root")
 	}
 	return root.ToBytes(true)
 }
@@ -102,20 +113,22 @@ func modifyRootMetadata(fn modifyRoot) ([]byte, error) {
 type modifyTimestamp func(*metadata.Metadata[metadata.TimestampType])
 
 func modifyTimestamptMetadata(fn modifyTimestamp) ([]byte, error) {
+	log := metadata.GetLogger()
+
 	timestamp, err := metadata.Timestamp().FromBytes(allRoles[metadata.TIMESTAMP])
 	if err != nil {
-		log.Debugf("failed to create timestamp metadata from bytes: %v", err)
+		log.Error(err, "failed to create timestamp metadata from bytes")
 	}
 	fn(timestamp)
 
 	signer, err := signature.LoadSignerFromPEMFile(testutils.KeystoreDir+"/timestamp_key", crypto.SHA256, cryptoutils.SkipPassword)
 	if err != nil {
-		log.Debugf("failed to load signer from pem file: %v", err)
+		log.Error(err, "failed to load signer from pem file")
 	}
 	timestamp.ClearSignatures()
 	_, err = timestamp.Sign(signer)
 	if err != nil {
-		log.Debugf("failed to sign timestamp: %v", err)
+		log.Error(err, "failed to sign timestamp")
 	}
 	return timestamp.ToBytes(true)
 }
@@ -123,20 +136,22 @@ func modifyTimestamptMetadata(fn modifyTimestamp) ([]byte, error) {
 type modifySnapshot func(*metadata.Metadata[metadata.SnapshotType])
 
 func modifySnapshotMetadata(fn modifySnapshot) ([]byte, error) {
+	log := metadata.GetLogger()
+
 	snapshot, err := metadata.Snapshot().FromBytes(allRoles[metadata.SNAPSHOT])
 	if err != nil {
-		log.Debugf("failed to create snapshot metadata from bytes: %v", err)
+		log.Error(err, "failed to create snapshot metadata from bytes")
 	}
 	fn(snapshot)
 
 	signer, err := signature.LoadSignerFromPEMFile(testutils.KeystoreDir+"/snapshot_key", crypto.SHA256, cryptoutils.SkipPassword)
 	if err != nil {
-		log.Debugf("failed to load signer from pem file: %v", err)
+		log.Error(err, "failed to load signer from pem file")
 	}
 	snapshot.ClearSignatures()
 	_, err = snapshot.Sign(signer)
 	if err != nil {
-		log.Debugf("failed to sign snapshot: %v", err)
+		log.Error(err, "failed to sign snapshot")
 	}
 	return snapshot.ToBytes(true)
 }
@@ -144,20 +159,22 @@ func modifySnapshotMetadata(fn modifySnapshot) ([]byte, error) {
 type modifyTargets func(*metadata.Metadata[metadata.TargetsType])
 
 func modifyTargetsMetadata(fn modifyTargets) ([]byte, error) {
+	log := metadata.GetLogger()
+
 	targets, err := metadata.Targets().FromBytes(allRoles[metadata.TARGETS])
 	if err != nil {
-		log.Debugf("failed to create targets metadata from bytes: %v", err)
+		log.Error(err, "failed to create targets metadata from bytes")
 	}
 	fn(targets)
 
 	signer, err := signature.LoadSignerFromPEMFile(testutils.KeystoreDir+"/targets_key", crypto.SHA256, cryptoutils.SkipPassword)
 	if err != nil {
-		log.Debugf("failed to load signer from pem file: %v", err)
+		log.Error(err, "failed to load signer from pem file")
 	}
 	targets.ClearSignatures()
 	_, err = targets.Sign(signer)
 	if err != nil {
-		log.Debugf("failed to sign targets: %v", err)
+		log.Error(err, "failed to sign targets")
 	}
 	return targets.ToBytes(true)
 }
