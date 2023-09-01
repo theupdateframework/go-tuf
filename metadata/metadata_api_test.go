@@ -27,7 +27,6 @@ import (
 	testutils "github.com/rdimitrov/go-tuf-metadata/testutils/testutils"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sigstore/sigstore/pkg/signature"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sys/unix"
 )
@@ -41,7 +40,8 @@ func TestMain(m *testing.M) {
 	defer testutils.Cleanup()
 
 	if err != nil {
-		log.Fatalf("failed to setup test dirs: %v", err)
+		log.Error(err, "failed to setup test dirs")
+		os.Exit(1)
 	}
 	m.Run()
 }

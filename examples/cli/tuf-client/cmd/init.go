@@ -14,14 +14,15 @@ package cmd
 import (
 	"fmt"
 	"io"
+	stdlog "log"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 
+	"github.com/go-logr/stdr"
 	"github.com/rdimitrov/go-tuf-metadata/metadata"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/trustedmetadata"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -48,9 +49,10 @@ func init() {
 
 func InitializeCmd() error {
 	copyTrusted := true
-	// handle verbosity level
+	// set logger and debug verbosity level
+	metadata.SetLogger(stdr.New(stdlog.New(os.Stdout, "ini_cmd", stdlog.LstdFlags)))
 	if Verbosity {
-		log.SetLevel(log.DebugLevel)
+		stdr.SetVerbosity(5)
 	}
 
 	// prepare the local environment

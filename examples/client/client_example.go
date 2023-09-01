@@ -14,13 +14,15 @@ package main
 import (
 	"fmt"
 	"io"
+	stdlog "log"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/go-logr/stdr"
 
+	"github.com/rdimitrov/go-tuf-metadata/metadata"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/config"
 	"github.com/rdimitrov/go-tuf-metadata/metadata/updater"
 )
@@ -30,30 +32,33 @@ const (
 	metadataURL          = "https://jku.github.io/tuf-demo/metadata"
 	targetsURL           = "https://jku.github.io/tuf-demo/targets"
 	targetName           = "file1.txt"
-	verbosity            = log.InfoLevel
+	verbosity            = 4
 	generateRandomFolder = false
 )
 
 func main() {
-	// set debug level
-	log.SetLevel(verbosity)
+	// set logger to stdout with info level
+	metadata.SetLogger(stdr.New(stdlog.New(os.Stdout, "client_example", stdlog.LstdFlags)))
+	stdr.SetVerbosity(verbosity)
+
+	log := metadata.GetLogger()
 
 	// initialize environment - temporary folders, etc.
 	metadataDir, err := InitEnvironment()
 	if err != nil {
-		log.Fatal("Failed to initialize environment: ", err)
+		log.Error(err, "Failed to initialize environment")
 	}
 
 	// initialize client with Trust-On-First-Use
 	err = InitTrustOnFirstUse(metadataDir)
 	if err != nil {
-		log.Fatal("Trust-On-First-Use failed: ", err)
+		log.Error(err, "Trust-On-First-Use failed")
 	}
 
 	// download the desired target
 	err = DownloadTarget(metadataDir, targetName)
 	if err != nil {
-		log.Fatal("Download failed: ", err)
+		log.Error(err, "Download failed")
 	}
 }
 
@@ -128,6 +133,8 @@ func InitTrustOnFirstUse(metadataDir string) error {
 // get the target information, verifies if the target is already cached, and in case it
 // is not cached, downloads the target file.
 func DownloadTarget(localMetadataDir, target string) error {
+	log := metadata.GetLogger()
+
 	rootBytes, err := os.ReadFile(filepath.Join(localMetadataDir, "root.json"))
 	if err != nil {
 		return err
@@ -166,7 +173,7 @@ func DownloadTarget(localMetadataDir, target string) error {
 		return fmt.Errorf("failed while finding a cached target: %w", err)
 	}
 	if path != "" {
-		log.Infof("Target %s is already present at - %s", target, path)
+		log.V(4).Info("Target is already present", "target", target, "path", path)
 	}
 
 	// target is not present locally, so let's try to download it
@@ -175,7 +182,7 @@ func DownloadTarget(localMetadataDir, target string) error {
 		return fmt.Errorf("failed to download target file %s - %w", target, err)
 	}
 
-	log.Infof("Successfully downloaded target %s at - %s", target, path)
+	log.V(4).Info("Successfully downloaded target", "target", target, "path", path)
 
 	return nil
 }
