@@ -68,7 +68,7 @@ func TestNewUpdaterConfig(t *testing.T) {
 			updaterConfig, err := New(tt.remoteURL, tt.rootBytes)
 			// special case if we expect no error
 			if tt.wantErr == nil {
-				assert.NoErrorf(t, err, "expected no erro but got %v", err)
+				assert.NoErrorf(t, err, "expected no error but got %v", err)
 				assert.EqualExportedValuesf(t, *tt.config, *updaterConfig, "expected %#+v but got %#+v", tt.config, updaterConfig)
 				return
 			}
