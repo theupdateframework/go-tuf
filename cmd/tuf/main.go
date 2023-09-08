@@ -30,6 +30,7 @@ Options:
 Commands:
   help               Show usage for a specific command
   init               Initialize a new repository
+  add-key            Adds a new signing key for a specific role
   gen-key            Generate a new signing key for a specific metadata file
   revoke-key         Revoke a signing key
   add                Add target file(s)

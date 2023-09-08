@@ -97,7 +97,7 @@ func (ECDSASuite) TestUnmarshalRSAPublicKey(c *C) {
 	signer := &rsaSigner{priv.PrivateKey}
 	goodKey := signer.PublicData()
 
-	verifier := newRsaVerifier()
+	verifier := NewRsaVerifier()
 	c.Assert(verifier.UnmarshalPublicKey(goodKey), IsNil)
 }
 
@@ -119,7 +119,7 @@ func (ECDSASuite) TestUnmarshalRSA_TooLongContent(c *C) {
 		Algorithms: data.HashAlgorithms,
 		Value:      tooLongPayload,
 	}
-	verifier := newRsaVerifier()
+	verifier := NewRsaVerifier()
 	err = verifier.UnmarshalPublicKey(badKey)
 	c.Assert(errors.Is(err, io.ErrUnexpectedEOF), Equals, true)
 }
