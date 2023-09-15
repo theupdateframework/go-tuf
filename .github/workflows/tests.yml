@@ -8,8 +8,8 @@ jobs:
     outputs:
       matrix: ${{ steps.versions.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: arnested/go-version-action@13d01fa2f867e8a08e9f8197def5f2da5a11ab6d
+      - uses: actions/checkout@v4
+      - uses: arnested/go-version-action@702cf260ed157312ca10a33483c306a585af0364
         id: versions
 
   run:
@@ -22,10 +22,10 @@ jobs:
     needs: get-go-versions
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup - Go ${{ matrix.go-version }}
-        uses: actions/setup-go@fac708d6674e30b6ba41289acaab6d4b75aa0753
+        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -45,7 +45,7 @@ jobs:
         run: go test -race -covermode atomic -coverprofile='profile.cov' ./...
 
       - name: Send coverage
-        uses: shogo82148/actions-goveralls@df920a6a2468668dfcf71a0b43817f89eaa5ea04
+        uses: shogo82148/actions-goveralls@7b1bd2871942af030d707d6574e5f684f9891fb2
         with:
           path-to-profile: profile.cov
           flag-name: Go-${{ matrix.go-version }}
@@ -58,12 +58,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: get-go-versions
     steps:
-      - uses: actions/setup-go@fac708d6674e30b6ba41289acaab6d4b75aa0753
+      - uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe
         with:
           go-version: ${{ matrix.go-version }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@639cd343e1d3b897ff35927a75193d57cfcba299
+        uses: golangci/golangci-lint-action@3a919529898de77ec3da873e3063ca4b10e7f5cc
         with:
           version: v1.51 # has to be pinned and thus manually updated due to https://github.com/golangci/golangci-lint-action/blob/6a290f7d5d488e1e423b0b37fe802c822ca2c08c/README.md?plain=1#L108
           args: --timeout 5m --verbose
