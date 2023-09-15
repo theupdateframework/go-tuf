@@ -37,7 +37,7 @@ func cmdAddKey(args *docopt.Args, repo *tuf.Repo) error {
 		string(data.KeySchemeRSASSA_PSS_SHA256):
 		keyScheme = data.KeyScheme(t)
 	default:
-		fmt.Fprintf(os.Stderr, "tuf: key schema %s not recognised", t)
+		fmt.Fprintf(os.Stderr, "tuf: key schema %s not recognised\n", t)
 		return nil
 	}
 	f := args.String["--public-key"]
@@ -71,7 +71,7 @@ func cmdAddKey(args *docopt.Args, repo *tuf.Repo) error {
 		return err
 	}
 	for _, id := range keyids {
-		fmt.Fprintf(os.Stdout, "Add key with ID %s", id)
+		fmt.Fprintf(os.Stdout, "Add key with ID %s\n", id)
 	}
 	return nil
 }
