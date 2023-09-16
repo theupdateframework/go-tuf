@@ -49,6 +49,15 @@ snapshots (i.e. by passing `--consistent-snapshot=false`). If consistent
 snapshots should be generated, the repository will be implicitly
 initialized to do so when generating keys.
 
+#### `tuf add-key [--scheme=<scheme>] [--expires=<days>] [--public-key=<path>] <role>`
+
+Adds a new signing key for the given role.
+
+The root metadata file will be staged
+with the addition of the key's ID to the role's list of key IDs.
+
+The public value can be specified as a path or passed in via stdin.
+
 #### `tuf gen-key [--expires=<days>] <role>`
 
 Prompts the user for an encryption passphrase (unless the
