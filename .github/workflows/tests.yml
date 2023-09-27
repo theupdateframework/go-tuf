@@ -41,7 +41,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - name: Run tests
-        run: go test -race -covermode atomic -coverprofile=coverage.out ./...
+        run: go test -race -covermode=atomic -coverpkg=./metadata/... -coverprofile=coverage.out ./...
 
       - name: Send coverage
         uses: codecov/codecov-action@v3
