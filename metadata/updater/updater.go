@@ -415,7 +415,7 @@ func (update *Updater) loadRoot() error {
 	upperBound := lowerBound + update.cfg.MaxRootRotations
 
 	// loop until we find the latest available version of root (download -> verify -> load -> persist)
-	for nextVersion := lowerBound; nextVersion <= upperBound; nextVersion++ {
+	for nextVersion := lowerBound; nextVersion < upperBound; nextVersion++ {
 		data, err := update.downloadMetadata(metadata.ROOT, update.cfg.RootMaxLength, strconv.FormatInt(nextVersion, 10))
 		if err != nil {
 			// downloading the root metadata failed for some reason
@@ -492,9 +492,9 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 				childRolesToVisit = append(childRolesToVisit, roleParentTuple{Role: child, Parent: delegation.Role})
 				if terminating {
 					log.V(5).Info("Not backtracking to other roles")
+					delegationsToVisit = []roleParentTuple{}
+					break
 				}
-				delegationsToVisit = []roleParentTuple{}
-				break
 			}
 			// push childRolesToVisit in reverse order of appearance
 			// onto delegationsToVisit. Roles are popped from the end of
