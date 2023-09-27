@@ -34,6 +34,8 @@ const (
 	TIMESTAMP = "timestamp"
 )
 
+var TOP_LEVEL_ROLE_NAMES = [...]string{ROOT, TIMESTAMP, SNAPSHOT, TARGETS}
+
 // Metadata[T Roles] represents a TUF metadata.
 // Provides methods to read and write to and
 // from file and bytes, also to create, verify and clear metadata signatures.

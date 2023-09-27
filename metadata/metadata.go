@@ -508,7 +508,11 @@ func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) 
 	if len(role.Paths) > 0 {
 		// standard delegations
 		for _, pathPattern := range role.Paths {
-			return filepath.Match(pathPattern, targetFilepath)
+			//  A delegated role path may be an explicit path or glob
+			//  pattern (Unix shell-style wildcards).
+			if isTargetInPathPattern(targetFilepath, pathPattern) {
+				return true, nil
+			}
 		}
 	} else if len(role.PathHashPrefixes) > 0 {
 		// hash bin delegations - calculate the hash of the filepath to determine in which bin to find the target.
@@ -520,6 +524,27 @@ func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) 
 		}
 	}
 	return false, nil
+}
+
+// Determine whether “targetpath“ matches the “pathpattern“.
+func isTargetInPathPattern(targetpath string, pathpattern string) bool {
+	// We need to make sure that targetpath and pathpattern are pointing to
+	// the same directory as fnmatch doesn't threat "/" as a special symbol.
+	targetParts := strings.Split(targetpath, "/")
+	patternParts := strings.Split(pathpattern, "/")
+	if len(targetParts) != len(patternParts) {
+		return false
+	}
+
+	// Every part in the pathpattern could include a glob pattern, that's why
+	// each of the target and pathpattern parts should match.
+	for i := 0; i < len(targetParts); i++ {
+		if ok, _ := filepath.Match(patternParts[i], targetParts[i]); !ok {
+			return false
+		}
+	}
+
+	return true
 }
 
 // GetRolesForTarget return the names and terminating status of all
