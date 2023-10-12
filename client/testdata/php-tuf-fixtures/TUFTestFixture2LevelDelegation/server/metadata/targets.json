@@ -1,0 +1,51 @@
+{
+ "signatures": [
+  {
+   "keyid": "e4dae3872d28d29f7624a702bfd25f68453544d597229ee9e0a8569d1f940cf4",
+   "sig": "ced6f3e967a4366731f268a72a0f78aac0025641345a869baa013bb903502d7812ff22086834ab6b45f5c47cb7832139048663549d4e87d9219a0be7145c2807"
+  }
+ ],
+ "signed": {
+  "_type": "targets",
+  "delegations": {
+   "keys": {
+    "05e17c1501d627b2597322f80d33aacec6f30a507552d3326a88913422b0e30b": {
+     "keyid_hash_algorithms": [
+      "sha256",
+      "sha512"
+     ],
+     "keytype": "ed25519",
+     "keyval": {
+      "public": "f758af464295e62a1da4d3267be6d13f4aba9c7d52166d01b6bd5b4559496c9d"
+     },
+     "scheme": "ed25519"
+    }
+   },
+   "roles": [
+    {
+     "keyids": [
+      "05e17c1501d627b2597322f80d33aacec6f30a507552d3326a88913422b0e30b"
+     ],
+     "name": "a",
+     "paths": [
+      "*.txt"
+     ],
+     "terminating": false,
+     "threshold": 1
+    }
+   ]
+  },
+  "expires": "2020-04-01T07:27:10Z",
+  "spec_version": "1.0.0",
+  "targets": {
+   "targets.txt": {
+    "hashes": {
+     "sha256": "6da6f624811b0d7792c57dc9ed58f1af8cbf4ebfaaaa3ea2011b57b4af63f7e6",
+     "sha512": "0951c719b5adf26a55700bd1ac6b657fb513b04e4adb335a935a0da7f12f2ac99834b47442d0b832e5f4ffdd365ef538f14d3a52221c0cf81ef7b68ce312476a"
+    },
+    "length": 21
+   }
+  },
+  "version": 3
+ }
+}

@@ -251,6 +251,30 @@ func TestPersistedMeta(t *testing.T) {
 	}
 }
 
+func TestGetDelegationPathWithNoTargetFile(t *testing.T) {
+	// In this test, we have created a target file c.txt for a delegation
+	// c.json, then we remove that target file and check if c.json is loaded
+	// in the localMeta. It shouldn't as it has no target file at all and shouldn't
+	// be used.
+	verify.IsExpired = func(t time.Time) bool { return false }
+	client, closer := initTestDelegationClient(t, "testdata/php-tuf-fixtures/TUFTestFixture2LevelDelegation")
+	defer closer()
+	_, err := client.Update()
+	assert.Nil(t, err)
+
+	err = client.getLocalMeta()
+	assert.Nil(t, err)
+
+	_, ok := client.localMeta["a.json"]
+	assert.True(t, ok)
+
+	_, ok = client.localMeta["b.json"]
+	assert.True(t, ok)
+
+	_, ok = client.localMeta["c.json"]
+	assert.False(t, ok)
+}
+
 func versionOfStoredTargets(name string, store map[string]json.RawMessage) (int64, error) {
 	rawTargets, ok := store[name]
 	if !ok {
@@ -296,7 +320,7 @@ func initTestDelegationClient(t *testing.T, dirPrefix string) (*Client, func() e
 		}
 		name := f.Name()
 		// ignoring consistent snapshot when loading initial state
-		if len(strings.Split(name, ".")) == 1 && strings.HasSuffix(name, ".json") {
+		if len(strings.Split(name, ".")) < 3 && strings.HasSuffix(name, ".json") {
 			rawFile, err := os.ReadFile(initialStateDir + "/" + name)
 			assert.Nil(t, err)
 			assert.Nil(t, c.local.SetMeta(name, rawFile))
