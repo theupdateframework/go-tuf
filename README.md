@@ -154,12 +154,12 @@ Typically, `path` will be a file containing the output of `tuf payload`.
 
 See also `tuf add-signatures`.
 
-#### `tuf add-signatures --signatures <sig_file> <metadata>`
-
+#### `tuf add-signatures [--signatures <sig_file>] [--format=<format>] [--key-id=<key-id>] <metadata>`
 
 Adds signatures (the output of `tuf sign-payload`) to the given role metadata file.
 
-If the signature does not verify, it will not be added.
+If the signature does not verify, it will not be added. Signature can be a json file
+or json passed in via `stdin`.
 
 #### `tuf status --valid-at <date> <role>`
 
