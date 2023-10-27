@@ -31,7 +31,7 @@ import (
 const (
 	metadataURL          = "https://jku.github.io/tuf-demo/metadata"
 	targetsURL           = "https://jku.github.io/tuf-demo/targets"
-	targetName           = "file1.txt"
+	targetName           = "rdimitrov/artifact-example.md"
 	verbosity            = 4
 	generateRandomFolder = false
 )
@@ -147,7 +147,7 @@ func DownloadTarget(localMetadataDir, target string) error {
 	cfg.LocalMetadataDir = localMetadataDir
 	cfg.LocalTargetsDir = filepath.Join(localMetadataDir, "download")
 	cfg.RemoteTargetsURL = targetsURL
-	cfg.PrefixTargetsWithHash = false // do not use hash-prefixed target files with consistent snapshots
+	cfg.PrefixTargetsWithHash = true
 
 	// create a new Updater instance
 	up, err := updater.New(cfg)
