@@ -3,7 +3,7 @@ module github.com/rdimitrov/go-tuf-metadata
 go 1.21
 
 require (
-	github.com/go-logr/logr v1.2.4
+	github.com/go-logr/logr v1.3.0
 	github.com/go-logr/stdr v1.2.2
 	github.com/secure-systems-lab/go-securesystemslib v0.7.0
 	github.com/sigstore/sigstore v1.7.5
