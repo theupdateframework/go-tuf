@@ -7,6 +7,7 @@
 # <img src="https://cdn.rawgit.com/theupdateframework/artwork/3a649fa6/tuf-logo.svg" height="100" valign="middle" alt="TUF"/> A Framework for Securing Software Update Systems
 
 ----------------------------
+
 [The Update Framework (TUF)](https://theupdateframework.io/) is a framework for
 secure content delivery and updates. It protects against various types of
 supply chain attacks and provides resilience to compromise.
