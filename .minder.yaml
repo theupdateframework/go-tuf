@@ -1,0 +1,133 @@
+# This is the Minder profile file used for securely monitoring rdimitrov/go-tuf-metadata.
+# For more information, see https://github.com/stacklok/minder.
+---
+version: v1
+type: profile
+name: go-tuf-metadata
+context:
+  provider: github
+alert: "on"
+remediate: "on"
+repository:
+  - type: secret_scanning
+    def:
+      enabled: true
+  - type: secret_push_protection
+    def:
+      enabled: true
+  - type: github_actions_allowed
+    def:
+      allowed_actions: all
+  # - type: allowed_selected_actions
+  #   def:
+  #     github_owned_allowed: true
+  #     verified_allowed: true
+  #     patterns_allowed: []
+  - type: default_workflow_permissions
+    def:
+      default_workflow_permissions: write
+      can_approve_pull_request_reviews: true
+  - type: codeql_enabled
+    def:
+      languages: [go]
+      schedule_interval: '30 4-6 * * *'
+  - type: actions_check_pinned_tags
+    def: {}
+  - type: dependabot_configured
+    def:
+      package_ecosystem: gomod
+      schedule_interval: weekly
+      apply_if_file: go.mod
+  - type: dockerfile_no_latest_tag
+    def: {}
+  # - type: trivy_action_enabled
+  #   def: {}
+  - type: branch_protection_enabled
+    params:
+      branch: main
+    def: {}
+  - type: branch_protection_allow_deletions
+    params:
+      branch: main
+    def:
+      allow_deletions: false
+  - type: branch_protection_allow_force_pushes
+    params:
+      branch: main
+    def:
+      allow_force_pushes: true
+  # - type: branch_protection_enforce_admins
+  #   params:
+  #     branch: main
+  #   def:
+  #     enforce_admins: true
+  - type: branch_protection_lock_branch
+    params:
+      branch: main
+    def:
+      lock_branch: false
+  - type: branch_protection_require_conversation_resolution
+    params:
+      branch: main
+    def:
+      required_conversation_resolution: true
+  - type: branch_protection_require_linear_history
+    params:
+      branch: main
+    def:
+      required_linear_history: true
+  - type: branch_protection_require_pull_request_approving_review_count
+    params:
+      branch: main
+    def:
+      required_approving_review_count: 1
+  - type: branch_protection_require_pull_request_code_owners_review
+    params:
+      branch: main
+    def:
+      require_code_owner_reviews: true
+  - type: branch_protection_require_pull_request_dismiss_stale_reviews
+    params:
+      branch: main
+    def:
+      dismiss_stale_reviews: true
+  - type: branch_protection_require_pull_request_last_push_approval
+    params:
+      branch: main
+    def:
+      require_last_push_approval: true
+  - type: branch_protection_require_pull_requests
+    params:
+      branch: main
+    def:
+      required_pull_request_reviews: true
+  - type: branch_protection_require_signatures
+    params:
+      branch: main
+    def:
+      required_signatures: false
+  - type: license
+    def:
+      license_filename: LICENSE
+      license_type: "BSD-2-Clause"
+# artifact:
+#   - type: artifact_signature
+#     params:
+#       tags: [main]
+#       name: test
+#     def:
+#       is_signed: true
+#       is_verified: true
+#       is_bundle_verified: true
+pull_request:
+  - type: pr_vulnerability_check
+    def:
+      action: review
+      ecosystem_config:
+        - name: go
+          vulnerability_database_type: osv
+          vulnerability_database_endpoint: https://vuln.go.dev
+          package_repository:
+            url: https://proxy.golang.org
+          sum_repository:
+            url: https://sum.golang.org
