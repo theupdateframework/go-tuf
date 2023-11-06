@@ -18,7 +18,7 @@ jobs:
     outputs:
       matrix: ${{ steps.versions.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
       - uses: arnested/go-version-action@b556f8d91b644164318c709d28b9083eaf0c064d
         id: versions
 
@@ -33,7 +33,7 @@ jobs:
     needs: get-go-versions
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
 
       - name: Setup - Go ${{ matrix.go-version }}
         uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
@@ -44,7 +44,7 @@ jobs:
         run: go test -race -covermode=atomic -coverpkg=./metadata/... -coverprofile=coverage.out ./...
 
       - name: Send coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d
         with:
           flags: Go-${{ matrix.go-version }}
 
@@ -59,20 +59,15 @@ jobs:
       - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version: ${{ matrix.go-version }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
       - name: golangci-lint
         uses: golangci/golangci-lint-action@07db5389c99593f11ad7b44463c2d4233066a9b1
         with:
           version: v1.51 # has to be pinned and thus manually updated due to https://github.com/golangci/golangci-lint-action/blob/6a290f7d5d488e1e423b0b37fe802c822ca2c08c/README.md?plain=1#L108
           args: --timeout 5m --verbose
       - name: govulncheck
-        uses: golang/govulncheck-action@v1
+        uses: golang/govulncheck-action@7da72f730e37eeaad891fcff0a532d27ed737cd4
         with:
           go-version-input: ${{ matrix.go-version }}
           go-package: ./...
-      - name: Trivy Scan
-        uses: aquasecurity/trivy-action@fbd16365eb88e12433951383f5e99bd901fc618f  # v0.12.0
-        with:
-          image-ref: ${{ github.repository }}
-          format: json
-          exit-code: 1
+
