@@ -31,7 +31,7 @@ func main() {
 	keys := map[string]ed25519.PrivateKey{}
 
 	// Create Targets metadata
-	targets := metadata.Targets(helperExpireIn(60))
+	targets := metadata.Targets(helperExpireIn(10))
 	roles.SetTargets("targets", targets)
 
 	// Add each target to Targets metadata
@@ -51,15 +51,15 @@ func main() {
 	}
 
 	// Create Snapshot metadata
-	snapshot := metadata.Snapshot(helperExpireIn(365))
+	snapshot := metadata.Snapshot(helperExpireIn(10))
 	roles.SetSnapshot(snapshot)
 
 	// Create Timestamp metadata
-	timestamp := metadata.Timestamp(helperExpireIn(365))
+	timestamp := metadata.Timestamp(helperExpireIn(10))
 	roles.SetTimestamp(timestamp)
 
 	// Create Root metadata
-	root := metadata.Root(helperExpireIn(365))
+	root := metadata.Root(helperExpireIn(10))
 	roles.SetRoot(root)
 
 	// For this example, we generate one private key of type 'ed25519' for each top-level role
@@ -162,9 +162,9 @@ func main() {
 	fmt.Println("Done! Metadata files location:", cwd)
 }
 
-// helperExpireIn returns time offset by days
-func helperExpireIn(days int) time.Time {
-	return time.Now().AddDate(0, 0, days).UTC()
+// helperExpireIn returns time offset by years (for the sake of the example)
+func helperExpireIn(years int) time.Time {
+	return time.Now().AddDate(years, 0, 0).UTC()
 }
 
 // helperGetPathForTarget returns local and target paths for target
