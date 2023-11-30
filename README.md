@@ -5,29 +5,13 @@
 This is a Go implementation of [The Update Framework (TUF)](http://theupdateframework.com/),
 a framework for securing software update systems.
 
-## News
+## API instability
 
-Hey, everyone! 👋
+**Note**: go-tuf's API is in flux and backwards compatibility with version 0.7.0 and earlier will _**not**_ be maintained.
 
-We'd like to inform you that as a continuation of https://github.com/theupdateframework/go-tuf/issues/485, we have started the process of deprecating the existing https://github.com/theupdateframework/go-tuf code base in favour of https://github.com/rdimitrov/go-tuf-metadata.
+We recommend production users of go-tuf pin their dependency so that changes in main do not cause disruptions.
 
-**Reasoning:**
-
-* The reasoning behind this is explained in https://github.com/theupdateframework/go-tuf/issues/485, but essentially the new code base is much simpler, easier to work with and last but not least, easier to maintain and contribute to. The last two have been longstanding issues for go-tuf and we are looking forward to address them with this change.
-* Deep thank you to all of the people that helped shaping this effort!
-
-**Details:**
-
-* **This will not happen straight away!**
-* We'll continue to support this version in a separate branch(v0.7.0) until the migration process is considered as completed.
-* We advise all users to pin their dependencies of go-tuf to a certain release version (in case they haven't already) so they don't experience any inconveniences, i.e. `github.com/theupdateframework/go-tuf v0.7.0`
-* We'll continue to use the https://github.com/theupdateframework/go-tuf repository, but its content will be updated to accommodate the changes. We'll start introducing the go-tuf-metadata code base to the master branch of go-tuf, so technically there will be times where the master branch might be considered unstable (which is a general practice).
-* Even though go-tuf is pre-v1.0.0 and technically there are no API commitments to be followed, we won't release a v1.0.0 either with the new code base until it is well tested and we are sure of its stability.
-
-Apologies for the disruption and thank you in advance for the understanding!
-
-Yours,
-The go-tuf maintainers team.
+For more details on the changes, and the rationale for making them, see issue https://github.com/theupdateframework/go-tuf/issues/485 and the release notes for [v0.7.0](https://github.com/theupdateframework/go-tuf/releases/tag/v0.7.0)
 
 ## Directory layout
 
