@@ -11,7 +11,7 @@ a framework for securing software update systems.
 
 We recommend production users of go-tuf pin their dependency so that changes in main do not cause disruptions.
 
-For more details on the changes, and the rationale for making them, see issue https://github.com/theupdateframework/go-tuf/issues/485 and the release notes for [v0.7.0](https://github.com/theupdateframework/go-tuf/releases/tag/v0.7.0)
+For more details on the changes, and the rationale for making them, see [issue #485](https://github.com/theupdateframework/go-tuf/issues/485) and the v0.7.0 [release notes](https://github.com/theupdateframework/go-tuf/releases/tag/v0.7.0)
 
 ## Directory layout
 
