@@ -105,7 +105,7 @@ func (client *MultiRepoClient) initTUFClients() error {
 
 	// loop through each repository listed in the map file and initialize it
 	for repoName, repoURL := range client.Config.RepoMap.Repositories {
-		log.V(4).Info("Initializing", "name", repoName, "url", repoURL[0])
+		log.Info("Initializing", "name", repoName, "url", repoURL[0])
 
 		// get the trusted root file from the location specified in the map file relevant to its path
 		// NOTE: the root.json file is expected to be in a folder named after the repository it corresponds to placed in the same folder as the map file
@@ -149,7 +149,7 @@ func (client *MultiRepoClient) initTUFClients() error {
 
 		// save the client
 		client.TUFClients[repoName] = repoTUFClient
-		log.V(5).Info("Successfully initialized", "name", repoName, "url", repoURL)
+		log.Info("Successfully initialized", "name", repoName, "url", repoURL)
 	}
 	return nil
 }
@@ -160,7 +160,7 @@ func (client *MultiRepoClient) Refresh() error {
 
 	// loop through each initialized TUF client and refresh it
 	for name, repoTUFClient := range client.TUFClients {
-		log.V(4).Info("Refreshing", "name", name)
+		log.Info("Refreshing", "name", name)
 		err := repoTUFClient.Refresh()
 		if err != nil {
 			return err
@@ -312,7 +312,7 @@ func (client *MultiRepoClient) DownloadTarget(repos []string, targetFile *metada
 		}
 		if len(targetPath) != 0 && len(targetBytes) != 0 {
 			// we already got the target for this target info cached locally, so return it
-			log.V(4).Info("Target already present locally from repo", "target", targetFile.Path, "repo", repoName)
+			log.Info("Target already present locally from repo", "target", targetFile.Path, "repo", repoName)
 			return targetPath, targetBytes, nil
 		}
 		// not present locally, so let's try to download it
@@ -323,7 +323,7 @@ func (client *MultiRepoClient) DownloadTarget(repos []string, targetFile *metada
 			continue
 		}
 		// we got the target for this target info, so return it
-		log.V(4).Info("Downloaded target from repo", "target", targetFile.Path, "repo", repoName)
+		log.Info("Downloaded target from repo", "target", targetFile.Path, "repo", repoName)
 		return targetPath, targetBytes, nil
 	}
 	// error out as we haven't succeeded downloading the target file

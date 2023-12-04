@@ -194,7 +194,7 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 			return "", nil, err
 		}
 	}
-	log.V(4).Info("Downloaded target", "path", targetFile.Path)
+	log.Info("Downloaded target", "path", targetFile.Path)
 	return filePath, data, nil
 }
 
@@ -238,20 +238,20 @@ func (update *Updater) loadTimestamp() error {
 	data, err := update.loadLocalMetadata(filepath.Join(update.cfg.LocalMetadataDir, metadata.TIMESTAMP))
 	if err != nil {
 		// this means there's no existing local timestamp so we should proceed downloading it without the need to UpdateTimestamp
-		log.V(5).Info("Local timestamp does not exist")
+		log.Info("Local timestamp does not exist")
 	} else {
 		// local timestamp exists, let's try to verify it and load it to the trusted metadata set
 		_, err := update.trusted.UpdateTimestamp(data)
 		if err != nil {
 			if errors.Is(err, metadata.ErrRepository{}) {
 				// local timestamp is not valid, proceed downloading from remote; note that this error type includes several other subset errors
-				log.V(5).Info("Local timestamp is not valid")
+				log.Info("Local timestamp is not valid")
 			} else {
 				// another error
 				return err
 			}
 		}
-		log.V(5).Info("Local timestamp is valid")
+		log.Info("Local timestamp is valid")
 		// all okay, local timestamp exists and it is valid, nevertheless proceed with downloading from remote
 	}
 	// load from remote (whether local load succeeded or not)
@@ -286,7 +286,7 @@ func (update *Updater) loadSnapshot() error {
 	data, err := update.loadLocalMetadata(filepath.Join(update.cfg.LocalMetadataDir, metadata.SNAPSHOT))
 	if err != nil {
 		// this means there's no existing local snapshot so we should proceed downloading it without the need to UpdateSnapshot
-		log.V(5).Info("Local snapshot does not exist")
+		log.Info("Local snapshot does not exist")
 	} else {
 		// successfully read a local snapshot metadata, so let's try to verify and load it to the trusted metadata set
 		_, err = update.trusted.UpdateSnapshot(data, true)
@@ -294,19 +294,19 @@ func (update *Updater) loadSnapshot() error {
 			// this means snapshot verification/loading failed
 			if errors.Is(err, metadata.ErrRepository{}) {
 				// local snapshot is not valid, proceed downloading from remote; note that this error type includes several other subset errors
-				log.V(5).Info("Local snapshot is not valid")
+				log.Info("Local snapshot is not valid")
 			} else {
 				// another error
 				return err
 			}
 		} else {
 			// this means snapshot verification/loading succeeded
-			log.V(5).Info("Local snapshot is valid: not downloading new one")
+			log.Info("Local snapshot is valid: not downloading new one")
 			return nil
 		}
 	}
 	// local snapshot does not exist or is invalid, update from remote
-	log.V(5).Info("Failed to load local snapshot")
+	log.Info("Failed to load local snapshot")
 	if update.trusted.Timestamp == nil {
 		return fmt.Errorf("trusted timestamp not set")
 	}
@@ -352,7 +352,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 	data, err := update.loadLocalMetadata(filepath.Join(update.cfg.LocalMetadataDir, roleName))
 	if err != nil {
 		// this means there's no existing local target file so we should proceed downloading it without the need to UpdateDelegatedTargets
-		log.V(5).Info("Local role does not exist", "role", roleName)
+		log.Info("Local role does not exist", "role", roleName)
 	} else {
 		// successfully read a local targets metadata, so let's try to verify and load it to the trusted metadata set
 		delegatedTargets, err := update.trusted.UpdateDelegatedTargets(data, roleName, parentName)
@@ -360,19 +360,19 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 			// this means targets verification/loading failed
 			if errors.Is(err, metadata.ErrRepository{}) {
 				// local target file is not valid, proceed downloading from remote; note that this error type includes several other subset errors
-				log.V(5).Info("Local role is not valid", "role", roleName)
+				log.Info("Local role is not valid", "role", roleName)
 			} else {
 				// another error
 				return nil, err
 			}
 		} else {
 			// this means targets verification/loading succeeded
-			log.V(5).Info("Local role is valid: not downloading new one", "role", roleName)
+			log.Info("Local role is valid: not downloading new one", "role", roleName)
 			return delegatedTargets, nil
 		}
 	}
 	// local "roleName" does not exist or is invalid, update from remote
-	log.V(5).Info("Failed to load local role", "role", roleName)
+	log.Info("Failed to load local role", "role", roleName)
 	if update.trusted.Snapshot == nil {
 		return nil, fmt.Errorf("trusted snapshot not set")
 	}
@@ -466,7 +466,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 		// skip any visited current role to prevent cycles
 		_, ok := visitedRoleNames[delegation.Role]
 		if ok {
-			log.V(5).Info("Skipping visited current role", "role", delegation.Role)
+			log.Info("Skipping visited current role", "role", delegation.Role)
 			continue
 		}
 		// the metadata for delegation.Role must be downloaded/updated before
@@ -477,7 +477,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 		}
 		target, ok := targets.Signed.Targets[targetFilePath]
 		if ok {
-			log.V(5).Info("Found target in current role", "role", delegation.Role)
+			log.Info("Found target in current role", "role", delegation.Role)
 			return target, nil
 		}
 		// after pre-order check, add current role to set of visited roles
@@ -488,10 +488,10 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 			// delegated roles
 			roles := targets.Signed.Delegations.GetRolesForTarget(targetFilePath)
 			for child, terminating := range roles {
-				log.V(5).Info("Adding child role", "role", child)
+				log.Info("Adding child role", "role", child)
 				childRolesToVisit = append(childRolesToVisit, roleParentTuple{Role: child, Parent: delegation.Role})
 				if terminating {
-					log.V(5).Info("Not backtracking to other roles")
+					log.Info("Not backtracking to other roles")
 					delegationsToVisit = []roleParentTuple{}
 					break
 				}
@@ -504,7 +504,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 		}
 	}
 	if len(delegationsToVisit) > 0 {
-		log.V(5).Info("Too many roles left to visit for max allowed delegations",
+		log.Info("Too many roles left to visit for max allowed delegations",
 			"roles-left", len(delegationsToVisit),
 			"allowed-delegations", update.cfg.MaxDelegations)
 	}
@@ -536,7 +536,7 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 		// delete the temporary file if there was an error while writing
 		errRemove := os.Remove(file.Name())
 		if errRemove != nil {
-			log.V(5).Info("Failed to delete temporary file", "name", file.Name())
+			log.Info("Failed to delete temporary file", "name", file.Name())
 		}
 		return err
 	}

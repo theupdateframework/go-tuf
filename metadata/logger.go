@@ -11,14 +11,29 @@
 
 package metadata
 
-import "github.com/go-logr/logr"
+var log Logger = DiscardLogger{}
 
-var log logr.Logger = logr.Discard()
+// Logger partially implements the go-log/logr's interface:
+// https://github.com/go-logr/logr/blob/master/logr.go
+type Logger interface {
+	// Info logs a non-error message with key/value pairs
+	Info(msg string, kv ...any)
+	// Error logs an error with a given message and key/value pairs.
+	Error(err error, msg string, kv ...any)
+}
 
-func SetLogger(logger logr.Logger) {
+type DiscardLogger struct{}
+
+func (d DiscardLogger) Info(msg string, kv ...any) {
+}
+
+func (d DiscardLogger) Error(err error, msg string, kv ...any) {
+}
+
+func SetLogger(logger Logger) {
 	log = logger
 }
 
-func GetLogger() logr.Logger {
+func GetLogger() Logger {
 	return log
 }

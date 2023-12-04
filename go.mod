@@ -3,7 +3,6 @@ module github.com/rdimitrov/go-tuf-metadata
 go 1.21
 
 require (
-	github.com/go-logr/logr v1.3.0
 	github.com/go-logr/stdr v1.2.2
 	github.com/secure-systems-lab/go-securesystemslib v0.7.0
 	github.com/sigstore/sigstore v1.7.5
@@ -17,6 +16,7 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-containerregistry v0.16.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
