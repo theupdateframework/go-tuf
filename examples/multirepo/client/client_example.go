@@ -127,7 +127,7 @@ func BootstrapTUF() ([]byte, map[string][]byte, error) {
 			return nil, nil, fmt.Errorf("failed while finding a cached target: %w", err)
 		}
 		if path != "" {
-			log.V(4).Info("Target is already present", "target", name, "path", path)
+			log.Info("Target is already present", "target", name, "path", path)
 		}
 
 		// target is not present locally, so let's try to download it
@@ -152,7 +152,7 @@ func BootstrapTUF() ([]byte, map[string][]byte, error) {
 			repositoryName := strings.Split(name, string(os.PathSeparator))
 			trustedRoots[repositoryName[0]] = bytes
 		}
-		log.V(4).Info("Successfully downloaded target", "target", name, "path", path)
+		log.Info("Successfully downloaded target", "target", name, "path", path)
 	}
 
 	return mapBytes, trustedRoots, nil

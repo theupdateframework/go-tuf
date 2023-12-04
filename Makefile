@@ -6,7 +6,7 @@
 # notices and license terms. Your use of these subcomponents is subject to
 # the terms and conditions of the subcomponent's license, as noted in the
 # LICENSE file.
-# 
+#
 # SPDX-License-Identifier: BSD-2-Clause
 
 # We want to use bash
@@ -39,7 +39,7 @@ build-%:
 
 # Test target
 .PHONY: test
-test: 
+test:
 	go test -race -covermode atomic ./...
 
 #####################
@@ -47,8 +47,12 @@ test:
 #####################
 
 .PHONY: lint
-lint: 
+lint:
 	golangci-lint run
+
+.PHONY: fmt
+fmt:
+	go fmt ./...
 
 #####################
 # examples section
@@ -60,13 +64,13 @@ example-all: example-client example-repository example-multirepo example-tuf-cli
 
 # Target for demoing the examples/client/client_example.go
 .PHONY: example-client
-example-client: 
+example-client:
 	@echo "Executing the following example - client/client_example.go"
 	@cd examples/client/ && go run .
 
 # Target for demoing the examples/repository/basic_repository.go
 .PHONY: example-repository
-example-repository: 
+example-repository:
 	@echo "Executing the following example - repository/basic_repository.go"
 	@cd examples/repository/ && go run .
 
@@ -114,4 +118,3 @@ clean:
 	@rm -rf tuf_metadata
 	@rm -f tuf-client
 	@rm -f root.json
-

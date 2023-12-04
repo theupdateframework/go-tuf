@@ -54,7 +54,7 @@ func (trusted *TrustedMetadata) UpdateRoot(rootData []byte) (*metadata.Metadata[
 	if trusted.Timestamp != nil {
 		return nil, metadata.ErrRuntime{Msg: "cannot update root after timestamp"}
 	}
-	log.V(5).Info("Updating root")
+	log.Info("Updating root")
 	// generate root metadata
 	newRoot, err := metadata.Root().FromBytes(rootData)
 	if err != nil {
@@ -80,7 +80,7 @@ func (trusted *TrustedMetadata) UpdateRoot(rootData []byte) (*metadata.Metadata[
 	}
 	// save root if verified
 	trusted.Root = newRoot
-	log.V(4).Info("Updated root", "version", trusted.Root.Signed.Version)
+	log.Info("Updated root", "version", trusted.Root.Signed.Version)
 	return trusted.Root, nil
 }
 
@@ -102,7 +102,7 @@ func (trusted *TrustedMetadata) UpdateTimestamp(timestampData []byte) (*metadata
 		// timestamp/snapshot can not yet be loaded at this point
 		return nil, metadata.ErrExpiredMetadata{Msg: "final root.json is expired"}
 	}
-	log.V(5).Info("Updating timestamp")
+	log.Info("Updating timestamp")
 	newTimestamp, err := metadata.Timestamp().FromBytes(timestampData)
 	if err != nil {
 		return nil, err
@@ -125,7 +125,7 @@ func (trusted *TrustedMetadata) UpdateTimestamp(timestampData []byte) (*metadata
 		}
 		// keep using old timestamp if versions are equal
 		if newTimestamp.Signed.Version == trusted.Timestamp.Signed.Version {
-			log.V(5).Info("New timestamp version equals the old one", "new", newTimestamp.Signed.Version, "old", trusted.Timestamp.Signed.Version)
+			log.Info("New timestamp version equals the old one", "new", newTimestamp.Signed.Version, "old", trusted.Timestamp.Signed.Version)
 			return nil, metadata.ErrEqualVersionNumber{Msg: fmt.Sprintf("new timestamp version %d equals the old one %d", newTimestamp.Signed.Version, trusted.Timestamp.Signed.Version)}
 		}
 		// prevent rolling back snapshot version
@@ -139,7 +139,7 @@ func (trusted *TrustedMetadata) UpdateTimestamp(timestampData []byte) (*metadata
 	// protection of new timestamp: expiry is checked in UpdateSnapshot()
 	// save root if verified
 	trusted.Timestamp = newTimestamp
-	log.V(4).Info("Updated timestamp", "version", trusted.Timestamp.Signed.Version)
+	log.Info("Updated timestamp", "version", trusted.Timestamp.Signed.Version)
 
 	// timestamp is loaded: error if it is not valid _final_ timestamp
 	err = trusted.checkFinalTimestamp()
@@ -175,7 +175,7 @@ func (trusted *TrustedMetadata) UpdateSnapshot(snapshotData []byte, isTrusted bo
 	if trusted.Targets[metadata.TARGETS] != nil {
 		return nil, metadata.ErrRuntime{Msg: "cannot update snapshot after targets"}
 	}
-	log.V(5).Info("Updating snapshot")
+	log.Info("Updating snapshot")
 
 	// snapshot cannot be loaded if final timestamp is expired
 	err := trusted.checkFinalTimestamp()
@@ -226,7 +226,7 @@ func (trusted *TrustedMetadata) UpdateSnapshot(snapshotData []byte, isTrusted bo
 	// expiry not checked to allow old snapshot to be used for rollback
 	// protection of new snapshot: it is checked when targets is updated
 	trusted.Snapshot = newSnapshot
-	log.V(4).Info("Updated snapshot", "version", trusted.Snapshot.Signed.Version)
+	log.Info("Updated snapshot", "version", trusted.Snapshot.Signed.Version)
 
 	// snapshot is loaded, but we error if it's not valid _final_ snapshot
 	err = trusted.checkFinalSnapshot()
@@ -281,7 +281,7 @@ func (trusted *TrustedMetadata) UpdateDelegatedTargets(targetsData []byte, roleN
 	if !ok {
 		return nil, metadata.ErrRuntime{Msg: "cannot load targets before delegator"}
 	}
-	log.V(5).Info("Updating delegated role", "role", roleName, "delegator", delegatorName)
+	log.Info("Updating delegated role", "role", roleName, "delegator", delegatorName)
 	// Verify against the hashes in snapshot, if any
 	meta, ok := trusted.Snapshot.Signed.Meta[fmt.Sprintf("%s.json", roleName)]
 	if !ok {
@@ -320,7 +320,7 @@ func (trusted *TrustedMetadata) UpdateDelegatedTargets(targetsData []byte, roleN
 		return nil, metadata.ErrExpiredMetadata{Msg: fmt.Sprintf("new %s is expired", roleName)}
 	}
 	trusted.Targets[roleName] = newDelegate
-	log.V(4).Info("Updated role", "role", roleName, "version", trusted.Targets[roleName].Signed.Version)
+	log.Info("Updated role", "role", roleName, "version", trusted.Targets[roleName].Signed.Version)
 	return trusted.Targets[roleName], nil
 }
 
@@ -346,6 +346,6 @@ func (trusted *TrustedMetadata) loadTrustedRoot(rootData []byte) error {
 	}
 	// save root if verified
 	trusted.Root = newRoot
-	log.V(4).Info("Loaded trusted root", "version", trusted.Root.Signed.Version)
+	log.Info("Loaded trusted root", "version", trusted.Root.Signed.Version)
 	return nil
 }
