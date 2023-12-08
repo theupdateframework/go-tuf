@@ -17,6 +17,8 @@ on:
       - "v*"
 name: CI
 jobs:
+  linting:
+    uses: ./.github/workflows/linting.yml
   tests:
     uses: ./.github/workflows/tests.yml
   examples:

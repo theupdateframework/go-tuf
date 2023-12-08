@@ -1,6 +1,6 @@
 module github.com/rdimitrov/go-tuf-metadata
 
-go 1.21
+go 1.21.5
 
 require (
 	github.com/go-logr/stdr v1.2.2

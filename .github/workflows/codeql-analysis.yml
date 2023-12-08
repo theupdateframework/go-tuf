@@ -37,9 +37,11 @@ jobs:
         # Learn more about CodeQL language support at https://git.io/codeql-language-support
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
-
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
+        with:
+          go-version-file: 'go.mod'
+          cache: false
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
         uses: github/codeql-action/init@74483a38d39275f33fcff5f35b679b5ca4a26a99
