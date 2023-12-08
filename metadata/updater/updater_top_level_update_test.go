@@ -65,8 +65,17 @@ func loadUpdaterConfig() (*config.UpdaterConfig, error) {
 	return updaterConfig, err
 }
 
-// runRefresh creates new Updater instance and
-// runs Refresh
+func loadUnsafeUpdaterConfig() (*config.UpdaterConfig, error) {
+	updaterConfig, err := loadUpdaterConfig()
+	if err != nil {
+		return nil, err
+	}
+	updaterConfig.UnsafeLocalMode = true
+
+	return updaterConfig, nil
+}
+
+// runRefresh creates new Updater instance and runs Refresh
 func runRefresh(updaterConfig *config.UpdaterConfig, moveInTime time.Time) (Updater, error) {
 	if len(simulator.Sim.DumpDir) > 0 {
 		simulator.Sim.Write()
@@ -114,6 +123,23 @@ func assertFilesExist(t *testing.T, roles []string) {
 	for _, file := range expectedFiles {
 		assert.Contains(t, actual, file)
 	}
+}
+
+func assertFilesExact(t *testing.T, roles []string) {
+	expectedFiles := []string{}
+
+	for _, role := range roles {
+		expectedFiles = append(expectedFiles, fmt.Sprintf("%s.json", role))
+	}
+	localMetadataFiles, err := os.ReadDir(simulator.MetadataDir)
+	assert.NoError(t, err)
+
+	actual := []string{}
+	for _, file := range localMetadataFiles {
+		actual = append(actual, file.Name())
+	}
+
+	assert.ElementsMatch(t, actual, expectedFiles)
 }
 
 // Asserts that local file content is the expected
@@ -169,6 +195,27 @@ func TestLoadTrustedRootMetadata(t *testing.T) {
 	}
 }
 
+func TestUnsafeLoadTrustedRootMetadata(t *testing.T) {
+	err := loadOrResetTrustedRootMetadata()
+	assert.NoError(t, err)
+
+	updaterConfig, err := loadUnsafeUpdaterConfig()
+	assert.NoError(t, err)
+	updater, err := New(updaterConfig)
+	assert.NoError(t, err)
+
+	assert.Nil(t, err)
+	if assert.NotNil(t, updater) {
+		assert.Equal(t, metadata.ROOT, updater.trusted.Root.Signed.Type)
+		assert.Equal(t, metadata.SPECIFICATION_VERSION, updater.trusted.Root.Signed.SpecVersion)
+		assert.True(t, updater.trusted.Root.Signed.ConsistentSnapshot)
+		assert.Equal(t, int64(1), updater.trusted.Root.Signed.Version)
+		assert.Nil(t, updater.trusted.Snapshot)
+		assert.Nil(t, updater.trusted.Timestamp)
+		assert.Empty(t, updater.trusted.Targets)
+	}
+}
+
 func TestFirstTimeRefresh(t *testing.T) {
 	err := loadOrResetTrustedRootMetadata()
 	assert.NoError(t, err)
@@ -190,6 +237,64 @@ func TestFirstTimeRefresh(t *testing.T) {
 		}
 		assertContentEquals(t, role, &version)
 	}
+}
+
+func TestFirstUnsafeTimeRefresh(t *testing.T) {
+	err := loadOrResetTrustedRootMetadata()
+	assert.NoError(t, err)
+
+	assertFilesExist(t, []string{metadata.ROOT})
+	simulator.Sim.MDRoot.Signed.Version += 1
+	simulator.Sim.PublishRoot()
+
+	updaterConfig, err := loadUnsafeUpdaterConfig()
+	assert.NoError(t, err)
+	_, err = runRefresh(updaterConfig, time.Now())
+	assert.Error(t, err)
+	// As no update was made only the root file should be present
+	assertFilesExact(t, []string{metadata.ROOT})
+}
+
+func TestUnsafeRefresh(t *testing.T) {
+	// First run a "real" refresh
+	err := loadOrResetTrustedRootMetadata()
+	assert.NoError(t, err)
+
+	assertFilesExist(t, []string{metadata.ROOT})
+	simulator.Sim.MDRoot.Signed.Version += 1
+	simulator.Sim.PublishRoot()
+
+	updaterConfig, err := loadUpdaterConfig()
+	assert.NoError(t, err)
+	_, err = runRefresh(updaterConfig, time.Now())
+	assert.NoError(t, err)
+	assertFilesExist(t, metadata.TOP_LEVEL_ROLE_NAMES[:])
+
+	// Create a new unsafe updater, verify content is still valid
+	updaterConfig, err = loadUnsafeUpdaterConfig()
+	assert.NoError(t, err)
+	updater, err := runRefresh(updaterConfig, time.Now())
+	assert.NotNil(t, updater)
+	assert.NoError(t, err)
+	assertFilesExist(t, metadata.TOP_LEVEL_ROLE_NAMES[:])
+
+	for _, role := range metadata.TOP_LEVEL_ROLE_NAMES {
+		var version int
+		if role == metadata.ROOT {
+			// The root file is written when the updater is
+			// created, so the version is reset.
+			version = 1
+		}
+		assertContentEquals(t, role, &version)
+	}
+
+	assert.Equal(t, metadata.ROOT, updater.trusted.Root.Signed.Type)
+	assert.Equal(t, metadata.SPECIFICATION_VERSION, updater.trusted.Root.Signed.SpecVersion)
+	assert.True(t, updater.trusted.Root.Signed.ConsistentSnapshot)
+	assert.Equal(t, int64(1), updater.trusted.Root.Signed.Version)
+	assert.NotNil(t, updater.trusted.Snapshot)
+	assert.NotNil(t, updater.trusted.Timestamp)
+	assert.Equal(t, 1, len(updater.trusted.Targets))
 }
 
 func TestTrustedRootMissing(t *testing.T) {
