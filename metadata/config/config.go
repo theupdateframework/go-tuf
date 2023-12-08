@@ -35,6 +35,9 @@ type UpdaterConfig struct {
 	RemoteTargetsURL      string
 	DisableLocalCache     bool
 	PrefixTargetsWithHash bool
+	// UnsafeLocalMode only uses the metadata as written on disk
+	// if the metadata is incomplete, calling updater.Refresh will fail
+	UnsafeLocalMode bool
 }
 
 // New creates a new UpdaterConfig instance used by the Updater to
@@ -61,6 +64,7 @@ func New(remoteURL string, rootBytes []byte) (*UpdaterConfig, error) {
 		RemoteTargetsURL:      targetsURL,                // URL of where the target files should be downloaded from
 		DisableLocalCache:     false,                     // enable local caching of trusted metadata
 		PrefixTargetsWithHash: true,                      // use hash-prefixed target files with consistent snapshots
+		UnsafeLocalMode:       false,
 	}, nil
 }
 
