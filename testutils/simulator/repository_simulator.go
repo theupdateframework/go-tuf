@@ -58,6 +58,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -314,10 +315,41 @@ func (rs *RepositorySimulator) DownloadFile(urlPath string, maxLength int64, tim
 	return data, err
 }
 
+func IsWindowsPath(path string) bool {
+	match, _ := regexp.MatchString(`^[a-zA-Z]:\\`, path)
+	return match
+}
+
+func trimPrefix(path string, prefix string) (string, error) {
+	var toTrim string
+	if IsWindowsPath(path) {
+		toTrim = path
+	} else {
+		parsedURL, e := url.Parse(path)
+		if e != nil {
+			return "", e
+		}
+		toTrim = parsedURL.Path
+	}
+
+	return strings.TrimPrefix(toTrim, prefix), nil
+}
+
+func hasPrefix(path, prefix string) bool {
+	return strings.HasPrefix(filepath.ToSlash(path), prefix)
+}
+
+func hasSuffix(path, prefix string) bool {
+	return strings.HasSuffix(filepath.ToSlash(path), prefix)
+}
+
 func (rs *RepositorySimulator) fetch(urlPath string) ([]byte, error) {
-	parsedURL, _ := url.Parse(urlPath)
-	path := strings.TrimPrefix(parsedURL.Path, rs.LocalDir)
-	if strings.HasPrefix(path, "/metadata/") && strings.HasSuffix(path, ".json") {
+
+	path, err := trimPrefix(urlPath, rs.LocalDir)
+	if err != nil {
+		return nil, err
+	}
+	if hasPrefix(path, "/metadata/") && hasSuffix(path, ".json") {
 		fileName := path[len("/metadata/"):]
 		verAndName := fileName[:len(path)-len("/metadata/")-len(".json")]
 		versionStr, role := partition(verAndName, ".")
@@ -333,16 +365,16 @@ func (rs *RepositorySimulator) fetch(urlPath string) ([]byte, error) {
 			version = -1
 		}
 		return rs.FetchMetadata(role, &version)
-	} else if strings.HasPrefix(path, "/targets/") {
+	} else if hasPrefix(path, "/targets/") {
 		targetPath := path[len("/targets/"):]
-		dirParts, sep, prefixedFilename := lastIndex(targetPath, "/")
+		dirParts, sep, prefixedFilename := lastIndex(targetPath, string(filepath.Separator))
 		var filename string
 		prefix := ""
 		filename = prefixedFilename
 		if rs.MDRoot.Signed.ConsistentSnapshot && rs.PrefixTargetsWithHash {
 			prefix, filename = partition(prefixedFilename, ".")
 		}
-		targetPath = fmt.Sprintf("%s%s%s", dirParts, sep, filename)
+		targetPath = filepath.Join(dirParts, sep, filename)
 		target, err := rs.FetchTarget(targetPath, prefix)
 		if err != nil {
 			log.Printf("failed to fetch target: %v", err)

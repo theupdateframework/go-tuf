@@ -19,8 +19,8 @@ package trustedmetadata
 
 import (
 	"crypto"
-	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -38,39 +38,50 @@ func setAllRolesBytes(path string) {
 	log := metadata.GetLogger()
 
 	allRoles = make(map[string][]byte)
-	root, err := os.ReadFile(fmt.Sprintf("%s/root.json", path))
+	rootPath := filepath.Join(path, "root.json")
+	root, err := os.ReadFile(rootPath)
 	if err != nil {
-		log.Error(err, "failed to root bytes")
+		log.Error(err, "failed to read root bytes")
 		os.Exit(1)
 	}
 	allRoles[metadata.ROOT] = root
-	targets, err := os.ReadFile(fmt.Sprintf("%s/targets.json", path))
+
+	targetsPath := filepath.Join(path, "targets.json")
+	targets, err := os.ReadFile(targetsPath)
 	if err != nil {
-		log.Error(err, "failed to targets bytes")
+		log.Error(err, "failed to read targets bytes")
 		os.Exit(1)
 	}
 	allRoles[metadata.TARGETS] = targets
-	snapshot, err := os.ReadFile(fmt.Sprintf("%s/snapshot.json", path))
+
+	snapshotPath := filepath.Join(path, "snapshot.json")
+	snapshot, err := os.ReadFile(snapshotPath)
 	if err != nil {
-		log.Error(err, "failed to snapshot bytes")
+		log.Error(err, "failed to read snapshot bytes")
 		os.Exit(1)
 	}
 	allRoles[metadata.SNAPSHOT] = snapshot
-	timestamp, err := os.ReadFile(fmt.Sprintf("%s/timestamp.json", path))
+
+	timestampPath := filepath.Join(path, "timestamp.json")
+	timestamp, err := os.ReadFile(timestampPath)
 	if err != nil {
-		log.Error(err, "failed to timestamp bytes")
+		log.Error(err, "failed to read timestamp bytes")
 		os.Exit(1)
 	}
 	allRoles[metadata.TIMESTAMP] = timestamp
-	role1, err := os.ReadFile(fmt.Sprintf("%s/role1.json", path))
+
+	role1Path := filepath.Join(path, "role1.json")
+	role1, err := os.ReadFile(role1Path)
 	if err != nil {
-		log.Error(err, "failed to role1 bytes")
+		log.Error(err, "failed to read role1 bytes")
 		os.Exit(1)
 	}
 	allRoles["role1"] = role1
-	role2, err := os.ReadFile(fmt.Sprintf("%s/role2.json", path))
+
+	role2Path := filepath.Join(path, "role2.json")
+	role2, err := os.ReadFile(role2Path)
 	if err != nil {
-		log.Error(err, "failed to role2 bytes")
+		log.Error(err, "failed to read role2 bytes")
 		os.Exit(1)
 	}
 	allRoles["role2"] = role2
@@ -104,7 +115,7 @@ func modifyRootMetadata(fn modifyRoot) ([]byte, error) {
 	}
 	fn(root)
 
-	signer, err := signature.LoadSignerFromPEMFile(testutils.KeystoreDir+"/root_key", crypto.SHA256, cryptoutils.SkipPassword)
+	signer, err := signature.LoadSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "root_key"), crypto.SHA256, cryptoutils.SkipPassword)
 	if err != nil {
 		log.Error(err, "failed to load signer from pem file")
 	}
@@ -127,7 +138,7 @@ func modifyTimestamptMetadata(fn modifyTimestamp) ([]byte, error) {
 	}
 	fn(timestamp)
 
-	signer, err := signature.LoadSignerFromPEMFile(testutils.KeystoreDir+"/timestamp_key", crypto.SHA256, cryptoutils.SkipPassword)
+	signer, err := signature.LoadSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "timestamp_key"), crypto.SHA256, cryptoutils.SkipPassword)
 	if err != nil {
 		log.Error(err, "failed to load signer from pem file")
 	}
@@ -150,7 +161,7 @@ func modifySnapshotMetadata(fn modifySnapshot) ([]byte, error) {
 	}
 	fn(snapshot)
 
-	signer, err := signature.LoadSignerFromPEMFile(testutils.KeystoreDir+"/snapshot_key", crypto.SHA256, cryptoutils.SkipPassword)
+	signer, err := signature.LoadSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "snapshot_key"), crypto.SHA256, cryptoutils.SkipPassword)
 	if err != nil {
 		log.Error(err, "failed to load signer from pem file")
 	}
@@ -173,7 +184,7 @@ func modifyTargetsMetadata(fn modifyTargets) ([]byte, error) {
 	}
 	fn(targets)
 
-	signer, err := signature.LoadSignerFromPEMFile(testutils.KeystoreDir+"/targets_key", crypto.SHA256, cryptoutils.SkipPassword)
+	signer, err := signature.LoadSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "targets_key"), crypto.SHA256, cryptoutils.SkipPassword)
 	if err != nil {
 		log.Error(err, "failed to load signer from pem file")
 	}

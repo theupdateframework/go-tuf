@@ -19,6 +19,7 @@ package simulator
 
 import (
 	"os"
+	"path/filepath"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -65,11 +66,11 @@ func InitMetadataDir() (*RepositorySimulator, string, string, error) {
 	if err != nil {
 		log.Fatal("failed to initialize environment: ", err)
 	}
-	metadataDir := LocalDir + metadataPath
+	metadataDir := filepath.Join(LocalDir, metadataPath)
 
 	sim := NewRepository()
 
-	f, err := os.Create(metadataDir + "/root.json")
+	f, err := os.Create(filepath.Join(metadataDir, "root.json"))
 	if err != nil {
 		log.Fatalf("failed to create root: %v", err)
 	}
@@ -78,13 +79,13 @@ func InitMetadataDir() (*RepositorySimulator, string, string, error) {
 	if err != nil {
 		log.Debugf("repository simulator setup: failed to write signed roots: %v", err)
 	}
-	targetsDir := LocalDir + targetsPath
+	targetsDir := filepath.Join(LocalDir, targetsPath)
 	sim.LocalDir = LocalDir
 	return sim, metadataDir, targetsDir, err
 }
 
 func GetRootBytes(localMetadataDir string) ([]byte, error) {
-	return os.ReadFile(localMetadataDir + "/root.json")
+	return os.ReadFile(filepath.Join(localMetadataDir, "root.json"))
 }
 
 func RepositoryCleanup(tmpDir string) {

@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -34,7 +35,6 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
 	"github.com/theupdateframework/go-tuf/v2/testutils/testutils"
-	"golang.org/x/sys/unix"
 )
 
 func TestMain(m *testing.M) {
@@ -64,7 +64,7 @@ func TestGenericRead(t *testing.T) {
 	_, err = Timestamp().FromBytes([]byte(badMetadata))
 	assert.ErrorIs(t, err, ErrValue{"expected metadata type timestamp, got - bad-metadata"})
 
-	badMetadataPath := fmt.Sprintf("%s/bad-metadata.json", testutils.RepoDir)
+	badMetadataPath := filepath.Join(testutils.RepoDir, "bad-metadata.json")
 	err = os.WriteFile(badMetadataPath, []byte(badMetadata), 0644)
 	assert.NoError(t, err)
 	assert.FileExists(t, badMetadataPath)
@@ -85,46 +85,46 @@ func TestGenericRead(t *testing.T) {
 
 func TestGenericReadFromMismatchingRoles(t *testing.T) {
 	// Test failing to load other roles from root metadata
-	_, err := Snapshot().FromFile(fmt.Sprintf("%s/root.json", testutils.RepoDir))
+	_, err := Snapshot().FromFile(filepath.Join(testutils.RepoDir, "root.json"))
 	assert.ErrorIs(t, err, ErrValue{"expected metadata type snapshot, got - root"})
-	_, err = Timestamp().FromFile(fmt.Sprintf("%s/root.json", testutils.RepoDir))
+	_, err = Timestamp().FromFile(filepath.Join(testutils.RepoDir, "root.json"))
 	assert.ErrorIs(t, err, ErrValue{"expected metadata type timestamp, got - root"})
-	_, err = Targets().FromFile(fmt.Sprintf("%s/root.json", testutils.RepoDir))
+	_, err = Targets().FromFile(filepath.Join(testutils.RepoDir, "root.json"))
 	assert.ErrorIs(t, err, ErrValue{"expected metadata type targets, got - root"})
 
 	// Test failing to load other roles from targets metadata
-	_, err = Snapshot().FromFile(fmt.Sprintf("%s/targets.json", testutils.RepoDir))
+	_, err = Snapshot().FromFile(filepath.Join(testutils.RepoDir, "targets.json"))
 	assert.ErrorIs(t, err, ErrValue{"expected metadata type snapshot, got - targets"})
-	_, err = Timestamp().FromFile(fmt.Sprintf("%s/targets.json", testutils.RepoDir))
+	_, err = Timestamp().FromFile(filepath.Join(testutils.RepoDir, "targets.json"))
 	assert.ErrorIs(t, err, ErrValue{"expected metadata type timestamp, got - targets"})
-	_, err = Root().FromFile(fmt.Sprintf("%s/targets.json", testutils.RepoDir))
+	_, err = Root().FromFile(filepath.Join(testutils.RepoDir, "targets.json"))
 	assert.ErrorIs(t, err, ErrValue{"expected metadata type root, got - targets"})
 
 	// Test failing to load other roles from timestamp metadata
-	_, err = Snapshot().FromFile(fmt.Sprintf("%s/timestamp.json", testutils.RepoDir))
+	_, err = Snapshot().FromFile(filepath.Join(testutils.RepoDir, "timestamp.json"))
 	assert.ErrorIs(t, err, ErrValue{"expected metadata type snapshot, got - timestamp"})
-	_, err = Targets().FromFile(fmt.Sprintf("%s/timestamp.json", testutils.RepoDir))
+	_, err = Targets().FromFile(filepath.Join(testutils.RepoDir, "timestamp.json"))
 	assert.ErrorIs(t, err, ErrValue{"expected metadata type targets, got - timestamp"})
-	_, err = Root().FromFile(fmt.Sprintf("%s/timestamp.json", testutils.RepoDir))
+	_, err = Root().FromFile(filepath.Join(testutils.RepoDir, "timestamp.json"))
 	assert.ErrorIs(t, err, ErrValue{"expected metadata type root, got - timestamp"})
 
 	// Test failing to load other roles from snapshot metadata
-	_, err = Targets().FromFile(fmt.Sprintf("%s/snapshot.json", testutils.RepoDir))
+	_, err = Targets().FromFile(filepath.Join(testutils.RepoDir, "snapshot.json"))
 	assert.ErrorIs(t, err, ErrValue{"expected metadata type targets, got - snapshot"})
-	_, err = Timestamp().FromFile(fmt.Sprintf("%s/snapshot.json", testutils.RepoDir))
+	_, err = Timestamp().FromFile(filepath.Join(testutils.RepoDir, "snapshot.json"))
 	assert.ErrorIs(t, err, ErrValue{"expected metadata type timestamp, got - snapshot"})
-	_, err = Root().FromFile(fmt.Sprintf("%s/snapshot.json", testutils.RepoDir))
+	_, err = Root().FromFile(filepath.Join(testutils.RepoDir, "snapshot.json"))
 	assert.ErrorIs(t, err, ErrValue{"expected metadata type root, got - snapshot"})
 }
 
 func TestMDReadWriteFileExceptions(t *testing.T) {
 	// Test writing to a file with bad filename
-	badMetadataPath := fmt.Sprintf("%s/bad-metadata.json", testutils.RepoDir)
+	badMetadataPath := filepath.Join(testutils.RepoDir, "bad-metadata.json")
 	_, err := Root().FromFile(badMetadataPath)
 	expectedErr := fs.PathError{
 		Op:   "open",
 		Path: badMetadataPath,
-		Err:  unix.ENOENT,
+		Err:  fs.ErrNotExist,
 	}
 	assert.ErrorIs(t, err, expectedErr.Err)
 
@@ -134,39 +134,43 @@ func TestMDReadWriteFileExceptions(t *testing.T) {
 	expectedErr = fs.PathError{
 		Op:   "open",
 		Path: "",
-		Err:  unix.ENOENT,
+		Err:  fs.ErrNotExist,
 	}
 	assert.ErrorIs(t, err, expectedErr.Err)
 }
 
 func TestCompareFromBytesFromFileToBytes(t *testing.T) {
-	rootBytesWant, err := os.ReadFile(fmt.Sprintf("%s/root.json", testutils.RepoDir))
+	rootPath := filepath.Join(testutils.RepoDir, "root.json")
+	rootBytesWant, err := os.ReadFile(rootPath)
 	assert.NoError(t, err)
-	root, err := Root().FromFile(fmt.Sprintf("%s/root.json", testutils.RepoDir))
+	root, err := Root().FromFile(rootPath)
 	assert.NoError(t, err)
 	rootBytesActual, err := root.ToBytes(true)
 	assert.NoError(t, err)
 	assert.Equal(t, rootBytesWant, rootBytesActual)
 
-	targetsBytesWant, err := os.ReadFile(fmt.Sprintf("%s/targets.json", testutils.RepoDir))
+	targetsPath := filepath.Join(testutils.RepoDir, "targets.json")
+	targetsBytesWant, err := os.ReadFile(targetsPath)
 	assert.NoError(t, err)
-	targets, err := Targets().FromFile(fmt.Sprintf("%s/targets.json", testutils.RepoDir))
+	targets, err := Targets().FromFile(targetsPath)
 	assert.NoError(t, err)
 	targetsBytesActual, err := targets.ToBytes(true)
 	assert.NoError(t, err)
 	assert.Equal(t, targetsBytesWant, targetsBytesActual)
 
-	snapshotBytesWant, err := os.ReadFile(fmt.Sprintf("%s/snapshot.json", testutils.RepoDir))
+	snapshotPath := filepath.Join(testutils.RepoDir, "snapshot.json")
+	snapshotBytesWant, err := os.ReadFile(snapshotPath)
 	assert.NoError(t, err)
-	snapshot, err := Snapshot().FromFile(fmt.Sprintf("%s/snapshot.json", testutils.RepoDir))
+	snapshot, err := Snapshot().FromFile(snapshotPath)
 	assert.NoError(t, err)
 	snapshotBytesActual, err := snapshot.ToBytes(true)
 	assert.NoError(t, err)
 	assert.Equal(t, snapshotBytesWant, snapshotBytesActual)
 
-	timestampBytesWant, err := os.ReadFile(fmt.Sprintf("%s/timestamp.json", testutils.RepoDir))
+	timestampPath := filepath.Join(testutils.RepoDir, "timestamp.json")
+	timestampBytesWant, err := os.ReadFile(timestampPath)
 	assert.NoError(t, err)
-	timestamp, err := Timestamp().FromFile(fmt.Sprintf("%s/timestamp.json", testutils.RepoDir))
+	timestamp, err := Timestamp().FromFile(timestampPath)
 	assert.NoError(t, err)
 	timestampBytesActual, err := timestamp.ToBytes(true)
 	assert.NoError(t, err)
@@ -174,7 +178,7 @@ func TestCompareFromBytesFromFileToBytes(t *testing.T) {
 }
 
 func TestRootReadWriteReadCompare(t *testing.T) {
-	src := testutils.RepoDir + "/root.json"
+	src := filepath.Join(testutils.RepoDir, "root.json")
 	srcRoot, err := Root().FromFile(src)
 	assert.NoError(t, err)
 
@@ -196,7 +200,7 @@ func TestRootReadWriteReadCompare(t *testing.T) {
 }
 
 func TestSnapshotReadWriteReadCompare(t *testing.T) {
-	path1 := testutils.RepoDir + "/snapshot.json"
+	path1 := filepath.Join(testutils.RepoDir, "snapshot.json")
 	snaphot1, err := Snapshot().FromFile(path1)
 	assert.NoError(t, err)
 
@@ -218,7 +222,7 @@ func TestSnapshotReadWriteReadCompare(t *testing.T) {
 }
 
 func TestTargetsReadWriteReadCompare(t *testing.T) {
-	path1 := testutils.RepoDir + "/targets.json"
+	path1 := filepath.Join(testutils.RepoDir, "targets.json")
 	targets1, err := Targets().FromFile(path1)
 	assert.NoError(t, err)
 
@@ -240,7 +244,7 @@ func TestTargetsReadWriteReadCompare(t *testing.T) {
 }
 
 func TestTimestampReadWriteReadCompare(t *testing.T) {
-	path1 := testutils.RepoDir + "/timestamp.json"
+	path1 := filepath.Join(testutils.RepoDir, "timestamp.json")
 	timestamp1, err := Timestamp().FromFile(path1)
 	assert.NoError(t, err)
 
@@ -263,7 +267,8 @@ func TestTimestampReadWriteReadCompare(t *testing.T) {
 
 func TestToFromBytes(t *testing.T) {
 	// ROOT
-	data, err := os.ReadFile(testutils.RepoDir + "/root.json")
+	rootPath := filepath.Join(testutils.RepoDir, "root.json")
+	data, err := os.ReadFile(rootPath)
 	assert.NoError(t, err)
 	root, err := Root().FromBytes(data)
 	assert.NoError(t, err)
@@ -284,7 +289,7 @@ func TestToFromBytes(t *testing.T) {
 	assert.Equal(t, rootBytesWant, rootBytesActual)
 
 	// SNAPSHOT
-	data, err = os.ReadFile(testutils.RepoDir + "/snapshot.json")
+	data, err = os.ReadFile(filepath.Join(testutils.RepoDir, "snapshot.json"))
 	assert.NoError(t, err)
 	snapshot, err := Snapshot().FromBytes(data)
 	assert.NoError(t, err)
@@ -302,7 +307,7 @@ func TestToFromBytes(t *testing.T) {
 	assert.Equal(t, snapshotBytesWant, snapshotBytesActual)
 
 	// TARGETS
-	data, err = os.ReadFile(testutils.RepoDir + "/targets.json")
+	data, err = os.ReadFile(filepath.Join(testutils.RepoDir, "targets.json"))
 	assert.NoError(t, err)
 	targets, err := Targets().FromBytes(data)
 	assert.NoError(t, err)
@@ -320,7 +325,7 @@ func TestToFromBytes(t *testing.T) {
 	assert.Equal(t, targetsBytesWant, targetsBytesActual)
 
 	// TIMESTAMP
-	data, err = os.ReadFile(testutils.RepoDir + "/timestamp.json")
+	data, err = os.ReadFile(filepath.Join(testutils.RepoDir, "timestamp.json"))
 	assert.NoError(t, err)
 	timestamp, err := Timestamp().FromBytes(data)
 	assert.NoError(t, err)
@@ -340,7 +345,7 @@ func TestToFromBytes(t *testing.T) {
 }
 
 func TestSignVerify(t *testing.T) {
-	root, err := Root().FromFile(testutils.RepoDir + "/root.json")
+	root, err := Root().FromFile(filepath.Join(testutils.RepoDir, "root.json"))
 	assert.NoError(t, err)
 
 	// Locate the public keys we need from root
@@ -352,7 +357,7 @@ func TestSignVerify(t *testing.T) {
 	timestampKeyID := root.Signed.Roles[TIMESTAMP].KeyIDs[0]
 
 	// Load sample metadata (targets) and assert ...
-	targets, err := Targets().FromFile(testutils.RepoDir + "/targets.json")
+	targets, err := Targets().FromFile(filepath.Join(testutils.RepoDir, "targets.json"))
 	assert.NoError(t, err)
 	sig, _ := getSignatureByKeyID(targets.Signatures, targetsKeyID)
 	data, err := targets.Signed.MarshalJSON()
@@ -382,7 +387,7 @@ func TestSignVerify(t *testing.T) {
 	assert.ErrorContains(t, err, "crypto/rsa: verification error")
 
 	// Append a new signature with the unrelated key and assert that ...
-	signer, err := signature.LoadSignerFromPEMFile(testutils.KeystoreDir+"/snapshot_key", crypto.SHA256, cryptoutils.SkipPassword)
+	signer, err := signature.LoadSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "snapshot_key"), crypto.SHA256, cryptoutils.SkipPassword)
 	assert.NoError(t, err)
 	snapshotSig, err := targets.Sign(signer)
 	assert.NoError(t, err)
@@ -397,7 +402,7 @@ func TestSignVerify(t *testing.T) {
 	assert.Equal(t, snapshotSig.KeyID, snapshotKeyID)
 
 	// Clear all signatures and add a new signature with the unrelated key and assert that ...
-	signer, err = signature.LoadSignerFromPEMFile(testutils.KeystoreDir+"/timestamp_key", crypto.SHA256, cryptoutils.SkipPassword)
+	signer, err = signature.LoadSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "timestamp_key"), crypto.SHA256, cryptoutils.SkipPassword)
 	assert.NoError(t, err)
 	targets.ClearSignatures()
 	assert.Equal(t, 0, len(targets.Signatures))
@@ -420,7 +425,7 @@ func TestSignVerify(t *testing.T) {
 }
 
 func TestKeyVerifyFailures(t *testing.T) {
-	root, err := Root().FromFile(testutils.RepoDir + "/root.json")
+	root, err := Root().FromFile(filepath.Join(testutils.RepoDir, "root.json"))
 	assert.NoError(t, err)
 
 	// Locate the timestamp public key we need from root
@@ -428,7 +433,7 @@ func TestKeyVerifyFailures(t *testing.T) {
 	timestampKeyID := root.Signed.Roles[TIMESTAMP].KeyIDs[0]
 
 	// Load sample metadata (timestamp)
-	timestamp, err := Timestamp().FromFile(testutils.RepoDir + "/timestamp.json")
+	timestamp, err := Timestamp().FromFile(filepath.Join(testutils.RepoDir, "timestamp.json"))
 	assert.NoError(t, err)
 
 	timestampSig, _ := getSignatureByKeyID(timestamp.Signatures, timestampKeyID)
@@ -489,7 +494,7 @@ func TestKeyVerifyFailures(t *testing.T) {
 func TestMetadataSignedIsExpired(t *testing.T) {
 	// Use of Snapshot is arbitrary, we're just testing the base class
 	// features with real data
-	snapshot, err := Snapshot().FromFile(testutils.RepoDir + "/snapshot.json")
+	snapshot, err := Snapshot().FromFile(filepath.Join(testutils.RepoDir, "snapshot.json"))
 	assert.NoError(t, err)
 	assert.Equal(t, time.Date(2030, 8, 15, 14, 30, 45, 100, time.UTC), snapshot.Signed.Expires)
 
@@ -505,17 +510,16 @@ func TestMetadataSignedIsExpired(t *testing.T) {
 
 func TestMetadataVerifyDelegate(t *testing.T) {
 
-	root, err := Root().FromFile(fmt.Sprintf("%s/root.json", testutils.RepoDir))
+	root, err := Root().FromFile(filepath.Join(testutils.RepoDir, "root.json"))
 	assert.NoError(t, err)
-	snapshot, err := Snapshot().FromFile(fmt.Sprintf("%s/snapshot.json", testutils.RepoDir))
+	snapshot, err := Snapshot().FromFile(filepath.Join(testutils.RepoDir, "snapshot.json"))
 	assert.NoError(t, err)
-	targets, err := Targets().FromFile(fmt.Sprintf("%s/targets.json", testutils.RepoDir))
+	targets, err := Targets().FromFile(filepath.Join(testutils.RepoDir, "targets.json"))
 	assert.NoError(t, err)
-	role1, err := Targets().FromFile(fmt.Sprintf("%s/role1.json", testutils.RepoDir))
+	role1, err := Targets().FromFile(filepath.Join(testutils.RepoDir, "role1.json"))
 	assert.NoError(t, err)
-	role2, err := Targets().FromFile(fmt.Sprintf("%s/role2.json", testutils.RepoDir))
+	role2, err := Targets().FromFile(filepath.Join(testutils.RepoDir, "role2.json"))
 	assert.NoError(t, err)
-
 	// Test the expected delegation tree
 	err = root.VerifyDelegate(ROOT, root)
 	assert.NoError(t, err)
@@ -583,7 +587,7 @@ func TestMetadataVerifyDelegate(t *testing.T) {
 
 	// Verify succeeds when we correct the new signature and reach the
 	// threshold of 2 keys
-	signer, err := signature.LoadSignerFromPEMFile(testutils.KeystoreDir+"/timestamp_key", crypto.SHA256, cryptoutils.SkipPassword)
+	signer, err := signature.LoadSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "timestamp_key"), crypto.SHA256, cryptoutils.SkipPassword)
 	assert.NoError(t, err)
 	_, err = snapshot.Sign(signer)
 	assert.NoError(t, err)
@@ -592,11 +596,11 @@ func TestMetadataVerifyDelegate(t *testing.T) {
 }
 
 func TestRootAddKeyAndRevokeKey(t *testing.T) {
-	root, err := Root().FromFile(fmt.Sprintf("%s/root.json", testutils.RepoDir))
+	root, err := Root().FromFile(filepath.Join(testutils.RepoDir, "root.json"))
 	assert.NoError(t, err)
 
 	// Create a new key
-	signer, err := signature.LoadSignerFromPEMFile(testutils.KeystoreDir+"/root_key2", crypto.SHA256, cryptoutils.SkipPassword)
+	signer, err := signature.LoadSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "root_key2"), crypto.SHA256, cryptoutils.SkipPassword)
 	assert.NoError(t, err)
 	key, err := signer.PublicKey()
 	assert.NoError(t, err)
@@ -654,7 +658,7 @@ func TestRootAddKeyAndRevokeKey(t *testing.T) {
 }
 
 func TestTargetsKeyAPI(t *testing.T) {
-	targets, err := Targets().FromFile(fmt.Sprintf("%s/targets.json", testutils.RepoDir))
+	targets, err := Targets().FromFile(filepath.Join(testutils.RepoDir, "targets.json"))
 	assert.NoError(t, err)
 
 	delegatedRole := DelegatedRole{
@@ -732,7 +736,7 @@ func TestTargetsKeyAPI(t *testing.T) {
 }
 
 func TestTargetsKeyAPIWithSuccinctRoles(t *testing.T) {
-	targets, err := Targets().FromFile(testutils.RepoDir + "/targets.json")
+	targets, err := Targets().FromFile(filepath.Join(testutils.RepoDir, "targets.json"))
 	assert.NoError(t, err)
 
 	// Remove delegated roles
@@ -785,13 +789,13 @@ func TestLengthAndHashValidation(t *testing.T) {
 	// Use timestamp to get a MetaFile object and snapshot
 	// for untrusted metadata file to verify.
 
-	timestamp, err := Timestamp().FromFile(testutils.RepoDir + "/timestamp.json")
+	timestamp, err := Timestamp().FromFile(filepath.Join(testutils.RepoDir, "timestamp.json"))
 	assert.NoError(t, err)
 
 	snapshotMetafile := timestamp.Signed.Meta["snapshot.json"]
 	assert.NotNil(t, snapshotMetafile)
 
-	snapshotData, err := os.ReadFile(testutils.RepoDir + "/snapshot.json")
+	snapshotData, err := os.ReadFile(filepath.Join(testutils.RepoDir, "snapshot.json"))
 	assert.NoError(t, err)
 	h32 := sha256.Sum256(snapshotData)
 	h := h32[:]
@@ -800,7 +804,7 @@ func TestLengthAndHashValidation(t *testing.T) {
 	}
 	snapshotMetafile.Length = 652
 
-	data, err := os.ReadFile(testutils.RepoDir + "/snapshot.json")
+	data, err := os.ReadFile(filepath.Join(testutils.RepoDir, "snapshot.json"))
 	assert.NoError(t, err)
 	err = snapshotMetafile.VerifyLengthHashes(data)
 	assert.NoError(t, err)
@@ -829,10 +833,10 @@ func TestLengthAndHashValidation(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test target files' hash and length verification
-	targets, err := Targets().FromFile(testutils.RepoDir + "/targets.json")
+	targets, err := Targets().FromFile(filepath.Join(testutils.RepoDir, "targets.json"))
 	assert.NoError(t, err)
 	targetFile := targets.Signed.Targets["file1.txt"]
-	targetFileData, err := os.ReadFile(testutils.TargetsDir + "/" + targetFile.Path)
+	targetFileData, err := os.ReadFile(filepath.Join(testutils.TargetsDir, targetFile.Path))
 	assert.NoError(t, err)
 
 	// test exceptions
@@ -849,21 +853,23 @@ func TestLengthAndHashValidation(t *testing.T) {
 
 func TestTargetFileFromFile(t *testing.T) {
 	// Test with an existing file and valid hash algorithm
-	targetFileFromFile, err := TargetFile().FromFile(testutils.TargetsDir+"/file1.txt", "sha256")
+	targetFilePath := filepath.Join(testutils.TargetsDir, "file1.txt")
+	targetFileFromFile, err := TargetFile().FromFile(targetFilePath, "sha256")
 	assert.NoError(t, err)
-	targetFileData, err := os.ReadFile(testutils.TargetsDir + "/file1.txt")
+	targetFileData, err := os.ReadFile(targetFilePath)
 	assert.NoError(t, err)
 	err = targetFileFromFile.VerifyLengthHashes(targetFileData)
 	assert.NoError(t, err)
 
 	// Test with mismatching target file data
-	mismatchingTargetFileData, err := os.ReadFile(testutils.TargetsDir + "/file2.txt")
+	mismatchingTargetFilePath := filepath.Join(testutils.TargetsDir, "file2.txt")
+	mismatchingTargetFileData, err := os.ReadFile(mismatchingTargetFilePath)
 	assert.NoError(t, err)
 	err = targetFileFromFile.VerifyLengthHashes(mismatchingTargetFileData)
 	assert.ErrorIs(t, err, ErrLengthOrHashMismatch{"hash verification failed - mismatch for algorithm sha256"})
 
 	// Test with an unsupported algorithm
-	_, err = TargetFile().FromFile(testutils.TargetsDir+"/file1.txt", "123")
+	_, err = TargetFile().FromFile(targetFilePath, "123")
 	assert.ErrorIs(t, err, ErrValue{"failed generating TargetFile - unsupported hashing algorithm - 123"})
 }
 
@@ -879,15 +885,16 @@ func TestTargetFileCustom(t *testing.T) {
 
 func TestTargetFileFromBytes(t *testing.T) {
 	data := []byte("Inline test content")
+	path := filepath.Join(testutils.TargetsDir, "file1.txt")
 
 	// Test with a valid hash algorithm
-	targetFileFromData, err := TargetFile().FromBytes(testutils.TargetsDir+"/file1.txt", data, "sha256")
+	targetFileFromData, err := TargetFile().FromBytes(path, data, "sha256")
 	assert.NoError(t, err)
 	err = targetFileFromData.VerifyLengthHashes(data)
 	assert.NoError(t, err)
 
 	// Test with no algorithms specified
-	targetFileFromDataWithNoAlg, err := TargetFile().FromBytes(testutils.TargetsDir+"/file1.txt", data)
+	targetFileFromDataWithNoAlg, err := TargetFile().FromBytes(path, data)
 	assert.NoError(t, err)
 	err = targetFileFromDataWithNoAlg.VerifyLengthHashes(data)
 	assert.NoError(t, err)

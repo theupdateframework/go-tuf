@@ -75,7 +75,7 @@ func InitializeCmd() error {
 		if err != nil {
 			return err
 		}
-		rootPath = fmt.Sprintf("%s/%s.json", rootPath, metadata.ROOT)
+		rootPath = filepath.Join(rootPath, fmt.Sprintf("%s.json", metadata.ROOT))
 		// no need to copy root.json to the metadata folder as we already download it in the expected location
 		copyTrusted = false
 	}

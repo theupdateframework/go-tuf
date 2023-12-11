@@ -39,7 +39,7 @@ func SetupTestDirs(repoPath string, targetsPath string, keystorePath string) err
 		return fmt.Errorf("failed to create temporary directory: %w", err)
 	}
 
-	RepoDir = fmt.Sprintf("%s/repository_data/repository", TempDir)
+	RepoDir = filepath.Join(TempDir, "repository_data", "repository")
 	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
 		return fmt.Errorf("failed to get absolute path: %w", err)
@@ -49,7 +49,7 @@ func SetupTestDirs(repoPath string, targetsPath string, keystorePath string) err
 		return fmt.Errorf("failed to copy metadata to %s: %w", RepoDir, err)
 	}
 
-	TargetsDir = fmt.Sprintf("%s/repository_data/repository/targets", TempDir)
+	TargetsDir = filepath.Join(TempDir, "repository_data", "repository", "targets")
 	targetsAbsPath, err := filepath.Abs(targetsPath)
 	if err != nil {
 		return fmt.Errorf("failed to get absolute targets path: %w", err)
@@ -59,7 +59,7 @@ func SetupTestDirs(repoPath string, targetsPath string, keystorePath string) err
 		return fmt.Errorf("failed to copy metadata to %s: %w", RepoDir, err)
 	}
 
-	KeystoreDir = fmt.Sprintf("%s/keystore", TempDir)
+	KeystoreDir = filepath.Join(TempDir, "keystore")
 	err = os.Mkdir(KeystoreDir, 0750)
 	if err != nil {
 		return fmt.Errorf("failed to create keystore dir %s: %w", KeystoreDir, err)
@@ -86,11 +86,11 @@ func Copy(fromPath string, toPath string) error {
 		return fmt.Errorf("failed to read path %s: %w", fromPath, err)
 	}
 	for _, file := range files {
-		data, err := os.ReadFile(fmt.Sprintf("%s/%s", fromPath, file.Name()))
+		data, err := os.ReadFile(filepath.Join(fromPath, file.Name()))
 		if err != nil {
 			return fmt.Errorf("failed to read file %s: %w", file.Name(), err)
 		}
-		filePath := fmt.Sprintf("%s/%s", toPath, file.Name())
+		filePath := filepath.Join(toPath, file.Name())
 		err = os.WriteFile(filePath, data, 0750)
 		if err != nil {
 			return fmt.Errorf("failed to write file %s: %w", filePath, err)

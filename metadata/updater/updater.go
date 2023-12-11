@@ -26,6 +26,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -237,7 +239,7 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 			targetFilePath = fmt.Sprintf("%s.%s", hashes, dirName)
 		} else {
 			// <dir-prefix>/<hash>.<target-name>
-			targetFilePath = fmt.Sprintf("%s/%s.%s", dirName, hashes, baseName)
+			targetFilePath = filepath.Join(dirName, fmt.Sprintf("%s.%s", hashes, baseName))
 		}
 	}
 	fullURL := fmt.Sprintf("%s%s", targetBaseURL, targetFilePath)
@@ -575,6 +577,40 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 	return nil, fmt.Errorf("target %s not found", targetFilePath)
 }
 
+// on windows, you can't rename a file across drives, so let's move instead
+func MoveFile(source, destination string) (err error) {
+	if runtime.GOOS == "windows" {
+		inputFile, err := os.Open(source)
+		if err != nil {
+			return fmt.Errorf("Couldn't open source file: %s", err)
+		}
+		defer inputFile.Close()
+		outputFile, err := os.Create(destination)
+		if err != nil {
+			inputFile.Close()
+			return fmt.Errorf("Couldn't open dest file: %s", err)
+		}
+		defer outputFile.Close()
+		c, err := io.Copy(outputFile, inputFile)
+		if err != nil {
+			return fmt.Errorf("Writing to output file failed: %s", err)
+		}
+		if c <= 0 {
+			return fmt.Errorf("Nothing copied to output file")
+		}
+		inputFile.Close()
+		// The copy was successful, so now delete the original file
+		err = os.Remove(source)
+		if err != nil {
+			return fmt.Errorf("Failed removing original file: %s", err)
+		}
+		return nil
+	} else {
+		return os.Rename(source, destination)
+	}
+
+}
+
 // persistMetadata writes metadata to disk atomically to avoid data loss
 func (update *Updater) persistMetadata(roleName string, data []byte) error {
 	log := metadata.GetLogger()
@@ -593,6 +629,7 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	// write the data content to the temporary file
 	err = os.WriteFile(file.Name(), data, 0644)
 	if err != nil {
@@ -603,10 +640,20 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 		}
 		return err
 	}
+
+	// can't move/rename an open file on windows, so close it first
+	file.Close()
 	// if all okay, rename the temporary file to the desired one
-	err = os.Rename(file.Name(), fileName)
+	err = MoveFile(file.Name(), fileName)
 	if err != nil {
 		return err
+	}
+	read, err := os.ReadFile(fileName)
+	if err != nil {
+		return err
+	}
+	if string(read) != string(data) {
+		return fmt.Errorf("failed to persist metadata: %w", err)
 	}
 	return nil
 }
@@ -648,8 +695,20 @@ func (update *Updater) GetTrustedMetadataSet() trustedmetadata.TrustedMetadata {
 	return *update.trusted
 }
 
+func IsWindowsPath(path string) bool {
+	match, _ := regexp.MatchString(`^[a-zA-Z]:\\`, path)
+	return match
+}
+
 // ensureTrailingSlash ensures url ends with a slash
 func ensureTrailingSlash(url string) string {
+	if IsWindowsPath(url) {
+		slash := string(filepath.Separator)
+		if strings.HasSuffix(url, slash) {
+			return url
+		}
+		return url + slash
+	}
 	if strings.HasSuffix(url, "/") {
 		return url
 	}

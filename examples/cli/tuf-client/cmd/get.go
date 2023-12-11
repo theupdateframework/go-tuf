@@ -157,7 +157,7 @@ func verifyEnv() (*localConfig, error) {
 		return nil, fmt.Errorf("no local download folder: %w", err)
 	}
 	// verify there's a local root.json available for bootstrapping trust
-	_, err = os.Stat(fmt.Sprintf("%s/%s.json", env.MetadataDir, metadata.ROOT))
+	_, err = os.Stat(filepath.Join(env.MetadataDir, fmt.Sprintf("%s.json", metadata.ROOT)))
 	if err != nil {
 		return nil, fmt.Errorf("no local download folder: %w", err)
 	}

@@ -21,8 +21,8 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/json"
-	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -506,7 +506,7 @@ func TestToByte(t *testing.T) {
 
 func TestFromFile(t *testing.T) {
 	root := Root(fixedExpire)
-	_, err := root.FromFile(fmt.Sprintf("%s/1.root.json", TEST_REPOSITORY_DATA))
+	_, err := root.FromFile(filepath.Join(TEST_REPOSITORY_DATA, "1.root.json"))
 	assert.NoError(t, err)
 
 	assert.Equal(t, fixedExpire, root.Signed.Expires)
@@ -554,7 +554,7 @@ func TestToFile(t *testing.T) {
 	tmpDir, err := os.MkdirTemp(tmp, "0750")
 	assert.NoError(t, err)
 
-	fileName := fmt.Sprintf("%s/1.root.json", tmpDir)
+	fileName := filepath.Join(tmpDir, "1.root.json")
 	assert.NoFileExists(t, fileName)
 	root, err := Root().FromBytes(testRootBytes)
 	assert.NoError(t, err)
