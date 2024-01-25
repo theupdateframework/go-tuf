@@ -21,9 +21,9 @@ import (
 	"path/filepath"
 
 	"github.com/go-logr/stdr"
-	"github.com/rdimitrov/go-tuf-metadata/metadata"
-	"github.com/rdimitrov/go-tuf-metadata/metadata/trustedmetadata"
 	"github.com/spf13/cobra"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
+	"github.com/theupdateframework/go-tuf/v2/metadata/trustedmetadata"
 )
 
 var rootPath string

@@ -21,10 +21,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/rdimitrov/go-tuf-metadata/metadata"
-	"github.com/rdimitrov/go-tuf-metadata/metadata/config"
-	simulator "github.com/rdimitrov/go-tuf-metadata/testutils/simulator"
-	testutils "github.com/rdimitrov/go-tuf-metadata/testutils/testutils"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
+	"github.com/theupdateframework/go-tuf/v2/metadata/config"
+	"github.com/theupdateframework/go-tuf/v2/testutils/simulator"
+	"github.com/theupdateframework/go-tuf/v2/testutils/testutils"
 )
 
 func TestMain(m *testing.M) {

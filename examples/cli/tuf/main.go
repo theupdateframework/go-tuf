@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"os"
 
-	tuf "github.com/rdimitrov/go-tuf-metadata/examples/cli/tuf/cmd"
+	tuf "github.com/theupdateframework/go-tuf/v2/examples/cli/tuf/cmd"
 )
 
 func main() {

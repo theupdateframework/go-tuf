@@ -12,7 +12,7 @@
 package repository
 
 import (
-	"github.com/rdimitrov/go-tuf-metadata/metadata"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
 // repositoryType struct for storing metadata
