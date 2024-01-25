@@ -22,9 +22,9 @@ import (
 
 	"github.com/go-logr/stdr"
 
-	"github.com/rdimitrov/go-tuf-metadata/metadata"
-	"github.com/rdimitrov/go-tuf-metadata/metadata/config"
-	"github.com/rdimitrov/go-tuf-metadata/metadata/updater"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
+	"github.com/theupdateframework/go-tuf/v2/metadata/config"
+	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
 
 // The following config is used to fetch a target from Jussi's GitHub repository example

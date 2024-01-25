@@ -56,10 +56,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rdimitrov/go-tuf-metadata/metadata"
-	"github.com/rdimitrov/go-tuf-metadata/metadata/fetcher"
 	"github.com/sigstore/sigstore/pkg/signature"
 	log "github.com/sirupsen/logrus"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
+	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
 
 var SPEC_VER = "." + metadata.SPECIFICATION_VERSION

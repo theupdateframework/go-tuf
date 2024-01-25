@@ -1,4 +1,4 @@
-module github.com/rdimitrov/go-tuf-metadata
+module github.com/theupdateframework/go-tuf/v2
 
 go 1.21.5
 

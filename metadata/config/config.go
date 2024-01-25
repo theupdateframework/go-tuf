@@ -15,7 +15,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/rdimitrov/go-tuf-metadata/metadata/fetcher"
+	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
 
 type UpdaterConfig struct {

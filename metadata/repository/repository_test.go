@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rdimitrov/go-tuf-metadata/metadata"
 	"github.com/stretchr/testify/assert"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
 func TestNewRepository(t *testing.T) {

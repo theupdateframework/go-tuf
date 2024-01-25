@@ -12,7 +12,7 @@
 package main
 
 import (
-	tufclient "github.com/rdimitrov/go-tuf-metadata/examples/cli/tuf-client/cmd"
+	tufclient "github.com/theupdateframework/go-tuf/v2/examples/cli/tuf-client/cmd"
 )
 
 func main() {

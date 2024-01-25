@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rdimitrov/go-tuf-metadata/metadata"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
 // TrustedMetadata struct for storing trusted metadata

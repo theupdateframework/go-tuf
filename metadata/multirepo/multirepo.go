@@ -17,9 +17,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/rdimitrov/go-tuf-metadata/metadata"
-	"github.com/rdimitrov/go-tuf-metadata/metadata/config"
-	"github.com/rdimitrov/go-tuf-metadata/metadata/updater"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
+	"github.com/theupdateframework/go-tuf/v2/metadata/config"
+	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 	"golang.org/x/exp/slices"
 )
 
