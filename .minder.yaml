@@ -109,7 +109,7 @@ repository:
   - type: license
     def:
       license_filename: LICENSE
-      license_type: "BSD-2-Clause"
+      license_type: "Apache License"
 # artifact:
 #   - type: artifact_signature
 #     params:
