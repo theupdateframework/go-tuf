@@ -27,8 +27,8 @@ import (
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
+	"github.com/theupdateframework/go-tuf/v2/internal/testutils"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
-	"github.com/theupdateframework/go-tuf/v2/testutils/testutils"
 )
 
 var allRoles map[string][]byte
@@ -89,9 +89,9 @@ func setAllRolesBytes(path string) {
 func TestMain(m *testing.M) {
 	log := metadata.GetLogger()
 
-	repoPath := "../../testutils/repository_data/repository/metadata"
-	keystorePath := "../../testutils/repository_data/keystore"
-	targetsPath := "../../testutils/repository_data/repository/targets"
+	repoPath := "../../internal/testutils/repository_data/repository/metadata"
+	keystorePath := "../../internal/testutils/repository_data/keystore"
+	targetsPath := "../../internal/testutils/repository_data/repository/targets"
 	err := testutils.SetupTestDirs(repoPath, targetsPath, keystorePath)
 	defer testutils.Cleanup()
 

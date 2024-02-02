@@ -34,14 +34,14 @@ import (
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
-	"github.com/theupdateframework/go-tuf/v2/testutils/testutils"
+	"github.com/theupdateframework/go-tuf/v2/internal/testutils"
 )
 
 func TestMain(m *testing.M) {
 
-	repoPath := "../testutils/repository_data/repository/metadata"
-	targetsPath := "../testutils/repository_data/repository/targets"
-	keystorePath := "../testutils/repository_data/keystore"
+	repoPath := "../internal/testutils/repository_data/repository/metadata"
+	targetsPath := "../internal/testutils/repository_data/repository/targets"
+	keystorePath := "../internal/testutils/repository_data/keystore"
 	err := testutils.SetupTestDirs(repoPath, targetsPath, keystorePath)
 	defer testutils.Cleanup()
 
