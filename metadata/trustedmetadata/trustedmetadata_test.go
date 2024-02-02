@@ -29,7 +29,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"github.com/theupdateframework/go-tuf/v2/testutils/testutils"
-	"golang.org/x/exp/maps"
 )
 
 var allRoles map[string][]byte
@@ -634,9 +633,10 @@ func TestUpdateSnapshotSuccessfulRollbackChecks(t *testing.T) {
 }
 
 func TestUpdateTargetsMoMetaInSnapshot(t *testing.T) {
-
-	clearMeta := func(snapahot *metadata.Metadata[metadata.SnapshotType]) {
-		maps.Clear(snapahot.Signed.Meta)
+	clearMeta := func(snapshot *metadata.Metadata[metadata.SnapshotType]) {
+		for key := range snapshot.Signed.Meta {
+			delete(snapshot.Signed.Meta, key)
+		}
 	}
 	snapshot, err := modifySnapshotMetadata(clearMeta)
 	assert.NoError(t, err)
