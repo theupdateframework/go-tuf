@@ -33,13 +33,13 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/sigstore/sigstore/pkg/signature"
-	"golang.org/x/exp/slices"
 )
 
 // Root return new metadata instance of type Root
