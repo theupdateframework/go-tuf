@@ -218,7 +218,7 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	// sign the Signed part
 	sb, err := signer.SignMessage(bytes.NewReader(payload))
 	if err != nil {
-		return nil, ErrUnsignedMetadata{Msg: "problem signing metadata"}
+		return nil, &ErrUnsignedMetadata{Msg: "problem signing metadata"}
 	}
 	// get the signer's PublicKey
 	publ, err := signer.PublicKey()
@@ -263,12 +263,12 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			roleThreshold = role.Threshold
 		} else {
 			// the delegated role was not found, no need to proceed
-			return ErrValue{Msg: fmt.Sprintf("no delegation found for %s", delegatedRole)}
+			return &ErrValue{Msg: fmt.Sprintf("no delegation found for %s", delegatedRole)}
 		}
 	// Targets delegator
 	case *Metadata[TargetsType]:
 		if i.Signed.Delegations == nil {
-			return ErrValue{Msg: "no delegations found"}
+			return &ErrValue{Msg: "no delegations found"}
 		}
 		keys = i.Signed.Delegations.Keys
 		if i.Signed.Delegations.Roles != nil {
@@ -283,24 +283,24 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			}
 			// the delegated role was not found, no need to proceed
 			if !found {
-				return ErrValue{Msg: fmt.Sprintf("no delegation found for %s", delegatedRole)}
+				return &ErrValue{Msg: fmt.Sprintf("no delegation found for %s", delegatedRole)}
 			}
 		} else if i.Signed.Delegations.SuccinctRoles != nil {
 			roleKeyIDs = i.Signed.Delegations.SuccinctRoles.KeyIDs
 			roleThreshold = i.Signed.Delegations.SuccinctRoles.Threshold
 		}
 	default:
-		return ErrType{Msg: "call is valid only on delegator metadata (should be either root or targets)"}
+		return &ErrType{Msg: "call is valid only on delegator metadata (should be either root or targets)"}
 	}
 	// if there are no keyIDs for that role it means there's no delegation found
 	if len(roleKeyIDs) == 0 {
-		return ErrValue{Msg: fmt.Sprintf("no delegation found for %s", delegatedRole)}
+		return &ErrValue{Msg: fmt.Sprintf("no delegation found for %s", delegatedRole)}
 	}
 	// loop through each role keyID
 	for _, keyID := range roleKeyIDs {
 		key, ok := keys[keyID]
 		if !ok {
-			return ErrValue{Msg: fmt.Sprintf("key with ID %s not found in %s keyids", keyID, delegatedRole)}
+			return &ErrValue{Msg: fmt.Sprintf("key with ID %s not found in %s keyids", keyID, delegatedRole)}
 		}
 		sign := Signature{}
 		var payload []byte
@@ -363,7 +363,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 				return err
 			}
 		default:
-			return ErrType{Msg: "unknown delegated metadata type"}
+			return &ErrType{Msg: "unknown delegated metadata type"}
 		}
 		// verify if the signature for that payload corresponds to the given key
 		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payload)); err != nil {
@@ -378,7 +378,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 	// check if the amount of valid signatures is enough
 	if len(signingKeys) < roleThreshold {
 		log.Info("Verifying failed, not enough signatures", "role", delegatedRole, "got", len(signingKeys), "want", roleThreshold)
-		return ErrUnsignedMetadata{Msg: fmt.Sprintf("Verifying %s failed, not enough signatures, got %d, want %d", delegatedRole, len(signingKeys), roleThreshold)}
+		return &ErrUnsignedMetadata{Msg: fmt.Sprintf("Verifying %s failed, not enough signatures, got %d, want %d", delegatedRole, len(signingKeys), roleThreshold)}
 	}
 	log.Info("Verified successfully", "role", delegatedRole)
 	return nil
@@ -490,7 +490,7 @@ func (t *TargetFiles) FromBytes(localPath string, data []byte, hashes ...string)
 		case "sha512":
 			hasher = sha512.New()
 		default:
-			return nil, ErrValue{Msg: fmt.Sprintf("failed generating TargetFile - unsupported hashing algorithm - %s", v)}
+			return nil, &ErrValue{Msg: fmt.Sprintf("failed generating TargetFile - unsupported hashing algorithm - %s", v)}
 		}
 		_, err := hasher.Write(data)
 		if err != nil {
@@ -653,7 +653,7 @@ func (role *SuccinctRoles) IsDelegatedRole(roleName string) bool {
 func (signed *RootType) AddKey(key *Key, role string) error {
 	// verify role is present
 	if _, ok := signed.Roles[role]; !ok {
-		return ErrValue{Msg: fmt.Sprintf("role %s doesn't exist", role)}
+		return &ErrValue{Msg: fmt.Sprintf("role %s doesn't exist", role)}
 	}
 	// add keyID to role
 	if !slices.Contains(signed.Roles[role].KeyIDs, key.ID()) {
@@ -670,11 +670,11 @@ func (signed *RootType) AddKey(key *Key, role string) error {
 func (signed *RootType) RevokeKey(keyID, role string) error {
 	// verify role is present
 	if _, ok := signed.Roles[role]; !ok {
-		return ErrValue{Msg: fmt.Sprintf("role %s doesn't exist", role)}
+		return &ErrValue{Msg: fmt.Sprintf("role %s doesn't exist", role)}
 	}
 	// verify keyID is present for given role
 	if !slices.Contains(signed.Roles[role].KeyIDs, keyID) {
-		return ErrValue{Msg: fmt.Sprintf("key with id %s is not used by %s", keyID, role)}
+		return &ErrValue{Msg: fmt.Sprintf("key with id %s is not used by %s", keyID, role)}
 	}
 	// remove keyID from role
 	filteredKeyIDs := []string{}
@@ -703,7 +703,7 @@ func (signed *RootType) RevokeKey(keyID, role string) error {
 func (signed *TargetsType) AddKey(key *Key, role string) error {
 	// check if Delegations are even present
 	if signed.Delegations == nil {
-		return ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
+		return &ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
 	}
 	// standard delegated roles
 	if signed.Delegations.Roles != nil {
@@ -723,7 +723,7 @@ func (signed *TargetsType) AddKey(key *Key, role string) error {
 			}
 		}
 		if !isDelegatedRole {
-			return ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
+			return &ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
 		}
 	} else if signed.Delegations.SuccinctRoles != nil {
 		// add key if keyID is not already part of keyIDs for the SuccinctRoles role
@@ -745,7 +745,7 @@ func (signed *TargetsType) AddKey(key *Key, role string) error {
 func (signed *TargetsType) RevokeKey(keyID string, role string) error {
 	// check if Delegations are even present
 	if signed.Delegations == nil {
-		return ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
+		return &ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
 	}
 	// standard delegated roles
 	if signed.Delegations.Roles != nil {
@@ -755,7 +755,7 @@ func (signed *TargetsType) RevokeKey(keyID string, role string) error {
 			if d.Name == role {
 				// check if keyID is present in keyIDs for that role
 				if !slices.Contains(d.KeyIDs, keyID) {
-					return ErrValue{Msg: fmt.Sprintf("key with id %s is not used by %s", keyID, role)}
+					return &ErrValue{Msg: fmt.Sprintf("key with id %s is not used by %s", keyID, role)}
 				}
 				// remove keyID from role
 				filteredKeyIDs := []string{}
@@ -778,11 +778,11 @@ func (signed *TargetsType) RevokeKey(keyID string, role string) error {
 			}
 		}
 		// we haven't found the delegated role
-		return ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
+		return &ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
 	} else if signed.Delegations.SuccinctRoles != nil {
 		// check if keyID is used by SuccinctRoles role
 		if !slices.Contains(signed.Delegations.SuccinctRoles.KeyIDs, keyID) {
-			return ErrValue{Msg: fmt.Sprintf("key with id %s is not used by SuccinctRoles", keyID)}
+			return &ErrValue{Msg: fmt.Sprintf("key with id %s is not used by SuccinctRoles", keyID)}
 		}
 		// remove keyID from the SuccinctRoles role
 		filteredKeyIDs := []string{}
@@ -798,7 +798,7 @@ func (signed *TargetsType) RevokeKey(keyID string, role string) error {
 		delete(signed.Delegations.Keys, keyID)
 		return nil
 	}
-	return ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
+	return &ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
 }
 
 // Equal checks whether one hash set equals another
@@ -824,7 +824,7 @@ func verifyLength(data []byte, length int64) error {
 		return err
 	}
 	if length != len {
-		return ErrLengthOrHashMismatch{Msg: fmt.Sprintf("length verification failed - expected %d, got %d", length, len)}
+		return &ErrLengthOrHashMismatch{Msg: fmt.Sprintf("length verification failed - expected %d, got %d", length, len)}
 	}
 	return nil
 }
@@ -839,11 +839,11 @@ func verifyHashes(data []byte, hashes Hashes) error {
 		case "sha512":
 			hasher = sha512.New()
 		default:
-			return ErrLengthOrHashMismatch{Msg: fmt.Sprintf("hash verification failed - unknown hashing algorithm - %s", k)}
+			return &ErrLengthOrHashMismatch{Msg: fmt.Sprintf("hash verification failed - unknown hashing algorithm - %s", k)}
 		}
 		hasher.Write(data)
 		if hex.EncodeToString(v) != hex.EncodeToString(hasher.Sum(nil)) {
-			return ErrLengthOrHashMismatch{Msg: fmt.Sprintf("hash verification failed - mismatch for algorithm %s", k)}
+			return &ErrLengthOrHashMismatch{Msg: fmt.Sprintf("hash verification failed - mismatch for algorithm %s", k)}
 		}
 	}
 	return nil
@@ -873,7 +873,7 @@ func checkUniqueSignatures[T Roles](meta Metadata[T]) error {
 	signatures := []string{}
 	for _, sig := range meta.Signatures {
 		if slices.Contains(signatures, sig.KeyID) {
-			return ErrValue{Msg: fmt.Sprintf("multiple signatures found for key ID %s", sig.KeyID)}
+			return &ErrValue{Msg: fmt.Sprintf("multiple signatures found for key ID %s", sig.KeyID)}
 		}
 		signatures = append(signatures, sig.KeyID)
 	}
@@ -891,22 +891,22 @@ func checkType[T Roles](data []byte) error {
 	switch i.(type) {
 	case *RootType:
 		if ROOT != signedType {
-			return ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", ROOT, signedType)}
+			return &ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", ROOT, signedType)}
 		}
 	case *SnapshotType:
 		if SNAPSHOT != signedType {
-			return ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", SNAPSHOT, signedType)}
+			return &ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", SNAPSHOT, signedType)}
 		}
 	case *TimestampType:
 		if TIMESTAMP != signedType {
-			return ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", TIMESTAMP, signedType)}
+			return &ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", TIMESTAMP, signedType)}
 		}
 	case *TargetsType:
 		if TARGETS != signedType {
-			return ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", TARGETS, signedType)}
+			return &ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", TARGETS, signedType)}
 		}
 	default:
-		return ErrValue{Msg: fmt.Sprintf("unrecognized metadata type - %s", signedType)}
+		return &ErrValue{Msg: fmt.Sprintf("unrecognized metadata type - %s", signedType)}
 	}
 	// all okay
 	return nil

@@ -56,13 +56,13 @@ func TestGenericRead(t *testing.T) {
 	// Assert that it chokes correctly on an unknown metadata type
 	badMetadata := "{\"signed\": {\"_type\": \"bad-metadata\"}}"
 	_, err := Root().FromBytes([]byte(badMetadata))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type root, got - bad-metadata"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type root, got - bad-metadata"})
 	_, err = Snapshot().FromBytes([]byte(badMetadata))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type snapshot, got - bad-metadata"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type snapshot, got - bad-metadata"})
 	_, err = Targets().FromBytes([]byte(badMetadata))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type targets, got - bad-metadata"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type targets, got - bad-metadata"})
 	_, err = Timestamp().FromBytes([]byte(badMetadata))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type timestamp, got - bad-metadata"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type timestamp, got - bad-metadata"})
 
 	badMetadataPath := filepath.Join(testutils.RepoDir, "bad-metadata.json")
 	err = os.WriteFile(badMetadataPath, []byte(badMetadata), 0644)
@@ -70,13 +70,13 @@ func TestGenericRead(t *testing.T) {
 	assert.FileExists(t, badMetadataPath)
 
 	_, err = Root().FromFile(badMetadataPath)
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type root, got - bad-metadata"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type root, got - bad-metadata"})
 	_, err = Snapshot().FromFile(badMetadataPath)
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type snapshot, got - bad-metadata"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type snapshot, got - bad-metadata"})
 	_, err = Targets().FromFile(badMetadataPath)
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type targets, got - bad-metadata"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type targets, got - bad-metadata"})
 	_, err = Timestamp().FromFile(badMetadataPath)
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type timestamp, got - bad-metadata"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type timestamp, got - bad-metadata"})
 
 	err = os.RemoveAll(badMetadataPath)
 	assert.NoError(t, err)
@@ -86,35 +86,35 @@ func TestGenericRead(t *testing.T) {
 func TestGenericReadFromMismatchingRoles(t *testing.T) {
 	// Test failing to load other roles from root metadata
 	_, err := Snapshot().FromFile(filepath.Join(testutils.RepoDir, "root.json"))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type snapshot, got - root"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type snapshot, got - root"})
 	_, err = Timestamp().FromFile(filepath.Join(testutils.RepoDir, "root.json"))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type timestamp, got - root"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type timestamp, got - root"})
 	_, err = Targets().FromFile(filepath.Join(testutils.RepoDir, "root.json"))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type targets, got - root"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type targets, got - root"})
 
 	// Test failing to load other roles from targets metadata
 	_, err = Snapshot().FromFile(filepath.Join(testutils.RepoDir, "targets.json"))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type snapshot, got - targets"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type snapshot, got - targets"})
 	_, err = Timestamp().FromFile(filepath.Join(testutils.RepoDir, "targets.json"))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type timestamp, got - targets"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type timestamp, got - targets"})
 	_, err = Root().FromFile(filepath.Join(testutils.RepoDir, "targets.json"))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type root, got - targets"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type root, got - targets"})
 
 	// Test failing to load other roles from timestamp metadata
 	_, err = Snapshot().FromFile(filepath.Join(testutils.RepoDir, "timestamp.json"))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type snapshot, got - timestamp"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type snapshot, got - timestamp"})
 	_, err = Targets().FromFile(filepath.Join(testutils.RepoDir, "timestamp.json"))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type targets, got - timestamp"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type targets, got - timestamp"})
 	_, err = Root().FromFile(filepath.Join(testutils.RepoDir, "timestamp.json"))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type root, got - timestamp"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type root, got - timestamp"})
 
 	// Test failing to load other roles from snapshot metadata
 	_, err = Targets().FromFile(filepath.Join(testutils.RepoDir, "snapshot.json"))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type targets, got - snapshot"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type targets, got - snapshot"})
 	_, err = Timestamp().FromFile(filepath.Join(testutils.RepoDir, "snapshot.json"))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type timestamp, got - snapshot"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type timestamp, got - snapshot"})
 	_, err = Root().FromFile(filepath.Join(testutils.RepoDir, "snapshot.json"))
-	assert.ErrorIs(t, err, ErrValue{"expected metadata type root, got - snapshot"})
+	assert.ErrorIs(t, err, &ErrValue{"expected metadata type root, got - snapshot"})
 }
 
 func TestMDReadWriteFileExceptions(t *testing.T) {
@@ -534,21 +534,21 @@ func TestMetadataVerifyDelegate(t *testing.T) {
 
 	// Only root and targets can verify delegates
 	err = snapshot.VerifyDelegate(SNAPSHOT, snapshot)
-	assert.ErrorIs(t, err, ErrType{"call is valid only on delegator metadata (should be either root or targets)"})
+	assert.ErrorIs(t, err, &ErrType{"call is valid only on delegator metadata (should be either root or targets)"})
 	// Verify fails for roles that are not delegated by delegator
 	err = root.VerifyDelegate("role1", role1)
-	assert.ErrorIs(t, err, ErrValue{"no delegation found for role1"})
+	assert.ErrorIs(t, err, &ErrValue{"no delegation found for role1"})
 	err = targets.VerifyDelegate(TARGETS, targets)
-	assert.ErrorIs(t, err, ErrValue{"no delegation found for targets"})
+	assert.ErrorIs(t, err, &ErrValue{"no delegation found for targets"})
 	// Verify fails when delegator has no delegations
 	err = role2.VerifyDelegate("role1", role1)
-	assert.ErrorIs(t, err, ErrValue{"no delegations found"})
+	assert.ErrorIs(t, err, &ErrValue{"no delegations found"})
 
 	// Verify fails when delegate content is modified
 	expires := snapshot.Signed.Expires
 	snapshot.Signed.Expires = snapshot.Signed.Expires.Add(time.Hour * 24)
 	err = root.VerifyDelegate(SNAPSHOT, snapshot)
-	assert.ErrorIs(t, err, ErrUnsignedMetadata{"Verifying snapshot failed, not enough signatures, got 0, want 1"})
+	assert.ErrorIs(t, err, &ErrUnsignedMetadata{"Verifying snapshot failed, not enough signatures, got 0, want 1"})
 	snapshot.Signed.Expires = expires
 
 	// Verify fails with verification error
@@ -558,12 +558,12 @@ func TestMetadataVerifyDelegate(t *testing.T) {
 	assert.NotEmpty(t, goodSig)
 	snapshot.Signatures[idx].Signature = []byte("foo")
 	err = root.VerifyDelegate(SNAPSHOT, snapshot)
-	assert.ErrorIs(t, err, ErrUnsignedMetadata{"Verifying snapshot failed, not enough signatures, got 0, want 1"})
+	assert.ErrorIs(t, err, &ErrUnsignedMetadata{"Verifying snapshot failed, not enough signatures, got 0, want 1"})
 	snapshot.Signatures[idx].Signature = goodSig
 
 	// Verify fails if roles keys do not sign the metadata
 	err = root.VerifyDelegate(TIMESTAMP, snapshot)
-	assert.ErrorIs(t, err, ErrUnsignedMetadata{"Verifying timestamp failed, not enough signatures, got 0, want 1"})
+	assert.ErrorIs(t, err, &ErrUnsignedMetadata{"Verifying timestamp failed, not enough signatures, got 0, want 1"})
 
 	// Add a key to snapshot role, make sure the new sig fails to verify
 	tsKeyID := root.Signed.Roles[TIMESTAMP].KeyIDs[0]
@@ -583,7 +583,7 @@ func TestMetadataVerifyDelegate(t *testing.T) {
 	// Verify fails if threshold of signatures is not reached
 	root.Signed.Roles[SNAPSHOT].Threshold = 2
 	err = root.VerifyDelegate(SNAPSHOT, snapshot)
-	assert.ErrorIs(t, err, ErrUnsignedMetadata{"Verifying snapshot failed, not enough signatures, got 1, want 2"})
+	assert.ErrorIs(t, err, &ErrUnsignedMetadata{"Verifying snapshot failed, not enough signatures, got 1, want 2"})
 
 	// Verify succeeds when we correct the new signature and reach the
 	// threshold of 2 keys
@@ -637,7 +637,7 @@ func TestRootAddKeyAndRevokeKey(t *testing.T) {
 
 	// Add the same key to a nonexistent role.
 	err = root.Signed.AddKey(rootKey2, "nosuchrole")
-	assert.ErrorIs(t, err, ErrValue{"role nosuchrole doesn't exist"})
+	assert.ErrorIs(t, err, &ErrValue{"role nosuchrole doesn't exist"})
 
 	// Remove the key from root role (targets role still uses it)
 	err = root.Signed.RevokeKey(rootKey2.id, ROOT)
@@ -652,9 +652,9 @@ func TestRootAddKeyAndRevokeKey(t *testing.T) {
 	assert.NotContains(t, root.Signed.Keys, rootKey2.id)
 
 	err = root.Signed.RevokeKey("nosuchkey", ROOT)
-	assert.ErrorIs(t, err, ErrValue{"key with id nosuchkey is not used by root"})
+	assert.ErrorIs(t, err, &ErrValue{"key with id nosuchkey is not used by root"})
 	err = root.Signed.RevokeKey(rootKey2.id, "nosuchrole")
-	assert.ErrorIs(t, err, ErrValue{"role nosuchrole doesn't exist"})
+	assert.ErrorIs(t, err, &ErrValue{"role nosuchrole doesn't exist"})
 }
 
 func TestTargetsKeyAPI(t *testing.T) {
@@ -694,7 +694,7 @@ func TestTargetsKeyAPI(t *testing.T) {
 
 	// Try adding a key to a delegated role that doesn't exists
 	err = targets.Signed.AddKey(key, "nosuchrole")
-	assert.ErrorIs(t, err, ErrValue{"delegated role nosuchrole doesn't exist"})
+	assert.ErrorIs(t, err, &ErrValue{"delegated role nosuchrole doesn't exist"})
 
 	//  Add the same key to "role2" as well
 	err = targets.Signed.AddKey(key, "role2")
@@ -717,11 +717,11 @@ func TestTargetsKeyAPI(t *testing.T) {
 
 	// Try remove key not used by "role1"
 	err = targets.Signed.RevokeKey(key.id, "role1")
-	assert.ErrorIs(t, err, ErrValue{fmt.Sprintf("key with id %s is not used by role1", key.id)})
+	assert.ErrorIs(t, err, &ErrValue{fmt.Sprintf("key with id %s is not used by role1", key.id)})
 
 	// Try removing a key from delegated role that doesn't exists
 	err = targets.Signed.RevokeKey(key.id, "nosuchrole")
-	assert.ErrorIs(t, err, ErrValue{"delegated role nosuchrole doesn't exist"})
+	assert.ErrorIs(t, err, &ErrValue{"delegated role nosuchrole doesn't exist"})
 
 	// Remove delegations as a whole
 	targets.Signed.Delegations = nil
@@ -729,9 +729,9 @@ func TestTargetsKeyAPI(t *testing.T) {
 	//Test that calling add_key and revoke_key throws an error
 	// and that delegations is still None after each of the api calls
 	err = targets.Signed.AddKey(key, "role1")
-	assert.ErrorIs(t, err, ErrValue{"delegated role role1 doesn't exist"})
+	assert.ErrorIs(t, err, &ErrValue{"delegated role role1 doesn't exist"})
 	err = targets.Signed.RevokeKey(key.id, "role1")
-	assert.ErrorIs(t, err, ErrValue{"delegated role role1 doesn't exist"})
+	assert.ErrorIs(t, err, &ErrValue{"delegated role role1 doesn't exist"})
 	assert.Nil(t, targets.Signed.Delegations)
 }
 
@@ -781,7 +781,7 @@ func TestTargetsKeyAPIWithSuccinctRoles(t *testing.T) {
 
 	// Try removing it again.
 	err = targets.Signed.RevokeKey(key.id, "foo")
-	assert.ErrorIs(t, err, ErrValue{fmt.Sprintf("key with id %s is not used by SuccinctRoles", key.id)})
+	assert.ErrorIs(t, err, &ErrValue{fmt.Sprintf("key with id %s is not used by SuccinctRoles", key.id)})
 }
 
 func TestLengthAndHashValidation(t *testing.T) {
@@ -813,18 +813,18 @@ func TestLengthAndHashValidation(t *testing.T) {
 	originalLength := snapshotMetafile.Length
 	snapshotMetafile.Length = 2345
 	err = snapshotMetafile.VerifyLengthHashes(data)
-	assert.ErrorIs(t, err, ErrLengthOrHashMismatch{fmt.Sprintf("length verification failed - expected %d, got %d", 2345, originalLength)})
+	assert.ErrorIs(t, err, &ErrLengthOrHashMismatch{fmt.Sprintf("length verification failed - expected %d, got %d", 2345, originalLength)})
 
 	snapshotMetafile.Length = originalLength
 	originalHashSHA256 := snapshotMetafile.Hashes["sha256"]
 	snapshotMetafile.Hashes["sha256"] = []byte("incorrecthash")
 	err = snapshotMetafile.VerifyLengthHashes(data)
-	assert.ErrorIs(t, err, ErrLengthOrHashMismatch{"hash verification failed - mismatch for algorithm sha256"})
+	assert.ErrorIs(t, err, &ErrLengthOrHashMismatch{"hash verification failed - mismatch for algorithm sha256"})
 
 	snapshotMetafile.Hashes["sha256"] = originalHashSHA256
 	snapshotMetafile.Hashes["unsupported-alg"] = []byte("72c5cabeb3e8079545a5f4d2b067f8e35f18a0de3c2b00d3cb8d05919c19c72d")
 	err = snapshotMetafile.VerifyLengthHashes(data)
-	assert.ErrorIs(t, err, ErrLengthOrHashMismatch{"hash verification failed - unknown hashing algorithm - unsupported-alg"})
+	assert.ErrorIs(t, err, &ErrLengthOrHashMismatch{"hash verification failed - unknown hashing algorithm - unsupported-alg"})
 
 	// test optional length and hashes
 	snapshotMetafile.Length = 0
@@ -843,12 +843,12 @@ func TestLengthAndHashValidation(t *testing.T) {
 	originalLength = targetFile.Length
 	targetFile.Length = 2345
 	err = targetFile.VerifyLengthHashes(targetFileData)
-	assert.ErrorIs(t, err, ErrLengthOrHashMismatch{fmt.Sprintf("length verification failed - expected %d, got %d", 2345, originalLength)})
+	assert.ErrorIs(t, err, &ErrLengthOrHashMismatch{fmt.Sprintf("length verification failed - expected %d, got %d", 2345, originalLength)})
 
 	targetFile.Length = originalLength
 	targetFile.Hashes["sha256"] = []byte("incorrecthash")
 	err = targetFile.VerifyLengthHashes(targetFileData)
-	assert.ErrorIs(t, err, ErrLengthOrHashMismatch{"hash verification failed - mismatch for algorithm sha256"})
+	assert.ErrorIs(t, err, &ErrLengthOrHashMismatch{"hash verification failed - mismatch for algorithm sha256"})
 }
 
 func TestTargetFileFromFile(t *testing.T) {
@@ -866,11 +866,11 @@ func TestTargetFileFromFile(t *testing.T) {
 	mismatchingTargetFileData, err := os.ReadFile(mismatchingTargetFilePath)
 	assert.NoError(t, err)
 	err = targetFileFromFile.VerifyLengthHashes(mismatchingTargetFileData)
-	assert.ErrorIs(t, err, ErrLengthOrHashMismatch{"hash verification failed - mismatch for algorithm sha256"})
+	assert.ErrorIs(t, err, &ErrLengthOrHashMismatch{"hash verification failed - mismatch for algorithm sha256"})
 
 	// Test with an unsupported algorithm
 	_, err = TargetFile().FromFile(targetFilePath, "123")
-	assert.ErrorIs(t, err, ErrValue{"failed generating TargetFile - unsupported hashing algorithm - 123"})
+	assert.ErrorIs(t, err, &ErrValue{"failed generating TargetFile - unsupported hashing algorithm - 123"})
 }
 
 func TestTargetFileCustom(t *testing.T) {

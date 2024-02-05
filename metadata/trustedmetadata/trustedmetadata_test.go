@@ -223,36 +223,36 @@ func TestOutOfOrderOps(t *testing.T) {
 
 	//  Update snapshot before timestamp
 	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.ErrorIs(t, err, metadata.ErrRuntime{Msg: "cannot update snapshot before timestamp"})
+	assert.ErrorIs(t, err, &metadata.ErrRuntime{Msg: "cannot update snapshot before timestamp"})
 
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
 	assert.NoError(t, err)
 
 	// Update root after timestamp
 	_, err = trustedSet.UpdateRoot(allRoles[metadata.ROOT])
-	assert.ErrorIs(t, err, metadata.ErrRuntime{Msg: "cannot update root after timestamp"})
+	assert.ErrorIs(t, err, &metadata.ErrRuntime{Msg: "cannot update root after timestamp"})
 
 	// Update targets before snapshot
 	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
-	assert.ErrorIs(t, err, metadata.ErrRuntime{Msg: "cannot load targets before snapshot"})
+	assert.ErrorIs(t, err, &metadata.ErrRuntime{Msg: "cannot load targets before snapshot"})
 
 	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
 	assert.NoError(t, err)
 
 	// Update timestamp after snapshot
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.ErrorIs(t, err, metadata.ErrRuntime{Msg: "cannot update timestamp after snapshot"})
+	assert.ErrorIs(t, err, &metadata.ErrRuntime{Msg: "cannot update timestamp after snapshot"})
 
 	// Update delegated targets before targets
 	_, err = trustedSet.UpdateDelegatedTargets(allRoles["role1"], "role1", metadata.TARGETS)
-	assert.ErrorIs(t, err, metadata.ErrRuntime{Msg: "cannot load targets before delegator"})
+	assert.ErrorIs(t, err, &metadata.ErrRuntime{Msg: "cannot load targets before delegator"})
 
 	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
 	assert.NoError(t, err)
 
 	//  Update snapshot after sucessful targets update
 	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.ErrorIs(t, err, metadata.ErrRuntime{Msg: "cannot update snapshot after targets"})
+	assert.ErrorIs(t, err, &metadata.ErrRuntime{Msg: "cannot update snapshot after targets"})
 
 	_, err = trustedSet.UpdateDelegatedTargets(allRoles["role1"], "role1", metadata.TARGETS)
 	assert.NoError(t, err)
@@ -275,11 +275,11 @@ func TestRootWithInvalidJson(t *testing.T) {
 	rootBytes, err := root.ToBytes(true)
 	assert.NoError(t, err)
 	_, err = trustedSet.UpdateRoot(rootBytes)
-	assert.ErrorIs(t, err, metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 0, want 1"})
+	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 0, want 1"})
 
 	// metadata is of wrong type
 	_, err = trustedSet.UpdateRoot(allRoles[metadata.SNAPSHOT])
-	assert.ErrorIs(t, err, metadata.ErrValue{Msg: "expected metadata type root, got - snapshot"})
+	assert.ErrorIs(t, err, &metadata.ErrValue{Msg: "expected metadata type root, got - snapshot"})
 }
 
 func TestTopLevelMetadataWithInvalidJSON(t *testing.T) {
@@ -300,11 +300,11 @@ func TestTopLevelMetadataWithInvalidJSON(t *testing.T) {
 	timestampBytes, err := timestamp.ToBytes(true)
 	assert.NoError(t, err)
 	_, err = trustedSet.UpdateTimestamp(timestampBytes)
-	assert.ErrorIs(t, err, metadata.ErrUnsignedMetadata{Msg: "Verifying timestamp failed, not enough signatures, got 0, want 1"})
+	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying timestamp failed, not enough signatures, got 0, want 1"})
 
 	// timestamp is of wrong type
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.ROOT])
-	assert.ErrorIs(t, err, metadata.ErrValue{Msg: "expected metadata type timestamp, got - root"})
+	assert.ErrorIs(t, err, &metadata.ErrValue{Msg: "expected metadata type timestamp, got - root"})
 
 	// SNAPSHOT
 	_, err = trustedSet.UpdateTimestamp(properTimestampBytes)
@@ -322,11 +322,11 @@ func TestTopLevelMetadataWithInvalidJSON(t *testing.T) {
 	snapshotBytes, err := snapshot.ToBytes(true)
 	assert.NoError(t, err)
 	_, err = trustedSet.UpdateSnapshot(snapshotBytes, false)
-	assert.ErrorIs(t, err, metadata.ErrUnsignedMetadata{Msg: "Verifying snapshot failed, not enough signatures, got 0, want 1"})
+	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying snapshot failed, not enough signatures, got 0, want 1"})
 
 	// snapshot is of wrong type
 	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.ROOT], false)
-	assert.ErrorIs(t, err, metadata.ErrValue{Msg: "expected metadata type snapshot, got - root"})
+	assert.ErrorIs(t, err, &metadata.ErrValue{Msg: "expected metadata type snapshot, got - root"})
 
 	// TARGETS
 	_, err = trustedSet.UpdateSnapshot(properSnapshotBytes, false)
@@ -342,11 +342,11 @@ func TestTopLevelMetadataWithInvalidJSON(t *testing.T) {
 	targetsBytes, err := targets.ToBytes(true)
 	assert.NoError(t, err)
 	_, err = trustedSet.UpdateTargets(targetsBytes)
-	assert.ErrorIs(t, err, metadata.ErrUnsignedMetadata{Msg: "Verifying targets failed, not enough signatures, got 0, want 1"})
+	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying targets failed, not enough signatures, got 0, want 1"})
 
 	// targets is of wrong type
 	_, err = trustedSet.UpdateTargets(allRoles[metadata.ROOT])
-	assert.ErrorIs(t, err, metadata.ErrValue{Msg: "expected metadata type targets, got - root"})
+	assert.ErrorIs(t, err, &metadata.ErrValue{Msg: "expected metadata type targets, got - root"})
 }
 
 func TestUpdateRootNewRoot(t *testing.T) {
@@ -376,7 +376,7 @@ func TestUpdateRootNewRootFailTreshholdVerification(t *testing.T) {
 	trustedSet, err := New(allRoles[metadata.ROOT])
 	assert.NoError(t, err)
 	_, err = trustedSet.UpdateRoot(root)
-	assert.ErrorIs(t, err, metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 1, want 2"})
+	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 1, want 2"})
 }
 
 func TestUpdateRootNewRootVerSameAsTrustedRootVer(t *testing.T) {
@@ -384,7 +384,7 @@ func TestUpdateRootNewRootVerSameAsTrustedRootVer(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = trustedSet.UpdateRoot(allRoles[metadata.ROOT])
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "bad version number, expected 2, got 1"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "bad version number, expected 2, got 1"})
 }
 
 func TestRootExpiredFinalRoot(t *testing.T) {
@@ -401,7 +401,7 @@ func TestRootExpiredFinalRoot(t *testing.T) {
 
 	// Update timestamp to trigger final root expiry check
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.ErrorIs(t, err, metadata.ErrExpiredMetadata{Msg: "final root.json is expired"})
+	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "final root.json is expired"})
 }
 
 func TestUpdateTimestampNewTimestampVerBelowTrustedVer(t *testing.T) {
@@ -417,7 +417,7 @@ func TestUpdateTimestampNewTimestampVerBelowTrustedVer(t *testing.T) {
 	_, err = trustedSet.UpdateTimestamp(timestamp)
 	assert.NoError(t, err)
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "new timestamp version 1 must be >= 3"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "new timestamp version 1 must be >= 3"})
 }
 
 func TestUpdateTimestampWithSameTimestamp(t *testing.T) {
@@ -432,7 +432,7 @@ func TestUpdateTimestampWithSameTimestamp(t *testing.T) {
 	// Update timestamp with the same version.
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
 	// EqualVersionNumberError
-	assert.ErrorIs(t, err, metadata.ErrEqualVersionNumber{Msg: "new timestamp version 1 equals the old one 1"})
+	assert.ErrorIs(t, err, &metadata.ErrEqualVersionNumber{Msg: "new timestamp version 1 equals the old one 1"})
 
 	// Verify that the timestamp object was not updated.
 	assert.Equal(t, initialTimestamp, trustedSet.Timestamp)
@@ -454,7 +454,7 @@ func TestUpdateTimestampSnapshotCerBellowCurrent(t *testing.T) {
 
 	// new timestamp meta version < trusted timestamp meta version
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "new timestamp version 1 must be >= 2"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "new timestamp version 1 must be >= 2"})
 }
 
 func TestUpdateTimestampExpired(t *testing.T) {
@@ -468,9 +468,9 @@ func TestUpdateTimestampExpired(t *testing.T) {
 	trustedSet, err := New(allRoles[metadata.ROOT])
 	assert.NoError(t, err)
 	_, err = trustedSet.UpdateTimestamp(timestamp)
-	assert.ErrorIs(t, err, metadata.ErrExpiredMetadata{Msg: "timestamp.json is expired"})
+	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "timestamp.json is expired"})
 	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.ErrorIs(t, err, metadata.ErrExpiredMetadata{Msg: "timestamp.json is expired"})
+	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "timestamp.json is expired"})
 }
 
 func TestUpdateSnapshotLengthOrHashMismatch(t *testing.T) {
@@ -485,7 +485,7 @@ func TestUpdateSnapshotLengthOrHashMismatch(t *testing.T) {
 	_, err = trustedSet.UpdateTimestamp(timestamp)
 	assert.NoError(t, err)
 	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.ErrorIs(t, err, metadata.ErrLengthOrHashMismatch{Msg: "length verification failed - expected 1, got 652"})
+	assert.ErrorIs(t, err, &metadata.ErrLengthOrHashMismatch{Msg: "length verification failed - expected 1, got 652"})
 }
 
 func TestUpdateSnapshotFailThreshholdVerification(t *testing.T) {
@@ -500,7 +500,7 @@ func TestUpdateSnapshotFailThreshholdVerification(t *testing.T) {
 	snapshotBytes, err := snapshot.ToBytes(true)
 	assert.NoError(t, err)
 	_, err = trustedSet.UpdateSnapshot(snapshotBytes, false)
-	assert.ErrorIs(t, err, metadata.ErrUnsignedMetadata{Msg: "Verifying snapshot failed, not enough signatures, got 0, want 1"})
+	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying snapshot failed, not enough signatures, got 0, want 1"})
 }
 
 func TestUpdateSnapshotVersionDivergeTimestampSnapshotVersion(t *testing.T) {
@@ -516,11 +516,11 @@ func TestUpdateSnapshotVersionDivergeTimestampSnapshotVersion(t *testing.T) {
 
 	// If intermediate snapshot version is incorrect, load it but also raise
 	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "expected 2, got 1"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected 2, got 1"})
 
 	// Targets update starts but fails if snapshot version does not match
 	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "expected 2, got 1"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected 2, got 1"})
 }
 
 // Update all metadata roles besides targets.
@@ -554,7 +554,7 @@ func TestUpdateSnapshotFileRemovedFromMeta(t *testing.T) {
 	snapshot, err := modifySnapshotMetadata(removeFileFromMeta)
 	assert.NoError(t, err)
 	_, err = trustedSet.UpdateSnapshot(snapshot, false)
-	assert.ErrorIs(t, err, metadata.ErrRepository{Msg: "new snapshot is missing info for targets.json"})
+	assert.ErrorIs(t, err, &metadata.ErrRepository{Msg: "new snapshot is missing info for targets.json"})
 }
 
 func TestUpdateSnapshotMetaVersionDecreases(t *testing.T) {
@@ -572,7 +572,7 @@ func TestUpdateSnapshotMetaVersionDecreases(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "expected targets.json version 1, got 2"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected targets.json version 1, got 2"})
 }
 
 func TestUpdateSnapshotExpiredNewSnapshot(t *testing.T) {
@@ -589,11 +589,11 @@ func TestUpdateSnapshotExpiredNewSnapshot(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = trustedSet.UpdateSnapshot(snapshot, false)
-	assert.ErrorIs(t, err, metadata.ErrExpiredMetadata{Msg: "snapshot.json is expired"})
+	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "snapshot.json is expired"})
 
 	// Targets update does start but fails because snapshot is expired
 	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
-	assert.ErrorIs(t, err, metadata.ErrExpiredMetadata{Msg: "snapshot.json is expired"})
+	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "snapshot.json is expired"})
 
 }
 
@@ -617,7 +617,7 @@ func TestUpdateSnapshotSuccessfulRollbackChecks(t *testing.T) {
 	// Load a "local" snapshot with mismatching version (loading happens but
 	// ErrBadVersionNumber is raised), then update to newer one:
 	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "expected 2, got 1"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected 2, got 1"})
 
 	bumpVersion := func(snapahot *metadata.Metadata[metadata.SnapshotType]) {
 		snapahot.Signed.Version += 1
@@ -647,7 +647,7 @@ func TestUpdateTargetsMoMetaInSnapshot(t *testing.T) {
 
 	// Remove meta information with information about targets from snapshot
 	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
-	assert.ErrorIs(t, err, metadata.ErrRepository{Msg: "snapshot does not contain information for targets"})
+	assert.ErrorIs(t, err, &metadata.ErrRepository{Msg: "snapshot does not contain information for targets"})
 
 }
 
@@ -669,7 +669,7 @@ func TestUpdateTargetsHashDiverfeFromSnapshotMetaHash(t *testing.T) {
 
 	// Observed hash != stored hash in snapshot meta for targets
 	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
-	assert.ErrorIs(t, err, metadata.ErrLengthOrHashMismatch{Msg: "length verification failed - expected 1, got 1266"})
+	assert.ErrorIs(t, err, &metadata.ErrLengthOrHashMismatch{Msg: "length verification failed - expected 1, got 1266"})
 }
 
 func TestUpdateTargetsVersionDivergeSnapshotMetaVersion(t *testing.T) {
@@ -687,7 +687,7 @@ func TestUpdateTargetsVersionDivergeSnapshotMetaVersion(t *testing.T) {
 
 	// New delegate sigfned version != meta version stored in snapshot
 	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "expected targets version 2, got 1"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected targets version 2, got 1"})
 }
 
 func TestUpdateTargetsExpiredMewTarget(t *testing.T) {
@@ -703,5 +703,5 @@ func TestUpdateTargetsExpiredMewTarget(t *testing.T) {
 	targets, err := modifyTargetsMetadata(modifyTargetExpiry)
 	assert.NoError(t, err)
 	_, err = trustedSet.UpdateTargets(targets)
-	assert.ErrorIs(t, err, metadata.ErrExpiredMetadata{Msg: "new targets is expired"})
+	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "new targets is expired"})
 }

@@ -218,7 +218,7 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 	}
 	if targetBaseURL == "" {
 		if update.cfg.RemoteTargetsURL == "" {
-			return "", nil, metadata.ErrValue{Msg: "targetBaseURL must be set in either DownloadTarget() or the Updater struct"}
+			return "", nil, &metadata.ErrValue{Msg: "targetBaseURL must be set in either DownloadTarget() or the Updater struct"}
 		}
 		targetBaseURL = ensureTrailingSlash(update.cfg.RemoteTargetsURL)
 	} else {
@@ -308,7 +308,7 @@ func (update *Updater) loadTimestamp() error {
 		// local timestamp exists, let's try to verify it and load it to the trusted metadata set
 		_, err := update.trusted.UpdateTimestamp(data)
 		if err != nil {
-			if errors.Is(err, metadata.ErrRepository{}) {
+			if errors.Is(err, &metadata.ErrRepository{}) {
 				// local timestamp is not valid, proceed downloading from remote; note that this error type includes several other subset errors
 				log.Info("Local timestamp is not valid")
 			} else {
@@ -327,7 +327,7 @@ func (update *Updater) loadTimestamp() error {
 	// try to verify and load the newly downloaded timestamp
 	_, err = update.trusted.UpdateTimestamp(data)
 	if err != nil {
-		if errors.Is(err, metadata.ErrEqualVersionNumber{}) {
+		if errors.Is(err, &metadata.ErrEqualVersionNumber{}) {
 			// if the new timestamp version is the same as current, discard the
 			// new timestamp; this is normal and it shouldn't raise any error
 			return nil
@@ -357,7 +357,7 @@ func (update *Updater) loadSnapshot() error {
 		_, err = update.trusted.UpdateSnapshot(data, true)
 		if err != nil {
 			// this means snapshot verification/loading failed
-			if errors.Is(err, metadata.ErrRepository{}) {
+			if errors.Is(err, &metadata.ErrRepository{}) {
 				// local snapshot is not valid, proceed downloading from remote; note that this error type includes several other subset errors
 				log.Info("Local snapshot is not valid")
 			} else {
@@ -423,7 +423,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 		delegatedTargets, err := update.trusted.UpdateDelegatedTargets(data, roleName, parentName)
 		if err != nil {
 			// this means targets verification/loading failed
-			if errors.Is(err, metadata.ErrRepository{}) {
+			if errors.Is(err, &metadata.ErrRepository{}) {
 				// local target file is not valid, proceed downloading from remote; note that this error type includes several other subset errors
 				log.Info("Local role is not valid", "role", roleName)
 			} else {
@@ -484,7 +484,7 @@ func (update *Updater) loadRoot() error {
 		data, err := update.downloadMetadata(metadata.ROOT, update.cfg.RootMaxLength, strconv.FormatInt(nextVersion, 10))
 		if err != nil {
 			// downloading the root metadata failed for some reason
-			var tmpErr metadata.ErrDownloadHTTP
+			var tmpErr *metadata.ErrDownloadHTTP
 			if errors.As(err, &tmpErr) {
 				if tmpErr.StatusCode != http.StatusNotFound && tmpErr.StatusCode != http.StatusForbidden {
 					// unexpected HTTP status code
@@ -674,7 +674,7 @@ func (update *Updater) downloadMetadata(roleName string, length int64, version s
 func (update *Updater) generateTargetFilePath(tf *metadata.TargetFiles) (string, error) {
 	// LocalTargetsDir can be omitted if caching is disabled
 	if update.cfg.LocalTargetsDir == "" && !update.cfg.DisableLocalCache {
-		return "", metadata.ErrValue{Msg: "LocalTargetsDir must be set if filepath is not given"}
+		return "", &metadata.ErrValue{Msg: "LocalTargetsDir must be set if filepath is not given"}
 	}
 	// Use URL encoded target path as filename
 	return url.JoinPath(update.cfg.LocalTargetsDir, url.QueryEscape(tf.Path))
