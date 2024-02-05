@@ -329,7 +329,7 @@ func TestTrustedRootExpired(t *testing.T) {
 	assert.NoError(t, err)
 	updater := initUpdater(updaterConfig)
 	err = updater.Refresh()
-	assert.ErrorIs(t, err, metadata.ErrExpiredMetadata{Msg: "final root.json is expired"})
+	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "final root.json is expired"})
 
 	assertFilesExist(t, []string{metadata.ROOT})
 	version := 2
@@ -368,7 +368,7 @@ func TestTrustedRootUnsigned(t *testing.T) {
 	updaterConfig, err := loadUpdaterConfig()
 	assert.NoError(t, err)
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 0, want 1"})
+	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 0, want 1"})
 
 	assertFilesExist(t, []string{metadata.ROOT})
 	mdRootAfter, err := simulator.Sim.MDRoot.FromFile(rootPath)
@@ -423,7 +423,7 @@ func TestIntermediateRootInclorrectlySigned(t *testing.T) {
 	updaterConfig, err := loadUpdaterConfig()
 	assert.NoError(t, err)
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 0, want 1"})
+	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 0, want 1"})
 
 	assertFilesExist(t, []string{metadata.ROOT})
 	version := 1
@@ -469,7 +469,7 @@ func TestNewRootSameVersion(t *testing.T) {
 	updaterConfig, err := loadUpdaterConfig()
 	assert.NoError(t, err)
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "bad version number, expected 2, got 1"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "bad version number, expected 2, got 1"})
 
 	// The update failed, latest root version is v1
 	assertFilesExist(t, []string{metadata.ROOT})
@@ -488,7 +488,7 @@ func TestNewRootNonconsecutiveVersion(t *testing.T) {
 	updaterConfig, err := loadUpdaterConfig()
 	assert.NoError(t, err)
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "bad version number, expected 2, got 3"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "bad version number, expected 2, got 3"})
 
 	// The update failed, latest root version is v1
 	assertFilesExist(t, []string{metadata.ROOT})
@@ -509,7 +509,7 @@ func TestFinalRootExpired(t *testing.T) {
 	updaterConfig, err := loadUpdaterConfig()
 	assert.NoError(t, err)
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrExpiredMetadata{Msg: "final root.json is expired"})
+	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "final root.json is expired"})
 
 	// The update failed but final root is persisted on the file system
 	assertFilesExist(t, []string{metadata.ROOT})
@@ -527,7 +527,7 @@ func TestNewTimestampUnsigned(t *testing.T) {
 	updaterConfig, err := loadUpdaterConfig()
 	assert.NoError(t, err)
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrUnsignedMetadata{Msg: "Verifying timestamp failed, not enough signatures, got 0, want 1"})
+	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying timestamp failed, not enough signatures, got 0, want 1"})
 
 	assertFilesExist(t, []string{metadata.ROOT})
 }
@@ -563,7 +563,7 @@ func TestExpiredTimestampVersionRollback(t *testing.T) {
 	// local timestamp has expired
 	moveInTime := time.Now().Add(time.Hour * 18 * 24)
 	_, err = runRefresh(updaterConfig, moveInTime)
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "new timestamp version 1 must be >= 2"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "new timestamp version 1 must be >= 2"})
 	assertVersionEquals(t, metadata.TIMESTAMP, 2)
 }
 
@@ -580,7 +580,7 @@ func TestNewTimestampVersionRollback(t *testing.T) {
 
 	simulator.Sim.MDTimestamp.Signed.Version = 1
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "new timestamp version 1 must be >= 2"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "new timestamp version 1 must be >= 2"})
 	assertVersionEquals(t, metadata.TIMESTAMP, 2)
 }
 
@@ -600,7 +600,7 @@ func TestNewTimestampSnapshotRollback(t *testing.T) {
 	simulator.Sim.MDTimestamp.Signed.Meta["snapshot.json"].Version = 1
 	simulator.Sim.MDTimestamp.Signed.Version += 1 // timestamp v3
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "new snapshot version 1 must be >= 2"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "new snapshot version 1 must be >= 2"})
 	assertVersionEquals(t, metadata.TIMESTAMP, 2)
 }
 
@@ -614,7 +614,7 @@ func TestNewTimestampExpired(t *testing.T) {
 	updaterConfig, err := loadUpdaterConfig()
 	assert.NoError(t, err)
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrExpiredMetadata{Msg: "timestamp.json is expired"})
+	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "timestamp.json is expired"})
 	assertFilesExist(t, []string{metadata.ROOT})
 }
 
@@ -675,7 +675,7 @@ func TestNewSnapshotHashMismatch(t *testing.T) {
 
 	// Hash mismatch error
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrLengthOrHashMismatch{Msg: "hash verification failed - mismatch for algorithm sha256"})
+	assert.ErrorIs(t, err, &metadata.ErrLengthOrHashMismatch{Msg: "hash verification failed - mismatch for algorithm sha256"})
 	assertVersionEquals(t, metadata.TIMESTAMP, 3)
 	assertVersionEquals(t, metadata.SNAPSHOT, 1)
 }
@@ -689,7 +689,7 @@ func TestNewSnapshotUnsigned(t *testing.T) {
 	updaterConfig, err := loadUpdaterConfig()
 	assert.NoError(t, err)
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrUnsignedMetadata{Msg: "Verifying snapshot failed, not enough signatures, got 0, want 1"})
+	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying snapshot failed, not enough signatures, got 0, want 1"})
 
 	assertFilesExist(t, []string{metadata.ROOT, metadata.TIMESTAMP})
 }
@@ -706,7 +706,7 @@ func TestNewSnapshotVersionMismatch(t *testing.T) {
 	updaterConfig, err := loadUpdaterConfig()
 	assert.NoError(t, err)
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "expected 1, got 2"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected 1, got 2"})
 
 	assertFilesExist(t, []string{metadata.ROOT, metadata.TIMESTAMP})
 }
@@ -726,7 +726,7 @@ func TestNewSnapshotVersionRollback(t *testing.T) {
 	simulator.Sim.MDSnapshot.Signed.Version = 1
 	simulator.Sim.UpdateTimestamp()
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "new snapshot version 1 must be >= 2"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "new snapshot version 1 must be >= 2"})
 
 	assertVersionEquals(t, metadata.SNAPSHOT, 2)
 }
@@ -782,7 +782,7 @@ func TestNewSnapshotExpired(t *testing.T) {
 	updaterConfig, err := loadUpdaterConfig()
 	assert.NoError(t, err)
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrExpiredMetadata{Msg: "snapshot.json is expired"})
+	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "snapshot.json is expired"})
 
 	assertFilesExist(t, []string{metadata.ROOT})
 }
@@ -807,7 +807,7 @@ func TestNewTargetsHashMismatch(t *testing.T) {
 	simulator.Sim.UpdateTimestamp()
 
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrLengthOrHashMismatch{Msg: "hash verification failed - mismatch for algorithm sha256"})
+	assert.ErrorIs(t, err, &metadata.ErrLengthOrHashMismatch{Msg: "hash verification failed - mismatch for algorithm sha256"})
 
 	assertVersionEquals(t, metadata.SNAPSHOT, 3)
 	assertVersionEquals(t, metadata.TARGETS, 1)
@@ -823,7 +823,7 @@ func TestNewTargetsUnsigned(t *testing.T) {
 	updaterConfig, err := loadUpdaterConfig()
 	assert.NoError(t, err)
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrUnsignedMetadata{Msg: "Verifying targets failed, not enough signatures, got 0, want 1"})
+	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying targets failed, not enough signatures, got 0, want 1"})
 
 	assertFilesExist(t, []string{metadata.ROOT, metadata.TIMESTAMP, metadata.SNAPSHOT})
 }
@@ -839,7 +839,7 @@ func TestNewTargetsVersionMismatch(t *testing.T) {
 	updaterConfig, err := loadUpdaterConfig()
 	assert.NoError(t, err)
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "expected targets version 1, got 2"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected targets version 1, got 2"})
 
 	assertFilesExist(t, []string{metadata.ROOT, metadata.TIMESTAMP, metadata.SNAPSHOT})
 }
@@ -855,7 +855,7 @@ func TestNewTargetsExpired(t *testing.T) {
 	updaterConfig, err := loadUpdaterConfig()
 	assert.NoError(t, err)
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrExpiredMetadata{Msg: "new targets is expired"})
+	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "new targets is expired"})
 
 	assertFilesExist(t, []string{metadata.ROOT, metadata.TIMESTAMP, metadata.SNAPSHOT})
 }
@@ -957,7 +957,7 @@ func TestSnapshotRollbackWithLocalSnapshotHashMismatch(t *testing.T) {
 	// Should fail as a new version of snapshot will be fetched which lowers
 	// the snapshot meta "targets.json" version by 1 and throws an error.
 	_, err = runRefresh(updaterConfig, time.Now())
-	assert.ErrorIs(t, err, metadata.ErrBadVersionNumber{Msg: "expected targets.json version 1, got 2"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected targets.json version 1, got 2"})
 }
 
 func TestExpiredMetadata(t *testing.T) {
@@ -1027,27 +1027,27 @@ func TestMaxMetadataLengths(t *testing.T) {
 	updater := initUpdater(updaterConfig)
 	updater.cfg.RootMaxLength = 100
 	err = updater.Refresh()
-	assert.ErrorIs(t, err, metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"})
+	assert.ErrorIs(t, err, &metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"})
 
 	updater = initUpdater(updaterConfig)
 	updater.cfg.TimestampMaxLength = 100
 	err = updater.Refresh()
-	assert.ErrorIs(t, err, metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"})
+	assert.ErrorIs(t, err, &metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"})
 
 	updater = initUpdater(updaterConfig)
 	updater.cfg.SnapshotMaxLength = 100
 	err = updater.Refresh()
-	assert.ErrorIs(t, err, metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"})
+	assert.ErrorIs(t, err, &metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"})
 
 	updater = initUpdater(updaterConfig)
 	updater.cfg.TargetsMaxLength = 100
 	err = updater.Refresh()
-	assert.ErrorIs(t, err, metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"})
+	assert.ErrorIs(t, err, &metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"})
 
 	// All good with normal length limits
 	updater = initUpdater(updaterConfig)
 	err = updater.Refresh()
-	assert.ErrorIs(t, err, metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"})
+	assert.ErrorIs(t, err, &metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"})
 }
 
 func TestTimestampEqVersionsCheck(t *testing.T) {

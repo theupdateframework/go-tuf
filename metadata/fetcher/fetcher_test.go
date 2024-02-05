@@ -64,7 +64,7 @@ func TestDownLoadFile(t *testing.T) {
 			desc:    "Path does not exist",
 			url:     "https://jku.github.io/tuf-demo/metadata/badPath.json",
 			data:    nil,
-			wantErr: metadata.ErrDownloadHTTP{},
+			wantErr: &metadata.ErrDownloadHTTP{},
 		},
 		{
 			name:      "data too long",
@@ -72,7 +72,7 @@ func TestDownLoadFile(t *testing.T) {
 			url:       "https://jku.github.io/tuf-demo/metadata/1.root.json",
 			maxLength: 1,
 			data:      nil,
-			wantErr:   metadata.ErrDownloadLengthMismatch{},
+			wantErr:   &metadata.ErrDownloadLengthMismatch{},
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

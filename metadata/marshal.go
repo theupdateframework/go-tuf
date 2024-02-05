@@ -335,7 +335,7 @@ func (meta *Metadata[T]) UnmarshalJSON(data []byte) error {
 		meta.Signed = i.(T)
 		meta.Signatures = dict.Signatures
 	default:
-		return ErrValue{Msg: "unrecognized metadata type"}
+		return &ErrValue{Msg: "unrecognized metadata type"}
 	}
 	delete(m, "signed")
 	delete(m, "signatures")
@@ -470,7 +470,7 @@ func (role DelegatedRole) MarshalJSON() ([]byte, error) {
 	dict["terminating"] = role.Terminating
 	// make sure we have only one of the two (per spec)
 	if role.Paths != nil && role.PathHashPrefixes != nil {
-		return nil, ErrValue{Msg: "failed to marshal: not allowed to have both \"paths\" and \"path_hash_prefixes\" present"}
+		return nil, &ErrValue{Msg: "failed to marshal: not allowed to have both \"paths\" and \"path_hash_prefixes\" present"}
 	}
 	if role.Paths != nil {
 		dict["paths"] = role.Paths

@@ -58,7 +58,7 @@ func (trusted *TrustedMetadata) UpdateRoot(rootData []byte) (*metadata.Metadata[
 	log := metadata.GetLogger()
 
 	if trusted.Timestamp != nil {
-		return nil, metadata.ErrRuntime{Msg: "cannot update root after timestamp"}
+		return nil, &metadata.ErrRuntime{Msg: "cannot update root after timestamp"}
 	}
 	log.Info("Updating root")
 	// generate root metadata
@@ -68,7 +68,7 @@ func (trusted *TrustedMetadata) UpdateRoot(rootData []byte) (*metadata.Metadata[
 	}
 	// check metadata type matches root
 	if newRoot.Signed.Type != metadata.ROOT {
-		return nil, metadata.ErrRepository{Msg: fmt.Sprintf("expected %s, got %s", metadata.ROOT, newRoot.Signed.Type)}
+		return nil, &metadata.ErrRepository{Msg: fmt.Sprintf("expected %s, got %s", metadata.ROOT, newRoot.Signed.Type)}
 	}
 	// verify that new root is signed by trusted root
 	err = trusted.Root.VerifyDelegate(metadata.ROOT, newRoot)
@@ -77,7 +77,7 @@ func (trusted *TrustedMetadata) UpdateRoot(rootData []byte) (*metadata.Metadata[
 	}
 	// verify version
 	if newRoot.Signed.Version != trusted.Root.Signed.Version+1 {
-		return nil, metadata.ErrBadVersionNumber{Msg: fmt.Sprintf("bad version number, expected %d, got %d", trusted.Root.Signed.Version+1, newRoot.Signed.Version)}
+		return nil, &metadata.ErrBadVersionNumber{Msg: fmt.Sprintf("bad version number, expected %d, got %d", trusted.Root.Signed.Version+1, newRoot.Signed.Version)}
 	}
 	// verify that new root is signed by itself
 	err = newRoot.VerifyDelegate(metadata.ROOT, newRoot)
@@ -100,13 +100,13 @@ func (trusted *TrustedMetadata) UpdateTimestamp(timestampData []byte) (*metadata
 	log := metadata.GetLogger()
 
 	if trusted.Snapshot != nil {
-		return nil, metadata.ErrRuntime{Msg: "cannot update timestamp after snapshot"}
+		return nil, &metadata.ErrRuntime{Msg: "cannot update timestamp after snapshot"}
 	}
 	// client workflow 5.3.10: Make sure final root is not expired.
 	if trusted.Root.Signed.IsExpired(trusted.RefTime) {
 		// no need to check for 5.3.11 (fast forward attack recovery):
 		// timestamp/snapshot can not yet be loaded at this point
-		return nil, metadata.ErrExpiredMetadata{Msg: "final root.json is expired"}
+		return nil, &metadata.ErrExpiredMetadata{Msg: "final root.json is expired"}
 	}
 	log.Info("Updating timestamp")
 	newTimestamp, err := metadata.Timestamp().FromBytes(timestampData)
@@ -115,7 +115,7 @@ func (trusted *TrustedMetadata) UpdateTimestamp(timestampData []byte) (*metadata
 	}
 	// check metadata type matches timestamp
 	if newTimestamp.Signed.Type != metadata.TIMESTAMP {
-		return nil, metadata.ErrRepository{Msg: fmt.Sprintf("expected %s, got %s", metadata.TIMESTAMP, newTimestamp.Signed.Type)}
+		return nil, &metadata.ErrRepository{Msg: fmt.Sprintf("expected %s, got %s", metadata.TIMESTAMP, newTimestamp.Signed.Type)}
 	}
 	// verify that new timestamp is signed by trusted root
 	err = trusted.Root.VerifyDelegate(metadata.TIMESTAMP, newTimestamp)
@@ -127,18 +127,18 @@ func (trusted *TrustedMetadata) UpdateTimestamp(timestampData []byte) (*metadata
 	if trusted.Timestamp != nil {
 		// prevent rolling back timestamp version
 		if newTimestamp.Signed.Version < trusted.Timestamp.Signed.Version {
-			return nil, metadata.ErrBadVersionNumber{Msg: fmt.Sprintf("new timestamp version %d must be >= %d", newTimestamp.Signed.Version, trusted.Timestamp.Signed.Version)}
+			return nil, &metadata.ErrBadVersionNumber{Msg: fmt.Sprintf("new timestamp version %d must be >= %d", newTimestamp.Signed.Version, trusted.Timestamp.Signed.Version)}
 		}
 		// keep using old timestamp if versions are equal
 		if newTimestamp.Signed.Version == trusted.Timestamp.Signed.Version {
 			log.Info("New timestamp version equals the old one", "new", newTimestamp.Signed.Version, "old", trusted.Timestamp.Signed.Version)
-			return nil, metadata.ErrEqualVersionNumber{Msg: fmt.Sprintf("new timestamp version %d equals the old one %d", newTimestamp.Signed.Version, trusted.Timestamp.Signed.Version)}
+			return nil, &metadata.ErrEqualVersionNumber{Msg: fmt.Sprintf("new timestamp version %d equals the old one %d", newTimestamp.Signed.Version, trusted.Timestamp.Signed.Version)}
 		}
 		// prevent rolling back snapshot version
 		snapshotMeta := trusted.Timestamp.Signed.Meta[fmt.Sprintf("%s.json", metadata.SNAPSHOT)]
 		newSnapshotMeta := newTimestamp.Signed.Meta[fmt.Sprintf("%s.json", metadata.SNAPSHOT)]
 		if newSnapshotMeta.Version < snapshotMeta.Version {
-			return nil, metadata.ErrBadVersionNumber{Msg: fmt.Sprintf("new snapshot version %d must be >= %d", newSnapshotMeta.Version, snapshotMeta.Version)}
+			return nil, &metadata.ErrBadVersionNumber{Msg: fmt.Sprintf("new snapshot version %d must be >= %d", newSnapshotMeta.Version, snapshotMeta.Version)}
 		}
 	}
 	// expiry not checked to allow old timestamp to be used for rollback
@@ -159,7 +159,7 @@ func (trusted *TrustedMetadata) UpdateTimestamp(timestampData []byte) (*metadata
 // checkFinalTimestamp verifies if trusted timestamp is not expired
 func (trusted *TrustedMetadata) checkFinalTimestamp() error {
 	if trusted.Timestamp.Signed.IsExpired(trusted.RefTime) {
-		return metadata.ErrExpiredMetadata{Msg: "timestamp.json is expired"}
+		return &metadata.ErrExpiredMetadata{Msg: "timestamp.json is expired"}
 	}
 	return nil
 }
@@ -176,10 +176,10 @@ func (trusted *TrustedMetadata) UpdateSnapshot(snapshotData []byte, isTrusted bo
 	log := metadata.GetLogger()
 
 	if trusted.Timestamp == nil {
-		return nil, metadata.ErrRuntime{Msg: "cannot update snapshot before timestamp"}
+		return nil, &metadata.ErrRuntime{Msg: "cannot update snapshot before timestamp"}
 	}
 	if trusted.Targets[metadata.TARGETS] != nil {
-		return nil, metadata.ErrRuntime{Msg: "cannot update snapshot after targets"}
+		return nil, &metadata.ErrRuntime{Msg: "cannot update snapshot after targets"}
 	}
 	log.Info("Updating snapshot")
 
@@ -203,7 +203,7 @@ func (trusted *TrustedMetadata) UpdateSnapshot(snapshotData []byte, isTrusted bo
 	}
 	// check metadata type matches snapshot
 	if newSnapshot.Signed.Type != metadata.SNAPSHOT {
-		return nil, metadata.ErrRepository{Msg: fmt.Sprintf("expected %s, got %s", metadata.SNAPSHOT, newSnapshot.Signed.Type)}
+		return nil, &metadata.ErrRepository{Msg: fmt.Sprintf("expected %s, got %s", metadata.SNAPSHOT, newSnapshot.Signed.Type)}
 	}
 	// verify that new snapshot is signed by trusted root
 	err = trusted.Root.VerifyDelegate(metadata.SNAPSHOT, newSnapshot)
@@ -220,11 +220,11 @@ func (trusted *TrustedMetadata) UpdateSnapshot(snapshotData []byte, isTrusted bo
 			newFileInfo, ok := newSnapshot.Signed.Meta[name]
 			// prevent removal of any metadata in meta
 			if !ok {
-				return nil, metadata.ErrRepository{Msg: fmt.Sprintf("new snapshot is missing info for %s", name)}
+				return nil, &metadata.ErrRepository{Msg: fmt.Sprintf("new snapshot is missing info for %s", name)}
 			}
 			// prevent rollback of any metadata versions
 			if newFileInfo.Version < info.Version {
-				return nil, metadata.ErrBadVersionNumber{Msg: fmt.Sprintf("expected %s version %d, got %d", name, newFileInfo.Version, info.Version)}
+				return nil, &metadata.ErrBadVersionNumber{Msg: fmt.Sprintf("expected %s version %d, got %d", name, newFileInfo.Version, info.Version)}
 			}
 		}
 	}
@@ -246,11 +246,11 @@ func (trusted *TrustedMetadata) UpdateSnapshot(snapshotData []byte, isTrusted bo
 // checkFinalSnapshot verifies if it's not expired and snapshot version matches timestamp meta version
 func (trusted *TrustedMetadata) checkFinalSnapshot() error {
 	if trusted.Snapshot.Signed.IsExpired(trusted.RefTime) {
-		return metadata.ErrExpiredMetadata{Msg: "snapshot.json is expired"}
+		return &metadata.ErrExpiredMetadata{Msg: "snapshot.json is expired"}
 	}
 	snapshotMeta := trusted.Timestamp.Signed.Meta[fmt.Sprintf("%s.json", metadata.SNAPSHOT)]
 	if trusted.Snapshot.Signed.Version != snapshotMeta.Version {
-		return metadata.ErrBadVersionNumber{Msg: fmt.Sprintf("expected %d, got %d", snapshotMeta.Version, trusted.Snapshot.Signed.Version)}
+		return &metadata.ErrBadVersionNumber{Msg: fmt.Sprintf("expected %d, got %d", snapshotMeta.Version, trusted.Snapshot.Signed.Version)}
 	}
 	return nil
 }
@@ -266,7 +266,7 @@ func (trusted *TrustedMetadata) UpdateDelegatedTargets(targetsData []byte, roleN
 
 	var ok bool
 	if trusted.Snapshot == nil {
-		return nil, metadata.ErrRuntime{Msg: "cannot load targets before snapshot"}
+		return nil, &metadata.ErrRuntime{Msg: "cannot load targets before snapshot"}
 	}
 	// targets cannot be loaded if final snapshot is expired or its version
 	// does not match meta version in timestamp
@@ -285,13 +285,13 @@ func (trusted *TrustedMetadata) UpdateDelegatedTargets(targetsData []byte, roleN
 		_, ok = trusted.Targets[delegatorName]
 	}
 	if !ok {
-		return nil, metadata.ErrRuntime{Msg: "cannot load targets before delegator"}
+		return nil, &metadata.ErrRuntime{Msg: "cannot load targets before delegator"}
 	}
 	log.Info("Updating delegated role", "role", roleName, "delegator", delegatorName)
 	// Verify against the hashes in snapshot, if any
 	meta, ok := trusted.Snapshot.Signed.Meta[fmt.Sprintf("%s.json", roleName)]
 	if !ok {
-		return nil, metadata.ErrRepository{Msg: fmt.Sprintf("snapshot does not contain information for %s", roleName)}
+		return nil, &metadata.ErrRepository{Msg: fmt.Sprintf("snapshot does not contain information for %s", roleName)}
 	}
 	err = meta.VerifyLengthHashes(targetsData)
 	if err != nil {
@@ -303,7 +303,7 @@ func (trusted *TrustedMetadata) UpdateDelegatedTargets(targetsData []byte, roleN
 	}
 	// check metadata type matches targets
 	if newDelegate.Signed.Type != metadata.TARGETS {
-		return nil, metadata.ErrRepository{Msg: fmt.Sprintf("expected %s, got %s", metadata.TARGETS, newDelegate.Signed.Type)}
+		return nil, &metadata.ErrRepository{Msg: fmt.Sprintf("expected %s, got %s", metadata.TARGETS, newDelegate.Signed.Type)}
 	}
 	// get delegator metadata and verify the new delegatee
 	if delegatorName == metadata.ROOT {
@@ -319,11 +319,11 @@ func (trusted *TrustedMetadata) UpdateDelegatedTargets(targetsData []byte, roleN
 	}
 	// check versions
 	if newDelegate.Signed.Version != meta.Version {
-		return nil, metadata.ErrBadVersionNumber{Msg: fmt.Sprintf("expected %s version %d, got %d", roleName, meta.Version, newDelegate.Signed.Version)}
+		return nil, &metadata.ErrBadVersionNumber{Msg: fmt.Sprintf("expected %s version %d, got %d", roleName, meta.Version, newDelegate.Signed.Version)}
 	}
 	// check expiration
 	if newDelegate.Signed.IsExpired(trusted.RefTime) {
-		return nil, metadata.ErrExpiredMetadata{Msg: fmt.Sprintf("new %s is expired", roleName)}
+		return nil, &metadata.ErrExpiredMetadata{Msg: fmt.Sprintf("new %s is expired", roleName)}
 	}
 	trusted.Targets[roleName] = newDelegate
 	log.Info("Updated role", "role", roleName, "version", trusted.Targets[roleName].Signed.Version)
@@ -343,7 +343,7 @@ func (trusted *TrustedMetadata) loadTrustedRoot(rootData []byte) error {
 	}
 	// check metadata type matches root
 	if newRoot.Signed.Type != metadata.ROOT {
-		return metadata.ErrRepository{Msg: fmt.Sprintf("expected %s, got %s", metadata.ROOT, newRoot.Signed.Type)}
+		return &metadata.ErrRepository{Msg: fmt.Sprintf("expected %s, got %s", metadata.ROOT, newRoot.Signed.Type)}
 	}
 	// verify root by itself
 	err = newRoot.VerifyDelegate(metadata.ROOT, newRoot)

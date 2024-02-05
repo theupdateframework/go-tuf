@@ -308,7 +308,7 @@ func (rs *RepositorySimulator) DownloadFile(urlPath string, maxLength int64, tim
 		return data, err
 	}
 	if len(data) > int(maxLength) {
-		err = metadata.ErrDownloadLengthMismatch{
+		err = &metadata.ErrDownloadLengthMismatch{
 			Msg: fmt.Sprintf("Downloaded %d bytes exceeding the maximum allowed length of %d", len(data), maxLength),
 		}
 	}
@@ -418,7 +418,7 @@ func (rs *RepositorySimulator) FetchMetadata(role string, version *int) ([]byte,
 		// Return a version previously serialized in PublishRoot()
 		if version == nil || *version > len(rs.SignedRoots) && *version > 0 {
 			log.Printf("unknown root version %d", *version)
-			return []byte{}, metadata.ErrDownloadHTTP{StatusCode: 404}
+			return []byte{}, &metadata.ErrDownloadHTTP{StatusCode: 404}
 		}
 		log.Printf("fetched root version %d", version)
 		return rs.SignedRoots[*version-1], nil
@@ -435,7 +435,7 @@ func (rs *RepositorySimulator) FetchMetadata(role string, version *int) ([]byte,
 		md, ok := rs.MDDelegates[role]
 		if !ok {
 			log.Printf("unknown role %s", role)
-			return []byte{}, metadata.ErrDownloadHTTP{StatusCode: 404}
+			return []byte{}, &metadata.ErrDownloadHTTP{StatusCode: 404}
 		}
 		return signMetadata(role, &md, rs)
 	}

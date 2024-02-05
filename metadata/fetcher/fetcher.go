@@ -57,7 +57,7 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, timeout t
 	defer res.Body.Close()
 	// Handle HTTP status codes.
 	if res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusForbidden || res.StatusCode != http.StatusOK {
-		return nil, metadata.ErrDownloadHTTP{StatusCode: res.StatusCode, URL: urlPath}
+		return nil, &metadata.ErrDownloadHTTP{StatusCode: res.StatusCode, URL: urlPath}
 	}
 	var length int64
 	// Get content length from header (might not be accurate, -1 or not set).
@@ -68,7 +68,7 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, timeout t
 		}
 		// Error if the reported size is greater than what is expected.
 		if length > maxLength {
-			return nil, metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
+			return nil, &metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
 		}
 	}
 	// Although the size has been checked above, use a LimitReader in case
@@ -82,7 +82,7 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, timeout t
 	// Error if the reported size is greater than what is expected.
 	length = int64(len(data))
 	if length > maxLength {
-		return nil, metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
+		return nil, &metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
 	}
 
 	return data, nil
