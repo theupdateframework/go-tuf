@@ -31,7 +31,7 @@ import (
 
 var testRootBytes = []byte("{\"signatures\":[{\"keyid\":\"roothash\",\"sig\":\"1307990e6ba5ca145eb35e99182a9bec46531bc54ddf656a602c780fa0240dee\"}],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{\"roothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubrootval\"},\"scheme\":\"ed25519\"},\"snapshothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubsval\"},\"scheme\":\"ed25519\"},\"targetshash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtrval\"},\"scheme\":\"ed25519\"},\"timestamphash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtmval\"},\"scheme\":\"ed25519\"}},\"roles\":{\"root\":{\"keyids\":[\"roothash\"],\"threshold\":1},\"snapshot\":{\"keyids\":[\"snapshothash\"],\"threshold\":1},\"targets\":{\"keyids\":[\"targetshash\"],\"threshold\":1},\"timestamp\":{\"keyids\":[\"timestamphash\"],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"version\":1}}")
 
-const TEST_REPOSITORY_DATA = "../testutils/repository_data/repository/metadata"
+const TEST_REPOSITORY_DATA = "../internal/testutils/repository_data/repository/metadata"
 
 var fixedExpire = time.Date(2030, 8, 15, 14, 30, 45, 100, time.UTC)
 
