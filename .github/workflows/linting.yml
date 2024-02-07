@@ -31,12 +31,16 @@ jobs:
     name: golangci-lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
-      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
+      - name: Checkout code
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+
+      - name: Setup - Go
+        uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version-file: 'go.mod'
-          cache: false
-      - name: golangci-lint
+          cache: true
+
+      - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
           # Require: The version of golangci-lint to use.
