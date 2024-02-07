@@ -56,7 +56,7 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, timeout t
 	}
 	defer res.Body.Close()
 	// Handle HTTP status codes.
-	if res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusForbidden || res.StatusCode != http.StatusOK {
+	if res.StatusCode != http.StatusOK {
 		return nil, &metadata.ErrDownloadHTTP{StatusCode: res.StatusCode, URL: urlPath}
 	}
 	var length int64
