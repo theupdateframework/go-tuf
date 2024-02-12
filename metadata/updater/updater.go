@@ -27,7 +27,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -577,38 +576,36 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 	return nil, fmt.Errorf("target %s not found", targetFilePath)
 }
 
-// on windows, you can't rename a file across drives, so let's move instead
-func MoveFile(source, destination string) (err error) {
-	if runtime.GOOS == "windows" {
-		inputFile, err := os.Open(source)
-		if err != nil {
-			return fmt.Errorf("Couldn't open source file: %s", err)
-		}
-		defer inputFile.Close()
-		outputFile, err := os.Create(destination)
-		if err != nil {
-			inputFile.Close()
-			return fmt.Errorf("Couldn't open dest file: %s", err)
-		}
-		defer outputFile.Close()
-		c, err := io.Copy(outputFile, inputFile)
-		if err != nil {
-			return fmt.Errorf("Writing to output file failed: %s", err)
-		}
-		if c <= 0 {
-			return fmt.Errorf("Nothing copied to output file")
-		}
-		inputFile.Close()
-		// The copy was successful, so now delete the original file
-		err = os.Remove(source)
-		if err != nil {
-			return fmt.Errorf("Failed removing original file: %s", err)
-		}
-		return nil
-	} else {
+func moveFile(source, destination string) (err error) {
+	// can only safely rename on any OS if source and destination are in the same directory
+	if filepath.Dir(source) == filepath.Dir(destination) {
 		return os.Rename(source, destination)
 	}
 
+	inputFile, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("couldn't open source file: %s", err)
+	}
+	defer inputFile.Close()
+	outputFile, err := os.Create(destination)
+	if err != nil {
+		return fmt.Errorf("couldn't open dest file: %s", err)
+	}
+	defer outputFile.Close()
+	c, err := io.Copy(outputFile, inputFile)
+	if err != nil {
+		return fmt.Errorf("writing to output file failed: %s", err)
+	}
+	if c <= 0 {
+		return fmt.Errorf("nothing copied to output file")
+	}
+	inputFile.Close()
+	// The copy was successful, so now delete the original file
+	err = os.Remove(source)
+	if err != nil {
+		return fmt.Errorf("failed removing original file: %s", err)
+	}
+	return nil
 }
 
 // persistMetadata writes metadata to disk atomically to avoid data loss
@@ -644,7 +641,7 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 	// can't move/rename an open file on windows, so close it first
 	file.Close()
 	// if all okay, rename the temporary file to the desired one
-	err = MoveFile(file.Name(), fileName)
+	err = moveFile(file.Name(), fileName)
 	if err != nil {
 		return err
 	}
