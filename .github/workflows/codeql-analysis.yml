@@ -41,7 +41,7 @@ jobs:
       - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
         with:
           go-version-file: 'go.mod'
-          cache: false
+          cache: true
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
         uses: github/codeql-action/init@74483a38d39275f33fcff5f35b679b5ca4a26a99
