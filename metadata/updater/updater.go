@@ -223,6 +223,7 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 	} else {
 		targetBaseURL = ensureTrailingSlash(targetBaseURL)
 	}
+
 	targetFilePath := targetFile.Path
 	consistentSnapshot := update.trusted.Root.Signed.ConsistentSnapshot
 	if consistentSnapshot && update.cfg.PrefixTargetsWithHash {
@@ -250,7 +251,6 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 	if err != nil {
 		return "", nil, err
 	}
-
 	// do not persist the target file if cache is disabled
 	if !update.cfg.DisableLocalCache {
 		err = os.WriteFile(filePath, data, 0644)
@@ -674,7 +674,7 @@ func (update *Updater) generateTargetFilePath(tf *metadata.TargetFiles) (string,
 		return "", &metadata.ErrValue{Msg: "LocalTargetsDir must be set if filepath is not given"}
 	}
 	// Use URL encoded target path as filename
-	return url.JoinPath(update.cfg.LocalTargetsDir, url.QueryEscape(tf.Path))
+	return filepath.Join(update.cfg.LocalTargetsDir, url.QueryEscape(tf.Path)), nil
 }
 
 // loadLocalMetadata reads a local <roleName>.json file and returns its bytes
