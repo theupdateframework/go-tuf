@@ -251,6 +251,7 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 	if err != nil {
 		return "", nil, err
 	}
+
 	// do not persist the target file if cache is disabled
 	if !update.cfg.DisableLocalCache {
 		err = os.WriteFile(filePath, data, 0644)
