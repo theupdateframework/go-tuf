@@ -223,7 +223,9 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 	} else {
 		targetBaseURL = ensureTrailingSlash(targetBaseURL)
 	}
+
 	targetFilePath := targetFile.Path
+	targetRemotePath := targetFilePath
 	consistentSnapshot := update.trusted.Root.Signed.ConsistentSnapshot
 	if consistentSnapshot && update.cfg.PrefixTargetsWithHash {
 		hashes := ""
@@ -235,13 +237,13 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 		dirName, baseName, ok := strings.Cut(targetFilePath, "/")
 		if !ok {
 			// <hash>.<target-name>
-			targetFilePath = fmt.Sprintf("%s.%s", hashes, dirName)
+			targetRemotePath = fmt.Sprintf("%s.%s", hashes, dirName)
 		} else {
 			// <dir-prefix>/<hash>.<target-name>
-			targetFilePath = filepath.Join(dirName, fmt.Sprintf("%s.%s", hashes, baseName))
+			targetRemotePath = fmt.Sprintf("%s/%s.%s", dirName, hashes, baseName)
 		}
 	}
-	fullURL := fmt.Sprintf("%s%s", targetBaseURL, targetFilePath)
+	fullURL := fmt.Sprintf("%s%s", targetBaseURL, targetRemotePath)
 	data, err := update.cfg.Fetcher.DownloadFile(fullURL, targetFile.Length, time.Second*15)
 	if err != nil {
 		return "", nil, err
@@ -674,7 +676,7 @@ func (update *Updater) generateTargetFilePath(tf *metadata.TargetFiles) (string,
 		return "", &metadata.ErrValue{Msg: "LocalTargetsDir must be set if filepath is not given"}
 	}
 	// Use URL encoded target path as filename
-	return url.JoinPath(update.cfg.LocalTargetsDir, url.QueryEscape(tf.Path))
+	return filepath.Join(update.cfg.LocalTargetsDir, url.QueryEscape(tf.Path)), nil
 }
 
 // loadLocalMetadata reads a local <roleName>.json file and returns its bytes
