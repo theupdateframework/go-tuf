@@ -155,7 +155,8 @@ func BootstrapTUF() ([]byte, map[string][]byte, error) {
 		if name == "map.json" {
 			mapBytes = bytes
 		} else {
-			repositoryName := strings.Split(name, string(os.PathSeparator))
+			// Target names uses forwardslash even on Windows
+			repositoryName := strings.Split(name, "/")
 			trustedRoots[repositoryName[0]] = bytes
 		}
 		log.Info("Successfully downloaded target", "target", name, "path", path)
