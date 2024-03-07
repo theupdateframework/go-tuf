@@ -19,13 +19,13 @@ package updater
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/sigstore/sigstore/pkg/signature"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils"
@@ -40,7 +40,8 @@ func TestMain(m *testing.M) {
 
 	if err != nil {
 		simulator.RepositoryCleanup(simulator.MetadataDir)
-		log.Fatalf("failed to load TrustedRootMetadata: %v\n", err)
+		slog.Error("Failed to load TrustedRootMetadata", "err", err)
+		os.Exit(1)
 	}
 
 	defer simulator.RepositoryCleanup(simulator.MetadataDir)
@@ -48,19 +49,21 @@ func TestMain(m *testing.M) {
 }
 
 func loadOrResetTrustedRootMetadata() error {
+	// TODO: This should be a t.Helper() function
 	var err error
 
 	simulator.Sim, simulator.MetadataDir, testutils.TargetsDir, err = simulator.InitMetadataDir()
 	if err != nil {
-		log.Printf("failed to initialize metadata dir: %v", err)
+		slog.Error("Failed to initialize metadata dir", "err", err)
 		return err
 	}
 
 	simulator.RootBytes, err = simulator.GetRootBytes(simulator.MetadataDir)
 	if err != nil {
-		log.Printf("failed to load root bytes: %v", err)
+		slog.Error("Failed to load root bytes", "err", err)
 		return err
 	}
+
 	return nil
 }
 
@@ -90,14 +93,15 @@ func runRefresh(updaterConfig *config.UpdaterConfig, moveInTime time.Time) (Upda
 
 	updater, err := New(updaterConfig)
 	if err != nil {
-		log.Debugf("failed to create new updater config: %v", err)
+		slog.Error("Failed to create new updater config", "err", err)
 		return Updater{}, err
 	}
+
 	if moveInTime != time.Now() {
 		updater.trusted.RefTime = moveInTime
 	}
-	err = updater.Refresh()
-	return *updater, err
+
+	return *updater, updater.Refresh()
 }
 
 func initUpdater(updaterConfig *config.UpdaterConfig) *Updater {
@@ -107,8 +111,9 @@ func initUpdater(updaterConfig *config.UpdaterConfig) *Updater {
 
 	updater, err := New(updaterConfig)
 	if err != nil {
-		log.Debugf("failed to create new updater config: %v", err)
+		slog.Error("Failed to create new updater config", "err", err)
 	}
+
 	return updater
 }
 
