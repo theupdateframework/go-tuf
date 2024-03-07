@@ -20,6 +20,7 @@ package main
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -31,7 +32,6 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"github.com/theupdateframework/go-tuf/v2/metadata/repository"
-	"golang.org/x/crypto/ed25519"
 )
 
 // A TUF repository example using the low-level TUF Metadata API.

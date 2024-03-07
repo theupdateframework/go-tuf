@@ -19,6 +19,7 @@ package main
 
 import (
 	"crypto"
+	"crypto/ed25519"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,7 +29,6 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"github.com/theupdateframework/go-tuf/v2/metadata/repository"
-	"golang.org/x/crypto/ed25519"
 )
 
 func main() {
