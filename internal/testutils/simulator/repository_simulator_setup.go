@@ -48,11 +48,11 @@ func InitLocalEnv() error {
 		os.Exit(1)
 	}
 
-	if err = os.Mkdir(tmpDir+metadataPath, 0750); err != nil {
+	if err = os.Mkdir(filepath.Join(tmpDir,metadataPath), 0750); err != nil {
 		slog.Error("Repository simulator: failed to create dir", "err", err)
 	}
 
-	if err = os.Mkdir(tmpDir+targetsPath, 0750); err != nil {
+	if err = os.Mkdir(filepath.Join(tmpDir,targetsPath), 0750); err != nil {
 		slog.Error("Repository simulator: failed to create dir", "err", err)
 	}
 
