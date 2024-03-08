@@ -19,6 +19,8 @@ on:
 name: Linting
 jobs:
   govulncheck_job:
+    permissions:
+      pull-requests: write # Needed to allow writing comments on PRs
     runs-on: ubuntu-latest
     name: govulncheck
     steps:
@@ -28,6 +30,15 @@ jobs:
         with:
           go-version-file: 'go.mod'
           go-package: ./...
+      - name: Comment on PR
+        if: steps.govulncheck.outcome == 'failure'
+        run: gh pr comment $NUM --edit-last --body $BODY || gh pr comment $NUM --body $BODY
+        env:
+          BODY: |
+            :warning: **govulncheck found potential vulnerabilities in the code**
+            Check the output here: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/job/${{ github.job }}
+          NUM: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   golangci:
     name: golangci-lint
