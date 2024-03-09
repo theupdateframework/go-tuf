@@ -1,5 +1,5 @@
 ![GitHub Workflow Status (with branch)](https://img.shields.io/github/actions/workflow/status/rdimitrov/go-tuf-metadata/ci.yml?branch=main)
-[![codecov](https://codecov.io/github/rdimitrov/go-tuf-metadata/branch/main/graph/badge.svg?token=2ZUA68ZL13)](https://codecov.io/github/rdimitrov/go-tuf-metadata)
+[![codecov](https://codecov.io/github/theupdateframework/go-tuf/branch/master/graph/badge.svg?token=2ZUA68ZL13)](https://codecov.io/github/theupdateframework/go-tuf)
 [![Go Reference](https://pkg.go.dev/badge/github.com/rdimitrov/go-tuf-metadata.svg)](https://pkg.go.dev/github.com/rdimitrov/go-tuf-metadata)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rdimitrov/go-tuf-metadata)](https://goreportcard.com/report/github.com/rdimitrov/go-tuf-metadata)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
