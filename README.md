@@ -1,19 +1,16 @@
-![GitHub Workflow Status (with branch)](https://img.shields.io/github/actions/workflow/status/rdimitrov/go-tuf-metadata/ci.yml?branch=main)
-[![codecov](https://codecov.io/github/rdimitrov/go-tuf-metadata/branch/main/graph/badge.svg?token=2ZUA68ZL13)](https://codecov.io/github/rdimitrov/go-tuf-metadata)
-[![Go Reference](https://pkg.go.dev/badge/github.com/rdimitrov/go-tuf-metadata.svg)](https://pkg.go.dev/github.com/rdimitrov/go-tuf-metadata)
-[![Go Report Card](https://goreportcard.com/badge/github.com/rdimitrov/go-tuf-metadata)](https://goreportcard.com/report/github.com/rdimitrov/go-tuf-metadata)
+![GitHub Workflow Status (with branch)](https://img.shields.io/github/actions/workflow/status/theupdateframework/go-tuf/ci.yml?branch=master)
+[![codecov](https://codecov.io/github/theupdateframework/go-tuf/branch/master/graph/badge.svg?token=2ZUA68ZL13)](https://codecov.io/github/theupdateframework/go-tuf)
+[![Go Reference](https://pkg.go.dev/badge/github.com/theupdateframework/go-tuf.svg)](https://pkg.go.dev/github.com/theupdateframework/go-tuf)
+[![Go Report Card](https://goreportcard.com/badge/github.com/theupdateframework/go-tuf)](https://goreportcard.com/report/github.com/theupdateframework/go-tuf)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-# <img src="https://cdn.rawgit.com/theupdateframework/artwork/3a649fa6/tuf-logo.svg" height="100" valign="middle" alt="TUF"/> A Framework for Securing Software Update Systems
+# <img src="https://cdn.rawgit.com/theupdateframework/artwork/3a649fa6/tuf-logo.svg" height="100" valign="middle" alt="TUF"/> go-tuf/v2 - Framework for Securing Software Update Systems
 
 ----------------------------
 
 [The Update Framework (TUF)](https://theupdateframework.io/) is a framework for
 secure content delivery and updates. It protects against various types of
 supply chain attacks and provides resilience to compromise.
-
-[go-tuf-metadata](https://github.com/rdimitrov/go-tuf-metadata) started from the idea of providing a Go implementation of TUF that is heavily influenced by the
-design decisions made in [python-tuf](https://github.com/theupdateframework/python-tuf).
 
 ## About The Update Framework
 
@@ -37,16 +34,16 @@ Please see [TUF's website](https://theupdateframework.com/) for more information
 
 ----------------------------
 
-The [go-tuf-metadata](https://github.com/rdimitrov/go-tuf-metadata) project provides the following functionality:
+The go-tuf v2 project provides a lightweight library with the following functionality:
 
-* creation, reading, and writing of metadata
-* an easy object-oriented approach for interacting with metadata
+* creation, reading, and writing of TUF metadata
+* an easy object-oriented approach for interacting with TUF metadata
 * consistent snapshots
-* signing and verifying metadata
+* signing and verifying TUF metadata
 * ED25519, RSA, and ECDSA key types referenced by the latest TUF specification
 * top-level role delegation
 * target delegation via standard and hash bin delegations
-* support of [succinct hash bin delegations](https://github.com/theupdateframework/taps/blob/master/tap15.md) which significantly reduce the size of metadata
+* support of [succinct hash bin delegations](https://github.com/theupdateframework/taps/blob/master/tap15.md) which significantly reduce the size of the TUF metadata
 * support for unrecognized fields within the metadata (i.e. preserved and accessible through `root.Signed.UnrecognizedFields["some-unknown-field"]`, also used for verifying/signing (if included in the Signed portion of the metadata))
 * TUF client API
 * TUF multi-repository client API (implements [TAP 4 - Multiple repository consensus on entrusted targets](https://github.com/theupdateframework/taps/blob/master/tap4.md))
@@ -54,6 +51,8 @@ The [go-tuf-metadata](https://github.com/rdimitrov/go-tuf-metadata) project prov
 ## Examples
 
 ----------------------------
+
+There are several examples that can act as a guideline on how to use the library and its features. Some of which are:
 
 * [basic_repository.go](examples/repository/basic_repository.go) example which demonstrates how to *manually* create and
 maintain repository metadata using the low-level Metadata API.
@@ -114,17 +113,21 @@ and can be used to implement various TUF clients with relatively little effort.
 
 ----------------------------
 
-* [go-tuf-metadata documentation](https://pkg.go.dev/github.com/rdimitrov/go-tuf-metadata)
+* [Documentation](https://pkg.go.dev/github.com/theupdateframework/go-tuf)
 
 * [Introduction to TUF's Design](https://theupdateframework.io/overview/)
 
 * [The TUF Specification](https://theupdateframework.github.io/specification/latest/)
 
+## History - legacy go-tuf vs go-tuf/v2
+
+The [legacy go-tuf (v0.7.0)](https://github.com/theupdateframework/go-tuf/tree/v0.7.0) codebase was difficult to maintain and prone to errors due to its initial design decisions. Now it is considered deprecated in favour of go-tuf v2 (originaly from [rdimitrov/go-tuf-metadata](https://github.com/rdimitrov/go-tuf-metadata)) which started from the idea of providing a Go implementation of TUF that is heavily influenced by the design decisions made in [python-tuf](https://github.com/theupdateframework/python-tuf).
+
 ## Contact
 
 ----------------------------
 
-Questions, feedback, and suggestions are welcomed on the [#tuf](https://cloud-native.slack.com/archives/C8NMD3QJ3) channel on
+Questions, feedback, and suggestions are welcomed on the [#tuf](https://cloud-native.slack.com/archives/C8NMD3QJ3) and/or [#go-tuf](https://cloud-native.slack.com/archives/C02D577GX54) channels on
 [CNCF Slack](https://slack.cncf.io/).
 
 We strive to make the specification easy to implement, so if you come across
