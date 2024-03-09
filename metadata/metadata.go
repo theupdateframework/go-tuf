@@ -323,7 +323,9 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			}
 		}
 		// load a verifier based on that key
-		// handle RSA PSS keys separately as the LoadVerifier function doesn't identify them correctly
+		// handle RSA PSS scheme separately as the LoadVerifier function doesn't identify it correctly
+		// Note we should support RSA PSS, not RSA PKCS1v15 (which is what LoadVerifier would return)
+		// Reference: https://theupdateframework.github.io/specification/latest/#file-formats-keys
 		var verifier signature.Verifier
 		if key.Type == KeyTypeRSASSA_PSS_SHA256 {
 			// Load a verifier for rsa
