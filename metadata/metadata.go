@@ -312,7 +312,14 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 		// use corresponding hash function for key type
 		hash := crypto.Hash(0)
 		if key.Type != KeyTypeEd25519 {
-			hash = crypto.SHA256
+			switch key.Scheme {
+			case KeySchemeECDSA_SHA2_P256:
+				hash = crypto.SHA256
+			case KeySchemeECDSA_SHA2_P384:
+				hash = crypto.SHA384
+			default:
+				hash = crypto.SHA256
+			}
 		}
 		// load a verifier based on that key
 		verifier, err := signature.LoadVerifier(publicKey, hash)
