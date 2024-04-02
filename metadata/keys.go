@@ -38,6 +38,7 @@ const (
 	KeyTypeRSASSA_PSS_SHA256      = "rsa"
 	KeySchemeEd25519              = "ed25519"
 	KeySchemeECDSA_SHA2_P256      = "ecdsa-sha2-nistp256"
+	KeySchemeECDSA_SHA2_P384      = "ecdsa-sha2-nistp384"
 	KeySchemeRSASSA_PSS_SHA256    = "rsassa-pss-sha256"
 )
 
