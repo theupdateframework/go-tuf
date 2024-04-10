@@ -18,11 +18,10 @@
 package simulator
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -41,44 +40,47 @@ var (
 )
 
 func InitLocalEnv() error {
-
 	tmp := os.TempDir()
 
 	tmpDir, err := os.MkdirTemp(tmp, "0750")
 	if err != nil {
-		log.Fatal("failed to create temporary directory: ", err)
+		slog.Error("Failed to create temporary directory", "err", err)
+		os.Exit(1)
 	}
 
-	err = os.Mkdir(tmpDir+metadataPath, 0750)
-	if err != nil {
-		log.Debugf("repository simulator: failed to create dir: %v", err)
+	if err = os.Mkdir(filepath.Join(tmpDir,metadataPath), 0750); err != nil {
+		slog.Error("Repository simulator: failed to create dir", "err", err)
 	}
-	err = os.Mkdir(tmpDir+targetsPath, 0750)
-	if err != nil {
-		log.Debugf("repository simulator: failed to create dir: %v", err)
+
+	if err = os.Mkdir(filepath.Join(tmpDir,targetsPath), 0750); err != nil {
+		slog.Error("Repository simulator: failed to create dir", "err", err)
 	}
+
 	LocalDir = tmpDir
+
 	return nil
 }
 
 func InitMetadataDir() (*RepositorySimulator, string, string, error) {
-	err := InitLocalEnv()
-	if err != nil {
-		log.Fatal("failed to initialize environment: ", err)
+	if err := InitLocalEnv(); err != nil {
+		slog.Error("Failed to initialize environment", "err", err)
+		os.Exit(1)
 	}
+
 	metadataDir := filepath.Join(LocalDir, metadataPath)
 
 	sim := NewRepository()
 
 	f, err := os.Create(filepath.Join(metadataDir, "root.json"))
 	if err != nil {
-		log.Fatalf("failed to create root: %v", err)
+		slog.Error("Failed to create root", "err", err)
+		os.Exit(1)
 	}
 
-	_, err = f.Write(sim.SignedRoots[0])
-	if err != nil {
-		log.Debugf("repository simulator setup: failed to write signed roots: %v", err)
+	if _, err = f.Write(sim.SignedRoots[0]); err != nil {
+		slog.Error("Repository simulator setup: failed to write signed roots", "err", err)
 	}
+
 	targetsDir := filepath.Join(LocalDir, targetsPath)
 	sim.LocalDir = LocalDir
 	return sim, metadataDir, targetsDir, err
@@ -89,6 +91,6 @@ func GetRootBytes(localMetadataDir string) ([]byte, error) {
 }
 
 func RepositoryCleanup(tmpDir string) {
-	log.Printf("Cleaning temporary directory: %s\n", tmpDir)
+	slog.Info("Cleaning temporary directory", "dir", tmpDir)
 	os.RemoveAll(tmpDir)
 }

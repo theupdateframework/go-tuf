@@ -235,7 +235,7 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 			break
 		}
 		baseName := filepath.Base(targetFilePath)
-		dirName, ok := strings.CutSuffix(targetFilePath, baseName)
+		dirName, ok := strings.CutSuffix(targetFilePath, "/"+baseName)
 		if !ok {
 			// <hash>.<target-name>
 			targetRemotePath = fmt.Sprintf("%s.%s", hashes, baseName)

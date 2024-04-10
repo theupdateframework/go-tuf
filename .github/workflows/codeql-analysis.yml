@@ -37,14 +37,17 @@ jobs:
         # Learn more about CodeQL language support at https://git.io/codeql-language-support
 
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
-      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Setup - Go
+        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
           go-version-file: 'go.mod'
           cache: true
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@74483a38d39275f33fcff5f35b679b5ca4a26a99
+        uses: github/codeql-action/init@47b3d888fe66b639e431abf22ebca059152f1eea # 3.24.5
         with:
           languages: ${{ matrix.language }}
           # If you wish to specify custom queries, you can do so here or in a config file.
@@ -55,7 +58,7 @@ jobs:
       # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
       # If this step fails, then you should remove it and run the build manually (see below)
       - name: Autobuild
-        uses: github/codeql-action/autobuild@74483a38d39275f33fcff5f35b679b5ca4a26a99
+        uses: github/codeql-action/autobuild@47b3d888fe66b639e431abf22ebca059152f1eea # 3.24.5
 
       # ℹ️ Command-line programs to run using the OS shell.
       # 📚 https://git.io/JvXDl
@@ -69,4 +72,4 @@ jobs:
       #   make release
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@74483a38d39275f33fcff5f35b679b5ca4a26a99
+        uses: github/codeql-action/analyze@47b3d888fe66b639e431abf22ebca059152f1eea # 3.24.5
