@@ -652,7 +652,7 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 		return err
 	}
 	if string(read) != string(data) {
-		return fmt.Errorf("failed to persist metadata: %w", err)
+		return fmt.Errorf("failed to persist metadata")
 	}
 	return nil
 }
