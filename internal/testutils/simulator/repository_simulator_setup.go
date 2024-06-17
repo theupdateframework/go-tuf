@@ -48,11 +48,11 @@ func InitLocalEnv() error {
 		os.Exit(1)
 	}
 
-	if err = os.Mkdir(filepath.Join(tmpDir,metadataPath), 0750); err != nil {
+	if err = os.Mkdir(filepath.Join(tmpDir, metadataPath), 0750); err != nil {
 		slog.Error("Repository simulator: failed to create dir", "err", err)
 	}
 
-	if err = os.Mkdir(filepath.Join(tmpDir,targetsPath), 0750); err != nil {
+	if err = os.Mkdir(filepath.Join(tmpDir, targetsPath), 0750); err != nil {
 		slog.Error("Repository simulator: failed to create dir", "err", err)
 	}
 
@@ -76,6 +76,7 @@ func InitMetadataDir() (*RepositorySimulator, string, string, error) {
 		slog.Error("Failed to create root", "err", err)
 		os.Exit(1)
 	}
+	defer f.Close()
 
 	if _, err = f.Write(sim.SignedRoots[0]); err != nil {
 		slog.Error("Repository simulator setup: failed to write signed roots", "err", err)

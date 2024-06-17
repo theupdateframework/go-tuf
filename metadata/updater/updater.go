@@ -579,38 +579,6 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 	return nil, fmt.Errorf("target %s not found", targetFilePath)
 }
 
-func moveFile(source, destination string) (err error) {
-	// can only safely rename on any OS if source and destination are in the same directory
-	if filepath.Dir(source) == filepath.Dir(destination) {
-		return os.Rename(source, destination)
-	}
-
-	inputFile, err := os.Open(source)
-	if err != nil {
-		return fmt.Errorf("couldn't open source file: %s", err)
-	}
-	defer inputFile.Close()
-	outputFile, err := os.Create(destination)
-	if err != nil {
-		return fmt.Errorf("couldn't open dest file: %s", err)
-	}
-	defer outputFile.Close()
-	c, err := io.Copy(outputFile, inputFile)
-	if err != nil {
-		return fmt.Errorf("writing to output file failed: %s", err)
-	}
-	if c <= 0 {
-		return fmt.Errorf("nothing copied to output file")
-	}
-	inputFile.Close()
-	// The copy was successful, so now delete the original file
-	err = os.Remove(source)
-	if err != nil {
-		return fmt.Errorf("failed removing original file: %s", err)
-	}
-	return nil
-}
-
 // persistMetadata writes metadata to disk atomically to avoid data loss
 func (update *Updater) persistMetadata(roleName string, data []byte) error {
 	log := metadata.GetLogger()
@@ -620,12 +588,8 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 	}
 	// caching enabled, proceed with persisting the metadata locally
 	fileName := filepath.Join(update.cfg.LocalMetadataDir, fmt.Sprintf("%s.json", url.QueryEscape(roleName)))
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
 	// create a temporary file
-	file, err := os.CreateTemp(cwd, "tuf_tmp")
+	file, err := os.CreateTemp(update.cfg.LocalMetadataDir, "tuf_tmp")
 	if err != nil {
 		return err
 	}
@@ -642,9 +606,12 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 	}
 
 	// can't move/rename an open file on windows, so close it first
-	file.Close()
+	err = file.Close()
+	if err != nil {
+		return err
+	}
 	// if all okay, rename the temporary file to the desired one
-	err = moveFile(file.Name(), fileName)
+	err = os.Rename(file.Name(), fileName)
 	if err != nil {
 		return err
 	}
