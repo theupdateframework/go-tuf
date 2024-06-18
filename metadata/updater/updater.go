@@ -662,6 +662,10 @@ func (update *Updater) GetTrustedMetadataSet() trustedmetadata.TrustedMetadata {
 	return *update.trusted
 }
 
+func (update *Updater) SetRefTime(t time.Time) {
+	update.trusted.RefTime = t
+}
+
 func IsWindowsPath(path string) bool {
 	match, _ := regexp.MatchString(`^[a-zA-Z]:\\`, path)
 	return match

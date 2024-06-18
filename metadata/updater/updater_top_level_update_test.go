@@ -98,7 +98,7 @@ func runRefresh(updaterConfig *config.UpdaterConfig, moveInTime time.Time) (Upda
 	}
 
 	if moveInTime != time.Now() {
-		updater.trusted.RefTime = moveInTime
+		updater.SetRefTime(moveInTime)
 	}
 
 	return *updater, updater.Refresh()
