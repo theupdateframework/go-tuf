@@ -662,6 +662,13 @@ func (update *Updater) GetTrustedMetadataSet() trustedmetadata.TrustedMetadata {
 	return *update.trusted
 }
 
+// UnsafeSetRefTime sets the reference time that the updater uses.
+// This should only be done in tests.
+// Using this function is useful when testing time-related behavior in go-tuf.
+func (update *Updater) UnsafeSetRefTime(t time.Time) {
+	update.trusted.RefTime = t
+}
+
 func IsWindowsPath(path string) bool {
 	match, _ := regexp.MatchString(`^[a-zA-Z]:\\`, path)
 	return match
