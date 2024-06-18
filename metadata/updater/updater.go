@@ -662,6 +662,9 @@ func (update *Updater) GetTrustedMetadataSet() trustedmetadata.TrustedMetadata {
 	return *update.trusted
 }
 
+// Sets the reference time that the updater uses.
+// This should only be done in tests.
+// UnsafeSetRefTime is useful when testing time-related behavior in go-tuf.
 func (update *Updater) UnsafeSetRefTime(t time.Time) {
 	update.trusted.RefTime = t
 }
