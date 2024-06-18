@@ -662,7 +662,7 @@ func (update *Updater) GetTrustedMetadataSet() trustedmetadata.TrustedMetadata {
 	return *update.trusted
 }
 
-func (update *Updater) SetRefTime(t time.Time) {
+func (update *Updater) UnsafeSetRefTime(t time.Time) {
 	update.trusted.RefTime = t
 }
 
