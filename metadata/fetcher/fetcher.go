@@ -37,6 +37,10 @@ type DefaultFetcher struct {
 	httpUserAgent string
 }
 
+func (d *DefaultFetcher) SetHTTPUserAgent(httpUserAgent string) {
+	d.httpUserAgent = httpUserAgent
+}
+
 // DownloadFile downloads a file from urlPath, errors out if it failed,
 // its length is larger than maxLength or the timeout is reached.
 func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, timeout time.Duration) ([]byte, error) {
