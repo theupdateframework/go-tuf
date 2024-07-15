@@ -57,7 +57,7 @@ func New(remoteURL string, rootBytes []byte) (*UpdaterConfig, error) {
 
 	return &UpdaterConfig{
 		// TUF configuration
-		MaxRootRotations:   32,
+		MaxRootRotations:   256,
 		MaxDelegations:     32,
 		RootMaxLength:      512000,  // bytes
 		TimestampMaxLength: 16384,   // bytes
