@@ -43,7 +43,7 @@ func TestNewUpdaterConfig(t *testing.T) {
 			remoteURL: "somepath",
 			rootBytes: []byte("somerootbytes"),
 			config: &UpdaterConfig{
-				MaxRootRotations:      32,
+				MaxRootRotations:      256,
 				MaxDelegations:        32,
 				RootMaxLength:         512000,
 				TimestampMaxLength:    16384,
