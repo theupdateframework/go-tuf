@@ -1,5 +1,7 @@
 # go-tuf
 
+temporary change to test ci.yaml workflow
+
 [![build](https://github.com/DataDog/go-tuf/workflows/build/badge.svg)](https://github.com/DataDog/go-tuf/actions?query=workflow%3Abuild) [![Coverage Status](https://coveralls.io/repos/github/theupdateframework/go-tuf/badge.svg)](https://coveralls.io/github/theupdateframework/go-tuf) [![PkgGoDev](https://pkg.go.dev/badge/github.com/DataDog/go-tuf)](https://pkg.go.dev/github.com/DataDog/go-tuf) [![Go Report Card](https://goreportcard.com/badge/github.com/DataDog/go-tuf)](https://goreportcard.com/report/github.com/DataDog/go-tuf)
 
 This is a Go implementation of [The Update Framework (TUF)](http://theupdateframework.com/),
