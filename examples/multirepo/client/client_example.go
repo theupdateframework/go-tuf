@@ -33,8 +33,8 @@ import (
 )
 
 const (
-	metadataURL = "https://raw.githubusercontent.com/rdimitrov/go-tuf-metadata/main/examples/multirepo/repository/metadata"
-	targetsURL  = "https://raw.githubusercontent.com/rdimitrov/go-tuf-metadata/main/examples/multirepo/repository/targets"
+	metadataURL = "https://raw.githubusercontent.com/theupdateframework/go-tuf/main/examples/multirepo/repository/metadata"
+	targetsURL  = "https://raw.githubusercontent.com/theupdateframework/go-tuf/main/examples/multirepo/repository/targets"
 	verbosity   = 4
 )
 

@@ -2,7 +2,7 @@
 {
   "repositories": {
     "sigstore-tuf-root": ["https://tuf-repo-cdn.sigstore.dev"],
-    "staging":   ["https://raw.githubusercontent.com/sigstore/root-signing/main/repository/repository"]
+    "staging":   ["https://tuf-repo-cdn.sigstore.dev"]
   },
   "mapping": [
     {
