@@ -1,20 +1,20 @@
 {
 	"signatures": [
 		{
-			"keyid": "a606e603cc4974a8fa894928cb165ce38a3f9948c245414bc71ef681caae9dc5",
-			"sig": "4c2ad791fe1b2d23b4a7292120b493c61795cb23519b2f23b9c17a25a1078b7cdf72f052fe4ddc583e45ef6ab6ca809f35c192bdf60649ba371bc063a62cbd05"
+			"keyid": "b779120edb45353d2a151004fe463ec6f10d90d83c0fa1c755e4e436e2ac8009",
+			"sig": "548ef3fb01c6def4b972444e05a5bc7a7c0e5750eb0c78dc04bd52997849185b3ec72a440157a467c42ff6dd63a808a047a0aee944855e319734bb927e9d7e05"
 		}
 	],
 	"signed": {
 		"_type": "targets",
-		"expires": "2033-11-28T19:51:01.793233Z",
+		"expires": "2034-09-30T11:29:58.187585Z",
 		"spec_version": "1.0.31",
 		"targets": {
 			"map.json": {
 				"hashes": {
-					"sha256": "9bb72b3c684f4e489e7fdce1afabff64b4e3f4b7877ac8cb78a684c2c65fc6d8"
+					"sha256": "562fc7cffe872542a430342995998546e3949dc3acbe7d37668dc76d657032ff"
 				},
-				"length": 645
+				"length": 596
 			},
 			"sigstore-tuf-root/root.json": {
 				"hashes": {
