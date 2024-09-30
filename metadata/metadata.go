@@ -562,28 +562,30 @@ func isTargetInPathPattern(targetpath string, pathpattern string) bool {
 
 // GetRolesForTarget return the names and terminating status of all
 // delegated roles who are responsible for targetFilepath
-func (role *Delegations) GetRolesForTarget(targetFilepath string) map[string]bool {
-	res := map[string]bool{}
-	// standard delegations
+// Note the result should be an ordered list, ref. https://github.com/theupdateframework/go-tuf/security/advisories/GHSA-4f8r-qqr9-fq8j
+func (role *Delegations) GetRolesForTarget(targetFilepath string) []RoleResult {
+	var res []RoleResult
+	// Standard delegations
 	if role.Roles != nil {
 		for _, r := range role.Roles {
 			ok, err := r.IsDelegatedPath(targetFilepath)
 			if err == nil && ok {
-				res[r.Name] = r.Terminating
+				res = append(res, RoleResult{Name: r.Name, Terminating: r.Terminating})
 			}
 		}
 	} else if role.SuccinctRoles != nil {
 		// SuccinctRoles delegations
 		res = role.SuccinctRoles.GetRolesForTarget(targetFilepath)
 	}
+	// We preserve the same order as the actual roles list
 	return res
 }
 
 // GetRolesForTarget calculate the name of the delegated role responsible for "targetFilepath".
 // The target at path "targetFilepath" is assigned to a bin by casting
 // the left-most "BitLength" of bits of the file path hash digest to
-// int, using it as bin index between 0 and “2**BitLength - 1“.
-func (role *SuccinctRoles) GetRolesForTarget(targetFilepath string) map[string]bool {
+// int, using it as bin index between 0 and “2**BitLength-1”.
+func (role *SuccinctRoles) GetRolesForTarget(targetFilepath string) []RoleResult {
 	// calculate the suffixLen value based on the total number of bins in
 	// hex. If bit_length = 10 then numberOfBins = 1024 or bin names will
 	// have a suffix between "000" and "3ff" in hex and suffixLen will be 3
@@ -604,8 +606,8 @@ func (role *SuccinctRoles) GetRolesForTarget(targetFilepath string) map[string]b
 	// add zero padding if necessary and cast to hex the suffix
 	suffix := fmt.Sprintf("%0*x", suffixLen, binNumber)
 	// we consider all succinct_roles as terminating.
-	// for more information read TAP 15.
-	return map[string]bool{fmt.Sprintf("%s-%s", role.NamePrefix, suffix): true}
+	// for more information, read TAP 15.
+	return []RoleResult{{Name: fmt.Sprintf("%s-%s", role.NamePrefix, suffix), Terminating: true}}
 }
 
 // GetRoles returns the names of all different delegated roles

@@ -171,3 +171,9 @@ type SuccinctRoles struct {
 	NamePrefix         string         `json:"name_prefix"`
 	UnrecognizedFields map[string]any `json:"-"`
 }
+
+// RoleResult represents the name and terminating status of a delegated role that is responsible for targetFilepath
+type RoleResult struct {
+	Name        string
+	Terminating bool
+}

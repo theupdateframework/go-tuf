@@ -550,14 +550,14 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 		// after pre-order check, add current role to set of visited roles
 		visitedRoleNames[delegation.Role] = true
 		if targets.Signed.Delegations != nil {
-			childRolesToVisit := []roleParentTuple{}
+			var childRolesToVisit []roleParentTuple
 			// note that this may be a slow operation if there are many
 			// delegated roles
 			roles := targets.Signed.Delegations.GetRolesForTarget(targetFilePath)
-			for child, terminating := range roles {
-				log.Info("Adding child role", "role", child)
-				childRolesToVisit = append(childRolesToVisit, roleParentTuple{Role: child, Parent: delegation.Role})
-				if terminating {
+			for _, rolesForTarget := range roles {
+				log.Info("Adding child role", "role", rolesForTarget.Name)
+				childRolesToVisit = append(childRolesToVisit, roleParentTuple{Role: rolesForTarget.Name, Parent: delegation.Role})
+				if rolesForTarget.Terminating {
 					log.Info("Not backtracking to other roles")
 					delegationsToVisit = []roleParentTuple{}
 					break
