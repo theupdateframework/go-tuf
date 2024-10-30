@@ -21,8 +21,8 @@ import (
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
-// repositoryType struct for storing metadata
-type repositoryType struct {
+// Type struct for storing metadata
+type Type struct {
 	root      *metadata.Metadata[metadata.RootType]
 	snapshot  *metadata.Metadata[metadata.SnapshotType]
 	timestamp *metadata.Metadata[metadata.TimestampType]
@@ -30,48 +30,48 @@ type repositoryType struct {
 }
 
 // New creates an empty repository instance
-func New() *repositoryType {
-	return &repositoryType{
+func New() *Type {
+	return &Type{
 		targets: map[string]*metadata.Metadata[metadata.TargetsType]{},
 	}
 }
 
 // Root returns metadata of type Root
-func (r *repositoryType) Root() *metadata.Metadata[metadata.RootType] {
+func (r *Type) Root() *metadata.Metadata[metadata.RootType] {
 	return r.root
 }
 
 // SetRoot sets metadata of type Root
-func (r *repositoryType) SetRoot(meta *metadata.Metadata[metadata.RootType]) {
+func (r *Type) SetRoot(meta *metadata.Metadata[metadata.RootType]) {
 	r.root = meta
 }
 
 // Snapshot returns metadata of type Snapshot
-func (r *repositoryType) Snapshot() *metadata.Metadata[metadata.SnapshotType] {
+func (r *Type) Snapshot() *metadata.Metadata[metadata.SnapshotType] {
 	return r.snapshot
 }
 
 // SetSnapshot sets metadata of type Snapshot
-func (r *repositoryType) SetSnapshot(meta *metadata.Metadata[metadata.SnapshotType]) {
+func (r *Type) SetSnapshot(meta *metadata.Metadata[metadata.SnapshotType]) {
 	r.snapshot = meta
 }
 
 // Timestamp returns metadata of type Timestamp
-func (r *repositoryType) Timestamp() *metadata.Metadata[metadata.TimestampType] {
+func (r *Type) Timestamp() *metadata.Metadata[metadata.TimestampType] {
 	return r.timestamp
 }
 
 // SetTimestamp sets metadata of type Timestamp
-func (r *repositoryType) SetTimestamp(meta *metadata.Metadata[metadata.TimestampType]) {
+func (r *Type) SetTimestamp(meta *metadata.Metadata[metadata.TimestampType]) {
 	r.timestamp = meta
 }
 
 // Targets returns metadata of type Targets
-func (r *repositoryType) Targets(name string) *metadata.Metadata[metadata.TargetsType] {
+func (r *Type) Targets(name string) *metadata.Metadata[metadata.TargetsType] {
 	return r.targets[name]
 }
 
 // SetTargets sets metadata of type Targets
-func (r *repositoryType) SetTargets(name string, meta *metadata.Metadata[metadata.TargetsType]) {
+func (r *Type) SetTargets(name string, meta *metadata.Metadata[metadata.TargetsType]) {
 	r.targets[name] = meta
 }
