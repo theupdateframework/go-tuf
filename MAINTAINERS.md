@@ -8,7 +8,6 @@ The [@theupdateframework/go-tuf-maintainers](https://github.com/orgs/theupdatefr
 | Maintainer                 | GitHub ID                                                  | Affiliation                                |
 | -------------------------- | ---------------------------------------------------------- | ------------------------------------------ |
 | Fredrik Skogman            | [@kommendorkapten](https://github.com/kommendorkapten)     | [@GitHub](https://github.com/github)       |
-| Joshua Lock                | [@joshuagl](https://github.com/joshuagl)                   | [@Verizon](https://github.com/verizon)     |
 | Marina Moore               | [@mnm678](https://github.com/mnm678)                       | NYU                                        |
 | Marvin Drees               | [@MDr164](https://github.com/MDr164)                       | [@9elements](https://github.com/9elements) |
 | Radoslav Dimitrov          | [@rdimitrov](https://github.com/rdimitrov)                 | [@Stacklok](https://github.com/stacklok)   |
@@ -20,5 +19,6 @@ We are deeply indebted to our emeritus maintainers below:
 
 | Maintainer                 | GitHub ID                                                  |
 | -------------------------- | ---------------------------------------------------------- |
+| Joshua Lock                | [@joshuagl](https://github.com/joshuagl)                   |
 | Trishank Karthik Kuppusamy | [@trishankatdatadog](https://github.com/trishankatdatadog) |
 | Zack Newman                | [@znewman01](https://github.com/znewman01)                 |
