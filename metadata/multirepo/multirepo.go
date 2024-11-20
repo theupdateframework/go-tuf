@@ -311,8 +311,13 @@ func (client *MultiRepoClient) DownloadTarget(repos []string, targetFile *metada
 	log := metadata.GetLogger()
 
 	for _, repoName := range repos {
+		repoClient, ok := client.TUFClients[repoName]
+		if !ok {
+			return "", nil, fmt.Errorf("no client found for repo %q", repoName)
+		}
+
 		// see if the target is already present locally
-		targetPath, targetBytes, err := client.TUFClients[repoName].FindCachedTarget(targetFile, filePath)
+		targetPath, targetBytes, err := repoClient.FindCachedTarget(targetFile, filePath)
 		if err != nil {
 			return "", nil, err
 		}
@@ -322,7 +327,7 @@ func (client *MultiRepoClient) DownloadTarget(repos []string, targetFile *metada
 			return targetPath, targetBytes, nil
 		}
 		// not present locally, so let's try to download it
-		targetPath, targetBytes, err = client.TUFClients[repoName].DownloadTarget(targetFile, filePath, targetBaseURL)
+		targetPath, targetBytes, err = repoClient.DownloadTarget(targetFile, filePath, targetBaseURL)
 		if err != nil {
 			// TODO: decide if we should error if one repository serves the expected target info, but we fail to download the actual target
 			// try downloading the target from the next available repository
