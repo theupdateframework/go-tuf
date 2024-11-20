@@ -499,7 +499,9 @@ func main() {
 
 	// Use a mixture of key types
 	// ==========================
-	// Create an RSA key
+	// Create an RSA key.
+	// Note TUF should use an RSA PSS key scheme, not RSA PKCS1v15.
+	// Reference: https://theupdateframework.github.io/specification/latest/#file-formats-keys
 	anotherRootKeyRSA, _ := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		panic(fmt.Sprintln("basic_repository.go:", "RSA key generation failed", err))
@@ -549,7 +551,7 @@ func main() {
 	}
 
 	// Sign root with the new RSA and ECDSA keys
-	outofbandSignerRSA, err := signature.LoadSigner(anotherRootKeyRSA, crypto.SHA256)
+	outofbandSignerRSA, err := signature.LoadRSAPSSSigner(anotherRootKeyRSA, crypto.SHA256, &rsa.PSSOptions{Hash: crypto.SHA256})
 	if err != nil {
 		panic(fmt.Sprintln("basic_repository.go:", "loading RSA signer failed", err))
 	}
