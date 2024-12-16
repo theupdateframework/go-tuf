@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/go-logr/stdr v1.2.2
-	github.com/secure-systems-lab/go-securesystemslib v0.8.0
+	github.com/secure-systems-lab/go-securesystemslib v0.9.0
 	github.com/sigstore/sigstore v1.8.4
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.10.0
