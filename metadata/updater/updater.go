@@ -205,7 +205,7 @@ func (update *Updater) GetTargetInfo(targetPath string) (*metadata.TargetFiles, 
 }
 
 // DownloadTarget downloads the target file specified by targetFile
-func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath, targetBaseURL string) (string, []byte, error) {
+func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath, targetBaseURL string, timeout time.Duration) (string, []byte, error) {
 	log := metadata.GetLogger()
 
 	var err error
@@ -244,8 +244,11 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 			targetRemotePath = fmt.Sprintf("%s/%s.%s", dirName, hashes, baseName)
 		}
 	}
+	if timeout != 0 {
+		update.cfg.Timeout = timeout
+	}
 	fullURL := fmt.Sprintf("%s%s", targetBaseURL, targetRemotePath)
-	data, err := update.cfg.Fetcher.DownloadFile(fullURL, targetFile.Length, time.Second*15)
+	data, err := update.cfg.Fetcher.DownloadFile(fullURL, targetFile.Length, update.cfg.Timeout)
 	if err != nil {
 		return "", nil, err
 	}

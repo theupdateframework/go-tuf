@@ -146,7 +146,7 @@ func BootstrapTUF() ([]byte, map[string][]byte, error) {
 		}
 
 		// download targets (we don't have to actually store them other than for the sake of the example)
-		path, bytes, err := up.DownloadTarget(targetInfo, expectedTargetLocation, "")
+		path, bytes, err := up.DownloadTarget(targetInfo, expectedTargetLocation, "",cfg.Timeout)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to download target file %s - %w", name, err)
 		}

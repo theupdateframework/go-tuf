@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
@@ -55,6 +56,7 @@ func TestNewUpdaterConfig(t *testing.T) {
 				RemoteTargetsURL:      "somepath/targets",
 				DisableLocalCache:     false,
 				PrefixTargetsWithHash: true,
+				Timeout: 15 * time.Second, // Updated expected Timeout
 			},
 			wantErr: nil,
 		},
