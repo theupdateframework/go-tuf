@@ -1,50 +1,50 @@
 {
-	"signatures": [
-		{
-			"keyid": "282612f348dcd7fe3f19e0f890e89fad48d45335deeb91deef92873934e6fe6d",
-			"sig": "80cd125a4b128c9508df8bc6f71ad2ed9896a9e7afccd53fca9e7dbc2f02db69c3ae712234d3730c929d891fa035bdf059736e7debf62cbac6f0e8d22ab0c5de3b3e47b249eb0d41dea66d9fda9588893cde824a95614129263b6fed72fafb21cd7114e603fe3a30e3871e9eb5b5029e3e9a8353190f1bcb332a81ec211a93eb"
-		}
-	],
-	"signed": {
-		"_type": "targets",
-		"delegations": {
-			"keys": {
-				"c8022fa1e9b9cb239a6b362bbdffa9649e61ad2cb699d2e4bc4fdf7930a0e64a": {
-					"keyid_hash_algorithms": [
-						"sha256",
-						"sha512"
-					],
-					"keytype": "ed25519",
-					"keyval": {
-						"public": "fcf224e55fa226056adf113ef1eb3d55e308b75b321c8c8316999d8c4fd9e0d9"
-					},
-					"scheme": "ed25519"
-				}
-			},
-			"roles": [
-				{
-					"keyids": [
-						"c8022fa1e9b9cb239a6b362bbdffa9649e61ad2cb699d2e4bc4fdf7930a0e64a"
-					],
-					"name": "role1",
-					"paths": [
-						"file3.txt"
-					],
-					"terminating": false,
-					"threshold": 1
-				}
-			]
-		},
-		"expires": "2030-08-15T14:30:45.0000001Z",
-		"spec_version": "1.0.31",
-		"targets": {
-			"file1.txt": {
-				"hashes": {
-					"sha256": "65b8c67f51c993d898250f40aa57a317d854900b3a04895464313e48785440da"
-				},
-				"length": 31
-			}
-		},
-		"version": 1
-	}
+ "signatures": [
+  {
+   "keyid": "282612f348dcd7fe3f19e0f890e89fad48d45335deeb91deef92873934e6fe6d",
+   "sig": "699c0c762032f6471fceabfd2d61b80f352ad6bf2ba5fd7b114fd0b9b1ab8d94f1482776b3fef43c53183a9c9cd7f5de671cbdafdd5032bbe2c42273e953bf3ce9f99c2d46dac8802d6155082e10313e22c4886af2be113b626f2a8af930e01ed41df50a5dbe6ca4cedf5f5d2a7f3b7e7090abacc8aebd6e021ad021d3580cad"
+  }
+ ],
+ "signed": {
+  "_type": "targets",
+  "delegations": {
+   "keys": {
+    "c8022fa1e9b9cb239a6b362bbdffa9649e61ad2cb699d2e4bc4fdf7930a0e64a": {
+     "keyid_hash_algorithms": [
+      "sha256",
+      "sha512"
+     ],
+     "keytype": "ed25519",
+     "keyval": {
+      "public": "fcf224e55fa226056adf113ef1eb3d55e308b75b321c8c8316999d8c4fd9e0d9"
+     },
+     "scheme": "ed25519"
+    }
+   },
+   "roles": [
+    {
+     "keyids": [
+      "c8022fa1e9b9cb239a6b362bbdffa9649e61ad2cb699d2e4bc4fdf7930a0e64a"
+     ],
+     "name": "role1",
+     "paths": [
+      "file3.txt"
+     ],
+     "terminating": false,
+     "threshold": 1
+    }
+   ]
+  },
+  "expires": "2030-08-15T14:30:45.0000001Z",
+  "spec_version": "1.0.31",
+  "targets": {
+   "file1.txt": {
+    "hashes": {
+     "sha256": "65b8c67f51c993d898250f40aa57a317d854900b3a04895464313e48785440da"
+    },
+    "length": 31
+   }
+  },
+  "version": 1
+ }
 }

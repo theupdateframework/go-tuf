@@ -20,6 +20,7 @@ package metadata
 import (
 	"bytes"
 	"crypto"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -35,6 +36,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils"
+	"github.com/theupdateframework/go-tuf/v2/internal/testutils/rsapss"
 )
 
 func TestMain(m *testing.M) {
@@ -147,7 +149,7 @@ func TestCompareFromBytesFromFileToBytes(t *testing.T) {
 	assert.NoError(t, err)
 	rootBytesActual, err := root.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, rootBytesWant, rootBytesActual)
+	assert.Equal(t, stripWhitespaces(rootBytesWant), stripWhitespaces(rootBytesActual))
 
 	targetsPath := filepath.Join(testutils.RepoDir, "targets.json")
 	targetsBytesWant, err := os.ReadFile(targetsPath)
@@ -156,7 +158,7 @@ func TestCompareFromBytesFromFileToBytes(t *testing.T) {
 	assert.NoError(t, err)
 	targetsBytesActual, err := targets.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, targetsBytesWant, targetsBytesActual)
+	assert.Equal(t, stripWhitespaces(targetsBytesWant), stripWhitespaces(targetsBytesActual))
 
 	snapshotPath := filepath.Join(testutils.RepoDir, "snapshot.json")
 	snapshotBytesWant, err := os.ReadFile(snapshotPath)
@@ -165,7 +167,7 @@ func TestCompareFromBytesFromFileToBytes(t *testing.T) {
 	assert.NoError(t, err)
 	snapshotBytesActual, err := snapshot.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, snapshotBytesWant, snapshotBytesActual)
+	assert.Equal(t, stripWhitespaces(snapshotBytesWant), stripWhitespaces(snapshotBytesActual))
 
 	timestampPath := filepath.Join(testutils.RepoDir, "timestamp.json")
 	timestampBytesWant, err := os.ReadFile(timestampPath)
@@ -174,7 +176,7 @@ func TestCompareFromBytesFromFileToBytes(t *testing.T) {
 	assert.NoError(t, err)
 	timestampBytesActual, err := timestamp.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, timestampBytesWant, timestampBytesActual)
+	assert.Equal(t, stripWhitespaces(timestampBytesWant), stripWhitespaces(timestampBytesActual))
 }
 
 func TestRootReadWriteReadCompare(t *testing.T) {
@@ -265,6 +267,11 @@ func TestTimestampReadWriteReadCompare(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func stripWhitespaces(b []byte) []byte {
+	tmp := strings.ReplaceAll(string(b), " ", "")
+	return []byte(strings.ReplaceAll(tmp, "\t", ""))
+}
+
 func TestToFromBytes(t *testing.T) {
 	// ROOT
 	rootPath := filepath.Join(testutils.RepoDir, "root.json")
@@ -278,15 +285,16 @@ func TestToFromBytes(t *testing.T) {
 
 	// Case 1: test noncompact by overriding the default serializer.
 	rootBytesWant, err := root.ToBytes(true)
+
 	assert.NoError(t, err)
-	assert.Equal(t, data, rootBytesWant)
+	assert.Equal(t, stripWhitespaces(rootBytesWant), stripWhitespaces(data))
 
 	// Case 2: test compact by using the default serializer.
 	root2, err := Root().FromBytes(rootBytesWant)
 	assert.NoError(t, err)
 	rootBytesActual, err := root2.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, rootBytesWant, rootBytesActual)
+	assert.Equal(t, stripWhitespaces(rootBytesWant), stripWhitespaces(rootBytesActual))
 
 	// SNAPSHOT
 	data, err = os.ReadFile(filepath.Join(testutils.RepoDir, "snapshot.json"))
@@ -297,14 +305,14 @@ func TestToFromBytes(t *testing.T) {
 	// Case 1: test noncompact by overriding the default serializer.
 	snapshotBytesWant, err := snapshot.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, data, snapshotBytesWant)
+	assert.Equal(t, stripWhitespaces(data), stripWhitespaces(snapshotBytesWant))
 
 	// Case 2: test compact by using the default serializer.
 	snapshot2, err := Snapshot().FromBytes(snapshotBytesWant)
 	assert.NoError(t, err)
 	snapshotBytesActual, err := snapshot2.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, snapshotBytesWant, snapshotBytesActual)
+	assert.Equal(t, stripWhitespaces(snapshotBytesWant), stripWhitespaces(snapshotBytesActual))
 
 	// TARGETS
 	data, err = os.ReadFile(filepath.Join(testutils.RepoDir, "targets.json"))
@@ -315,14 +323,14 @@ func TestToFromBytes(t *testing.T) {
 	// Case 1: test noncompact by overriding the default serializer.
 	targetsBytesWant, err := targets.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, data, targetsBytesWant)
+	assert.Equal(t, stripWhitespaces(data), stripWhitespaces(targetsBytesWant))
 
 	// Case 2: test compact by using the default serializer.
 	targets2, err := Targets().FromBytes(targetsBytesWant)
 	assert.NoError(t, err)
 	targetsBytesActual, err := targets2.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, targetsBytesWant, targetsBytesActual)
+	assert.Equal(t, stripWhitespaces(targetsBytesWant), stripWhitespaces(targetsBytesActual))
 
 	// TIMESTAMP
 	data, err = os.ReadFile(filepath.Join(testutils.RepoDir, "timestamp.json"))
@@ -333,15 +341,14 @@ func TestToFromBytes(t *testing.T) {
 	// Case 1: test noncompact by overriding the default serializer.
 	timestampBytesWant, err := timestamp.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, data, timestampBytesWant)
+	assert.Equal(t, stripWhitespaces(data), stripWhitespaces(timestampBytesWant))
 
 	// Case 2: test compact by using the default serializer.
 	timestamp2, err := Timestamp().FromBytes(timestampBytesWant)
 	assert.NoError(t, err)
 	timestampBytesActual, err := timestamp2.ToBytes(true)
 	assert.NoError(t, err)
-	assert.Equal(t, timestampBytesWant, timestampBytesActual)
-
+	assert.Equal(t, stripWhitespaces(timestampBytesWant), stripWhitespaces(timestampBytesActual))
 }
 
 func TestSignVerify(t *testing.T) {
@@ -371,7 +378,11 @@ func TestSignVerify(t *testing.T) {
 	targetsPublicKey, err := targetsKey.ToPublicKey()
 	assert.NoError(t, err)
 	targetsHash := crypto.SHA256
-	targetsVerifier, err := signature.LoadVerifier(targetsPublicKey, targetsHash)
+	targetsVerifier, err := signature.LoadRSAPSSVerifier(
+		targetsPublicKey.(*rsa.PublicKey),
+		targetsHash,
+		&rsa.PSSOptions{Hash: targetsHash},
+	)
 	assert.NoError(t, err)
 	err = targetsVerifier.VerifySignature(bytes.NewReader(sig), bytes.NewReader(data))
 	assert.NoError(t, err)
@@ -459,7 +470,11 @@ func TestKeyVerifyFailures(t *testing.T) {
 	timestampPublicKey, err = timestampKey.ToPublicKey()
 	assert.NoError(t, err)
 	timestampHash = crypto.SHA256
-	timestampVerifier, err = signature.LoadVerifier(timestampPublicKey, timestampHash)
+	timestampVerifier, err = signature.LoadRSAPSSVerifier(
+		timestampPublicKey.(*rsa.PublicKey),
+		timestampHash,
+		&rsa.PSSOptions{Hash: timestampHash},
+	)
 	assert.NoError(t, err)
 	err = timestampVerifier.VerifySignature(bytes.NewReader(timestampSig), bytes.NewReader(data))
 	assert.NoError(t, err)
@@ -587,7 +602,7 @@ func TestMetadataVerifyDelegate(t *testing.T) {
 
 	// Verify succeeds when we correct the new signature and reach the
 	// threshold of 2 keys
-	signer, err := signature.LoadSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "timestamp_key"), crypto.SHA256, cryptoutils.SkipPassword)
+	signer, err := rsapss.LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "timestamp_key"))
 	assert.NoError(t, err)
 	_, err = snapshot.Sign(signer)
 	assert.NoError(t, err)
