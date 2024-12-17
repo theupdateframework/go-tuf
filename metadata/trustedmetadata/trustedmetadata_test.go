@@ -18,47 +18,19 @@
 package trustedmetadata
 
 import (
-	"crypto"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/sigstore/sigstore/pkg/signature"
-	"github.com/sigstore/sigstore/pkg/signature/options"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils"
+	"github.com/theupdateframework/go-tuf/v2/internal/testutils/rsapss"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
 var allRoles map[string][]byte
-
-func LoadRSAPSSSignerFromPEMFile(p string) (signature.Signer, error) {
-	var b []byte
-	var block *pem.Block
-	var pk any
-	var err error
-
-	if b, err = os.ReadFile(p); err != nil {
-		return nil, err
-	}
-
-	if block, _ = pem.Decode(b); len(block.Bytes) == 0 {
-		return nil, errors.New("empty PEM block")
-	}
-
-	if pk, err = x509.ParsePKCS1PrivateKey(block.Bytes); err != nil {
-		return nil, err
-	}
-	var pssOpt = rsa.PSSOptions{Hash: crypto.SHA256}
-
-	return signature.LoadSignerWithOpts(pk, options.WithRSAPSS(&pssOpt))
-}
 
 func setAllRolesBytes(path string) {
 	log := metadata.GetLogger()
@@ -141,7 +113,7 @@ func modifyRootMetadata(fn modifyRoot) ([]byte, error) {
 	}
 	fn(root)
 
-	signer, err := LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "root_key"))
+	signer, err := rsapss.LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "root_key"))
 	if err != nil {
 		log.Error(err, "failed to load signer from pem file")
 	}
@@ -164,7 +136,7 @@ func modifyTimestamptMetadata(fn modifyTimestamp) ([]byte, error) {
 	}
 	fn(timestamp)
 
-	signer, err := LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "timestamp_key"))
+	signer, err := rsapss.LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "timestamp_key"))
 	if err != nil {
 		log.Error(err, "failed to load signer from pem file")
 	}
@@ -187,7 +159,7 @@ func modifySnapshotMetadata(fn modifySnapshot) ([]byte, error) {
 	}
 	fn(snapshot)
 
-	signer, err := LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "snapshot_key"))
+	signer, err := rsapss.LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "snapshot_key"))
 	if err != nil {
 		log.Error(err, "failed to load signer from pem file")
 	}
@@ -210,7 +182,7 @@ func modifyTargetsMetadata(fn modifyTargets) ([]byte, error) {
 	}
 	fn(targets)
 
-	signer, err := LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "targets_key"))
+	signer, err := rsapss.LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "targets_key"))
 	if err != nil {
 		log.Error(err, "failed to load signer from pem file")
 	}
