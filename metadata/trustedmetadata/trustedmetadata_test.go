@@ -18,16 +18,15 @@
 package trustedmetadata
 
 import (
-	"crypto"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/sigstore/sigstore/pkg/cryptoutils"
-	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils"
+	"github.com/theupdateframework/go-tuf/v2/internal/testutils/rsapss"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
@@ -114,7 +113,7 @@ func modifyRootMetadata(fn modifyRoot) ([]byte, error) {
 	}
 	fn(root)
 
-	signer, err := signature.LoadSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "root_key"), crypto.SHA256, cryptoutils.SkipPassword)
+	signer, err := rsapss.LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "root_key"))
 	if err != nil {
 		log.Error(err, "failed to load signer from pem file")
 	}
@@ -137,7 +136,7 @@ func modifyTimestamptMetadata(fn modifyTimestamp) ([]byte, error) {
 	}
 	fn(timestamp)
 
-	signer, err := signature.LoadSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "timestamp_key"), crypto.SHA256, cryptoutils.SkipPassword)
+	signer, err := rsapss.LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "timestamp_key"))
 	if err != nil {
 		log.Error(err, "failed to load signer from pem file")
 	}
@@ -160,7 +159,7 @@ func modifySnapshotMetadata(fn modifySnapshot) ([]byte, error) {
 	}
 	fn(snapshot)
 
-	signer, err := signature.LoadSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "snapshot_key"), crypto.SHA256, cryptoutils.SkipPassword)
+	signer, err := rsapss.LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "snapshot_key"))
 	if err != nil {
 		log.Error(err, "failed to load signer from pem file")
 	}
@@ -183,7 +182,7 @@ func modifyTargetsMetadata(fn modifyTargets) ([]byte, error) {
 	}
 	fn(targets)
 
-	signer, err := signature.LoadSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "targets_key"), crypto.SHA256, cryptoutils.SkipPassword)
+	signer, err := rsapss.LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "targets_key"))
 	if err != nil {
 		log.Error(err, "failed to load signer from pem file")
 	}
@@ -197,7 +196,7 @@ func modifyTargetsMetadata(fn modifyTargets) ([]byte, error) {
 
 func TestUpdate(t *testing.T) {
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
 	assert.NoError(t, err)
 	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
@@ -219,7 +218,7 @@ func TestUpdate(t *testing.T) {
 
 func TestOutOfOrderOps(t *testing.T) {
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//  Update snapshot before timestamp
 	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
@@ -260,7 +259,7 @@ func TestOutOfOrderOps(t *testing.T) {
 
 func TestRootWithInvalidJson(t *testing.T) {
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test loading initial root and root update
 
@@ -284,7 +283,7 @@ func TestRootWithInvalidJson(t *testing.T) {
 
 func TestTopLevelMetadataWithInvalidJSON(t *testing.T) {
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//TIMESTAMP
 	// timestamp is not json
@@ -359,7 +358,7 @@ func TestUpdateRootNewRoot(t *testing.T) {
 	assert.NoError(t, err)
 
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = trustedSet.UpdateRoot(root)
 	assert.NoError(t, err)
 }
@@ -374,14 +373,14 @@ func TestUpdateRootNewRootFailTreshholdVerification(t *testing.T) {
 	assert.NoError(t, err)
 
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = trustedSet.UpdateRoot(root)
 	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 1, want 2"})
 }
 
 func TestUpdateRootNewRootVerSameAsTrustedRootVer(t *testing.T) {
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = trustedSet.UpdateRoot(allRoles[metadata.ROOT])
 	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "bad version number, expected 2, got 1"})
@@ -397,7 +396,7 @@ func TestRootExpiredFinalRoot(t *testing.T) {
 	root, err := modifyRootMetadata(modifyRootExpiry)
 	assert.NoError(t, err)
 	trustedSet, err := New(root)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Update timestamp to trigger final root expiry check
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
@@ -413,7 +412,7 @@ func TestUpdateTimestampNewTimestampVerBelowTrustedVer(t *testing.T) {
 	assert.NoError(t, err)
 
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = trustedSet.UpdateTimestamp(timestamp)
 	assert.NoError(t, err)
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
@@ -424,7 +423,7 @@ func TestUpdateTimestampWithSameTimestamp(t *testing.T) {
 	// Test that timestamp is NOT updated if:
 	// newTimestamp.Version = trustedTimestamp.Version
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
 	assert.NoError(t, err)
 
@@ -448,7 +447,7 @@ func TestUpdateTimestampSnapshotCerBellowCurrent(t *testing.T) {
 	timestamp, err := modifyTimestamptMetadata(bumpSnapshotVersion)
 	assert.NoError(t, err)
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = trustedSet.UpdateTimestamp(timestamp)
 	assert.NoError(t, err)
 
@@ -466,7 +465,7 @@ func TestUpdateTimestampExpired(t *testing.T) {
 	timestamp, err := modifyTimestamptMetadata(modifyTimestampExpiry)
 	assert.NoError(t, err)
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = trustedSet.UpdateTimestamp(timestamp)
 	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "timestamp.json is expired"})
 	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
@@ -481,7 +480,7 @@ func TestUpdateSnapshotLengthOrHashMismatch(t *testing.T) {
 	timestamp, err := modifyTimestamptMetadata(modifySnapshotLength)
 	assert.NoError(t, err)
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = trustedSet.UpdateTimestamp(timestamp)
 	assert.NoError(t, err)
 	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
@@ -490,7 +489,7 @@ func TestUpdateSnapshotLengthOrHashMismatch(t *testing.T) {
 
 func TestUpdateSnapshotFailThreshholdVerification(t *testing.T) {
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
 	assert.NoError(t, err)
 
@@ -510,7 +509,7 @@ func TestUpdateSnapshotVersionDivergeTimestampSnapshotVersion(t *testing.T) {
 	timestamp, err := modifyTimestamptMetadata(modifyTimestampVersion)
 	assert.NoError(t, err)
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = trustedSet.UpdateTimestamp(timestamp)
 	assert.NoError(t, err)
 
@@ -544,7 +543,7 @@ func updateAllBesidesTargets(trustedSet *TrustedMetadata, timestampBytes []byte,
 
 func TestUpdateSnapshotFileRemovedFromMeta(t *testing.T) {
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = updateAllBesidesTargets(trustedSet, allRoles[metadata.TIMESTAMP], []byte{})
 	assert.NoError(t, err)
 	removeFileFromMeta := func(snaphot *metadata.Metadata[metadata.SnapshotType]) {
@@ -559,7 +558,7 @@ func TestUpdateSnapshotFileRemovedFromMeta(t *testing.T) {
 
 func TestUpdateSnapshotMetaVersionDecreases(t *testing.T) {
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
 	assert.NoError(t, err)
 
@@ -577,7 +576,7 @@ func TestUpdateSnapshotMetaVersionDecreases(t *testing.T) {
 
 func TestUpdateSnapshotExpiredNewSnapshot(t *testing.T) {
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
 	assert.NoError(t, err)
 
@@ -600,7 +599,7 @@ func TestUpdateSnapshotExpiredNewSnapshot(t *testing.T) {
 func TestUpdateSnapshotSuccessfulRollbackChecks(t *testing.T) {
 	// Load a "local" timestamp, then update to newer one:
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
 	assert.NoError(t, err)
 
@@ -641,7 +640,7 @@ func TestUpdateTargetsMoMetaInSnapshot(t *testing.T) {
 	snapshot, err := modifySnapshotMetadata(clearMeta)
 	assert.NoError(t, err)
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = updateAllBesidesTargets(trustedSet, allRoles[metadata.TIMESTAMP], snapshot)
 	assert.NoError(t, err)
 
@@ -663,7 +662,7 @@ func TestUpdateTargetsHashDiverfeFromSnapshotMetaHash(t *testing.T) {
 	snapshot, err := modifySnapshotMetadata(modifyMetaLength)
 	assert.NoError(t, err)
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = updateAllBesidesTargets(trustedSet, allRoles[metadata.TIMESTAMP], snapshot)
 	assert.NoError(t, err)
 
@@ -681,7 +680,7 @@ func TestUpdateTargetsVersionDivergeSnapshotMetaVersion(t *testing.T) {
 	snapshot, err := modifySnapshotMetadata(modifyMeta)
 	assert.NoError(t, err)
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = updateAllBesidesTargets(trustedSet, allRoles[metadata.TIMESTAMP], snapshot)
 	assert.NoError(t, err)
 
@@ -692,7 +691,7 @@ func TestUpdateTargetsVersionDivergeSnapshotMetaVersion(t *testing.T) {
 
 func TestUpdateTargetsExpiredMewTarget(t *testing.T) {
 	trustedSet, err := New(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = updateAllBesidesTargets(trustedSet, allRoles[metadata.TIMESTAMP], allRoles[metadata.SNAPSHOT])
 	assert.NoError(t, err)
 

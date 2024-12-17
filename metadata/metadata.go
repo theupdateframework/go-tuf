@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/hmac"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
@@ -322,7 +323,21 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			}
 		}
 		// load a verifier based on that key
-		verifier, err := signature.LoadVerifier(publicKey, hash)
+		// handle RSA PSS scheme separately as the LoadVerifier function doesn't identify it correctly
+		// Note we should support RSA PSS, not RSA PKCS1v15 (which is what LoadVerifier would return)
+		// Reference: https://theupdateframework.github.io/specification/latest/#file-formats-keys
+		var verifier signature.Verifier
+		if key.Type == KeyTypeRSASSA_PSS_SHA256 {
+			// Load a verifier for rsa
+			publicKeyRSAPSS, ok := publicKey.(*rsa.PublicKey)
+			if !ok {
+				return &ErrType{Msg: "failed to convert public key to RSA PSS key"}
+			}
+			verifier, err = signature.LoadRSAPSSVerifier(publicKeyRSAPSS, hash, &rsa.PSSOptions{Hash: crypto.SHA256})
+		} else {
+			// Load a verifier for ed25519 and ecdsa
+			verifier, err = signature.LoadVerifier(publicKey, hash)
+		}
 		if err != nil {
 			return err
 		}
