@@ -20,6 +20,7 @@ package config
 import (
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
@@ -44,6 +45,7 @@ type UpdaterConfig struct {
 	// UnsafeLocalMode only uses the metadata as written on disk
 	// if the metadata is incomplete, calling updater.Refresh will fail
 	UnsafeLocalMode bool
+	Timeout         time.Duration
 }
 
 // New creates a new UpdaterConfig instance used by the Updater to
@@ -71,6 +73,7 @@ func New(remoteURL string, rootBytes []byte) (*UpdaterConfig, error) {
 		DisableLocalCache:     false,                     // enable local caching of trusted metadata
 		PrefixTargetsWithHash: true,                      // use hash-prefixed target files with consistent snapshots
 		UnsafeLocalMode:       false,
+		Timeout:               time.Second * 15,
 	}, nil
 }
 

@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"github.com/theupdateframework/go-tuf/v2/metadata/config"
@@ -327,7 +328,7 @@ func (client *MultiRepoClient) DownloadTarget(repos []string, targetFile *metada
 			return targetPath, targetBytes, nil
 		}
 		// not present locally, so let's try to download it
-		targetPath, targetBytes, err = repoClient.DownloadTarget(targetFile, filePath, targetBaseURL)
+		targetPath, targetBytes, err = repoClient.DownloadTarget(targetFile, filePath, targetBaseURL, time.Second*15)
 		if err != nil {
 			// TODO: decide if we should error if one repository serves the expected target info, but we fail to download the actual target
 			// try downloading the target from the next available repository

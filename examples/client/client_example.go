@@ -183,7 +183,7 @@ func DownloadTarget(localMetadataDir, target string) error {
 	}
 
 	// target is not present locally, so let's try to download it
-	path, _, err = up.DownloadTarget(targetInfo, "", "")
+	path, _, err = up.DownloadTarget(targetInfo, "", "",cfg.Timeout)
 	if err != nil {
 		return fmt.Errorf("failed to download target file %s - %w", target, err)
 	}
