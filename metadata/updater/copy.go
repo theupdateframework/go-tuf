@@ -14,6 +14,11 @@ func crossMoveFile(source *os.File, dest string, removeSource bool, overwrite bo
 	} else {
 		flag = os.O_RDWR | os.O_CREATE | os.O_EXCL
 	}
+	// Make sure we are at the start of the source
+	_, err := source.Seek(0, 0)
+	if err != nil {
+		return err
+	}
 	// Open the destination
 	destFil, err := os.OpenFile(dest, flag, 0644)
 	if err != nil {
