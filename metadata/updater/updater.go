@@ -598,7 +598,7 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 	}
 	defer file.Close()
 	// write the data content to the temporary file
-	err = os.WriteFile(file.Name(), data, 0644)
+	_, err = file.Write(data)
 	if err != nil {
 		// delete the temporary file if there was an error while writing
 		errRemove := os.Remove(file.Name())
@@ -608,23 +608,12 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 		return err
 	}
 
-	// can't move/rename an open file on windows, so close it first
-	err = file.Close()
-	if err != nil {
-		return err
-	}
 	// if all okay, rename the temporary file to the desired one
-	err = os.Rename(file.Name(), fileName)
+	err = crossMoveFile(file, fileName, true, true)
 	if err != nil {
 		return err
 	}
-	read, err := os.ReadFile(fileName)
-	if err != nil {
-		return err
-	}
-	if string(read) != string(data) {
-		return fmt.Errorf("failed to persist metadata")
-	}
+	
 	return nil
 }
 
