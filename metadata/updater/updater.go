@@ -597,10 +597,22 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 		return err
 	}
 	defer file.Close()
-	// write the data content to the temporary file
-	err = os.WriteFile(file.Name(), data, 0644)
+	// change the file permissions to our desired permissions
+	err = file.Chmod(0644)
 	if err != nil {
-		// delete the temporary file if there was an error while writing
+		// close and delete the temporary file if there was an error while writing
+		file.Close()
+		errRemove := os.Remove(file.Name())
+		if errRemove != nil {
+			log.Info("Failed to delete temporary file", "name", file.Name())
+		}
+		return err
+	}
+	// write the data content to the temporary file
+	_, err = file.Write(data)
+	if err != nil {
+		// close and delete the temporary file if there was an error while writing
+		file.Close()
 		errRemove := os.Remove(file.Name())
 		if errRemove != nil {
 			log.Info("Failed to delete temporary file", "name", file.Name())
