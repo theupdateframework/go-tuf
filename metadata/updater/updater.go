@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -568,7 +569,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 			// push childRolesToVisit in reverse order of appearance
 			// onto delegationsToVisit. Roles are popped from the end of
 			// the list
-			reverseSlice(childRolesToVisit)
+			slices.Reverse(childRolesToVisit)
 			delegationsToVisit = append(delegationsToVisit, childRolesToVisit...)
 		}
 	}
@@ -700,11 +701,4 @@ func ensureTrailingSlash(url string) string {
 		return url
 	}
 	return url + "/"
-}
-
-// reverseSlice reverses the elements in a generic type of slice
-func reverseSlice[S ~[]E, E any](s S) {
-	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
-		s[i], s[j] = s[j], s[i]
-	}
 }
