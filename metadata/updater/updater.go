@@ -596,7 +596,6 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
 	// change the file permissions to our desired permissions
 	err = file.Chmod(0644)
 	if err != nil {
