@@ -81,7 +81,7 @@ func InitializeCmd() error {
 	}
 
 	// read the content of root.json
-	rootBytes, err := ReadFile(rootPath)
+	rootBytes, err := os.ReadFile(rootPath)
 	if err != nil {
 		return err
 	}
