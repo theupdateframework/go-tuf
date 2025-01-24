@@ -18,7 +18,6 @@
 package cmd
 
 import (
-	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -41,18 +40,4 @@ func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
-}
-
-// ReadFile reads the content of a file and return its bytes
-func ReadFile(name string) ([]byte, error) {
-	in, err := os.Open(name)
-	if err != nil {
-		return nil, err
-	}
-	defer in.Close()
-	data, err := io.ReadAll(in)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
 }

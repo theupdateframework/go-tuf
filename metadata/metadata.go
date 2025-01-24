@@ -161,12 +161,7 @@ func MetaFile(version int64) *MetaFiles {
 
 // FromFile load metadata from file
 func (meta *Metadata[T]) FromFile(name string) (*Metadata[T], error) {
-	in, err := os.Open(name)
-	if err != nil {
-		return nil, err
-	}
-	defer in.Close()
-	data, err := io.ReadAll(in)
+	data, err := os.ReadFile(name)
 	if err != nil {
 		return nil, err
 	}
@@ -474,14 +469,8 @@ func (source *TargetFiles) Equal(expected TargetFiles) bool {
 // FromFile generate TargetFiles from file
 func (t *TargetFiles) FromFile(localPath string, hashes ...string) (*TargetFiles, error) {
 	log.Info("Generating target file from file", "path", localPath)
-	// open file
-	in, err := os.Open(localPath)
-	if err != nil {
-		return nil, err
-	}
-	defer in.Close()
 	// read file
-	data, err := io.ReadAll(in)
+	data, err := os.ReadFile(localPath)
 	if err != nil {
 		return nil, err
 	}

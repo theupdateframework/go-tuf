@@ -21,12 +21,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -283,7 +283,7 @@ func (update *Updater) FindCachedTarget(targetFile *metadata.TargetFiles, filePa
 		targetFilePath = filePath
 	}
 	// get file content
-	data, err := readFile(targetFilePath)
+	data, err := os.ReadFile(targetFilePath)
 	if err != nil {
 		// do not want to return err, instead we say that there's no cached target available
 		return "", nil, nil
@@ -569,7 +569,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 			// push childRolesToVisit in reverse order of appearance
 			// onto delegationsToVisit. Roles are popped from the end of
 			// the list
-			reverseSlice(childRolesToVisit)
+			slices.Reverse(childRolesToVisit)
 			delegationsToVisit = append(delegationsToVisit, childRolesToVisit...)
 		}
 	}
@@ -663,7 +663,7 @@ func (update *Updater) generateTargetFilePath(tf *metadata.TargetFiles) (string,
 
 // loadLocalMetadata reads a local <roleName>.json file and returns its bytes
 func (update *Updater) loadLocalMetadata(roleName string) ([]byte, error) {
-	return readFile(fmt.Sprintf("%s.json", roleName))
+	return os.ReadFile(fmt.Sprintf("%s.json", roleName))
 }
 
 // GetTopLevelTargets returns the top-level target files
@@ -701,25 +701,4 @@ func ensureTrailingSlash(url string) string {
 		return url
 	}
 	return url + "/"
-}
-
-// reverseSlice reverses the elements in a generic type of slice
-func reverseSlice[S ~[]E, E any](s S) {
-	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
-		s[i], s[j] = s[j], s[i]
-	}
-}
-
-// readFile reads the content of a file and return its bytes
-func readFile(name string) ([]byte, error) {
-	in, err := os.Open(name)
-	if err != nil {
-		return nil, err
-	}
-	defer in.Close()
-	data, err := io.ReadAll(in)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
 }
