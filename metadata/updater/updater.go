@@ -590,7 +590,7 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 		return nil
 	}
 	// caching enabled, proceed with persisting the metadata locally
-	fileName := filepath.Join(update.cfg.LocalMetadataDir, fmt.Sprintf("%s.json", url.QueryEscape(roleName)))
+	fileName := filepath.Join(update.cfg.LocalMetadataDir, fmt.Sprintf("%s.json", url.PathEscape(roleName)))
 	// create a temporary file
 	file, err := os.CreateTemp(update.cfg.LocalMetadataDir, "tuf_tmp")
 	if err != nil {
@@ -644,9 +644,9 @@ func (update *Updater) downloadMetadata(roleName string, length int64, version s
 	urlPath := ensureTrailingSlash(update.cfg.RemoteMetadataURL)
 	// build urlPath
 	if version == "" {
-		urlPath = fmt.Sprintf("%s%s.json", urlPath, url.QueryEscape(roleName))
+		urlPath = fmt.Sprintf("%s%s.json", urlPath, url.PathEscape(roleName))
 	} else {
-		urlPath = fmt.Sprintf("%s%s.%s.json", urlPath, version, url.QueryEscape(roleName))
+		urlPath = fmt.Sprintf("%s%s.%s.json", urlPath, version, url.PathEscape(roleName))
 	}
 	return update.cfg.Fetcher.DownloadFile(urlPath, length, time.Second*15)
 }
@@ -658,7 +658,7 @@ func (update *Updater) generateTargetFilePath(tf *metadata.TargetFiles) (string,
 		return "", &metadata.ErrValue{Msg: "LocalTargetsDir must be set if filepath is not given"}
 	}
 	// Use URL encoded target path as filename
-	return filepath.Join(update.cfg.LocalTargetsDir, url.QueryEscape(tf.Path)), nil
+	return filepath.Join(update.cfg.LocalTargetsDir, url.PathEscape(tf.Path)), nil
 }
 
 // loadLocalMetadata reads a local <roleName>.json file and returns its bytes
