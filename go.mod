@@ -1,6 +1,6 @@
 module github.com/theupdateframework/go-tuf/v2
 
-go 1.21
+go 1.22
 
 require (
 	github.com/go-logr/stdr v1.2.2
