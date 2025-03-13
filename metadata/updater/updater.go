@@ -142,7 +142,7 @@ func (update *Updater) onlineRefresh() error {
 	return nil
 }
 
-// unsafeLoadRefresh tries to load the persisted metadata already cached
+// unsafeLocalRefresh tries to load the persisted metadata already cached
 // on disk. Note that this is an usafe function, and does deviate from the
 // TUF specification section 5.3 to 5.7 (update phases).
 // The metadata on disk are verified against the provided root though,
