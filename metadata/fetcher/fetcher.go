@@ -32,9 +32,21 @@ type Fetcher interface {
 	DownloadFile(urlPath string, maxLength int64, timeout time.Duration) ([]byte, error)
 }
 
+func NewDefaultFetcher() DefaultFetcher {
+	return NewDefaultFetcherWithConfig(time.Second*15, "")
+}
+
+func NewDefaultFetcherWithConfig(timeout time.Duration, httpUserAgent string) DefaultFetcher {
+	return DefaultFetcher{
+		httpUserAgent: httpUserAgent,
+		timeout:       timeout,
+	}
+}
+
 // DefaultFetcher implements Fetcher
 type DefaultFetcher struct {
 	httpUserAgent string
+	timeout       time.Duration
 }
 
 func (d *DefaultFetcher) SetHTTPUserAgent(httpUserAgent string) {
@@ -44,7 +56,14 @@ func (d *DefaultFetcher) SetHTTPUserAgent(httpUserAgent string) {
 // DownloadFile downloads a file from urlPath, errors out if it failed,
 // its length is larger than maxLength or the timeout is reached.
 func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, timeout time.Duration) ([]byte, error) {
-	client := &http.Client{Timeout: timeout}
+	// If the timeout parameter is set, use it, otherwise use the default field value
+	var tm time.Duration
+	if timeout != 0 {
+		tm = timeout
+	} else {
+		tm = d.timeout
+	}
+	client := &http.Client{Timeout: tm}
 	req, err := http.NewRequest("GET", urlPath, nil)
 	if err != nil {
 		return nil, err
@@ -78,7 +97,7 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, timeout t
 	// Although the size has been checked above, use a LimitReader in case
 	// the reported size is inaccurate, or size is -1 which indicates an
 	// unknown length. We read maxLength + 1 in order to check if the read data
-	// surpased our set limit.
+	// surpassed our set limit.
 	data, err := io.ReadAll(io.LimitReader(res.Body, maxLength+1))
 	if err != nil {
 		return nil, err
