@@ -92,3 +92,21 @@ func TestDownLoadFile(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateHTTPClient(t *testing.T) {
+	t.Run("client with default timeout passed as parameter", func(t *testing.T) {
+		d := DefaultFetcher{}
+		expected := time.Second * 15
+		c := d.createHTTPClient(expected)
+		assert.Equal(t, expected, c.Timeout)
+	})
+
+	t.Run("client with custom timeout set in fetcher", func(t *testing.T) {
+		expected := time.Second * 10
+		d := DefaultFetcher{
+			timeout: expected,
+		}
+		c := d.createHTTPClient(15)
+		assert.Equal(t, expected, c.Timeout)
+	})
+}
