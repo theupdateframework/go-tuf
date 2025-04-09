@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
@@ -33,20 +34,30 @@ type Fetcher interface {
 }
 
 func NewDefaultFetcher() DefaultFetcher {
-	return NewDefaultFetcherWithConfig(time.Second*15, "")
+	return NewDefaultFetcherWithConfig(time.Second*15, "", 0, 0)
 }
 
-func NewDefaultFetcherWithConfig(timeout time.Duration, httpUserAgent string) DefaultFetcher {
+func NewDefaultFetcherWithConfig(timeout time.Duration, httpUserAgent string, backoffInterval time.Duration, retryCount uint64) DefaultFetcher {
 	return DefaultFetcher{
 		httpUserAgent: httpUserAgent,
 		timeout:       timeout,
+		backoffCfg: BackoffConfig{
+			RetryInterval: backoffInterval,
+			RetryCount:    retryCount,
+		},
 	}
+}
+
+type BackoffConfig struct {
+	RetryInterval time.Duration
+	RetryCount    uint64
 }
 
 // DefaultFetcher implements Fetcher
 type DefaultFetcher struct {
 	httpUserAgent string
 	timeout       time.Duration
+	backoffCfg    BackoffConfig
 }
 
 func (d *DefaultFetcher) SetHTTPUserAgent(httpUserAgent string) {
@@ -72,40 +83,51 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, timeout t
 	if d.httpUserAgent != "" {
 		req.Header.Set("User-Agent", d.httpUserAgent)
 	}
-	// Execute the request.
-	res, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	// Handle HTTP status codes.
-	if res.StatusCode != http.StatusOK {
-		return nil, &metadata.ErrDownloadHTTP{StatusCode: res.StatusCode, URL: urlPath}
-	}
-	var length int64
-	// Get content length from header (might not be accurate, -1 or not set).
-	if header := res.Header.Get("Content-Length"); header != "" {
-		length, err = strconv.ParseInt(header, 10, 0)
+
+	var data []byte
+	bo := backoff.NewConstantBackOff(d.backoffCfg.RetryInterval)
+	err = backoff.Retry(func() error {
+		// Execute the request.
+		res, err := client.Do(req)
 		if err != nil {
-			return nil, err
+			return err
+		}
+		defer res.Body.Close()
+		// Handle HTTP status codes.
+		if res.StatusCode != http.StatusOK {
+			return &metadata.ErrDownloadHTTP{StatusCode: res.StatusCode, URL: urlPath}
+		}
+		var length int64
+		// Get content length from header (might not be accurate, -1 or not set).
+		if header := res.Header.Get("Content-Length"); header != "" {
+			length, err = strconv.ParseInt(header, 10, 0)
+			if err != nil {
+				return err
+			}
+			// Error if the reported size is greater than what is expected.
+			if length > maxLength {
+				return &metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
+			}
+		}
+		// Although the size has been checked above, use a LimitReader in case
+		// the reported size is inaccurate, or size is -1 which indicates an
+		// unknown length. We read maxLength + 1 in order to check if the read data
+		// surpassed our set limit.
+		data, err := io.ReadAll(io.LimitReader(res.Body, maxLength+1))
+		if err != nil {
+			return err
 		}
 		// Error if the reported size is greater than what is expected.
+		length = int64(len(data))
 		if length > maxLength {
-			return nil, &metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
+			return &metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
 		}
-	}
-	// Although the size has been checked above, use a LimitReader in case
-	// the reported size is inaccurate, or size is -1 which indicates an
-	// unknown length. We read maxLength + 1 in order to check if the read data
-	// surpassed our set limit.
-	data, err := io.ReadAll(io.LimitReader(res.Body, maxLength+1))
+
+		return nil
+	}, backoff.WithMaxRetries(bo, d.backoffCfg.RetryCount))
+
 	if err != nil {
 		return nil, err
-	}
-	// Error if the reported size is greater than what is expected.
-	length = int64(len(data))
-	if length > maxLength {
-		return nil, &metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
 	}
 
 	return data, nil

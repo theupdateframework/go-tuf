@@ -79,7 +79,7 @@ func TestDownLoadFile(t *testing.T) {
 			// this will only be printed if run in verbose mode or if test fails
 			t.Logf("Desc: %s", tt.desc)
 			// run the function under test
-			fetcher := NewDefaultFetcherWithConfig(tt.timeout, "Metadata_Unit_Test/1.0")
+			fetcher := NewDefaultFetcherWithConfig(tt.timeout, "Metadata_Unit_Test/1.0", 0, 0)
 			data, err := fetcher.DownloadFile(tt.url, tt.maxLength, 0)
 			// special case if we expect no error
 			if tt.wantErr == nil {
