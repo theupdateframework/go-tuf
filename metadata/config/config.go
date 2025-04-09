@@ -19,6 +19,7 @@ package config
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"time"
@@ -94,14 +95,14 @@ func (cfg *UpdaterConfig) EnsurePathsExist() error {
 	return nil
 }
 
-func (cfg *UpdaterConfig) SetDefaultFetcherTimeout(timeout time.Duration) error {
+func (cfg *UpdaterConfig) SetDefaultFetcherHTTPClient(client *http.Client) error {
 	// Check if the configured fetcher is the default fetcher
 	// since we are only configuring a timeout value for the default fetcher
 	df, ok := cfg.Fetcher.(*fetcher.DefaultFetcher)
 	if !ok {
 		return fmt.Errorf("fetcher is not type fetcher.DefaultFetcher")
 	}
-	df.SetTimeout(timeout)
+	df.SetHTTPClient(client)
 	cfg.Fetcher = df
 	return nil
 }

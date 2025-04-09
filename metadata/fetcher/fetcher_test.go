@@ -79,8 +79,8 @@ func TestDownLoadFile(t *testing.T) {
 			// this will only be printed if run in verbose mode or if test fails
 			t.Logf("Desc: %s", tt.desc)
 			// run the function under test
-			fetcher := DefaultFetcher{httpUserAgent: "Metadata_Unit_Test/1.0"}
-			data, err := fetcher.DownloadFile(tt.url, tt.maxLength, tt.timeout)
+			fetcher := NewDefaultFetcher("Metadata_Unit_Test/1.0")
+			data, err := fetcher.DownloadFile(tt.url, tt.maxLength)
 			// special case if we expect no error
 			if tt.wantErr == nil {
 				assert.NoErrorf(t, err, "expected no error but got %v", err)
@@ -91,22 +91,4 @@ func TestDownLoadFile(t *testing.T) {
 			assert.IsTypef(t, tt.wantErr, err, "expected %v but got %v", tt.wantErr, err)
 		})
 	}
-}
-
-func TestCreateHTTPClient(t *testing.T) {
-	t.Run("client with default timeout passed as parameter", func(t *testing.T) {
-		d := DefaultFetcher{}
-		expected := time.Second * 15
-		c := d.createHTTPClient(expected)
-		assert.Equal(t, expected, c.Timeout)
-	})
-
-	t.Run("client with custom timeout set in fetcher", func(t *testing.T) {
-		expected := time.Second * 10
-		d := DefaultFetcher{
-			timeout: expected,
-		}
-		c := d.createHTTPClient(15)
-		assert.Equal(t, expected, c.Timeout)
-	})
 }

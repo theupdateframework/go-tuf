@@ -22,45 +22,33 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
+// httpClient interface
+type httpClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 // Fetcher interface
 type Fetcher interface {
-	DownloadFile(urlPath string, maxLength int64, timeout time.Duration) ([]byte, error)
+	DownloadFile(urlPath string, maxLength int64) ([]byte, error)
 }
 
 // DefaultFetcher implements Fetcher
 type DefaultFetcher struct {
 	httpUserAgent string
-	timeout       time.Duration
+	client        httpClient
 }
 
 func (d *DefaultFetcher) SetHTTPUserAgent(httpUserAgent string) {
 	d.httpUserAgent = httpUserAgent
 }
 
-func (d *DefaultFetcher) SetTimeout(timeout time.Duration) {
-	d.timeout = timeout
-}
-
-func (d *DefaultFetcher) createHTTPClient(defaultTimeout time.Duration) *http.Client {
-	c := &http.Client{}
-	// Use the Fetcher timeout field if set, otherwise fallback to the timeout function parameter
-	if d.timeout != 0 {
-		c.Timeout = d.timeout
-	} else {
-		c.Timeout = defaultTimeout
-	}
-	return c
-}
-
 // DownloadFile downloads a file from urlPath, errors out if it failed,
 // its length is larger than maxLength or the timeout is reached.
-func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, timeout time.Duration) ([]byte, error) {
-	client := d.createHTTPClient(timeout)
+func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, error) {
 	req, err := http.NewRequest("GET", urlPath, nil)
 	if err != nil {
 		return nil, err
@@ -70,7 +58,7 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, timeout t
 		req.Header.Set("User-Agent", d.httpUserAgent)
 	}
 	// Execute the request.
-	res, err := client.Do(req)
+	res, err := d.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -106,4 +94,23 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, timeout t
 	}
 
 	return data, nil
+}
+
+func NewDefaultFetcher(httpUserAgent string) *DefaultFetcher {
+	return &DefaultFetcher{
+		client:        http.DefaultClient,
+		httpUserAgent: httpUserAgent,
+	}
+}
+
+func (f *DefaultFetcher) NewFetcherWitCustomHTTPClient(hc httpClient, httpUserAgent string) *DefaultFetcher {
+	return &DefaultFetcher{
+		client:        hc,
+		httpUserAgent: httpUserAgent,
+	}
+}
+
+func (f *DefaultFetcher) SetHTTPClient(hc httpClient) *DefaultFetcher {
+	f.client = hc
+	return f
 }
