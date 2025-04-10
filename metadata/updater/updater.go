@@ -245,7 +245,7 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 		}
 	}
 	fullURL := fmt.Sprintf("%s%s", targetBaseURL, targetRemotePath)
-	data, err := update.cfg.Fetcher.DownloadFile(fullURL, targetFile.Length, time.Second*15)
+	data, err := update.cfg.Fetcher.DownloadFile(fullURL, targetFile.Length)
 	if err != nil {
 		return "", nil, err
 	}
@@ -648,7 +648,7 @@ func (update *Updater) downloadMetadata(roleName string, length int64, version s
 	} else {
 		urlPath = fmt.Sprintf("%s%s.%s.json", urlPath, version, url.PathEscape(roleName))
 	}
-	return update.cfg.Fetcher.DownloadFile(urlPath, length, time.Second*15)
+	return update.cfg.Fetcher.DownloadFile(urlPath, length)
 }
 
 // generateTargetFilePath generates path from TargetFiles
