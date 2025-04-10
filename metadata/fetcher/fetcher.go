@@ -100,10 +100,9 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, 
 	return data, nil
 }
 
-func NewDefaultFetcher(httpUserAgent string) *DefaultFetcher {
+func NewDefaultFetcher() *DefaultFetcher {
 	return &DefaultFetcher{
-		client:        http.DefaultClient,
-		httpUserAgent: httpUserAgent,
+		client: http.DefaultClient,
 	}
 }
 
@@ -124,7 +123,16 @@ func (f *DefaultFetcher) NewFetcherWithRoundTripper(rt http.RoundTripper) *Defau
 	}
 }
 
-func (f *DefaultFetcher) SetHTTPClient(hc httpClient) *DefaultFetcher {
+func (f *DefaultFetcher) SetHTTPClient(hc httpClient) {
 	f.client = hc
-	return f
+}
+
+func (f *DefaultFetcher) SetTransport(rt http.RoundTripper) error {
+	hc, ok := f.client.(*http.Client)
+	if !ok {
+		return fmt.Errorf("fetcher is not type fetcher.DefaultFetcher")
+	}
+	hc.Transport = rt
+	f.client = hc
+	return nil
 }

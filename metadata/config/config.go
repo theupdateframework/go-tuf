@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"time"
 
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
@@ -36,11 +35,7 @@ type UpdaterConfig struct {
 	SnapshotMaxLength  int64
 	TargetsMaxLength   int64
 	// Updater configuration
-	// Set a custom fetcher implementation to use for downloading metadata
-	Fetcher fetcher.Fetcher
-	// Set a custom timeout for the default fetcher. If a custom fetcher is provided
-	// with Fetcher, this option will be ignored
-	FetcherTimeout        time.Duration
+	Fetcher               fetcher.Fetcher
 	LocalTrustedRoot      []byte
 	LocalMetadataDir      string
 	LocalTargetsDir       string
@@ -71,12 +66,12 @@ func New(remoteURL string, rootBytes []byte) (*UpdaterConfig, error) {
 		SnapshotMaxLength:  2000000, // bytes
 		TargetsMaxLength:   5000000, // bytes
 		// Updater configuration
-		Fetcher:               &fetcher.DefaultFetcher{}, // use the default built-in download fetcher
-		LocalTrustedRoot:      rootBytes,                 // trusted root.json
-		RemoteMetadataURL:     remoteURL,                 // URL of where the TUF metadata is
-		RemoteTargetsURL:      targetsURL,                // URL of where the target files should be downloaded from
-		DisableLocalCache:     false,                     // enable local caching of trusted metadata
-		PrefixTargetsWithHash: true,                      // use hash-prefixed target files with consistent snapshots
+		Fetcher:               fetcher.NewDefaultFetcher(), // use the default built-in download fetcher
+		LocalTrustedRoot:      rootBytes,                   // trusted root.json
+		RemoteMetadataURL:     remoteURL,                   // URL of where the TUF metadata is
+		RemoteTargetsURL:      targetsURL,                  // URL of where the target files should be downloaded from
+		DisableLocalCache:     false,                       // enable local caching of trusted metadata
+		PrefixTargetsWithHash: true,                        // use hash-prefixed target files with consistent snapshots
 		UnsafeLocalMode:       false,
 	}, nil
 }
@@ -103,6 +98,20 @@ func (cfg *UpdaterConfig) SetDefaultFetcherHTTPClient(client *http.Client) error
 		return fmt.Errorf("fetcher is not type fetcher.DefaultFetcher")
 	}
 	df.SetHTTPClient(client)
+	cfg.Fetcher = df
+	return nil
+}
+
+func (cfg *UpdaterConfig) SetDefaultFetcherTransport(rt http.RoundTripper) error {
+	// Check if the configured fetcher is the default fetcher
+	// since we are only configuring a timeout value for the default fetcher
+	df, ok := cfg.Fetcher.(*fetcher.DefaultFetcher)
+	if !ok {
+		return fmt.Errorf("fetcher is not type fetcher.DefaultFetcher")
+	}
+	if err := df.SetTransport(rt); err != nil {
+		return err
+	}
 	cfg.Fetcher = df
 	return nil
 }
