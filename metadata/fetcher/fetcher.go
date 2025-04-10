@@ -26,7 +26,8 @@ import (
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
-// httpClient interface
+// httpClient interface allows us to either provide a live http.Client
+// or a mock implementation for testing purposes
 type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
@@ -40,6 +41,9 @@ type Fetcher interface {
 type DefaultFetcher struct {
 	httpUserAgent string
 	client        httpClient
+	// for implementation of retry logic in a future pull request
+	// retryInterval time.Duration
+	// retryCount    int
 }
 
 func (d *DefaultFetcher) SetHTTPUserAgent(httpUserAgent string) {
@@ -103,10 +107,20 @@ func NewDefaultFetcher(httpUserAgent string) *DefaultFetcher {
 	}
 }
 
-func (f *DefaultFetcher) NewFetcherWitCustomHTTPClient(hc httpClient, httpUserAgent string) *DefaultFetcher {
+// NewFetcherWithHTTPClient creates a new DefaultFetcher with a custom httpClient
+func (f *DefaultFetcher) NewFetcherWithHTTPClient(hc httpClient) *DefaultFetcher {
 	return &DefaultFetcher{
-		client:        hc,
-		httpUserAgent: httpUserAgent,
+		client: hc,
+	}
+}
+
+// NewFetcherWithRoundTripper creates a new DefaultFetcher with a custom RoundTripper
+// The function will create a default http.Client and replace the transport with the provided RoundTripper implementation
+func (f *DefaultFetcher) NewFetcherWithRoundTripper(rt http.RoundTripper) *DefaultFetcher {
+	client := http.DefaultClient
+	client.Transport = rt
+	return &DefaultFetcher{
+		client: client,
 	}
 }
 
