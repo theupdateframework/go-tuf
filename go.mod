@@ -2,8 +2,6 @@ module github.com/theupdateframework/go-tuf/v2
 
 go 1.23.0
 
-toolchain go1.24.2
-
 require (
 	github.com/go-logr/stdr v1.2.2
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0
