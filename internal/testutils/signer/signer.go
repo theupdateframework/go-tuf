@@ -154,7 +154,7 @@ func loadSigner(k, s string) (signature.Signer, error) {
 		var pssOpt = rsa.PSSOptions{Hash: crypto.SHA256}
 		opts = append(opts, options.WithRSAPSS(&pssOpt))
 	default:
-		return nil, fmt.Errorf("unsupported key scheme %s\n", s)
+		return nil, fmt.Errorf("unsupported key scheme %s", s)
 	}
 
 	return signature.LoadSignerWithOpts(pk, opts...)
