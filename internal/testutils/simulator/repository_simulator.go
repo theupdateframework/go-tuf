@@ -427,13 +427,14 @@ func (rs *RepositorySimulator) FetchMetadata(role string, version *int) ([]byte,
 	}
 
 	// Sign and serialize the requested metadata
-	if role == metadata.TIMESTAMP {
+	switch role {
+	case metadata.TIMESTAMP:
 		return signMetadata(role, rs.MDTimestamp, rs)
-	} else if role == metadata.SNAPSHOT {
+	case metadata.SNAPSHOT:
 		return signMetadata(role, rs.MDSnapshot, rs)
-	} else if role == metadata.TARGETS {
+	case metadata.TARGETS:
 		return signMetadata(role, rs.MDTargets, rs)
-	} else {
+	default:
 		md, ok := rs.MDDelegates[role]
 		if !ok {
 			slog.Error("Unknown role", "role", role)
