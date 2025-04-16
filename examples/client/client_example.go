@@ -79,7 +79,7 @@ func InitEnvironment() (string, error) {
 	if !generateRandomFolder {
 		tmpDir = filepath.Join(cwd, "tmp")
 		// create a temporary folder for storing the demo artifacts
-		os.Mkdir(tmpDir, 0750)
+		_ = os.Mkdir(tmpDir, 0750)
 	} else {
 		// create a temporary folder for storing the demo artifacts
 		tmpDir, err = os.MkdirTemp(cwd, "tmp")
@@ -89,7 +89,7 @@ func InitEnvironment() (string, error) {
 	}
 
 	// create a destination folder for storing the downloaded target
-	os.Mkdir(filepath.Join(tmpDir, "download"), 0750)
+	_ = os.Mkdir(filepath.Join(tmpDir, "download"), 0750)
 	return tmpDir, nil
 }
 
