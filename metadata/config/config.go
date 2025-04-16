@@ -94,7 +94,7 @@ func (cfg *UpdaterConfig) EnsurePathsExist() error {
 
 func (cfg *UpdaterConfig) SetDefaultFetcherHTTPClient(client *http.Client) error {
 	// Check if the configured fetcher is the default fetcher
-	// since we are only configuring a timeout value for the default fetcher
+	// since we are only configuring a http.Client value for the default fetcher
 	df, ok := cfg.Fetcher.(*fetcher.DefaultFetcher)
 	if !ok {
 		return fmt.Errorf("fetcher is not type fetcher.DefaultFetcher")
@@ -106,7 +106,7 @@ func (cfg *UpdaterConfig) SetDefaultFetcherHTTPClient(client *http.Client) error
 
 func (cfg *UpdaterConfig) SetDefaultFetcherTransport(rt http.RoundTripper) error {
 	// Check if the configured fetcher is the default fetcher
-	// since we are only configuring a timeout value for the default fetcher
+	// since we are only configuring a Transport value for the default fetcher
 	df, ok := cfg.Fetcher.(*fetcher.DefaultFetcher)
 	if !ok {
 		return fmt.Errorf("fetcher is not type fetcher.DefaultFetcher")
@@ -118,9 +118,10 @@ func (cfg *UpdaterConfig) SetDefaultFetcherTransport(rt http.RoundTripper) error
 	return nil
 }
 
+// SetDefaultFetcherRetry sets the constant retry interval and count for the default fetcher
 func (cfg *UpdaterConfig) SetDefaultFetcherRetry(retryInterval time.Duration, retryCount uint) error {
 	// Check if the configured fetcher is the default fetcher
-	// since we are only configuring a timeout value for the default fetcher
+	// since we are only configuring the retry interval and count for the default fetcher
 	df, ok := cfg.Fetcher.(*fetcher.DefaultFetcher)
 	if !ok {
 		return fmt.Errorf("fetcher is not type fetcher.DefaultFetcher")
@@ -132,7 +133,7 @@ func (cfg *UpdaterConfig) SetDefaultFetcherRetry(retryInterval time.Duration, re
 
 func (cfg *UpdaterConfig) SetRetryOptions(retryOptions ...backoff.RetryOption) error {
 	// Check if the configured fetcher is the default fetcher
-	// since we are only configuring a timeout value for the default fetcher
+	// since we are only configuring retry options for the default fetcher
 	df, ok := cfg.Fetcher.(*fetcher.DefaultFetcher)
 	if !ok {
 		return fmt.Errorf("fetcher is not type fetcher.DefaultFetcher")
