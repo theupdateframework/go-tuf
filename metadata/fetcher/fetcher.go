@@ -65,16 +65,7 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, 
 		req.Header.Set("User-Agent", d.httpUserAgent)
 	}
 
-	//bo := backoff.NewConstantBackOff(d.retryInterval)
 	operation := func() ([]byte, error) {
-		req, err := http.NewRequest("GET", urlPath, nil)
-		if err != nil {
-			return nil, err
-		}
-		// Use in case of multiple sessions.
-		if d.httpUserAgent != "" {
-			req.Header.Set("User-Agent", d.httpUserAgent)
-		}
 		// Execute the request.
 		res, err := d.client.Do(req)
 		if err != nil {
@@ -123,7 +114,8 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, 
 
 func NewDefaultFetcher() *DefaultFetcher {
 	return &DefaultFetcher{
-		client:       http.DefaultClient,
+		client: http.DefaultClient,
+		// default to attempting the HTTP request once
 		retryOptions: []backoff.RetryOption{backoff.WithMaxTries(1)},
 	}
 }
