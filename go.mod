@@ -3,7 +3,7 @@ module github.com/theupdateframework/go-tuf/v2
 go 1.23.0
 
 require (
-	github.com/cenkalti/backoff/v4 v4.3.0
+	github.com/cenkalti/backoff/v5 v5.0.2
 	github.com/go-logr/stdr v1.2.2
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0
 	github.com/sigstore/sigstore v1.8.4

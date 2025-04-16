@@ -18,13 +18,14 @@
 package fetcher
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v5"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
@@ -45,7 +46,7 @@ type DefaultFetcher struct {
 	client        httpClient
 	// for implementation of retry logic in a future pull request
 	retryInterval time.Duration
-	retryCount    uint64
+	retryCount    uint
 }
 
 func (d *DefaultFetcher) SetHTTPUserAgent(httpUserAgent string) {
@@ -64,12 +65,11 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, 
 		req.Header.Set("User-Agent", d.httpUserAgent)
 	}
 
-	var data []byte
-	bo := backoff.NewConstantBackOff(d.retryInterval)
-	err = backoff.Retry(func() error {
+	//bo := backoff.NewConstantBackOff(d.retryInterval)
+	operation := func() ([]byte, error) {
 		req, err := http.NewRequest("GET", urlPath, nil)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		// Use in case of multiple sessions.
 		if d.httpUserAgent != "" {
@@ -78,23 +78,23 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, 
 		// Execute the request.
 		res, err := d.client.Do(req)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer res.Body.Close()
 		// Handle HTTP status codes.
 		if res.StatusCode != http.StatusOK {
-			return &metadata.ErrDownloadHTTP{StatusCode: res.StatusCode, URL: urlPath}
+			return nil, &metadata.ErrDownloadHTTP{StatusCode: res.StatusCode, URL: urlPath}
 		}
 		var length int64
 		// Get content length from header (might not be accurate, -1 or not set).
 		if header := res.Header.Get("Content-Length"); header != "" {
 			length, err = strconv.ParseInt(header, 10, 0)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			// Error if the reported size is greater than what is expected.
 			if length > maxLength {
-				return &metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
+				return nil, &metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
 			}
 		}
 		// Although the size has been checked above, use a LimitReader in case
@@ -103,16 +103,17 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, 
 		// surpassed our set limit.
 		data, err := io.ReadAll(io.LimitReader(res.Body, maxLength+1))
 		if err != nil {
-			return err
+			return nil, err
 		}
 		// Error if the reported size is greater than what is expected.
 		length = int64(len(data))
 		if length > maxLength {
-			return &metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
+			return nil, &metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
 		}
 
-		return nil
-	}, backoff.WithMaxRetries(bo, d.retryCount))
+		return data, nil
+	}
+	data, err := backoff.Retry(context.Background(), operation, backoff.WithMaxTries(d.retryCount))
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +123,8 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, 
 
 func NewDefaultFetcher() *DefaultFetcher {
 	return &DefaultFetcher{
-		client: http.DefaultClient,
+		client:     http.DefaultClient,
+		retryCount: 1,
 	}
 }
 
@@ -157,7 +159,7 @@ func (f *DefaultFetcher) SetTransport(rt http.RoundTripper) error {
 	return nil
 }
 
-func (f *DefaultFetcher) SetRetry(retryInterval time.Duration, retryCount uint64) {
+func (f *DefaultFetcher) SetRetry(retryInterval time.Duration, retryCount uint) {
 	f.retryInterval = retryInterval
 	f.retryCount = retryCount
 }

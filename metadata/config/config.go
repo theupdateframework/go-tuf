@@ -117,7 +117,7 @@ func (cfg *UpdaterConfig) SetDefaultFetcherTransport(rt http.RoundTripper) error
 	return nil
 }
 
-func (cfg *UpdaterConfig) SetDefaultFetcherRetry(retryInterval time.Duration, retryCount uint64) error {
+func (cfg *UpdaterConfig) SetDefaultFetcherRetry(retryInterval time.Duration, retryCount uint) error {
 	// Check if the configured fetcher is the default fetcher
 	// since we are only configuring a timeout value for the default fetcher
 	df, ok := cfg.Fetcher.(*fetcher.DefaultFetcher)
