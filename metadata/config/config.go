@@ -24,6 +24,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/cenkalti/backoff/v5"
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
 
@@ -125,6 +126,18 @@ func (cfg *UpdaterConfig) SetDefaultFetcherRetry(retryInterval time.Duration, re
 		return fmt.Errorf("fetcher is not type fetcher.DefaultFetcher")
 	}
 	df.SetRetry(retryInterval, retryCount)
+	cfg.Fetcher = df
+	return nil
+}
+
+func (cfg *UpdaterConfig) SetRetryOptions(retryOptions ...backoff.RetryOption) error {
+	// Check if the configured fetcher is the default fetcher
+	// since we are only configuring a timeout value for the default fetcher
+	df, ok := cfg.Fetcher.(*fetcher.DefaultFetcher)
+	if !ok {
+		return fmt.Errorf("fetcher is not type fetcher.DefaultFetcher")
+	}
+	df.SetRetryOptions(retryOptions...)
 	cfg.Fetcher = df
 	return nil
 }

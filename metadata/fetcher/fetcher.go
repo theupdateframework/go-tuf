@@ -42,11 +42,11 @@ type Fetcher interface {
 
 // DefaultFetcher implements Fetcher
 type DefaultFetcher struct {
+	//  httpClient configuration
 	httpUserAgent string
 	client        httpClient
-	// for implementation of retry logic in a future pull request
-	retryInterval time.Duration
-	retryCount    uint
+	// retry logic configuration
+	retryOptions []backoff.RetryOption
 }
 
 func (d *DefaultFetcher) SetHTTPUserAgent(httpUserAgent string) {
@@ -113,7 +113,7 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, 
 
 		return data, nil
 	}
-	data, err := backoff.Retry(context.Background(), operation, backoff.WithMaxTries(d.retryCount))
+	data, err := backoff.Retry(context.Background(), operation, d.retryOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -123,8 +123,8 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, 
 
 func NewDefaultFetcher() *DefaultFetcher {
 	return &DefaultFetcher{
-		client:     http.DefaultClient,
-		retryCount: 1,
+		client:       http.DefaultClient,
+		retryOptions: []backoff.RetryOption{backoff.WithMaxTries(1)},
 	}
 }
 
@@ -160,6 +160,11 @@ func (f *DefaultFetcher) SetTransport(rt http.RoundTripper) error {
 }
 
 func (f *DefaultFetcher) SetRetry(retryInterval time.Duration, retryCount uint) {
-	f.retryInterval = retryInterval
-	f.retryCount = retryCount
+	constantBackOff := backoff.WithBackOff(backoff.NewConstantBackOff(retryInterval))
+	maxTryCount := backoff.WithMaxTries(retryCount)
+	f.SetRetryOptions(constantBackOff, maxTryCount)
+}
+
+func (f *DefaultFetcher) SetRetryOptions(retryOptions ...backoff.RetryOption) {
+	f.retryOptions = retryOptions
 }
