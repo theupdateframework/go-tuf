@@ -22,19 +22,28 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
+// httpClient interface allows us to either provide a live http.Client
+// or a mock implementation for testing purposes
+type httpClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 // Fetcher interface
 type Fetcher interface {
-	DownloadFile(urlPath string, maxLength int64, timeout time.Duration) ([]byte, error)
+	DownloadFile(urlPath string, maxLength int64) ([]byte, error)
 }
 
 // DefaultFetcher implements Fetcher
 type DefaultFetcher struct {
 	httpUserAgent string
+	client        httpClient
+	// for implementation of retry logic in a future pull request
+	// retryInterval time.Duration
+	// retryCount    int
 }
 
 func (d *DefaultFetcher) SetHTTPUserAgent(httpUserAgent string) {
@@ -43,8 +52,7 @@ func (d *DefaultFetcher) SetHTTPUserAgent(httpUserAgent string) {
 
 // DownloadFile downloads a file from urlPath, errors out if it failed,
 // its length is larger than maxLength or the timeout is reached.
-func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, timeout time.Duration) ([]byte, error) {
-	client := &http.Client{Timeout: timeout}
+func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, error) {
 	req, err := http.NewRequest("GET", urlPath, nil)
 	if err != nil {
 		return nil, err
@@ -54,7 +62,7 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, timeout t
 		req.Header.Set("User-Agent", d.httpUserAgent)
 	}
 	// Execute the request.
-	res, err := client.Do(req)
+	res, err := d.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +86,7 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, timeout t
 	// Although the size has been checked above, use a LimitReader in case
 	// the reported size is inaccurate, or size is -1 which indicates an
 	// unknown length. We read maxLength + 1 in order to check if the read data
-	// surpased our set limit.
+	// surpassed our set limit.
 	data, err := io.ReadAll(io.LimitReader(res.Body, maxLength+1))
 	if err != nil {
 		return nil, err
@@ -90,4 +98,41 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, timeout t
 	}
 
 	return data, nil
+}
+
+func NewDefaultFetcher() *DefaultFetcher {
+	return &DefaultFetcher{
+		client: http.DefaultClient,
+	}
+}
+
+// NewFetcherWithHTTPClient creates a new DefaultFetcher with a custom httpClient
+func (f *DefaultFetcher) NewFetcherWithHTTPClient(hc httpClient) *DefaultFetcher {
+	return &DefaultFetcher{
+		client: hc,
+	}
+}
+
+// NewFetcherWithRoundTripper creates a new DefaultFetcher with a custom RoundTripper
+// The function will create a default http.Client and replace the transport with the provided RoundTripper implementation
+func (f *DefaultFetcher) NewFetcherWithRoundTripper(rt http.RoundTripper) *DefaultFetcher {
+	client := http.DefaultClient
+	client.Transport = rt
+	return &DefaultFetcher{
+		client: client,
+	}
+}
+
+func (f *DefaultFetcher) SetHTTPClient(hc httpClient) {
+	f.client = hc
+}
+
+func (f *DefaultFetcher) SetTransport(rt http.RoundTripper) error {
+	hc, ok := f.client.(*http.Client)
+	if !ok {
+		return fmt.Errorf("fetcher is not type fetcher.DefaultFetcher")
+	}
+	hc.Transport = rt
+	f.client = hc
+	return nil
 }
