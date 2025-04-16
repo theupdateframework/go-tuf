@@ -156,3 +156,8 @@ func (f *DefaultFetcher) SetTransport(rt http.RoundTripper) error {
 	f.client = hc
 	return nil
 }
+
+func (f *DefaultFetcher) SetRetry(retryInterval time.Duration, retryCount uint64) {
+	f.retryInterval = retryInterval
+	f.retryCount = retryCount
+}

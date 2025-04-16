@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
@@ -112,6 +113,18 @@ func (cfg *UpdaterConfig) SetDefaultFetcherTransport(rt http.RoundTripper) error
 	if err := df.SetTransport(rt); err != nil {
 		return err
 	}
+	cfg.Fetcher = df
+	return nil
+}
+
+func (cfg *UpdaterConfig) SetDefaultFetcherRetry(retryInterval time.Duration, retryCount uint64) error {
+	// Check if the configured fetcher is the default fetcher
+	// since we are only configuring a timeout value for the default fetcher
+	df, ok := cfg.Fetcher.(*fetcher.DefaultFetcher)
+	if !ok {
+		return fmt.Errorf("fetcher is not type fetcher.DefaultFetcher")
+	}
+	df.SetRetry(retryInterval, retryCount)
 	cfg.Fetcher = df
 	return nil
 }
