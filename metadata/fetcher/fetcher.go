@@ -18,11 +18,14 @@
 package fetcher
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/cenkalti/backoff/v5"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
@@ -39,11 +42,11 @@ type Fetcher interface {
 
 // DefaultFetcher implements Fetcher
 type DefaultFetcher struct {
+	//  httpClient configuration
 	httpUserAgent string
 	client        httpClient
-	// for implementation of retry logic in a future pull request
-	// retryInterval time.Duration
-	// retryCount    int
+	// retry logic configuration
+	retryOptions []backoff.RetryOption
 }
 
 func (d *DefaultFetcher) SetHTTPUserAgent(httpUserAgent string) {
@@ -61,40 +64,49 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, 
 	if d.httpUserAgent != "" {
 		req.Header.Set("User-Agent", d.httpUserAgent)
 	}
-	// Execute the request.
-	res, err := d.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	// Handle HTTP status codes.
-	if res.StatusCode != http.StatusOK {
-		return nil, &metadata.ErrDownloadHTTP{StatusCode: res.StatusCode, URL: urlPath}
-	}
-	var length int64
-	// Get content length from header (might not be accurate, -1 or not set).
-	if header := res.Header.Get("Content-Length"); header != "" {
-		length, err = strconv.ParseInt(header, 10, 0)
+
+	operation := func() ([]byte, error) {
+		// Execute the request.
+		res, err := d.client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer res.Body.Close()
+		// Handle HTTP status codes.
+		if res.StatusCode != http.StatusOK {
+			return nil, &metadata.ErrDownloadHTTP{StatusCode: res.StatusCode, URL: urlPath}
+		}
+		var length int64
+		// Get content length from header (might not be accurate, -1 or not set).
+		if header := res.Header.Get("Content-Length"); header != "" {
+			length, err = strconv.ParseInt(header, 10, 0)
+			if err != nil {
+				return nil, err
+			}
+			// Error if the reported size is greater than what is expected.
+			if length > maxLength {
+				return nil, &metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
+			}
+		}
+		// Although the size has been checked above, use a LimitReader in case
+		// the reported size is inaccurate, or size is -1 which indicates an
+		// unknown length. We read maxLength + 1 in order to check if the read data
+		// surpassed our set limit.
+		data, err := io.ReadAll(io.LimitReader(res.Body, maxLength+1))
 		if err != nil {
 			return nil, err
 		}
 		// Error if the reported size is greater than what is expected.
+		length = int64(len(data))
 		if length > maxLength {
 			return nil, &metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
 		}
+
+		return data, nil
 	}
-	// Although the size has been checked above, use a LimitReader in case
-	// the reported size is inaccurate, or size is -1 which indicates an
-	// unknown length. We read maxLength + 1 in order to check if the read data
-	// surpassed our set limit.
-	data, err := io.ReadAll(io.LimitReader(res.Body, maxLength+1))
+	data, err := backoff.Retry(context.Background(), operation, d.retryOptions...)
 	if err != nil {
 		return nil, err
-	}
-	// Error if the reported size is greater than what is expected.
-	length = int64(len(data))
-	if length > maxLength {
-		return nil, &metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length %d is larger than expected %d", urlPath, length, maxLength)}
 	}
 
 	return data, nil
@@ -103,6 +115,8 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, 
 func NewDefaultFetcher() *DefaultFetcher {
 	return &DefaultFetcher{
 		client: http.DefaultClient,
+		// default to attempting the HTTP request once
+		retryOptions: []backoff.RetryOption{backoff.WithMaxTries(1)},
 	}
 }
 
@@ -135,4 +149,14 @@ func (f *DefaultFetcher) SetTransport(rt http.RoundTripper) error {
 	hc.Transport = rt
 	f.client = hc
 	return nil
+}
+
+func (f *DefaultFetcher) SetRetry(retryInterval time.Duration, retryCount uint) {
+	constantBackOff := backoff.WithBackOff(backoff.NewConstantBackOff(retryInterval))
+	maxTryCount := backoff.WithMaxTries(retryCount)
+	f.SetRetryOptions(constantBackOff, maxTryCount)
+}
+
+func (f *DefaultFetcher) SetRetryOptions(retryOptions ...backoff.RetryOption) {
+	f.retryOptions = retryOptions
 }
