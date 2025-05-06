@@ -38,7 +38,7 @@ type httpClient interface {
 // Fetcher interface
 type Fetcher interface {
 	// DownloadFile downloads a file from the provided URL, reading
-	// up to maxLenght of bytes before it halts.
+	// up to maxLength of bytes before it aborts.
 	// The timeout argument is deprecated and not used. To configure
 	// the timeout (or retries), modify the fetcher instead. For the
 	// DefaultFetcher the underlying HTTP client can be substituted.
