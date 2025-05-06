@@ -85,7 +85,7 @@ func TestDownLoadFile(t *testing.T) {
 			// run the function under test
 			fetcher := NewDefaultFetcher()
 			fetcher.SetHTTPUserAgent("Metadata_Unit_Test/1.0")
-			data, err := fetcher.DownloadFile(tt.url, tt.maxLength)
+			data, err := fetcher.DownloadFile(tt.url, tt.maxLength, 0)
 			// special case if we expect no error
 			if tt.wantErr == nil {
 				assert.NoErrorf(t, err, "expected no error but got %v", err)
@@ -156,7 +156,7 @@ func TestDownloadFile_Retry(t *testing.T) {
 					backoff.WithMaxTries(3),
 				},
 			}
-			data, err := fetcher.DownloadFile("https://jku.github.io/tuf-demo/metadata/1.root.json", 512000)
+			data, err := fetcher.DownloadFile("https://jku.github.io/tuf-demo/metadata/1.root.json", 512000, 0)
 			if tt.shouldSucceed {
 				assert.Equal(t, sampleRootData, data)
 				assert.NoError(t, err)
