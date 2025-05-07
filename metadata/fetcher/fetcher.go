@@ -37,7 +37,12 @@ type httpClient interface {
 
 // Fetcher interface
 type Fetcher interface {
-	DownloadFile(urlPath string, maxLength int64) ([]byte, error)
+	// DownloadFile downloads a file from the provided URL, reading
+	// up to maxLength of bytes before it aborts.
+	// The timeout argument is deprecated and not used. To configure
+	// the timeout (or retries), modify the fetcher instead. For the
+	// DefaultFetcher the underlying HTTP client can be substituted.
+	DownloadFile(urlPath string, maxLength int64, _ time.Duration) ([]byte, error)
 }
 
 // DefaultFetcher implements Fetcher
@@ -55,7 +60,7 @@ func (d *DefaultFetcher) SetHTTPUserAgent(httpUserAgent string) {
 
 // DownloadFile downloads a file from urlPath, errors out if it failed,
 // its length is larger than maxLength or the timeout is reached.
-func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64) ([]byte, error) {
+func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, _ time.Duration) ([]byte, error) {
 	req, err := http.NewRequest("GET", urlPath, nil)
 	if err != nil {
 		return nil, err
