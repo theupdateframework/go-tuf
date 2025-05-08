@@ -70,6 +70,11 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, _ time.Du
 		req.Header.Set("User-Agent", d.httpUserAgent)
 	}
 
+	// For backwards compatibility, if the client is nil, use the default client.
+	if d.client == nil {
+		d.client = http.DefaultClient
+	}
+
 	operation := func() ([]byte, error) {
 		// Execute the request.
 		res, err := d.client.Do(req)
