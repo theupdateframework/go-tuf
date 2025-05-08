@@ -170,3 +170,9 @@ func TestDownloadFile_Retry(t *testing.T) {
 		})
 	}
 }
+
+func TestDownloadFile_NoHTTPClientSet(t *testing.T) {
+	fetcher := DefaultFetcher{}
+	_, err := fetcher.DownloadFile("https://jku.github.io/tuf-demo/metadata/1.root.json", 512000, 0)
+	assert.NoError(t, err)
+}
