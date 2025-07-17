@@ -598,12 +598,16 @@ func (s *ClientSuite) TestUpdateRoots(c *C) {
 		{"testdata/Published2Times_targets_keyrotated", nil, map[string]int64{"root": 2, "timestamp": 2, "snapshot": 2, "targets": 2}},
 		// timestamp role key rotation increase the timestamp.
 		{"testdata/Published2Times_timestamp_keyrotated", nil, map[string]int64{"root": 2, "timestamp": 2, "snapshot": 1, "targets": 1}},
-		//root file size > defaultRootDownloadLimit
+		// root file size > defaultRootDownloadLimit
 		{"testdata/Published2Times_roottoolarge", ErrMetaTooLarge{Name: "2.root.json", Size: defaultRootDownloadLimit + 1, MaxSize: defaultRootDownloadLimit}, map[string]int64{}},
+		// threshold number of timestamp keys are revoked, allowing recovery from higher role versions. Initial timestamp/snapshot/targets versions are 2. Timestamp is downgraded successfully to 1, while snapshot and targets are upgraded to 3.
+		{"testdata/Published1Time_rollbackAttackRecovery", nil, map[string]int64{"root": 2, "timestamp": 1, "snapshot": 3, "targets": 3}},
 	}
 
 	for _, test := range tests {
 		tufClient, closer := initRootTest(c, test.fixturePath)
+		// after initialization of the client, ensure the local store is up-to-date as well.
+		tufClient.getLocalMeta()
 		_, err := tufClient.Update()
 		if test.expectedError == nil {
 			c.Assert(err, IsNil)
