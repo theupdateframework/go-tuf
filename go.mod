@@ -5,7 +5,7 @@ go 1.23.0
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/go-logr/stdr v1.2.2
-	github.com/secure-systems-lab/go-securesystemslib v0.9.0
+	github.com/secure-systems-lab/go-securesystemslib v0.9.1
 	github.com/sigstore/sigstore v1.9.5
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
@@ -23,9 +23,9 @@ require (
 	github.com/sigstore/protobuf-specs v0.4.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
-	golang.org/x/crypto v0.36.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/term v0.30.0 // indirect
+	golang.org/x/crypto v0.40.0 // indirect
+	golang.org/x/sys v0.34.0 // indirect
+	golang.org/x/term v0.33.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240520151616-dc85e6b867a5 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
