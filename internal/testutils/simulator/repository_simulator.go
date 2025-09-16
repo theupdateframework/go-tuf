@@ -51,15 +51,12 @@ package simulator
 
 import (
 	"bytes"
-	"crypto"
-	"crypto/ed25519"
 	"crypto/sha256"
 	"fmt"
 	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -161,7 +158,7 @@ func (rs *RepositorySimulator) setupMinimalValidRepository() {
 	rs.MDRoot = metadata.Root(rs.SafeExpiry)
 
 	for _, role := range metadata.TOP_LEVEL_ROLE_NAMES {
-		publicKey, _, signer := CreateKey()
+		publicKey, _, signer := createKey()
 
 		mtdkey, err := metadata.KeyFromPublicKey(*publicKey)
 		if err != nil {
@@ -212,20 +209,6 @@ func (rs *RepositorySimulator) AllTargets() <-chan metadata.TargetsType {
 	return ch
 }
 
-func CreateKey() (*ed25519.PublicKey, *ed25519.PrivateKey, *signature.Signer) {
-	public, private, err := ed25519.GenerateKey(nil)
-	if err != nil {
-		slog.Error("Failed to generate key", "err", err)
-	}
-
-	signer, err := signature.LoadSigner(private, crypto.Hash(0))
-	if err != nil {
-		slog.Error("failed to load signer", "err", err)
-	}
-
-	return &public, &private, &signer
-}
-
 func (rs *RepositorySimulator) AddSigner(role string, keyID string, signer signature.Signer) {
 	if _, ok := rs.Signers[role]; !ok {
 		rs.Signers[role] = make(map[string]*signature.Signer)
@@ -241,7 +224,7 @@ func (rs *RepositorySimulator) RotateKeys(role string) {
 	}
 
 	for i := 0; i < rs.MDRoot.Signed.Roles[role].Threshold; i++ {
-		publicKey, _, signer := CreateKey()
+		publicKey, _, signer := createKey()
 		mtdkey, err := metadata.KeyFromPublicKey(*publicKey)
 		if err != nil {
 			slog.Error("Repository simulator: key conversion failed while rotating keys", "err", err)
@@ -314,34 +297,6 @@ func (rs *RepositorySimulator) DownloadFile(urlPath string, maxLength int64, _ t
 		}
 	}
 	return data, err
-}
-
-func IsWindowsPath(path string) bool {
-	match, _ := regexp.MatchString(`^[a-zA-Z]:\\`, path)
-	return match
-}
-
-func trimPrefix(path string, prefix string) (string, error) {
-	var toTrim string
-	if IsWindowsPath(path) {
-		toTrim = path
-	} else {
-		parsedURL, e := url.Parse(path)
-		if e != nil {
-			return "", e
-		}
-		toTrim = parsedURL.Path
-	}
-
-	return strings.TrimPrefix(toTrim, prefix), nil
-}
-
-func hasPrefix(path, prefix string) bool {
-	return strings.HasPrefix(filepath.ToSlash(path), prefix)
-}
-
-func hasSuffix(path, prefix string) bool {
-	return strings.HasSuffix(filepath.ToSlash(path), prefix)
 }
 
 func (rs *RepositorySimulator) fetch(urlPath string) ([]byte, error) {
@@ -552,7 +507,7 @@ func (rs *RepositorySimulator) AddDelegation(delegatorName string, role metadata
 	delegator.Delegations.Roles = append(delegator.Delegations.Roles, role)
 
 	// By default add one new key for the role
-	publicKey, _, signer := CreateKey()
+	publicKey, _, signer := createKey()
 	mdkey, err := metadata.KeyFromPublicKey(*publicKey)
 	if err != nil {
 		slog.Error("Repository simulator: key conversion failed while adding delegation", "err", err)
@@ -580,7 +535,7 @@ func (rs *RepositorySimulator) AddSuccinctRoles(delegatorName string, bitLength 
 		slog.Error("Can't add a SuccinctRoles when delegated roles are used")
 		os.Exit(1)
 	}
-	publicKey, _, signer := CreateKey()
+	publicKey, _, signer := createKey()
 	mdkey, err := metadata.KeyFromPublicKey(*publicKey)
 	if err != nil {
 		slog.Error("Repository simulator: key conversion failed while adding succinct roles", "err", err)
