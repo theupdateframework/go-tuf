@@ -24,9 +24,9 @@ jobs:
     steps:
       - id: govulncheck
         uses: golang/govulncheck-action@3a32958c2706f7048305d5a2e53633d7e37e97d0
-        continue-on-error: true
         with:
-          go-version-file: 'go.mod'
+          go-version-input: ''
+          go-version-file: go.mod
           go-package: ./...
 
   golangci:
