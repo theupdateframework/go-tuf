@@ -64,7 +64,7 @@ func InitLocalEnv() error {
 func InitMetadataDir() (*RepositorySimulator, string, string, error) {
 	if err := InitLocalEnv(); err != nil {
 		slog.Error("Failed to initialize environment", "err", err)
-		os.Exit(1)
+		return nil, "", "", err
 	}
 
 	metadataDir := filepath.Join(LocalDir, metadataPath)
