@@ -148,7 +148,12 @@ func (update *Updater) onlineRefresh() error {
 // The metadata on disk are verified against the provided root though,
 // and expiration dates are verified.
 func (update *Updater) unsafeLocalRefresh() error {
-	// Root is already loaded
+	// Load any rotated roots from disk
+	err := update.loadRootFromDisk()
+	if err != nil {
+		return err
+	}
+
 	// load timestamp
 	var p = filepath.Join(update.cfg.LocalMetadataDir, metadata.TIMESTAMP)
 	data, err := update.loadLocalMetadata(p)
@@ -511,6 +516,45 @@ func (update *Updater) loadRoot() error {
 			if err != nil {
 				return err
 			}
+			// also persist versioned root for offline use (e.g., unsafe local mode)
+			versionedRootName := fmt.Sprintf("%d.%s", nextVersion, metadata.ROOT)
+			err = update.persistMetadata(versionedRootName, data)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// loadRootFromDisk loads root metadata from local disk. Sequentially loads and
+// verifies every newer root metadata version available on disk.
+// This is used by unsafe local mode to support root rotation when operating offline.
+func (update *Updater) loadRootFromDisk() error {
+	// calculate boundaries
+	lowerBound := update.trusted.Root.Signed.Version + 1
+	upperBound := lowerBound + update.cfg.MaxRootRotations
+
+	// loop until we find the latest available version of root on disk
+	for nextVersion := lowerBound; nextVersion < upperBound; nextVersion++ {
+		versionedRootName := fmt.Sprintf("%d.%s", nextVersion, metadata.ROOT)
+		rootPath := filepath.Join(update.cfg.LocalMetadataDir, fmt.Sprintf("%s.json", url.PathEscape(versionedRootName)))
+
+		// try to load versioned root from disk
+		data, err := os.ReadFile(rootPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				// no more root versions available on disk, stop the loop
+				break
+			}
+			// some other error occurred
+			return err
+		}
+
+		// verify and load the root metadata
+		_, err = update.trusted.UpdateRoot(data)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
