@@ -293,8 +293,8 @@ func TestUnsafeRefresh(t *testing.T) {
 	for _, role := range metadata.TOP_LEVEL_ROLE_NAMES {
 		var version int
 		if role == metadata.ROOT {
-			// The root file is written when the updater is
-			// created, so the version is reset.
+			// The root file on disk is version 1 (written when updater was created).
+			// Unsafe mode doesn't persist to disk, it only loads from disk.
 			version = 1
 		}
 		assertContentEquals(t, role, &version)
@@ -303,10 +303,56 @@ func TestUnsafeRefresh(t *testing.T) {
 	assert.Equal(t, metadata.ROOT, updater.trusted.Root.Signed.Type)
 	assert.Equal(t, metadata.SPECIFICATION_VERSION, updater.trusted.Root.Signed.SpecVersion)
 	assert.True(t, updater.trusted.Root.Signed.ConsistentSnapshot)
-	assert.Equal(t, int64(1), updater.trusted.Root.Signed.Version)
+	// However, the in-memory trusted root should be version 2 after loading from disk
+	assert.Equal(t, int64(2), updater.trusted.Root.Signed.Version)
 	assert.NotNil(t, updater.trusted.Snapshot)
 	assert.NotNil(t, updater.trusted.Timestamp)
 	assert.Equal(t, 1, len(updater.trusted.Targets))
+}
+
+func TestUnsafeRefreshWithRotatedRoots(t *testing.T) {
+	// First run a "real" refresh to establish initial metadata
+	err := loadOrResetTrustedRootMetadata()
+	assert.NoError(t, err)
+
+	updaterConfig, err := loadUpdaterConfig()
+	assert.NoError(t, err)
+	_, err = runRefresh(updaterConfig, time.Now())
+	assert.NoError(t, err)
+	assertFilesExist(t, metadata.TOP_LEVEL_ROLE_NAMES[:])
+
+	// Bump root version without changing keys (simpler test case)
+	// This tests if unsafe mode can handle multiple root versions on disk
+	simulator.Sim.MDRoot.Signed.Version = 2
+	simulator.Sim.PublishRoot()
+
+	simulator.Sim.MDRoot.Signed.Version = 3
+	simulator.Sim.PublishRoot()
+
+	// Run another refresh in online mode to download the new root versions
+	// This ensures root.2.json and root.3.json are in the local cache
+	updaterConfig, err = loadUpdaterConfig()
+	assert.NoError(t, err)
+	onlineUpdater, err := runRefresh(updaterConfig, time.Now())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(3), onlineUpdater.trusted.Root.Signed.Version)
+
+	// Now create a new unsafe updater with the original trusted root (version 1)
+	// and verify it loads the rotated roots from disk
+	updaterConfig, err = loadUnsafeUpdaterConfig()
+	assert.NoError(t, err)
+	unsafeUpdater, err := runRefresh(updaterConfig, time.Now())
+	assert.NoError(t, err)
+
+	// The key assertion: unsafe mode should load rotated roots from disk
+	// and end up with the latest root version
+	assert.Equal(t, int64(3), unsafeUpdater.trusted.Root.Signed.Version,
+		"Unsafe local mode should load rotated roots from disk")
+
+	// Verify the other metadata is properly loaded
+	assert.NotNil(t, unsafeUpdater.trusted.Timestamp)
+	assert.NotNil(t, unsafeUpdater.trusted.Snapshot)
+	assert.Equal(t, 1, len(unsafeUpdater.trusted.Targets))
 }
 
 func TestTrustedRootMissing(t *testing.T) {
