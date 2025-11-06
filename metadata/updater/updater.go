@@ -102,7 +102,9 @@ func New(config *config.UpdaterConfig) (*Updater, error) {
 // Downloads, verifies, and loads metadata for the top-level roles in the
 // specified order (root -> timestamp -> snapshot -> targets) implementing
 // all the checks required in the TUF client workflow.
-// A Refresh() can be done only once during the lifetime of an Updater.
+// Refresh() can be called multiple times during the lifetime of an Updater
+// to ensure that the metadata is up-to-date. Each call will reload the
+// timestamp, snapshot, and targets metadata while preserving the root metadata.
 // If Refresh() has not been explicitly called before the first
 // GetTargetInfo() call, it will be done implicitly at that time.
 // The metadata for delegated roles is not updated by Refresh():
@@ -135,6 +137,9 @@ func (update *Updater) onlineRefresh() error {
 	if err != nil {
 		return err
 	}
+	// Remove the targets entry to allow re-loading during multiple Refresh() calls
+	// while still preventing redundant loads during GetTargetInfo()
+	delete(update.trusted.Targets, metadata.TARGETS)
 	_, err = update.loadTargets(metadata.TARGETS, metadata.ROOT)
 	if err != nil {
 		return err
@@ -313,12 +318,16 @@ func (update *Updater) loadTimestamp() error {
 			if errors.Is(err, &metadata.ErrRepository{}) {
 				// local timestamp is not valid, proceed downloading from remote; note that this error type includes several other subset errors
 				log.Info("Local timestamp is not valid")
+			} else if errors.Is(err, &metadata.ErrEqualVersionNumber{}) {
+				// local timestamp version equals current trusted version, proceed to check remote for updates
+				log.Info("Local timestamp version equals trusted version")
 			} else {
 				// another error
 				return err
 			}
+		} else {
+			log.Info("Local timestamp is valid")
 		}
-		log.Info("Local timestamp is valid")
 		// all okay, local timestamp exists and it is valid, nevertheless proceed with downloading from remote
 	}
 	// load from remote (whether local load succeeded or not)
@@ -368,12 +377,12 @@ func (update *Updater) loadSnapshot() error {
 			}
 		} else {
 			// this means snapshot verification/loading succeeded
-			log.Info("Local snapshot is valid: not downloading new one")
-			return nil
+			log.Info("Local snapshot is valid")
+			// Continue to check remote for potential updates
 		}
 	}
-	// local snapshot does not exist or is invalid, update from remote
-	log.Info("Failed to load local snapshot")
+	// check remote for updates (whether local load succeeded or not)
+	log.Info("Checking remote for snapshot updates")
 	if update.trusted.Timestamp == nil {
 		return fmt.Errorf("trusted timestamp not set")
 	}
@@ -422,7 +431,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 		log.Info("Local role does not exist", "role", roleName)
 	} else {
 		// successfully read a local targets metadata, so let's try to verify and load it to the trusted metadata set
-		delegatedTargets, err := update.trusted.UpdateDelegatedTargets(data, roleName, parentName)
+		_, err := update.trusted.UpdateDelegatedTargets(data, roleName, parentName)
 		if err != nil {
 			// this means targets verification/loading failed
 			if errors.Is(err, &metadata.ErrRepository{}) {
@@ -434,12 +443,12 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 			}
 		} else {
 			// this means targets verification/loading succeeded
-			log.Info("Local role is valid: not downloading new one", "role", roleName)
-			return delegatedTargets, nil
+			log.Info("Local role is valid", "role", roleName)
+			// Continue to check remote for potential updates
 		}
 	}
-	// local "roleName" does not exist or is invalid, update from remote
-	log.Info("Failed to load local role", "role", roleName)
+	// check remote for updates (whether local load succeeded or not)
+	log.Info("Checking remote for role updates", "role", roleName)
 	if update.trusted.Snapshot == nil {
 		return nil, fmt.Errorf("trusted snapshot not set")
 	}

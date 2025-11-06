@@ -57,9 +57,6 @@ func New(rootData []byte) (*TrustedMetadata, error) {
 func (trusted *TrustedMetadata) UpdateRoot(rootData []byte) (*metadata.Metadata[metadata.RootType], error) {
 	log := metadata.GetLogger()
 
-	if trusted.Timestamp != nil {
-		return nil, &metadata.ErrRuntime{Msg: "cannot update root after timestamp"}
-	}
 	log.Info("Updating root")
 	// generate root metadata
 	newRoot, err := metadata.Root().FromBytes(rootData)
@@ -99,9 +96,6 @@ func (trusted *TrustedMetadata) UpdateRoot(rootData []byte) (*metadata.Metadata[
 func (trusted *TrustedMetadata) UpdateTimestamp(timestampData []byte) (*metadata.Metadata[metadata.TimestampType], error) {
 	log := metadata.GetLogger()
 
-	if trusted.Snapshot != nil {
-		return nil, &metadata.ErrRuntime{Msg: "cannot update timestamp after snapshot"}
-	}
 	// client workflow 5.3.10: Make sure final root is not expired.
 	if trusted.Root.Signed.IsExpired(trusted.RefTime) {
 		// no need to check for 5.3.11 (fast forward attack recovery):
@@ -177,9 +171,6 @@ func (trusted *TrustedMetadata) UpdateSnapshot(snapshotData []byte, isTrusted bo
 
 	if trusted.Timestamp == nil {
 		return nil, &metadata.ErrRuntime{Msg: "cannot update snapshot before timestamp"}
-	}
-	if trusted.Targets[metadata.TARGETS] != nil {
-		return nil, &metadata.ErrRuntime{Msg: "cannot update snapshot after targets"}
 	}
 	log.Info("Updating snapshot")
 

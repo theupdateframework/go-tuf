@@ -1081,3 +1081,81 @@ func TestTimestampEqVersionsCheck(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, initialTimestampMetadataVer, timestamp.Signed.Meta["snapshot.json"].Version)
 }
+
+func TestMultipleRefreshCalls(t *testing.T) {
+	// Test that Refresh() can be called multiple times on the same Updater instance
+	// and that it successfully updates metadata when changes are available.
+
+	err := loadOrResetTrustedRootMetadata()
+	assert.NoError(t, err)
+
+	updaterConfig, err := loadUpdaterConfig()
+	assert.NoError(t, err)
+
+	// Create an updater and perform first refresh
+	updater := initUpdater(updaterConfig)
+	err = updater.Refresh()
+	assert.NoError(t, err)
+
+	// Verify initial versions
+	assertVersionEquals(t, metadata.TIMESTAMP, 1)
+	assertVersionEquals(t, metadata.SNAPSHOT, 1)
+	assertVersionEquals(t, metadata.TARGETS, 1)
+
+	// Update metadata on the repository
+	simulator.Sim.MDTargets.Signed.Version += 1
+	simulator.Sim.UpdateSnapshot()
+
+	// Call Refresh() again on the same updater instance
+	err = updater.Refresh()
+	assert.NoError(t, err)
+
+	// Verify that metadata was updated
+	assertVersionEquals(t, metadata.TIMESTAMP, 2)
+	assertVersionEquals(t, metadata.SNAPSHOT, 2)
+	assertVersionEquals(t, metadata.TARGETS, 2)
+
+	// Update metadata again
+	simulator.Sim.MDTargets.Signed.Version += 1
+	simulator.Sim.UpdateSnapshot()
+
+	// Call Refresh() a third time
+	err = updater.Refresh()
+	assert.NoError(t, err)
+
+	// Verify that metadata was updated again
+	assertVersionEquals(t, metadata.TIMESTAMP, 3)
+	assertVersionEquals(t, metadata.SNAPSHOT, 3)
+	assertVersionEquals(t, metadata.TARGETS, 3)
+}
+
+func TestMultipleRefreshCallsNoChanges(t *testing.T) {
+	// Test that Refresh() can be called multiple times even when there are no changes
+	// and returns nil (not an error) when everything is already up-to-date.
+
+	err := loadOrResetTrustedRootMetadata()
+	assert.NoError(t, err)
+
+	updaterConfig, err := loadUpdaterConfig()
+	assert.NoError(t, err)
+
+	// Create an updater and perform first refresh
+	updater := initUpdater(updaterConfig)
+	err = updater.Refresh()
+	assert.NoError(t, err)
+
+	// Verify initial versions
+	assertVersionEquals(t, metadata.TIMESTAMP, 1)
+	assertVersionEquals(t, metadata.SNAPSHOT, 1)
+	assertVersionEquals(t, metadata.TARGETS, 1)
+
+	// Call Refresh() again without any changes
+	// Should return nil (no error) since everything is up-to-date
+	err = updater.Refresh()
+	assert.NoError(t, err)
+
+	// Verify versions haven't changed
+	assertVersionEquals(t, metadata.TIMESTAMP, 1)
+	assertVersionEquals(t, metadata.SNAPSHOT, 1)
+	assertVersionEquals(t, metadata.TARGETS, 1)
+}

@@ -227,9 +227,10 @@ func TestOutOfOrderOps(t *testing.T) {
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
 	assert.NoError(t, err)
 
-	// Update root after timestamp
+	// Update root after timestamp is now allowed (for multiple Refresh() calls)
+	// but will fail due to version number check (expects v2, has v1)
 	_, err = trustedSet.UpdateRoot(allRoles[metadata.ROOT])
-	assert.ErrorIs(t, err, &metadata.ErrRuntime{Msg: "cannot update root after timestamp"})
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "bad version number, expected 2, got 1"})
 
 	// Update targets before snapshot
 	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
@@ -238,9 +239,10 @@ func TestOutOfOrderOps(t *testing.T) {
 	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
 	assert.NoError(t, err)
 
-	// Update timestamp after snapshot
+	// Update timestamp after snapshot is now allowed (for multiple Refresh() calls)
+	// and will succeed since versions are equal
 	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.ErrorIs(t, err, &metadata.ErrRuntime{Msg: "cannot update timestamp after snapshot"})
+	assert.ErrorIs(t, err, &metadata.ErrEqualVersionNumber{Msg: "new timestamp version 1 equals the old one 1"})
 
 	// Update delegated targets before targets
 	_, err = trustedSet.UpdateDelegatedTargets(allRoles["role1"], "role1", metadata.TARGETS)
@@ -249,9 +251,10 @@ func TestOutOfOrderOps(t *testing.T) {
 	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
 	assert.NoError(t, err)
 
-	//  Update snapshot after sucessful targets update
+	//  Update snapshot after targets is now allowed (for multiple Refresh() calls)
+	// and will succeed since versions are equal
 	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.ErrorIs(t, err, &metadata.ErrRuntime{Msg: "cannot update snapshot after targets"})
+	assert.NoError(t, err)
 
 	_, err = trustedSet.UpdateDelegatedTargets(allRoles["role1"], "role1", metadata.TARGETS)
 	assert.NoError(t, err)
