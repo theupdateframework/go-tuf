@@ -605,7 +605,7 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 		if errRemove != nil {
 			log.Info("Failed to delete temporary file", "name", file.Name())
 		}
-		return err
+		return errors.Join(err, errRemove)
 	}
 	// write the data content to the temporary file
 	_, err = file.Write(data)
@@ -616,7 +616,7 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 		if errRemove != nil {
 			log.Info("Failed to delete temporary file", "name", file.Name())
 		}
-		return err
+		return errors.Join(err, errRemove)
 	}
 
 	// can't move/rename an open file on windows, so close it first
