@@ -570,7 +570,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 			// onto delegationsToVisit. Roles are popped from the end of
 			// the list
 			slices.Reverse(childRolesToVisit)
-			delegationsToVisit = append(delegationsToVisit, childRolesToVisit...)
+			delegationsToVisit = slices.Concat(delegationsToVisit, childRolesToVisit)
 		}
 	}
 	if len(delegationsToVisit) > 0 {
