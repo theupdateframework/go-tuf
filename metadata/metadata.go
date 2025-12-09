@@ -619,7 +619,7 @@ func (role *SuccinctRoles) GetRoles() []string {
 	res := []string{}
 	suffixLen, numberOfBins := role.GetSuffixLen()
 
-	for binNumber := 0; binNumber < numberOfBins; binNumber++ {
+	for binNumber := range numberOfBins {
 		suffix := fmt.Sprintf("%0*x", suffixLen, binNumber)
 		res = append(res, fmt.Sprintf("%s-%s", role.NamePrefix, suffix))
 	}
