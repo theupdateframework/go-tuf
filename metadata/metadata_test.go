@@ -592,25 +592,23 @@ func TestVerifyDelegate(t *testing.T) {
 		},
 		Roles: []DelegatedRole{
 			{
-				Name:   "test",
-				KeyIDs: []string{delegateeKey.ID()},
+				Name:      "test",
+				KeyIDs:    []string{delegateeKey.ID()},
+				Threshold: 1,
 			},
 		},
 	}
+
 	targets.Signed.Delegations = delegations
-	err = targets.VerifyDelegate("test", root)
-	assert.NoError(t, err)
+	err = targets.VerifyDelegate("root", targets)
+	assert.Errorf(t, err, "Verifying test failed, not enough signatures, got %d, want %d", 0, 1)
 	err = targets.VerifyDelegate("test", targets)
-	assert.NoError(t, err)
+	assert.Errorf(t, err, "Verifying test failed, not enough signatures, got %d, want %d", 0, 1)
 
 	err = targets.VerifyDelegate("non-existing", root)
 	assert.EqualError(t, err, "value error: no delegation found for non-existing")
 	err = targets.VerifyDelegate("non-existing", targets)
 	assert.EqualError(t, err, "value error: no delegation found for non-existing")
-
-	targets.Signed.Delegations.Roles[0].Threshold = 1
-	err = targets.VerifyDelegate("test", targets)
-	assert.Errorf(t, err, "Verifying test failed, not enough signatures, got %d, want %d", 0, 1)
 
 	delegations.Keys["incorrectkey"] = delegations.Keys[delegateeKey.ID()]
 	delete(delegations.Keys, delegateeKey.ID())
@@ -624,6 +622,40 @@ func TestVerifyDelegate(t *testing.T) {
 	snapshot := Snapshot(fixedExpire)
 	err = snapshot.VerifyDelegate("test", snapshot)
 	assert.EqualError(t, err, "type error: call is valid only on delegator metadata (should be either root or targets)")
+}
+
+func TestVerifyDelegateThreshold(t *testing.T) {
+	root := Root(fixedExpire)
+	err := root.VerifyDelegate("test", root)
+	assert.EqualError(t, err, "value error: no delegation found for test")
+
+	targets := Targets(fixedExpire)
+	err = targets.VerifyDelegate("test", targets)
+	assert.EqualError(t, err, "value error: no delegations found")
+
+	key, _, err := ed25519.GenerateKey(nil)
+	assert.NoError(t, err)
+
+	delegateeKey, _ := KeyFromPublicKey(key)
+	delegations := &Delegations{
+		Keys: map[string]*Key{
+			delegateeKey.ID(): delegateeKey,
+		},
+		Roles: []DelegatedRole{
+			{
+				Name:      "test",
+				KeyIDs:    []string{delegateeKey.ID()},
+				Threshold: 0,
+			},
+		},
+	}
+	targets.Signed.Delegations = delegations
+	err = targets.VerifyDelegate("test", root)
+	assert.ErrorIs(t, err, &ErrValue{})
+	assert.EqualError(t, err, "value error: insufficient threshold (0) configured for test")
+	err = targets.VerifyDelegate("test", targets)
+	assert.ErrorIs(t, err, &ErrValue{})
+	assert.EqualError(t, err, "value error: insufficient threshold (0) configured for test")
 }
 
 func TestVerifyLengthHashesTargetFiles(t *testing.T) {

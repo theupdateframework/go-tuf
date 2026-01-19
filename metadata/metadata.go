@@ -292,6 +292,13 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 	if len(roleKeyIDs) == 0 {
 		return &ErrValue{Msg: fmt.Sprintf("no delegation found for %s", delegatedRole)}
 	}
+
+	if roleThreshold < 1 {
+		return &ErrValue{Msg: fmt.Sprintf("insufficient threshold (%d) configured for %s",
+			roleThreshold,
+			delegatedRole)}
+	}
+
 	// loop through each role keyID
 	for _, keyID := range roleKeyIDs {
 		key, ok := keys[keyID]
