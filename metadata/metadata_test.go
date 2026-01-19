@@ -598,20 +598,17 @@ func TestVerifyDelegate(t *testing.T) {
 			},
 		},
 	}
+
 	targets.Signed.Delegations = delegations
-	err = targets.VerifyDelegate("test", root)
-	assert.NoError(t, err)
+	err = targets.VerifyDelegate("root", targets)
+	assert.Errorf(t, err, "Verifying test failed, not enough signatures, got %d, want %d", 0, 1)
 	err = targets.VerifyDelegate("test", targets)
-	assert.NoError(t, err)
+	assert.Errorf(t, err, "Verifying test failed, not enough signatures, got %d, want %d", 0, 1)
 
 	err = targets.VerifyDelegate("non-existing", root)
 	assert.EqualError(t, err, "value error: no delegation found for non-existing")
 	err = targets.VerifyDelegate("non-existing", targets)
 	assert.EqualError(t, err, "value error: no delegation found for non-existing")
-
-	targets.Signed.Delegations.Roles[0].Threshold = 1
-	err = targets.VerifyDelegate("test", targets)
-	assert.Errorf(t, err, "Verifying test failed, not enough signatures, got %d, want %d", 0, 1)
 
 	delegations.Keys["incorrectkey"] = delegations.Keys[delegateeKey.ID()]
 	delete(delegations.Keys, delegateeKey.ID())
