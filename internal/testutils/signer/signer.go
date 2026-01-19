@@ -187,7 +187,15 @@ func getTUFMDRole(p string) (string, error) {
 	if err := json.Unmarshal(mdBytes, &m); err != nil {
 		return "", fmt.Errorf("failed to parse TUF metadata: %w", err)
 	}
-	signedType := m["signed"].(map[string]any)["_type"].(string)
+	signed, ok := m["signed"].(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("metadata 'signed' field is missing or not an object")
+	}
+	signedType, ok := signed["_type"].(string)
+	if !ok {
+		return "", fmt.Errorf("no _type found in signed")
+	}
+
 	switch signedType {
 	case metadata.ROOT:
 		fallthrough
