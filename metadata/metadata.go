@@ -900,7 +900,15 @@ func checkType[T Roles](data []byte) error {
 	if err := json.Unmarshal(data, &m); err != nil {
 		return err
 	}
-	signedType := m["signed"].(map[string]any)["_type"].(string)
+	signed, ok := m["signed"].(map[string]any)
+	if !ok {
+		return &ErrValue{Msg: "metadata 'signed' field is missing or not an object"}
+	}
+	signedType, ok := signed["_type"].(string)
+	if !ok {
+		return &ErrValue{Msg: "no _type found in signed"}
+	}
+
 	switch i.(type) {
 	case *RootType:
 		if ROOT != signedType {
