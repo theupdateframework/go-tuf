@@ -189,7 +189,7 @@ func getTUFMDRole(p string) (string, error) {
 	}
 	signed, ok := m["signed"].(map[string]any)
 	if !ok {
-		return "", &ErrValue{Msg: "metadata 'signed' field is missing or not an object"}
+		return "", fmt.Errorf("metadata 'signed' field is missing or not an object")
 	}
 	signedType, ok := signed["_type"].(string)
 	if !ok {
