@@ -54,6 +54,78 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
+func TestCheckTypeMalformedMetadata(t *testing.T) {
+	// Test that malformed metadata returns errors instead of panicking
+	testCases := []struct {
+		name        string
+		input       string
+		expectedErr string
+	}{
+		{
+			name:        "empty object",
+			input:       "{}",
+			expectedErr: "metadata 'signed' field is missing or not an object",
+		},
+		{
+			name:        "signed is null",
+			input:       `{"signed": null}`,
+			expectedErr: "metadata 'signed' field is missing or not an object",
+		},
+		{
+			name:        "signed is string",
+			input:       `{"signed": "not_a_map"}`,
+			expectedErr: "metadata 'signed' field is missing or not an object",
+		},
+		{
+			name:        "signed is number",
+			input:       `{"signed": 123}`,
+			expectedErr: "metadata 'signed' field is missing or not an object",
+		},
+		{
+			name:        "signed is array",
+			input:       `{"signed": [1, 2, 3]}`,
+			expectedErr: "metadata 'signed' field is missing or not an object",
+		},
+		{
+			name:        "signed missing _type",
+			input:       `{"signed": {}}`,
+			expectedErr: "metadata '_type' field is missing or not a string",
+		},
+		{
+			name:        "_type is null",
+			input:       `{"signed": {"_type": null}}`,
+			expectedErr: "metadata '_type' field is missing or not a string",
+		},
+		{
+			name:        "_type is number",
+			input:       `{"signed": {"_type": 123}}`,
+			expectedErr: "metadata '_type' field is missing or not a string",
+		},
+		{
+			name:        "_type is object",
+			input:       `{"signed": {"_type": {}}}`,
+			expectedErr: "metadata '_type' field is missing or not a string",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Test with all metadata types to ensure none panic
+			_, err := Root().FromBytes([]byte(tc.input))
+			assert.ErrorIs(t, err, &ErrValue{tc.expectedErr})
+
+			_, err = Snapshot().FromBytes([]byte(tc.input))
+			assert.ErrorIs(t, err, &ErrValue{tc.expectedErr})
+
+			_, err = Targets().FromBytes([]byte(tc.input))
+			assert.ErrorIs(t, err, &ErrValue{tc.expectedErr})
+
+			_, err = Timestamp().FromBytes([]byte(tc.input))
+			assert.ErrorIs(t, err, &ErrValue{tc.expectedErr})
+		})
+	}
+}
+
 func TestGenericRead(t *testing.T) {
 	// Assert that it chokes correctly on an unknown metadata type
 	badMetadata := "{\"signed\": {\"_type\": \"bad-metadata\"}}"
