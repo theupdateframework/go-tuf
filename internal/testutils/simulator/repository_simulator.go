@@ -172,7 +172,12 @@ func (rs *RepositorySimulator) setupMinimalValidRepository() {
 		if err = rs.MDRoot.Signed.AddKey(mtdkey, role); err != nil {
 			slog.Error("Repository simulator: failed to add key", "err", err)
 		}
-		rs.AddSigner(role, mtdkey.ID(), *signer)
+		keyID, err := mtdkey.ID()
+		if err != nil {
+			slog.Error("Repository simulator: failed to get key ID", "err", err)
+			os.Exit(1)
+		}
+		rs.AddSigner(role, keyID, *signer)
 	}
 
 	rs.PublishRoot()
@@ -250,7 +255,12 @@ func (rs *RepositorySimulator) RotateKeys(role string) {
 		if err = rs.MDRoot.Signed.AddKey(mtdkey, role); err != nil {
 			slog.Error("Repository simulator: failed to add key", "err", err)
 		}
-		rs.AddSigner(role, mtdkey.ID(), *signer)
+		keyID, err := mtdkey.ID()
+		if err != nil {
+			slog.Error("Repository simulator: failed to get key ID", "err", err)
+			os.Exit(1)
+		}
+		rs.AddSigner(role, keyID, *signer)
 	}
 }
 
@@ -561,7 +571,12 @@ func (rs *RepositorySimulator) AddDelegation(delegatorName string, role metadata
 	if err = delegator.AddKey(mdkey, role.Name); err != nil {
 		slog.Error("Repository simulator: failed to add key", "err", err)
 	}
-	rs.AddSigner(role.Name, mdkey.ID(), *signer)
+	keyID, err := mdkey.ID()
+	if err != nil {
+		slog.Error("Repository simulator: failed to get key ID", "err", err)
+		os.Exit(1)
+	}
+	rs.AddSigner(role.Name, keyID, *signer)
 	if _, ok := rs.MDDelegates[role.Name]; !ok {
 		rs.MDDelegates[role.Name] = metadata.Metadata[metadata.TargetsType]{
 			Signed:             targets,
@@ -586,6 +601,11 @@ func (rs *RepositorySimulator) AddSuccinctRoles(delegatorName string, bitLength 
 		slog.Error("Repository simulator: key conversion failed while adding succinct roles", "err", err)
 		os.Exit(1)
 	}
+	keyID, err := mdkey.ID()
+	if err != nil {
+		slog.Error("Repository simulator: failed to get key ID", "err", err)
+		os.Exit(1)
+	}
 	succinctRoles := &metadata.SuccinctRoles{
 		KeyIDs:     []string{},
 		Threshold:  1,
@@ -600,7 +620,7 @@ func (rs *RepositorySimulator) AddSuccinctRoles(delegatorName string, bitLength 
 				Expires: rs.SafeExpiry,
 			},
 		}
-		rs.AddSigner(delegatedName, mdkey.ID(), *signer)
+		rs.AddSigner(delegatedName, keyID, *signer)
 	}
 	if err = delegator.AddKey(mdkey, metadata.TARGETS); err != nil {
 		slog.Error("Repository simulator: failed to add key", "err", err)

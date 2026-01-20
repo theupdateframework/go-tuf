@@ -586,14 +586,16 @@ func TestVerifyDelegate(t *testing.T) {
 	assert.NoError(t, err)
 
 	delegateeKey, _ := KeyFromPublicKey(key)
+	delegateeKeyID, err := delegateeKey.ID()
+	assert.NoError(t, err)
 	delegations := &Delegations{
 		Keys: map[string]*Key{
-			delegateeKey.ID(): delegateeKey,
+			delegateeKeyID: delegateeKey,
 		},
 		Roles: []DelegatedRole{
 			{
 				Name:      "test",
-				KeyIDs:    []string{delegateeKey.ID()},
+				KeyIDs:    []string{delegateeKeyID},
 				Threshold: 1,
 			},
 		},
@@ -610,10 +612,10 @@ func TestVerifyDelegate(t *testing.T) {
 	err = targets.VerifyDelegate("non-existing", targets)
 	assert.EqualError(t, err, "value error: no delegation found for non-existing")
 
-	delegations.Keys["incorrectkey"] = delegations.Keys[delegateeKey.ID()]
-	delete(delegations.Keys, delegateeKey.ID())
+	delegations.Keys["incorrectkey"] = delegations.Keys[delegateeKeyID]
+	delete(delegations.Keys, delegateeKeyID)
 	err = targets.VerifyDelegate("test", root)
-	assert.Errorf(t, err, "key with ID %s not found in test keyids", delegateeKey.ID())
+	assert.Errorf(t, err, "key with ID %s not found in test keyids", delegateeKeyID)
 
 	timestamp := Timestamp(fixedExpire)
 	err = timestamp.VerifyDelegate("test", timestamp)
@@ -637,14 +639,16 @@ func TestVerifyDelegateThreshold(t *testing.T) {
 	assert.NoError(t, err)
 
 	delegateeKey, _ := KeyFromPublicKey(key)
+	delegateeKeyID, err := delegateeKey.ID()
+	assert.NoError(t, err)
 	delegations := &Delegations{
 		Keys: map[string]*Key{
-			delegateeKey.ID(): delegateeKey,
+			delegateeKeyID: delegateeKey,
 		},
 		Roles: []DelegatedRole{
 			{
 				Name:      "test",
-				KeyIDs:    []string{delegateeKey.ID()},
+				KeyIDs:    []string{delegateeKeyID},
 				Threshold: 0,
 			},
 		},
