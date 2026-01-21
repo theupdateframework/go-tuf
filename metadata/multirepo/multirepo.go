@@ -51,7 +51,12 @@ type MultiRepoConfig struct {
 	DisableLocalCache bool
 }
 
-// MultiRepoClient represents a multi-repository TUF client
+// MultiRepoClient represents a multi-repository TUF client.
+//
+// Thread Safety: MultiRepoClient is NOT safe for concurrent use. If multiple
+// goroutines need to use a MultiRepoClient concurrently, external synchronization
+// is required (e.g., a sync.Mutex). Alternatively, create separate MultiRepoClient
+// instances for each goroutine.
 type MultiRepoClient struct {
 	TUFClients map[string]*updater.Updater
 	Config     *MultiRepoConfig
@@ -346,7 +351,12 @@ func (cfg *MultiRepoConfig) EnsurePathsExist() error {
 		return nil
 	}
 	for _, path := range []string{cfg.LocalMetadataDir, cfg.LocalTargetsDir} {
-		err := os.MkdirAll(path, os.ModePerm)
+		// Use 0700 for cache directories: only the owner can read, write, and
+		// access the directory. This prevents other users on shared systems from
+		// reading or writing to the TUF cache, which could be a security risk.
+		// If different permissions are needed, pre-create the directories with
+		// the desired permissions before calling this function.
+		err := os.MkdirAll(path, 0700)
 		if err != nil {
 			return err
 		}
