@@ -51,7 +51,12 @@ type MultiRepoConfig struct {
 	DisableLocalCache bool
 }
 
-// MultiRepoClient represents a multi-repository TUF client
+// MultiRepoClient represents a multi-repository TUF client.
+//
+// Thread Safety: MultiRepoClient is NOT safe for concurrent use. If multiple
+// goroutines need to use a MultiRepoClient concurrently, external synchronization
+// is required (e.g., a sync.Mutex). Alternatively, create separate MultiRepoClient
+// instances for each goroutine.
 type MultiRepoClient struct {
 	TUFClients map[string]*updater.Updater
 	Config     *MultiRepoConfig
