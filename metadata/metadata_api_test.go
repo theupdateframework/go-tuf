@@ -1069,3 +1069,41 @@ func TestGetRolesInSuccinctRoles(t *testing.T) {
 		assert.Equal(t, fmt.Sprintf("bin-%s", expectedBinSuffix), roleName)
 	}
 }
+
+func TestSuccinctRolesBitLengthValidation(t *testing.T) {
+	tests := []struct {
+		name      string
+		bitLength int
+		wantErr   bool
+	}{
+		{"valid minimum", 1, false},
+		{"valid typical", 8, false},
+		{"valid maximum", 32, false},
+		{"invalid zero", 0, true},
+		{"invalid negative", -1, true},
+		{"invalid too large", 33, true},
+		{"invalid very large", 100, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			jsonData := fmt.Sprintf(`{
+				"keyids": ["abc123"],
+				"threshold": 1,
+				"bit_length": %d,
+				"name_prefix": "bin"
+			}`, tt.bitLength)
+
+			var role SuccinctRoles
+			err := json.Unmarshal([]byte(jsonData), &role)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "invalid bit_length")
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.bitLength, role.BitLength)
+			}
+		})
+	}
+}
