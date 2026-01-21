@@ -326,14 +326,18 @@ func main() {
 	// all configuration parameters see
 	// https://theupdateframework.github.io/specification/latest/#delegations
 	delegateeKey, _ := metadata.KeyFromPublicKey(delegateePrivateKey.Public())
+	delegateeKeyID, err := delegateeKey.ID()
+	if err != nil {
+		panic(fmt.Sprintln("basic_repository.go:", "failed to get key ID", err))
+	}
 	roles.Targets("targets").Signed.Delegations = &metadata.Delegations{
 		Keys: map[string]*metadata.Key{
-			delegateeKey.ID(): delegateeKey,
+			delegateeKeyID: delegateeKey,
 		},
 		Roles: []metadata.DelegatedRole{
 			{
 				Name:        delegateeName,
-				KeyIDs:      []string{delegateeKey.ID()},
+				KeyIDs:      []string{delegateeKeyID},
 				Threshold:   1,
 				Terminating: true,
 				Paths:       []string{"*.go"},
@@ -432,7 +436,11 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintln("basic_repository.go:", "key conversion failed", err))
 	}
-	err = roles.Root().Signed.RevokeKey(oldRootKey.ID(), "root")
+	oldRootKeyID, err := oldRootKey.ID()
+	if err != nil {
+		panic(fmt.Sprintln("basic_repository.go:", "failed to get key ID", err))
+	}
+	err = roles.Root().Signed.RevokeKey(oldRootKeyID, "root")
 	if err != nil {
 		panic(fmt.Sprintln("basic_repository.go:", "revoking key failed", err))
 	}
