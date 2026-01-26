@@ -19,15 +19,28 @@ package multirepo
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"github.com/theupdateframework/go-tuf/v2/metadata/config"
 	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
+
+// ErrInvalidRepoName is returned when a repository name contains path traversal
+// components or is otherwise invalid for use as a directory name.
+var ErrInvalidRepoName = errors.New("invalid repository name")
+
+// validRepoNamePattern defines the allowed characters for repository names.
+// Names must start with an alphanumeric character and may contain alphanumeric
+// characters, dots, hyphens, and underscores. This prevents path traversal
+// attacks while allowing typical repository naming conventions.
+// Examples: "sigstore-tuf-root", "staging", "repo.v2", "my_repo_1"
+var validRepoNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`)
 
 // The following represent the map file described in TAP 4
 type Mapping struct {
@@ -101,6 +114,13 @@ func New(config *MultiRepoConfig) (*MultiRepoClient, error) {
 	client := &MultiRepoClient{
 		Config:     config,
 		TUFClients: map[string]*updater.Updater{},
+	}
+
+	// validate repository names before using them as filesystem paths
+	for repoName := range config.RepoMap.Repositories {
+		if err := validateRepoName(repoName); err != nil {
+			return nil, fmt.Errorf("repository %q: %w", repoName, err)
+		}
 	}
 
 	// create TUF clients for each repository listed in the map file
@@ -360,6 +380,17 @@ func (cfg *MultiRepoConfig) EnsurePathsExist() error {
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// validateRepoName checks that a repository name is safe to use as a directory
+// component. Repository names must start with an alphanumeric character and
+// contain only alphanumeric characters, dots, hyphens, and underscores.
+// This prevents path traversal attacks when the repository name is used in filepath.Join.
+func validateRepoName(name string) error {
+	if !validRepoNamePattern.MatchString(name) {
+		return fmt.Errorf("%w: %q must start with alphanumeric and contain only alphanumeric, '.', '-', or '_' characters", ErrInvalidRepoName, name)
 	}
 	return nil
 }
