@@ -666,13 +666,13 @@ func TestVerifyLengthHashesTargetFiles(t *testing.T) {
 	targetFiles := TargetFile()
 	targetFiles.Hashes = map[string]HexBytes{}
 
+	// Per TUF spec, empty hashes must be rejected
 	data := []byte{}
 	err := targetFiles.VerifyLengthHashes(data)
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "hashes must not be empty")
 
 	data = []byte("some data")
-	err = targetFiles.VerifyLengthHashes(data)
-	assert.Error(t, err, "length/hash verification error: length verification failed - expected 0, got 9")
 
 	h32 := sha256.Sum256(data)
 	h := h32[:]
@@ -711,4 +711,28 @@ func TestVerifyLengthHashesMetaFiles(t *testing.T) {
 	incorrectData := []byte("another data")
 	err = metaFile.VerifyLengthHashes(incorrectData)
 	assert.Error(t, err, "length/hash verification error: length verification failed - expected 0, got 9")
+}
+
+func TestTargetFilesEmptyHashesRejected(t *testing.T) {
+	// Per TUF spec, hashes are mandatory for target files.
+	// Targets metadata with empty hashes should be rejected at parse time.
+	targetsJSON := []byte(`{
+		"signatures": [],
+		"signed": {
+			"_type": "targets",
+			"expires": "2030-08-15T14:30:45Z",
+			"spec_version": "1.0.31",
+			"targets": {
+				"test.txt": {
+					"hashes": {},
+					"length": 100
+				}
+			},
+			"version": 1
+		}
+	}`)
+
+	_, err := Targets().FromBytes(targetsJSON)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "hashes must not be empty")
 }
