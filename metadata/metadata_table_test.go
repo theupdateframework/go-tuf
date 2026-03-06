@@ -33,73 +33,48 @@ func TestMetadataCreation(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		createFunc   func() interface{}
+		createFunc   func() any
 		expectedType string
-		wantErr      bool
 	}{
 		{
-			name: "Root creation with default expiry",
-			createFunc: func() interface{} {
-				return Root()
-			},
+			name:         "Root creation with default expiry",
+			createFunc:   func() any { return Root() },
 			expectedType: ROOT,
-			wantErr:      false,
 		},
 		{
-			name: "Root creation with fixed expiry",
-			createFunc: func() interface{} {
-				return Root(fixedExpire)
-			},
+			name:         "Root creation with fixed expiry",
+			createFunc:   func() any { return Root(fixedExpire) },
 			expectedType: ROOT,
-			wantErr:      false,
 		},
 		{
-			name: "Targets creation with default expiry",
-			createFunc: func() interface{} {
-				return Targets()
-			},
+			name:         "Targets creation with default expiry",
+			createFunc:   func() any { return Targets() },
 			expectedType: TARGETS,
-			wantErr:      false,
 		},
 		{
-			name: "Targets creation with fixed expiry",
-			createFunc: func() interface{} {
-				return Targets(fixedExpire)
-			},
+			name:         "Targets creation with fixed expiry",
+			createFunc:   func() any { return Targets(fixedExpire) },
 			expectedType: TARGETS,
-			wantErr:      false,
 		},
 		{
-			name: "Snapshot creation with default expiry",
-			createFunc: func() interface{} {
-				return Snapshot()
-			},
+			name:         "Snapshot creation with default expiry",
+			createFunc:   func() any { return Snapshot() },
 			expectedType: SNAPSHOT,
-			wantErr:      false,
 		},
 		{
-			name: "Snapshot creation with fixed expiry",
-			createFunc: func() interface{} {
-				return Snapshot(fixedExpire)
-			},
+			name:         "Snapshot creation with fixed expiry",
+			createFunc:   func() any { return Snapshot(fixedExpire) },
 			expectedType: SNAPSHOT,
-			wantErr:      false,
 		},
 		{
-			name: "Timestamp creation with default expiry",
-			createFunc: func() interface{} {
-				return Timestamp()
-			},
+			name:         "Timestamp creation with default expiry",
+			createFunc:   func() any { return Timestamp() },
 			expectedType: TIMESTAMP,
-			wantErr:      false,
 		},
 		{
-			name: "Timestamp creation with fixed expiry",
-			createFunc: func() interface{} {
-				return Timestamp(fixedExpire)
-			},
+			name:         "Timestamp creation with fixed expiry",
+			createFunc:   func() any { return Timestamp(fixedExpire) },
 			expectedType: TIMESTAMP,
-			wantErr:      false,
 		},
 	}
 
@@ -136,15 +111,10 @@ func TestMetadataCreation(t *testing.T) {
 }
 
 func TestMetadataFromBytes(t *testing.T) {
-	tempManager := helpers.NewTempDirManager()
-	defer tempManager.Cleanup(t)
-
-	// Create test metadata files
 	validRoot := helpers.CreateTestRootJSON(t)
 	validTargets := helpers.CreateTestTargetsJSON(t)
 	validSnapshot := helpers.CreateTestSnapshotJSON(t)
 	validTimestamp := helpers.CreateTestTimestampJSON(t)
-
 	invalidData := helpers.CreateInvalidJSON()
 
 	tests := []struct {
@@ -158,25 +128,21 @@ func TestMetadataFromBytes(t *testing.T) {
 			name:         "Valid Root from bytes",
 			metadataType: ROOT,
 			data:         validRoot,
-			wantErr:      false,
 		},
 		{
 			name:         "Valid Targets from bytes",
 			metadataType: TARGETS,
 			data:         validTargets,
-			wantErr:      false,
 		},
 		{
 			name:         "Valid Snapshot from bytes",
 			metadataType: SNAPSHOT,
 			data:         validSnapshot,
-			wantErr:      false,
 		},
 		{
 			name:         "Valid Timestamp from bytes",
 			metadataType: TIMESTAMP,
 			data:         validTimestamp,
-			wantErr:      false,
 		},
 		{
 			name:         "Empty data",
@@ -210,7 +176,6 @@ func TestMetadataFromBytes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var err error
-
 			switch tt.metadataType {
 			case ROOT:
 				_, err = Root().FromBytes(tt.data)
@@ -227,20 +192,16 @@ func TestMetadataFromBytes(t *testing.T) {
 				if tt.errorMsg != "" {
 					assert.Contains(t, err.Error(), tt.errorMsg)
 				}
-			} else {
-				assert.NoError(t, err)
+				return
 			}
+			assert.NoError(t, err)
 		})
 	}
 }
 
 func TestMetadataFromFile(t *testing.T) {
-	tempManager := helpers.NewTempDirManager()
-	defer tempManager.Cleanup(t)
+	testDir := t.TempDir()
 
-	testDir := tempManager.CreateTempDir(t, "metadata_test")
-
-	// Create test files
 	validRoot := helpers.CreateTestRootJSON(t)
 	validTargets := helpers.CreateTestTargetsJSON(t)
 
@@ -259,13 +220,11 @@ func TestMetadataFromFile(t *testing.T) {
 			name:         "Valid Root from file",
 			metadataType: ROOT,
 			filePath:     rootFile,
-			wantErr:      false,
 		},
 		{
 			name:         "Valid Targets from file",
 			metadataType: TARGETS,
 			filePath:     targetsFile,
-			wantErr:      false,
 		},
 		{
 			name:         "Non-existent file",
@@ -293,7 +252,6 @@ func TestMetadataFromFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var err error
-
 			switch tt.metadataType {
 			case ROOT:
 				_, err = Root().FromFile(tt.filePath)
@@ -310,9 +268,9 @@ func TestMetadataFromFile(t *testing.T) {
 				if tt.errorMsg != "" {
 					assert.Contains(t, err.Error(), tt.errorMsg)
 				}
-			} else {
-				assert.NoError(t, err)
+				return
 			}
+			assert.NoError(t, err)
 		})
 	}
 }
@@ -322,47 +280,23 @@ func TestMetadataToBytes(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		metadata interface{}
+		metadata any
 		compact  bool
 		wantErr  bool
 	}{
-		{
-			name:     "Root to bytes compact",
-			metadata: Root(expiry),
-			compact:  true,
-			wantErr:  false,
-		},
-		{
-			name:     "Root to bytes non-compact",
-			metadata: Root(expiry),
-			compact:  false,
-			wantErr:  false,
-		},
-		{
-			name:     "Targets to bytes",
-			metadata: Targets(expiry),
-			compact:  true,
-			wantErr:  false,
-		},
-		{
-			name:     "Snapshot to bytes",
-			metadata: Snapshot(expiry),
-			compact:  true,
-			wantErr:  false,
-		},
-		{
-			name:     "Timestamp to bytes",
-			metadata: Timestamp(expiry),
-			compact:  true,
-			wantErr:  false,
-		},
+		{name: "Root to bytes compact", metadata: Root(expiry), compact: true},
+		{name: "Root to bytes non-compact", metadata: Root(expiry), compact: false},
+		{name: "Targets to bytes", metadata: Targets(expiry), compact: true},
+		{name: "Snapshot to bytes", metadata: Snapshot(expiry), compact: true},
+		{name: "Timestamp to bytes", metadata: Timestamp(expiry), compact: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var data []byte
-			var err error
-
+			var (
+				data []byte
+				err  error
+			)
 			switch meta := tt.metadata.(type) {
 			case *Metadata[RootType]:
 				data, err = meta.ToBytes(tt.compact)
@@ -376,174 +310,116 @@ func TestMetadataToBytes(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.NotEmpty(t, data)
-
-				// Verify it's valid JSON
-				var jsonData interface{}
-				assert.NoError(t, json.Unmarshal(data, &jsonData))
+				return
 			}
+			assert.NoError(t, err)
+			assert.NotEmpty(t, data)
+
+			// Verify the output is valid JSON.
+			var jsonData any
+			assert.NoError(t, json.Unmarshal(data, &jsonData))
 		})
 	}
 }
 
 func TestMetadataToFile(t *testing.T) {
-	tempManager := helpers.NewTempDirManager()
-	defer tempManager.Cleanup(t)
-
-	testDir := tempManager.CreateTempDir(t, "metadata_test")
+	testDir := t.TempDir()
 	expiry := time.Now().UTC().Add(24 * time.Hour)
 
 	tests := []struct {
 		name     string
-		metadata interface{}
+		metadata any
 		filename string
 		compact  bool
 		wantErr  bool
 	}{
-		{
-			name:     "Root to file",
-			metadata: Root(expiry),
-			filename: "root.json",
-			compact:  false,
-			wantErr:  false,
-		},
-		{
-			name:     "Targets to file compact",
-			metadata: Targets(expiry),
-			filename: "targets.json",
-			compact:  true,
-			wantErr:  false,
-		},
-		{
-			name:     "Snapshot to file",
-			metadata: Snapshot(expiry),
-			filename: "snapshot.json",
-			compact:  false,
-			wantErr:  false,
-		},
-		{
-			name:     "Timestamp to file",
-			metadata: Timestamp(expiry),
-			filename: "timestamp.json",
-			compact:  false,
-			wantErr:  false,
-		},
+		{name: "Root to file", metadata: Root(expiry), filename: "root.json"},
+		{name: "Targets to file compact", metadata: Targets(expiry), filename: "targets.json", compact: true},
+		{name: "Snapshot to file", metadata: Snapshot(expiry), filename: "snapshot.json"},
+		{name: "Timestamp to file", metadata: Timestamp(expiry), filename: "timestamp.json"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filePath := filepath.Join(testDir, tt.filename)
+			path := filepath.Join(testDir, tt.filename)
 			var err error
-
 			switch meta := tt.metadata.(type) {
 			case *Metadata[RootType]:
-				err = meta.ToFile(filePath, tt.compact)
+				err = meta.ToFile(path, tt.compact)
 			case *Metadata[TargetsType]:
-				err = meta.ToFile(filePath, tt.compact)
+				err = meta.ToFile(path, tt.compact)
 			case *Metadata[SnapshotType]:
-				err = meta.ToFile(filePath, tt.compact)
+				err = meta.ToFile(path, tt.compact)
 			case *Metadata[TimestampType]:
-				err = meta.ToFile(filePath, tt.compact)
+				err = meta.ToFile(path, tt.compact)
 			}
 
 			if tt.wantErr {
 				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-
-				// Verify file was created and contains valid JSON
-				data, err := os.ReadFile(filePath)
-				assert.NoError(t, err)
-				var jsonData interface{}
-				assert.NoError(t, json.Unmarshal(data, &jsonData))
+				return
 			}
+			assert.NoError(t, err)
+
+			// Verify the file contains valid JSON.
+			raw, err := os.ReadFile(path)
+			assert.NoError(t, err)
+			var jsonData any
+			assert.NoError(t, json.Unmarshal(raw, &jsonData))
 		})
 	}
 }
 
 func TestMetadataRoundTrip(t *testing.T) {
-	tempManager := helpers.NewTempDirManager()
-	defer tempManager.Cleanup(t)
-
-	testDir := tempManager.CreateTempDir(t, "roundtrip_test")
+	testDir := t.TempDir()
 	expiry := time.Now().UTC().Add(24 * time.Hour)
 
 	tests := []struct {
 		name     string
-		metadata interface{}
+		metadata any
 		filename string
 	}{
-		{
-			name:     "Root roundtrip",
-			metadata: Root(expiry),
-			filename: "root.json",
-		},
-		{
-			name:     "Targets roundtrip",
-			metadata: Targets(expiry),
-			filename: "targets.json",
-		},
-		{
-			name:     "Snapshot roundtrip",
-			metadata: Snapshot(expiry),
-			filename: "snapshot.json",
-		},
-		{
-			name:     "Timestamp roundtrip",
-			metadata: Timestamp(expiry),
-			filename: "timestamp.json",
-		},
+		{name: "Root roundtrip", metadata: Root(expiry), filename: "root.json"},
+		{name: "Targets roundtrip", metadata: Targets(expiry), filename: "targets.json"},
+		{name: "Snapshot roundtrip", metadata: Snapshot(expiry), filename: "snapshot.json"},
+		{name: "Timestamp roundtrip", metadata: Timestamp(expiry), filename: "timestamp.json"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filePath := filepath.Join(testDir, tt.filename)
+			path := filepath.Join(testDir, tt.filename)
 
-			// Write metadata to file
 			switch meta := tt.metadata.(type) {
 			case *Metadata[RootType]:
-				assert.NoError(t, meta.ToFile(filePath, false))
-
-				// Read back and compare
-				loadedMeta, err := Root().FromFile(filePath)
+				assert.NoError(t, meta.ToFile(path, false))
+				loaded, err := Root().FromFile(path)
 				assert.NoError(t, err)
-
-				// Compare essential fields
-				assert.Equal(t, meta.Signed.Type, loadedMeta.Signed.Type)
-				assert.Equal(t, meta.Signed.Version, loadedMeta.Signed.Version)
-				assert.Equal(t, meta.Signed.SpecVersion, loadedMeta.Signed.SpecVersion)
+				assert.Equal(t, meta.Signed.Type, loaded.Signed.Type)
+				assert.Equal(t, meta.Signed.Version, loaded.Signed.Version)
+				assert.Equal(t, meta.Signed.SpecVersion, loaded.Signed.SpecVersion)
 
 			case *Metadata[TargetsType]:
-				assert.NoError(t, meta.ToFile(filePath, false))
-
-				loadedMeta, err := Targets().FromFile(filePath)
+				assert.NoError(t, meta.ToFile(path, false))
+				loaded, err := Targets().FromFile(path)
 				assert.NoError(t, err)
-
-				assert.Equal(t, meta.Signed.Type, loadedMeta.Signed.Type)
-				assert.Equal(t, meta.Signed.Version, loadedMeta.Signed.Version)
-				assert.Equal(t, meta.Signed.SpecVersion, loadedMeta.Signed.SpecVersion)
+				assert.Equal(t, meta.Signed.Type, loaded.Signed.Type)
+				assert.Equal(t, meta.Signed.Version, loaded.Signed.Version)
+				assert.Equal(t, meta.Signed.SpecVersion, loaded.Signed.SpecVersion)
 
 			case *Metadata[SnapshotType]:
-				assert.NoError(t, meta.ToFile(filePath, false))
-
-				loadedMeta, err := Snapshot().FromFile(filePath)
+				assert.NoError(t, meta.ToFile(path, false))
+				loaded, err := Snapshot().FromFile(path)
 				assert.NoError(t, err)
-
-				assert.Equal(t, meta.Signed.Type, loadedMeta.Signed.Type)
-				assert.Equal(t, meta.Signed.Version, loadedMeta.Signed.Version)
-				assert.Equal(t, meta.Signed.SpecVersion, loadedMeta.Signed.SpecVersion)
+				assert.Equal(t, meta.Signed.Type, loaded.Signed.Type)
+				assert.Equal(t, meta.Signed.Version, loaded.Signed.Version)
+				assert.Equal(t, meta.Signed.SpecVersion, loaded.Signed.SpecVersion)
 
 			case *Metadata[TimestampType]:
-				assert.NoError(t, meta.ToFile(filePath, false))
-
-				loadedMeta, err := Timestamp().FromFile(filePath)
+				assert.NoError(t, meta.ToFile(path, false))
+				loaded, err := Timestamp().FromFile(path)
 				assert.NoError(t, err)
-
-				assert.Equal(t, meta.Signed.Type, loadedMeta.Signed.Type)
-				assert.Equal(t, meta.Signed.Version, loadedMeta.Signed.Version)
-				assert.Equal(t, meta.Signed.SpecVersion, loadedMeta.Signed.SpecVersion)
+				assert.Equal(t, meta.Signed.Type, loaded.Signed.Type)
+				assert.Equal(t, meta.Signed.Version, loaded.Signed.Version)
+				assert.Equal(t, meta.Signed.SpecVersion, loaded.Signed.SpecVersion)
 			}
 		})
 	}
@@ -554,28 +430,14 @@ func TestMetadataVersioning(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		metadata   interface{}
+		metadata   any
 		newVersion int64
-		wantErr    bool
 	}{
-		{
-			name:       "Increment Root version",
-			metadata:   Root(expiry),
-			newVersion: 2,
-			wantErr:    false,
-		},
-		{
-			name:       "Set high version number",
-			metadata:   Targets(expiry),
-			newVersion: 1000000,
-			wantErr:    false,
-		},
-		{
-			name:       "Zero version (invalid)",
-			metadata:   Snapshot(expiry),
-			newVersion: 0,
-			wantErr:    false, // Library might allow this, but it's not recommended
-		},
+		{name: "Increment Root version", metadata: Root(expiry), newVersion: 2},
+		{name: "Set high version number", metadata: Targets(expiry), newVersion: 1_000_000},
+		// Version 0 is below the valid minimum but the library permits setting it
+		// directly; enforcement happens at validation/update time.
+		{name: "Zero version (below minimum)", metadata: Snapshot(expiry), newVersion: 0},
 	}
 
 	for _, tt := range tests {
@@ -600,52 +462,30 @@ func TestMetadataVersioning(t *testing.T) {
 
 func TestMetadataExpiration(t *testing.T) {
 	now := time.Now().UTC()
-	pastTime := now.Add(-24 * time.Hour)
-	futureTime := now.Add(24 * time.Hour)
+	past := now.Add(-24 * time.Hour)
+	future := now.Add(24 * time.Hour)
 
 	tests := []struct {
-		name       string
-		metadata   interface{}
-		expiration time.Time
-		isExpired  bool
+		name      string
+		metadata  any
+		expires   time.Time
+		isExpired bool
 	}{
-		{
-			name:       "Root not expired",
-			metadata:   Root(futureTime),
-			expiration: futureTime,
-			isExpired:  false,
-		},
-		{
-			name:       "Root expired",
-			metadata:   Root(pastTime),
-			expiration: pastTime,
-			isExpired:  true,
-		},
-		{
-			name:       "Targets not expired",
-			metadata:   Targets(futureTime),
-			expiration: futureTime,
-			isExpired:  false,
-		},
-		{
-			name:       "Targets expired",
-			metadata:   Targets(pastTime),
-			expiration: pastTime,
-			isExpired:  true,
-		},
+		{name: "Root not expired", metadata: Root(future), expires: future, isExpired: false},
+		{name: "Root expired", metadata: Root(past), expires: past, isExpired: true},
+		{name: "Targets not expired", metadata: Targets(future), expires: future, isExpired: false},
+		{name: "Targets expired", metadata: Targets(past), expires: past, isExpired: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			switch meta := tt.metadata.(type) {
 			case *Metadata[RootType]:
-				assert.Equal(t, tt.expiration.Truncate(time.Second), meta.Signed.Expires.Truncate(time.Second))
-				actualExpired := meta.Signed.Expires.Before(now)
-				assert.Equal(t, tt.isExpired, actualExpired)
+				assert.Equal(t, tt.expires.Truncate(time.Second), meta.Signed.Expires.Truncate(time.Second))
+				assert.Equal(t, tt.isExpired, meta.Signed.Expires.Before(now))
 			case *Metadata[TargetsType]:
-				assert.Equal(t, tt.expiration.Truncate(time.Second), meta.Signed.Expires.Truncate(time.Second))
-				actualExpired := meta.Signed.Expires.Before(now)
-				assert.Equal(t, tt.isExpired, actualExpired)
+				assert.Equal(t, tt.expires.Truncate(time.Second), meta.Signed.Expires.Truncate(time.Second))
+				assert.Equal(t, tt.isExpired, meta.Signed.Expires.Before(now))
 			}
 		})
 	}

@@ -86,7 +86,7 @@ func TestMarshalUnmarshalJSON(t *testing.T) {
 		},
 		{
 			name:    "SuccinctRoles Marshal/Unmarshal",
-			input:   SuccinctRoles{KeyIDs: []string{"keyid"}, Threshold: 1, BitLength: 256, NamePrefix: "prefix"},
+			input:   SuccinctRoles{KeyIDs: []string{"keyid"}, Threshold: 1, BitLength: 8, NamePrefix: "prefix"},
 			wantErr: false,
 		},
 		{
@@ -297,8 +297,8 @@ func TestMarshalEdgeCases(t *testing.T) {
 		},
 		{
 			name:    "Negative threshold",
-			input:   SuccinctRoles{KeyIDs: []string{"key1"}, Threshold: -1, BitLength: 256, NamePrefix: "prefix"},
-			wantErr: false, // JSON marshaling might allow this
+			input:   SuccinctRoles{KeyIDs: []string{"key1"}, Threshold: -1, BitLength: 8, NamePrefix: "prefix"},
+			wantErr: false, // JSON marshaling allows negative threshold; validation happens elsewhere
 		},
 		{
 			name:    "Very large numbers",
@@ -329,7 +329,7 @@ func TestMarshalEdgeCases(t *testing.T) {
 				// Verify it produces valid JSON
 				var result interface{}
 				err = json.Unmarshal(data, &result)
-				helpers.NoError(t, err)
+				helpers.AssertNoError(t, err)
 			}
 		})
 	}
@@ -364,7 +364,7 @@ func TestUnmarshalErrorCases(t *testing.T) {
 			name:       "Null values",
 			targetType: "Signature",
 			jsonData:   `{"keyid": null, "sig": null}`,
-			wantErr:    false, // Might be handled gracefully
+			wantErr:    true, // null sig is invalid hex bytes
 		},
 		{
 			name:       "Array instead of object",
@@ -524,18 +524,18 @@ func TestComplexStructuresMarshaling(t *testing.T) {
 			// Verify valid JSON
 			var jsonData interface{}
 			err = json.Unmarshal(data, &jsonData)
-			helpers.NoError(t, err)
+			helpers.AssertNoError(t, err)
 
 			// Test unmarshaling back
 			switch tt.input.(type) {
 			case RootType:
 				var result RootType
 				err = json.Unmarshal(data, &result)
-				helpers.NoError(t, err)
+				helpers.AssertNoError(t, err)
 			case TargetsType:
 				var result TargetsType
 				err = json.Unmarshal(data, &result)
-				helpers.NoError(t, err)
+				helpers.AssertNoError(t, err)
 			}
 		})
 	}
