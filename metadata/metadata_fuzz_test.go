@@ -38,7 +38,7 @@ func FuzzRootFromBytes(f *testing.F) {
 	f.Add([]byte(`{"signed": {"_type": "root"}}`))
 	f.Add([]byte(`{"signed": {"_type": "wrong"}, "signatures": []}`))
 
-	generator := helpers.NewFuzzDataGenerator(time.Now().UnixNano())
+	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
 
 	// Add corrupted metadata
 	for i := 0; i < 5; i++ {
@@ -70,7 +70,7 @@ func FuzzTargetsFromBytes(f *testing.F) {
 	f.Add([]byte("{}"))
 	f.Add([]byte(`{"signed": {"_type": "targets"}}`))
 
-	generator := helpers.NewFuzzDataGenerator(time.Now().UnixNano())
+	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
 
 	for i := 0; i < 5; i++ {
 		f.Add(generator.CreateFuzzTestMetadata("targets"))
@@ -99,7 +99,7 @@ func FuzzSnapshotFromBytes(f *testing.F) {
 	f.Add([]byte("{}"))
 	f.Add([]byte(`{"signed": {"_type": "snapshot"}}`))
 
-	generator := helpers.NewFuzzDataGenerator(time.Now().UnixNano())
+	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
 
 	for i := 0; i < 5; i++ {
 		f.Add(generator.CreateFuzzTestMetadata("snapshot"))
@@ -128,7 +128,7 @@ func FuzzTimestampFromBytes(f *testing.F) {
 	f.Add([]byte("{}"))
 	f.Add([]byte(`{"signed": {"_type": "timestamp"}}`))
 
-	generator := helpers.NewFuzzDataGenerator(time.Now().UnixNano())
+	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
 
 	for i := 0; i < 5; i++ {
 		f.Add(generator.CreateFuzzTestMetadata("timestamp"))
@@ -194,13 +194,13 @@ func FuzzMetadataToBytes(f *testing.F) {
 
 // FuzzJSONMarshaling tests JSON marshaling of metadata structures
 func FuzzJSONMarshaling(f *testing.F) {
-	generator := helpers.NewFuzzDataGenerator(time.Now().UnixNano())
+	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
 
 	// Add valid JSON samples
 	f.Add([]byte(`{"test": "value"}`))
 	f.Add([]byte(`{}`))
 	f.Add([]byte(`[]`))
-	f.Add(helpers.CreateTestRootJSON(&testing.T{}))
+	f.Add(helpers.BuildRootJSON())
 
 	// Add some random data
 	for i := 0; i < 5; i++ {
@@ -238,7 +238,7 @@ func FuzzHexBytes(f *testing.F) {
 	f.Add([]byte("0123456789abcdef"))
 	f.Add([]byte{0, 1, 2, 3, 255})
 
-	generator := helpers.NewFuzzDataGenerator(time.Now().UnixNano())
+	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
 	for i := 0; i < 10; i++ {
 		f.Add(generator.GenerateRandomBytes(100))
 	}
@@ -274,7 +274,7 @@ func FuzzHexBytes(f *testing.F) {
 
 // FuzzMetadataFieldsValidation tests validation of metadata fields
 func FuzzMetadataFieldsValidation(f *testing.F) {
-	generator := helpers.NewFuzzDataGenerator(time.Now().UnixNano())
+	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
 
 	// Add seed test cases
 	f.Add("root", int64(1), "1.0.31")
@@ -325,7 +325,7 @@ func FuzzMetadataFieldsValidation(f *testing.F) {
 
 // FuzzSignatureOperations tests signature-related operations
 func FuzzSignatureOperations(f *testing.F) {
-	generator := helpers.NewFuzzDataGenerator(time.Now().UnixNano())
+	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
 
 	// Add seed data
 	f.Add("valid-keyid", []byte("signature-data"))
@@ -377,7 +377,7 @@ func FuzzSignatureOperations(f *testing.F) {
 
 // FuzzCompleteMetadataStructure tests complete metadata structure with random data
 func FuzzCompleteMetadataStructure(f *testing.F) {
-	generator := helpers.NewFuzzDataGenerator(time.Now().UnixNano())
+	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
 
 	// Add seed data for complete metadata structures
 	for _, metadataType := range []string{"root", "targets", "snapshot", "timestamp"} {

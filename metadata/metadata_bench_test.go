@@ -22,7 +22,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
-	mathrand "math/rand"
+	mathrand "math/rand/v2"
 	"testing"
 	"time"
 
@@ -57,8 +57,7 @@ func BenchmarkMetadataCreation(b *testing.B) {
 
 	for _, bm := range benchmarks {
 		b.Run(bm.name, func(b *testing.B) {
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				_ = bm.fn()
 			}
 		})
@@ -132,8 +131,7 @@ func BenchmarkMetadataToBytes(b *testing.B) {
 
 	for _, bm := range benchmarks {
 		b.Run(bm.name, func(b *testing.B) {
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				_, err := bm.metadata()
 				if err != nil {
 					b.Fatal(err)
@@ -199,8 +197,7 @@ func BenchmarkMetadataFromBytes(b *testing.B) {
 
 	for _, bm := range benchmarks {
 		b.Run(bm.name, func(b *testing.B) {
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				err := bm.fn(bm.data)
 				if err != nil {
 					b.Fatal(err)
@@ -229,8 +226,7 @@ func BenchmarkSignatureOperations(b *testing.B) {
 	root.Signed.Roles[ROOT].KeyIDs = []string{keyID}
 
 	b.Run("Sign", func(b *testing.B) {
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			// Create a fresh copy for each iteration
 			testRoot := Root()
 			testRoot.Signed = root.Signed
@@ -257,9 +253,6 @@ func BenchmarkSignatureOperations(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-
-	// Pre-generate test data
-
 }
 
 // BenchmarkJSONOperations benchmarks raw JSON operations for comparison
@@ -283,8 +276,7 @@ func BenchmarkJSONOperations(b *testing.B) {
 	}
 
 	b.Run("JSON-Marshal", func(b *testing.B) {
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, err := json.Marshal(root)
 			if err != nil {
 				b.Fatal(err)
@@ -293,8 +285,7 @@ func BenchmarkJSONOperations(b *testing.B) {
 	})
 
 	b.Run("JSON-Unmarshal", func(b *testing.B) {
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			var result Metadata[RootType]
 			err := json.Unmarshal(data, &result)
 			if err != nil {
@@ -323,8 +314,7 @@ func BenchmarkHexBytesOperations(b *testing.B) {
 
 		b.Run("Marshal-"+size, func(b *testing.B) {
 			hexBytes := HexBytes(data)
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				_, err := json.Marshal(hexBytes)
 				if err != nil {
 					b.Fatal(err)
@@ -339,8 +329,7 @@ func BenchmarkHexBytesOperations(b *testing.B) {
 				b.Fatal(err)
 			}
 
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				var result HexBytes
 				err := json.Unmarshal(jsonData, &result)
 				if err != nil {
@@ -392,8 +381,7 @@ func BenchmarkComplexStructures(b *testing.B) {
 	}
 
 	b.Run("ComplexTargets-ToBytes", func(b *testing.B) {
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, err := targets.ToBytes(true)
 			if err != nil {
 				b.Fatal(err)
@@ -408,8 +396,7 @@ func BenchmarkComplexStructures(b *testing.B) {
 	}
 
 	b.Run("ComplexTargets-FromBytes", func(b *testing.B) {
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, err := Targets().FromBytes(complexData)
 			if err != nil {
 				b.Fatal(err)
@@ -422,8 +409,7 @@ func BenchmarkComplexStructures(b *testing.B) {
 func BenchmarkMemoryAllocations(b *testing.B) {
 	b.Run("MetadataCreation-Allocs", func(b *testing.B) {
 		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			root := Root()
 			_ = root
 		}
@@ -432,8 +418,7 @@ func BenchmarkMemoryAllocations(b *testing.B) {
 	b.Run("Serialization-Allocs", func(b *testing.B) {
 		root := Root()
 		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			data, err := root.ToBytes(true)
 			if err != nil {
 				b.Fatal(err)
@@ -450,8 +435,7 @@ func BenchmarkMemoryAllocations(b *testing.B) {
 		}
 
 		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, err := Root().FromBytes(data)
 			if err != nil {
 				b.Fatal(err)
@@ -497,7 +481,7 @@ func generateRandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, length)
 	for i := range b {
-		b[i] = charset[mathrand.Intn(len(charset))]
+		b[i] = charset[mathrand.IntN(len(charset))]
 	}
 	return string(b)
 }
