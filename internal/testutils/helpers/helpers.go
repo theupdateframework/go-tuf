@@ -15,9 +15,20 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+// Package helpers provides composable test utilities for go-tuf tests.
+//
+// Design principles:
+//   - All helpers accept *testing.T or *testing.B and call t.Helper() first.
+//   - Use t.TempDir() instead of custom directory managers; the testing package
+//     cleans up automatically.
+//   - No third-party assertion libraries: helpers signal failures via t.Errorf
+//     and t.Fatalf, matching the standard library style.
+//   - JSON fixture builders do not depend on *testing.T so they can be used
+//     in fuzz seed functions without the &testing.T{} anti-pattern.
 package helpers
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
@@ -29,75 +40,30 @@ import (
 	"time"
 )
 
-// TestCase represents a generic test case structure for table-driven tests
-type TestCase[T any] struct {
-	Name     string
-	Setup    func(t *testing.T) T
-	Input    T
-	Want     T
-	WantErr  bool
-	ErrorMsg string
-	Cleanup  func(t *testing.T)
-}
-
-// TempDirManager manages temporary directories for tests
-type TempDirManager struct {
-	baseTempDir string
-	tempDirs    []string
-}
-
-// NewTempDirManager creates a new temporary directory manager
-func NewTempDirManager() *TempDirManager {
-	return &TempDirManager{
-		baseTempDir: os.TempDir(),
-		tempDirs:    make([]string, 0),
-	}
-}
-
-// CreateTempDir creates a temporary directory and tracks it for cleanup
-func (tdm *TempDirManager) CreateTempDir(t *testing.T, pattern string) string {
-	t.Helper()
-	tempDir, err := os.MkdirTemp(tdm.baseTempDir, pattern)
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	tdm.tempDirs = append(tdm.tempDirs, tempDir)
-	return tempDir
-}
-
-// Cleanup removes all tracked temporary directories
-func (tdm *TempDirManager) Cleanup(t *testing.T) {
-	t.Helper()
-	for _, dir := range tdm.tempDirs {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Errorf("failed to remove temp dir %s: %v", dir, err)
-		}
-	}
-	tdm.tempDirs = tdm.tempDirs[:0]
-}
-
-// WriteTestFile writes content to a file in the given directory
+// WriteTestFile writes content to a file in the given directory and returns the
+// full path. The test fails immediately if the write fails.
 func WriteTestFile(t *testing.T, dir, filename string, content []byte) string {
 	t.Helper()
-	filePath := filepath.Join(dir, filename)
-	if err := os.WriteFile(filePath, content, 0644); err != nil {
-		t.Fatalf("failed to write test file %s: %v", filePath, err)
+	path := filepath.Join(dir, filename)
+	if err := os.WriteFile(path, content, 0644); err != nil {
+		t.Fatalf("WriteTestFile(%q): %v", path, err)
 	}
-	return filePath
+	return path
 }
 
-// ReadTestFile reads content from a file
-func ReadTestFile(t *testing.T, filePath string) []byte {
+// ReadTestFile reads and returns the content of a file. The test fails
+// immediately if the read fails.
+func ReadTestFile(t *testing.T, path string) []byte {
 	t.Helper()
-	content, err := os.ReadFile(filePath)
+	data, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("failed to read test file %s: %v", filePath, err)
+		t.Fatalf("ReadTestFile(%q): %v", path, err)
 	}
-	return content
+	return data
 }
 
-// StripWhitespaces removes all whitespace characters from a byte slice
-func StripWhitespaces(data []byte) []byte {
+// StripWhitespace removes all ASCII whitespace characters from b.
+func StripWhitespace(data []byte) []byte {
 	result := make([]byte, 0, len(data))
 	for _, b := range data {
 		if b != ' ' && b != '\t' && b != '\n' && b != '\r' {
@@ -107,47 +73,48 @@ func StripWhitespaces(data []byte) []byte {
 	return result
 }
 
-// CompareJSON compares two JSON byte slices ignoring whitespace differences
+// CompareJSON asserts that got and want represent the same JSON value,
+// normalising away whitespace differences. The test is marked failed (but
+// not stopped) when they differ.
 func CompareJSON(t *testing.T, got, want []byte) {
 	t.Helper()
 
-	var gotJSON, wantJSON interface{}
-
-	if err := json.Unmarshal(got, &gotJSON); err != nil {
-		t.Fatalf("failed to unmarshal got JSON: %v", err)
+	var gotVal, wantVal any
+	if err := json.Unmarshal(got, &gotVal); err != nil {
+		t.Fatalf("CompareJSON: unmarshal got: %v", err)
+	}
+	if err := json.Unmarshal(want, &wantVal); err != nil {
+		t.Fatalf("CompareJSON: unmarshal want: %v", err)
 	}
 
-	if err := json.Unmarshal(want, &wantJSON); err != nil {
-		t.Fatalf("failed to unmarshal want JSON: %v", err)
-	}
-
-	gotBytes, err := json.Marshal(gotJSON)
+	gotNorm, err := json.Marshal(gotVal)
 	if err != nil {
-		t.Fatalf("failed to marshal got JSON: %v", err)
+		t.Fatalf("CompareJSON: re-marshal got: %v", err)
 	}
-
-	wantBytes, err := json.Marshal(wantJSON)
+	wantNorm, err := json.Marshal(wantVal)
 	if err != nil {
-		t.Fatalf("failed to marshal want JSON: %v", err)
+		t.Fatalf("CompareJSON: re-marshal want: %v", err)
 	}
 
-	if string(gotBytes) != string(wantBytes) {
-		t.Errorf("JSON mismatch:\ngot:  %s\nwant: %s", string(gotBytes), string(wantBytes))
+	if !bytes.Equal(gotNorm, wantNorm) {
+		t.Errorf("JSON mismatch:\ngot:  %s\nwant: %s", gotNorm, wantNorm)
 	}
 }
 
-// GenerateTestKeyPair generates a test Ed25519 key pair
+// GenerateTestKeyPair generates a fresh Ed25519 key pair. The test fails
+// immediately if key generation fails.
 func GenerateTestKeyPair(t *testing.T) (ed25519.PublicKey, ed25519.PrivateKey) {
 	t.Helper()
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		t.Fatalf("failed to generate test key pair: %v", err)
+		t.Fatalf("GenerateTestKeyPair: %v", err)
 	}
 	return pub, priv
 }
 
-// ErrorContains checks if error contains expected message
-func ErrorContains(t *testing.T, err error, expectedMsg string) {
+// AssertErrorContains fails the test if err is nil or if its message does not
+// contain expectedMsg.
+func AssertErrorContains(t *testing.T, err error, expectedMsg string) {
 	t.Helper()
 	if err == nil {
 		t.Fatalf("expected error containing %q, got nil", expectedMsg)
@@ -157,78 +124,38 @@ func ErrorContains(t *testing.T, err error, expectedMsg string) {
 	}
 }
 
-// NoError fails the test if err is not nil
-func NoError(t *testing.T, err error) {
+// AssertNoError fails the test immediately if err is non-nil.
+func AssertNoError(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-// MustMarshal marshals data to JSON or fails the test
-func MustMarshal(t *testing.T, v interface{}) []byte {
+// MustMarshal marshals v to JSON. The test fails immediately if marshalling
+// fails.
+func MustMarshal(t *testing.T, v any) []byte {
 	t.Helper()
 	data, err := json.Marshal(v)
 	if err != nil {
-		t.Fatalf("failed to marshal: %v", err)
+		t.Fatalf("MustMarshal: %v", err)
 	}
 	return data
 }
 
-// MustUnmarshal unmarshals JSON data or fails the test
+// MustUnmarshal unmarshals data into a value of type T. The test fails
+// immediately if unmarshalling fails.
 func MustUnmarshal[T any](t *testing.T, data []byte) T {
 	t.Helper()
 	var result T
 	if err := json.Unmarshal(data, &result); err != nil {
-		t.Fatalf("failed to unmarshal: %v", err)
+		t.Fatalf("MustUnmarshal: %v", err)
 	}
 	return result
 }
 
-// AssertEqual compares two values for equality
-func AssertEqual[T comparable](t *testing.T, got, want T, msgAndArgs ...interface{}) {
-	t.Helper()
-	if got != want {
-		msg := fmt.Sprintf("values not equal:\ngot:  %v\nwant: %v", got, want)
-		if len(msgAndArgs) > 0 {
-			if format, ok := msgAndArgs[0].(string); ok {
-				msg = fmt.Sprintf(format, msgAndArgs[1:]...) + "\n" + msg
-			}
-		}
-		t.Error(msg)
-	}
-}
-
-// AssertNotEqual compares two values for inequality
-func AssertNotEqual[T comparable](t *testing.T, got, want T, msgAndArgs ...interface{}) {
-	t.Helper()
-	if got == want {
-		msg := fmt.Sprintf("values should not be equal: %v", got)
-		if len(msgAndArgs) > 0 {
-			if format, ok := msgAndArgs[0].(string); ok {
-				msg = fmt.Sprintf(format, msgAndArgs[1:]...) + "\n" + msg
-			}
-		}
-		t.Error(msg)
-	}
-}
-
-// RunTableTest runs a table-driven test
-func RunTableTest[T any](t *testing.T, tests []TestCase[T], testFunc func(t *testing.T, tc TestCase[T])) {
-	t.Helper()
-	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			defer func() {
-				if tt.Cleanup != nil {
-					tt.Cleanup(t)
-				}
-			}()
-			testFunc(t, tt)
-		})
-	}
-}
-
-// CreateInvalidJSON creates various types of invalid JSON for testing
+// CreateInvalidJSON returns a map of named byte slices that represent various
+// kinds of invalid or malformed TUF metadata. Useful for error-path tests.
 func CreateInvalidJSON() map[string][]byte {
 	return map[string][]byte{
 		"empty":            []byte(""),
@@ -240,138 +167,133 @@ func CreateInvalidJSON() map[string][]byte {
 	}
 }
 
-// Benchmark helper function
-func BenchmarkOperation(b *testing.B, operation func()) {
-	b.Helper()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		operation()
-	}
+// HexBytes is a convenience type alias for testing scenarios that require
+// hex-encoded byte slices without importing the full metadata package.
+type HexBytes []byte
+
+func (h HexBytes) String() string {
+	return fmt.Sprintf("%x", []byte(h))
 }
 
-// CreateTestJSON creates test JSON for different metadata types
-func CreateTestRootJSON(t *testing.T) []byte {
-	t.Helper()
+// — JSON fixture builders —
+//
+// These functions do not accept *testing.T so they can be called from fuzz
+// seed setup (f.Add) without the &testing.T{} anti-pattern.
 
+// BuildRootJSON returns a minimal, valid root.json body as JSON bytes.
+func BuildRootJSON() []byte {
 	expiry := time.Now().UTC().Add(24 * time.Hour)
-
-	root := map[string]interface{}{
-		"signed": map[string]interface{}{
+	root := map[string]any{
+		"signed": map[string]any{
 			"_type":               "root",
 			"spec_version":        "1.0.31",
 			"version":             1,
 			"expires":             expiry.Format(time.RFC3339),
 			"consistent_snapshot": true,
-			"keys":                map[string]interface{}{},
-			"roles": map[string]interface{}{
-				"root": map[string]interface{}{
-					"keyids":    []string{},
-					"threshold": 1,
-				},
-				"targets": map[string]interface{}{
-					"keyids":    []string{},
-					"threshold": 1,
-				},
-				"snapshot": map[string]interface{}{
-					"keyids":    []string{},
-					"threshold": 1,
-				},
-				"timestamp": map[string]interface{}{
-					"keyids":    []string{},
-					"threshold": 1,
-				},
+			"keys":                map[string]any{},
+			"roles": map[string]any{
+				"root":      map[string]any{"keyids": []string{}, "threshold": 1},
+				"targets":   map[string]any{"keyids": []string{}, "threshold": 1},
+				"snapshot":  map[string]any{"keyids": []string{}, "threshold": 1},
+				"timestamp": map[string]any{"keyids": []string{}, "threshold": 1},
 			},
 		},
-		"signatures": []interface{}{},
+		"signatures": []any{},
 	}
-
 	data, err := json.Marshal(root)
 	if err != nil {
-		t.Fatalf("failed to create test root JSON: %v", err)
+		panic(fmt.Sprintf("BuildRootJSON: %v", err))
 	}
 	return data
 }
 
-func CreateTestTargetsJSON(t *testing.T) []byte {
-	t.Helper()
-
+// BuildTargetsJSON returns a minimal, valid targets.json body as JSON bytes.
+func BuildTargetsJSON() []byte {
 	expiry := time.Now().UTC().Add(24 * time.Hour)
-
-	targets := map[string]interface{}{
-		"signed": map[string]interface{}{
+	targets := map[string]any{
+		"signed": map[string]any{
 			"_type":        "targets",
 			"spec_version": "1.0.31",
 			"version":      1,
 			"expires":      expiry.Format(time.RFC3339),
-			"targets":      map[string]interface{}{},
+			"targets":      map[string]any{},
 		},
-		"signatures": []interface{}{},
+		"signatures": []any{},
 	}
-
 	data, err := json.Marshal(targets)
 	if err != nil {
-		t.Fatalf("failed to create test targets JSON: %v", err)
+		panic(fmt.Sprintf("BuildTargetsJSON: %v", err))
 	}
 	return data
 }
 
-func CreateTestSnapshotJSON(t *testing.T) []byte {
-	t.Helper()
-
+// BuildSnapshotJSON returns a minimal, valid snapshot.json body as JSON bytes.
+func BuildSnapshotJSON() []byte {
 	expiry := time.Now().UTC().Add(24 * time.Hour)
-
-	snapshot := map[string]interface{}{
-		"signed": map[string]interface{}{
+	snapshot := map[string]any{
+		"signed": map[string]any{
 			"_type":        "snapshot",
 			"spec_version": "1.0.31",
 			"version":      1,
 			"expires":      expiry.Format(time.RFC3339),
-			"meta": map[string]interface{}{
-				"targets.json": map[string]interface{}{
-					"version": 1,
-				},
+			"meta": map[string]any{
+				"targets.json": map[string]any{"version": 1},
 			},
 		},
-		"signatures": []interface{}{},
+		"signatures": []any{},
 	}
-
 	data, err := json.Marshal(snapshot)
 	if err != nil {
-		t.Fatalf("failed to create test snapshot JSON: %v", err)
+		panic(fmt.Sprintf("BuildSnapshotJSON: %v", err))
 	}
 	return data
 }
 
-func CreateTestTimestampJSON(t *testing.T) []byte {
-	t.Helper()
-
+// BuildTimestampJSON returns a minimal, valid timestamp.json body as JSON bytes.
+func BuildTimestampJSON() []byte {
 	expiry := time.Now().UTC().Add(24 * time.Hour)
-
-	timestamp := map[string]interface{}{
-		"signed": map[string]interface{}{
+	timestamp := map[string]any{
+		"signed": map[string]any{
 			"_type":        "timestamp",
 			"spec_version": "1.0.31",
 			"version":      1,
 			"expires":      expiry.Format(time.RFC3339),
-			"meta": map[string]interface{}{
-				"snapshot.json": map[string]interface{}{
-					"version": 1,
-				},
+			"meta": map[string]any{
+				"snapshot.json": map[string]any{"version": 1},
 			},
 		},
-		"signatures": []interface{}{},
+		"signatures": []any{},
 	}
-
 	data, err := json.Marshal(timestamp)
 	if err != nil {
-		t.Fatalf("failed to create test timestamp JSON: %v", err)
+		panic(fmt.Sprintf("BuildTimestampJSON: %v", err))
 	}
 	return data
 }
 
-// HexBytes is a simple type for testing - avoiding import cycles
-type HexBytes []byte
+// — Test-context variants (t.Helper wrappers for backwards compatibility) —
 
-func (h HexBytes) String() string {
-	return fmt.Sprintf("%x", []byte(h))
+// CreateTestRootJSON returns BuildRootJSON() and registers a test helper.
+// Prefer calling BuildRootJSON() directly when not inside a test function.
+func CreateTestRootJSON(t *testing.T) []byte {
+	t.Helper()
+	return BuildRootJSON()
+}
+
+// CreateTestTargetsJSON returns BuildTargetsJSON() and registers a test helper.
+func CreateTestTargetsJSON(t *testing.T) []byte {
+	t.Helper()
+	return BuildTargetsJSON()
+}
+
+// CreateTestSnapshotJSON returns BuildSnapshotJSON() and registers a test helper.
+func CreateTestSnapshotJSON(t *testing.T) []byte {
+	t.Helper()
+	return BuildSnapshotJSON()
+}
+
+// CreateTestTimestampJSON returns BuildTimestampJSON() and registers a test helper.
+func CreateTestTimestampJSON(t *testing.T) []byte {
+	t.Helper()
+	return BuildTimestampJSON()
 }
