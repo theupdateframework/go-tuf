@@ -2,8 +2,6 @@ module github.com/theupdateframework/go-tuf/v2
 
 go 1.25.0
 
-toolchain go1.25.8
-
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/go-logr/stdr v1.2.2
