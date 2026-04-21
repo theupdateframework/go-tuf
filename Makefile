@@ -49,6 +49,25 @@ test:
 	GODEBUG=rsa1024min=0 go test -race -covermode atomic ./...
 
 #####################
+# conformance section
+#####################
+
+# Build the tuf-conformance client-under-test binary.
+.PHONY: build-conformance-client
+build-conformance-client:
+	@echo "Building tuf-conformance-client"
+	@go build -o tuf-conformance-client ./cmd/tuf-conformance-client
+
+# Run the tuf-conformance test suite against this implementation.
+# Requires tuf-conformance to be installed:
+#   pip install tuf-conformance
+# or clone https://github.com/theupdateframework/tuf-conformance and run:
+#   make dev
+.PHONY: conformance
+conformance: build-conformance-client
+	pytest tuf_conformance --entrypoint ./tuf-conformance-client
+
+#####################
 # lint section
 #####################
 

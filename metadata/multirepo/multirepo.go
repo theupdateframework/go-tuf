@@ -31,9 +31,15 @@ import (
 	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
 
-// ErrInvalidRepoName is returned when a repository name contains path traversal
-// components or is otherwise invalid for use as a directory name.
-var ErrInvalidRepoName = errors.New("invalid repository name")
+var (
+	// ErrNoMapFile is returned when no map file is provided
+	ErrNoMapFile = errors.New("no map file provided")
+	// ErrNoTrustedRoots is returned when no trusted root metadata is provided
+	ErrNoTrustedRoots = errors.New("no trusted root metadata provided")
+	// ErrInvalidRepoName is returned when a repository name contains path traversal
+	// components or is otherwise invalid for use as a directory name.
+	ErrInvalidRepoName = errors.New("invalid repository name")
+)
 
 // validRepoNamePattern defines the allowed characters for repository names.
 // Names must start with an alphanumeric character and may contain alphanumeric
@@ -84,13 +90,13 @@ type targetMatch struct {
 func NewConfig(repoMap []byte, roots map[string][]byte) (*MultiRepoConfig, error) {
 	// error if we don't have the necessary arguments
 	if len(repoMap) == 0 || len(roots) == 0 {
-		return nil, fmt.Errorf("failed to create multi-repository config: no map file and/or trusted root metadata is provided")
+		return nil, fmt.Errorf("failed to create multi-repository config: %w and/or %w", ErrNoMapFile, ErrNoTrustedRoots)
 	}
 
 	// unmarshal the map file (note: should we expect/support unrecognized values here?)
 	var mapFile *MultiRepoMapType
 	if err := json.Unmarshal(repoMap, &mapFile); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal map file: %w", err)
 	}
 
 	// make sure we have enough trusted root metadata files provided based on the repository list
@@ -98,7 +104,7 @@ func NewConfig(repoMap []byte, roots map[string][]byte) (*MultiRepoConfig, error
 		// check if we have a trusted root metadata for this repository
 		_, ok := roots[repo]
 		if !ok {
-			return nil, fmt.Errorf("no trusted root metadata provided for repository - %s", repo)
+			return nil, fmt.Errorf("%w for repository - %s", ErrNoTrustedRoots, repo)
 		}
 	}
 
