@@ -396,7 +396,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 		// verify if the signature for that payload corresponds to the given key
 		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payload)); err != nil {
 			// failed to verify the metadata with that key ID
-			log.Info("Failed to verify %s with key ID %s", delegatedRole, keyID)
+			log.Info("Failed to verify role with key ID", "role", delegatedRole, "ID", keyID)
 		} else {
 			// save the verified keyID only if verification passed
 			signingKeys[keyID] = true
