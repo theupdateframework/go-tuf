@@ -18,7 +18,13 @@
 package metadata
 
 import (
+	"bytes"
+	"crypto"
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/json"
 	"os"
@@ -26,6 +32,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/secure-systems-lab/go-securesystemslib/cjson"
+	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -660,6 +668,120 @@ func TestVerifyDelegateThreshold(t *testing.T) {
 	err = targets.VerifyDelegate("test", targets)
 	assert.ErrorIs(t, err, &ErrValue{})
 	assert.EqualError(t, err, "value error: insufficient threshold (0) configured for test")
+}
+
+// Regression: one ECDSA public key registered under both
+// KeyTypeECDSA_SHA2_P256 ("ecdsa") and KeyTypeECDSA_SHA2_P256_COMPAT
+// ("ecdsa-sha2-nistp256") must count as a single threshold contribution.
+// Canonical-JSON-based Key.ID() includes `keytype`, so the two records
+// produce distinct keyIDs from one PEM; a keyID-keyed threshold map would
+// accept a single private-key holder as satisfying threshold=2.
+func TestVerifyDelegateDuplicateKeyTypeECDSA(t *testing.T) {
+	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.NoError(t, err)
+
+	// keyA is what KeyFromPublicKey produces: Type=KeyTypeECDSA_SHA2_P256.
+	keyA, err := KeyFromPublicKey(&privKey.PublicKey)
+	assert.NoError(t, err)
+	// keyB shares the same PEM under the COMPAT type string.
+	keyB := &Key{
+		Type:   KeyTypeECDSA_SHA2_P256_COMPAT,
+		Scheme: keyA.Scheme,
+		Value:  keyA.Value,
+	}
+
+	targets := Targets(fixedExpire)
+	payload, err := cjson.EncodeCanonical(targets.Signed)
+	assert.NoError(t, err)
+	signer, err := signature.LoadSignerVerifier(privKey, crypto.SHA256)
+	assert.NoError(t, err)
+	sigBytes, err := signer.SignMessage(bytes.NewReader(payload))
+	assert.NoError(t, err)
+
+	assertDuplicatePublicKeyCountsOnce(t, keyA, keyB, targets, sigBytes)
+}
+
+// Regression: even without an alternate keytype, duplicate Ed25519 key records
+// that resolve to the same public key must count as a single threshold
+// contribution.
+func TestVerifyDelegateDuplicatePublicKeyEd25519(t *testing.T) {
+	pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
+	assert.NoError(t, err)
+
+	keyA, err := KeyFromPublicKey(pubKey)
+	assert.NoError(t, err)
+	keyB := &Key{
+		Type:   keyA.Type,
+		Scheme: "ed25519-duplicate",
+		Value:  keyA.Value,
+	}
+
+	targets := Targets(fixedExpire)
+	payload, err := cjson.EncodeCanonical(targets.Signed)
+	assert.NoError(t, err)
+	signer, err := signature.LoadSignerVerifier(privKey, crypto.Hash(0))
+	assert.NoError(t, err)
+	sigBytes, err := signer.SignMessage(bytes.NewReader(payload))
+	assert.NoError(t, err)
+
+	assertDuplicatePublicKeyCountsOnce(t, keyA, keyB, targets, sigBytes)
+}
+
+// Regression: duplicate RSA key records that resolve to the same public key
+// must count as a single threshold contribution.
+func TestVerifyDelegateDuplicatePublicKeyRSA(t *testing.T) {
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	assert.NoError(t, err)
+
+	keyA, err := KeyFromPublicKey(&privKey.PublicKey)
+	assert.NoError(t, err)
+	keyB := &Key{
+		Type:   keyA.Type,
+		Scheme: "rsassa-pss-sha256-duplicate",
+		Value:  keyA.Value,
+	}
+
+	targets := Targets(fixedExpire)
+	payload, err := cjson.EncodeCanonical(targets.Signed)
+	assert.NoError(t, err)
+	signer, err := signature.LoadRSAPSSSignerVerifier(privKey, crypto.SHA256, nil)
+	assert.NoError(t, err)
+	sigBytes, err := signer.SignMessage(bytes.NewReader(payload))
+	assert.NoError(t, err)
+
+	assertDuplicatePublicKeyCountsOnce(t, keyA, keyB, targets, sigBytes)
+}
+
+func assertDuplicatePublicKeyCountsOnce(t *testing.T, keyA, keyB *Key, targets *Metadata[TargetsType], sigBytes []byte) {
+	t.Helper()
+
+	keyIDA, err := keyA.ID()
+	assert.NoError(t, err)
+	keyIDB, err := keyB.ID()
+	assert.NoError(t, err)
+	assert.NotEqual(t, keyIDA, keyIDB, "test must exercise two keyIDs for one public key")
+
+	targets.Signatures = []Signature{
+		{KeyID: keyIDA, Signature: sigBytes},
+		{KeyID: keyIDB, Signature: sigBytes},
+	}
+
+	root := Root(fixedExpire)
+	root.Signed.Keys[keyIDA] = keyA
+	root.Signed.Keys[keyIDB] = keyB
+	root.Signed.Roles[TARGETS] = &Role{
+		KeyIDs:    []string{keyIDA, keyIDB},
+		Threshold: 2,
+	}
+
+	err = root.VerifyDelegate(TARGETS, targets)
+	assert.ErrorIs(t, err, &ErrUnsignedMetadata{})
+	assert.ErrorContains(t, err, "got 1, want 2")
+
+	// Threshold of 1 still satisfied by the one underlying key.
+	root.Signed.Roles[TARGETS].Threshold = 1
+	err = root.VerifyDelegate(TARGETS, targets)
+	assert.NoError(t, err)
 }
 
 func TestVerifyLengthHashesTargetFiles(t *testing.T) {
