@@ -6,7 +6,7 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/go-logr/stdr v1.2.2
 	github.com/secure-systems-lab/go-securesystemslib v0.11.0
-	github.com/sigstore/sigstore v1.10.5
+	github.com/sigstore/sigstore v1.10.6
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 )
