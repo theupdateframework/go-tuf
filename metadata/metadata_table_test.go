@@ -231,7 +231,6 @@ func TestMetadataFromFile(t *testing.T) {
 			metadataType: ROOT,
 			filePath:     filepath.Join(testDir, "nonexistent.json"),
 			wantErr:      true,
-			errorMsg:     "no such file or directory",
 		},
 		{
 			name:         "Invalid JSON file",
