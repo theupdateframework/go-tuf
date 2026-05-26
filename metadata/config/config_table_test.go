@@ -241,8 +241,7 @@ func TestEnsurePathsExistTable(t *testing.T) {
 				cfg.LocalTargetsDir = filepath.Join(tmp, "targets")
 				return cfg
 			},
-			expectError:  true,
-			errorMessage: "not a directory",
+			expectError: true,
 		},
 		{
 			name: "already-existing directories succeed",

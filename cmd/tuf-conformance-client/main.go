@@ -30,6 +30,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 
 	stdlog "log"
 
@@ -39,6 +42,43 @@ import (
 	"github.com/theupdateframework/go-tuf/v2/metadata/config"
 	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
+
+// currentTime returns the reference time the updater should use.
+//
+// Go binaries on Linux read the clock via VDSO and are not affected by
+// libfaketime's LD_PRELOAD interception. The tuf-conformance harness drives
+// time via the faketime CLI, which exports the requested timestamp through
+// the FAKETIME env var; we parse it here so Updater.UnsafeSetRefTime can
+// honour it. Falls back to time.Now() when FAKETIME is unset or unparseable.
+func currentTime() time.Time {
+	raw := os.Getenv("FAKETIME")
+	if raw == "" {
+		return time.Now().UTC()
+	}
+	// Ubuntu's faketime CLI (libfaketime 0.9.10) converts an absolute
+	// datetime arg into a signed integer second offset, e.g.
+	// "+691200" for +8 days. Honour that format first.
+	if len(raw) > 1 && (raw[0] == '+' || raw[0] == '-') {
+		if secs, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			return time.Now().UTC().Add(time.Duration(secs) * time.Second)
+		}
+	}
+	// Otherwise fall back to absolute timestamp formats libfaketime
+	// itself accepts when FAKETIME is set directly.
+	abs := strings.TrimPrefix(raw, "@")
+	for _, layout := range []string{
+		"2006-01-02 15:04:05.999999-07:00", // Python str(datetime) with tz
+		"2006-01-02 15:04:05-07:00",
+		"2006-01-02 15:04:05",
+		time.RFC3339Nano,
+		time.RFC3339,
+	} {
+		if t, err := time.Parse(layout, abs); err == nil {
+			return t.UTC()
+		}
+	}
+	return time.Now().UTC()
+}
 
 func main() {
 	if err := newRootCmd().Execute(); err != nil {
@@ -161,11 +201,17 @@ using non-versioned filenames.`,
 				return fmt.Errorf("create updater config: %w", err)
 			}
 			cfg.LocalMetadataDir = metadataDir
+			// refresh doesn't fetch targets, but Updater.New calls
+			// EnsurePathsExist on both dirs; supply metadataDir as a
+			// harmless writable placeholder so the empty default doesn't
+			// trip os.MkdirAll.
+			cfg.LocalTargetsDir = metadataDir
 
 			up, err := updater.New(cfg)
 			if err != nil {
 				return fmt.Errorf("create updater: %w", err)
 			}
+			up.UnsafeSetRefTime(currentTime())
 
 			if err := up.Refresh(); err != nil {
 				return fmt.Errorf("refresh: %w", err)
@@ -243,6 +289,7 @@ re-downloaded.`,
 			if err != nil {
 				return fmt.Errorf("create updater: %w", err)
 			}
+			up.UnsafeSetRefTime(currentTime())
 
 			if err := up.Refresh(); err != nil {
 				return fmt.Errorf("refresh: %w", err)
