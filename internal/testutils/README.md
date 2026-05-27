@@ -150,6 +150,47 @@ repo := simulator.NewTestRepositoryWithBuilder(t, simulator.NewSimulator().
     WithTarget("artifact.txt", []byte("data")))
 ```
 
+## Static fixtures (`repository_data/`)
+
+`repository_data/` holds a pre-signed TUF repository used by the tests in
+`metadata/` and `metadata/trustedmetadata/`. Other packages (e.g.
+`metadata/updater/`) now build their fixtures in memory via the
+`simulator` package below and do not depend on these files.
+
+```
+repository_data/
+├── keystore/        # PEM key pairs for each top-level role + delegations
+└── repository/
+    ├── metadata/    # signed root/targets/snapshot/timestamp/role1/role2 JSON
+    └── targets/     # dummy target files (file1.txt, file2.txt, file3.txt)
+```
+
+### Regenerating signatures
+
+The fixture keys are stored as PEM PKCS1 RSA but their roles use the
+`rsassa-pss-sha256` scheme. Stock signing utilities don't combine those,
+so we ship a small helper at `internal/testutils/signer/signer.go` that
+loads a PKCS1 key, signs a metadata JSON file with the given scheme, and
+writes the result back in place.
+
+If you edit any file under `repository_data/repository/metadata/`, re-sign
+the affected role before running tests:
+
+```bash
+go run internal/testutils/signer/signer.go \
+    -k internal/testutils/repository_data/keystore/timestamp_key \
+    -s rsassa-pss-sha256 \
+    -f internal/testutils/repository_data/repository/metadata/timestamp.json
+```
+
+Substitute the matching key (`root_key`, `snapshot_key`, `targets_key`,
+`delegation_key`, etc.) for the role you changed.
+
+Note: prefer adding new test scenarios via the in-memory
+`simulator.TestRepository` / `simulator.SimulatorBuilder` builders below
+rather than editing the static tree -- they generate fresh signed
+metadata per test and avoid this regeneration step entirely.
+
 ## Running tests
 
 ```bash
