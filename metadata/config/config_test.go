@@ -18,133 +18,303 @@
 package config
 
 import (
-	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/theupdateframework/go-tuf/v2/internal/testutils/helpers"
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
 
-func TestNewUpdaterConfig(t *testing.T) {
-	// setup testing table (tt) and create subtest for each entry
-	for _, tt := range []struct {
-		name      string
-		desc      string
-		remoteURL string
-		rootBytes []byte
-		config    *UpdaterConfig
-		wantErr   error
+// TestUpdaterConfigNew tests the New constructor using table-driven tests.
+// It covers valid and invalid remote URL inputs.
+func TestUpdaterConfigNew(t *testing.T) {
+	rootBytes := helpers.CreateTestRootJSON(t)
+
+	tests := []struct {
+		name         string
+		remoteURL    string
+		expectError  bool
+		errorMessage string
+		validate     func(t *testing.T, cfg *UpdaterConfig)
 	}{
 		{
-			name:      "success",
-			desc:      "No errors expected",
-			remoteURL: "somepath",
-			rootBytes: []byte("somerootbytes"),
-			config: &UpdaterConfig{
-				MaxRootRotations:      256,
-				MaxDelegations:        32,
-				RootMaxLength:         512000,
-				TimestampMaxLength:    16384,
-				SnapshotMaxLength:     2000000,
-				TargetsMaxLength:      5000000,
-				Fetcher:               &fetcher.DefaultFetcher{},
-				LocalTrustedRoot:      []byte("somerootbytes"),
-				RemoteMetadataURL:     "somepath",
-				RemoteTargetsURL:      "somepath/targets",
-				DisableLocalCache:     false,
-				PrefixTargetsWithHash: true,
+			name:        "valid simple path",
+			remoteURL:   "simple/path",
+			expectError: false,
+			validate: func(t *testing.T, cfg *UpdaterConfig) {
+				t.Helper()
+				assert.NotNil(t, cfg)
+				assert.Equal(t, "simple/path", cfg.RemoteMetadataURL)
+				assert.Equal(t, int64(256), cfg.MaxRootRotations)
+				assert.Equal(t, 32, cfg.MaxDelegations)
+				assert.Equal(t, int64(512000), cfg.RootMaxLength)
+				assert.Equal(t, int64(16384), cfg.TimestampMaxLength)
+				assert.Equal(t, int64(2000000), cfg.SnapshotMaxLength)
+				assert.Equal(t, int64(5000000), cfg.TargetsMaxLength)
+				assert.False(t, cfg.UnsafeLocalMode)
+				assert.True(t, cfg.PrefixTargetsWithHash)
+				assert.NotNil(t, cfg.Fetcher)
+				assert.IsType(t, &fetcher.DefaultFetcher{}, cfg.Fetcher)
 			},
-			wantErr: nil,
 		},
 		{
-			name:      "invalid character in URL",
-			desc:      "Invalid ASCII control sequence in input",
-			remoteURL: string([]byte{0x7f}),
-			rootBytes: []byte("somerootbytes"),
-			config:    nil,
-			wantErr:   &url.Error{}, // just make sure this is non-nil, url pkg has no exported errors
+			name:        "valid absolute path",
+			remoteURL:   "/absolute/path/to/metadata",
+			expectError: false,
+			validate: func(t *testing.T, cfg *UpdaterConfig) {
+				t.Helper()
+				assert.NotNil(t, cfg)
+				assert.Equal(t, "/absolute/path/to/metadata", cfg.RemoteMetadataURL)
+			},
 		},
-	} {
+		{
+			name:        "valid https URL",
+			remoteURL:   "https://example.com/metadata",
+			expectError: false,
+			validate: func(t *testing.T, cfg *UpdaterConfig) {
+				t.Helper()
+				assert.Equal(t, "https://example.com/metadata", cfg.RemoteMetadataURL)
+				assert.Equal(t, "https://example.com/metadata/targets", cfg.RemoteTargetsURL)
+			},
+		},
+		{
+			name:        "valid file URL",
+			remoteURL:   "file:///path/to/metadata",
+			expectError: false,
+		},
+		{
+			name:        "empty remote URL",
+			remoteURL:   "",
+			expectError: false,
+			validate: func(t *testing.T, cfg *UpdaterConfig) {
+				t.Helper()
+				assert.NotNil(t, cfg)
+				assert.Equal(t, "", cfg.RemoteMetadataURL)
+			},
+		},
+		{
+			name:         "invalid control character in URL",
+			remoteURL:    string([]byte{0x7f}),
+			expectError:  true,
+			errorMessage: "invalid control character",
+		},
+		{
+			name:        "path with spaces",
+			remoteURL:   "path with spaces",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// this will only be printed if run in verbose mode or if test fails
-			t.Logf("Desc: %s", tt.desc)
-			// run the function under test
-			updaterConfig, err := New(tt.remoteURL, tt.rootBytes)
-			// special case if we expect no error
-			if tt.wantErr == nil {
-				assert.NoErrorf(t, err, "expected no error but got %v", err)
-				assert.EqualExportedValuesf(t, *tt.config, *updaterConfig, "expected %#+v but got %#+v", tt.config, updaterConfig)
+			cfg, err := New(tt.remoteURL, rootBytes)
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorMessage != "" {
+					assert.Contains(t, err.Error(), tt.errorMessage)
+				}
+				assert.Nil(t, cfg)
 				return
 			}
-			// compare the error with our expected error
-			assert.Nilf(t, updaterConfig, "expected nil but got %#+v", updaterConfig)
-			assert.Errorf(t, err, "expected %v but got %v", tt.wantErr, err)
+			assert.NoError(t, err)
+			assert.NotNil(t, cfg)
+			if tt.validate != nil {
+				tt.validate(t, cfg)
+			}
 		})
 	}
 }
 
-func TestEnsurePathsExist(t *testing.T) {
-	// setup testing table (tt) and create subtest for each entry
-	for _, tt := range []struct {
-		name    string
-		desc    string
-		config  *UpdaterConfig
-		setup   func(t *testing.T, cfg *UpdaterConfig)
-		wantErr error
+// TestUpdaterConfigDefaults verifies the default and custom configuration values.
+func TestUpdaterConfigDefaults(t *testing.T) {
+	t.Run("default configuration values", func(t *testing.T) {
+		rootBytes := helpers.CreateTestRootJSON(t)
+		cfg, err := New("https://example.com", rootBytes)
+		assert.NoError(t, err)
+
+		// Inputs are stored on the config, and the targets URL is derived
+		// from the metadata URL.
+		assert.Equal(t, "https://example.com", cfg.RemoteMetadataURL)
+		assert.Equal(t, "https://example.com/targets", cfg.RemoteTargetsURL)
+		assert.Equal(t, rootBytes, cfg.LocalTrustedRoot)
+
+		assert.Equal(t, int64(256), cfg.MaxRootRotations)
+		assert.Equal(t, 32, cfg.MaxDelegations)
+		assert.Equal(t, int64(512000), cfg.RootMaxLength)
+		assert.Equal(t, int64(16384), cfg.TimestampMaxLength)
+		assert.Equal(t, int64(2000000), cfg.SnapshotMaxLength)
+		assert.Equal(t, int64(5000000), cfg.TargetsMaxLength)
+		assert.False(t, cfg.UnsafeLocalMode)
+		assert.True(t, cfg.PrefixTargetsWithHash)
+		assert.False(t, cfg.DisableLocalCache)
+		assert.NotNil(t, cfg.Fetcher)
+		assert.IsType(t, &fetcher.DefaultFetcher{}, cfg.Fetcher)
+	})
+
+	t.Run("custom configuration values", func(t *testing.T) {
+		cfg, err := New("https://example.com", helpers.CreateTestRootJSON(t))
+		assert.NoError(t, err)
+
+		cfg.MaxRootRotations = 100
+		cfg.MaxDelegations = 10
+		cfg.RootMaxLength = 100000
+		cfg.UnsafeLocalMode = true
+		cfg.PrefixTargetsWithHash = false
+
+		assert.Equal(t, int64(100), cfg.MaxRootRotations)
+		assert.Equal(t, 10, cfg.MaxDelegations)
+		assert.Equal(t, int64(100000), cfg.RootMaxLength)
+		assert.True(t, cfg.UnsafeLocalMode)
+		assert.False(t, cfg.PrefixTargetsWithHash)
+	})
+}
+
+// TestEnsurePathsExistTable tests EnsurePathsExist via table-driven subtests.
+// EnsurePathsExist calls os.MkdirAll to create local cache directories.
+func TestEnsurePathsExistTable(t *testing.T) {
+	tests := []struct {
+		name         string
+		buildConfig  func(t *testing.T) *UpdaterConfig
+		expectError  bool
+		errorIs      error
+		errorMessage string
 	}{
 		{
-			name: "success",
-			desc: "No errors expected",
-			config: &UpdaterConfig{
-				DisableLocalCache: false,
-			},
-			setup: func(t *testing.T, cfg *UpdaterConfig) {
+			name: "creates metadata and targets directories",
+			buildConfig: func(t *testing.T) *UpdaterConfig {
 				t.Helper()
 				tmp := t.TempDir()
-				cfg.LocalTargetsDir = filepath.Join(tmp, "targets")
+				cfg, err := New("https://example.com", helpers.CreateTestRootJSON(t))
+				assert.NoError(t, err)
 				cfg.LocalMetadataDir = filepath.Join(tmp, "metadata")
+				cfg.LocalTargetsDir = filepath.Join(tmp, "targets")
+				return cfg
 			},
-			wantErr: nil,
+			expectError: false,
 		},
 		{
-			name: "path not exist",
-			desc: "No local directories error",
-			config: &UpdaterConfig{
-				DisableLocalCache: false,
-			},
-			setup: func(t *testing.T, cfg *UpdaterConfig) {
+			name: "creates deeply nested directories",
+			buildConfig: func(t *testing.T) *UpdaterConfig {
 				t.Helper()
+				tmp := t.TempDir()
+				cfg, err := New("https://example.com", helpers.CreateTestRootJSON(t))
+				assert.NoError(t, err)
+				cfg.LocalMetadataDir = filepath.Join(tmp, "a", "b", "c", "metadata")
+				cfg.LocalTargetsDir = filepath.Join(tmp, "a", "b", "c", "targets")
+				return cfg
 			},
-			wantErr: os.ErrNotExist,
+			expectError: false,
 		},
 		{
-			name: "no local cache",
-			desc: "Test if method no-op works",
-			config: &UpdaterConfig{
-				DisableLocalCache: true,
-			},
-			setup: func(t *testing.T, cfg *UpdaterConfig) {
+			name: "no-op when DisableLocalCache is true",
+			buildConfig: func(t *testing.T) *UpdaterConfig {
 				t.Helper()
+				cfg, err := New("https://example.com", helpers.CreateTestRootJSON(t))
+				assert.NoError(t, err)
+				cfg.DisableLocalCache = true
+				// Empty paths that would otherwise fail
+				cfg.LocalMetadataDir = ""
+				cfg.LocalTargetsDir = ""
+				return cfg
 			},
-			wantErr: nil,
+			expectError: false,
 		},
-	} {
+		{
+			name: "fails when metadata dir path is empty",
+			buildConfig: func(t *testing.T) *UpdaterConfig {
+				t.Helper()
+				cfg, err := New("https://example.com", helpers.CreateTestRootJSON(t))
+				assert.NoError(t, err)
+				cfg.LocalMetadataDir = ""
+				cfg.LocalTargetsDir = ""
+				return cfg
+			},
+			expectError: true,
+			errorIs:     os.ErrNotExist,
+		},
+		{
+			name: "fails when metadata dir path is a file",
+			buildConfig: func(t *testing.T) *UpdaterConfig {
+				t.Helper()
+				tmp := t.TempDir()
+				// Create a file at the path where a directory is expected
+				metadataFile := filepath.Join(tmp, "metadata_file")
+				err := os.WriteFile(metadataFile, []byte("test"), 0600)
+				assert.NoError(t, err)
+
+				cfg, err := New("https://example.com", helpers.CreateTestRootJSON(t))
+				assert.NoError(t, err)
+				cfg.LocalMetadataDir = metadataFile
+				cfg.LocalTargetsDir = filepath.Join(tmp, "targets")
+				return cfg
+			},
+			expectError: true,
+		},
+		{
+			name: "already-existing directories succeed",
+			buildConfig: func(t *testing.T) *UpdaterConfig {
+				t.Helper()
+				tmp := t.TempDir()
+				metadataDir := filepath.Join(tmp, "metadata")
+				targetsDir := filepath.Join(tmp, "targets")
+				assert.NoError(t, os.MkdirAll(metadataDir, 0700))
+				assert.NoError(t, os.MkdirAll(targetsDir, 0700))
+
+				cfg, err := New("https://example.com", helpers.CreateTestRootJSON(t))
+				assert.NoError(t, err)
+				cfg.LocalMetadataDir = metadataDir
+				cfg.LocalTargetsDir = targetsDir
+				return cfg
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// this will only be printed if run in verbose mode or if test fails
-			t.Logf("Desc: %s", tt.desc)
-			// run special test setup in case it is needed for any subtest
-			tt.setup(t, tt.config)
-			// run the method under test
-			err := tt.config.EnsurePathsExist()
-			// special case if we expect no error
-			if tt.wantErr == nil {
-				assert.NoErrorf(t, err, "expected no error but got %v", err)
+			cfg := tt.buildConfig(t)
+			err := cfg.EnsurePathsExist()
+
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorIs != nil {
+					assert.ErrorIs(t, err, tt.errorIs)
+				}
+				if tt.errorMessage != "" {
+					assert.Contains(t, err.Error(), tt.errorMessage)
+				}
 				return
 			}
-			// compare the error with our expected error
-			assert.ErrorIsf(t, err, tt.wantErr, "expected %v but got %v", tt.wantErr, err)
+			assert.NoError(t, err)
 		})
 	}
+}
+
+// TestUpdaterConfigCopy verifies that config values can be copied independently.
+func TestUpdaterConfigCopy(t *testing.T) {
+	original, err := New("https://example.com", helpers.CreateTestRootJSON(t))
+	assert.NoError(t, err)
+
+	copied := *original
+
+	// Mutate the original
+	original.MaxRootRotations = 999
+	original.UnsafeLocalMode = true
+
+	// Verify the copy is independent of the original
+	assert.NotEqual(t, copied.MaxRootRotations, original.MaxRootRotations)
+	assert.NotEqual(t, copied.UnsafeLocalMode, original.UnsafeLocalMode)
+}
+
+// TestUpdaterConfigCustomFetcher verifies that a custom fetcher can be set.
+func TestUpdaterConfigCustomFetcher(t *testing.T) {
+	cfg, err := New("https://example.com", helpers.CreateTestRootJSON(t))
+	assert.NoError(t, err)
+
+	customFetcher := &fetcher.DefaultFetcher{}
+	cfg.Fetcher = customFetcher
+
+	assert.Same(t, customFetcher, cfg.Fetcher)
 }
