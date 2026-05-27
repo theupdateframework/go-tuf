@@ -18,6 +18,7 @@
 package updater
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils/simulator"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
+	"github.com/theupdateframework/go-tuf/v2/metadata/config"
 )
 
 // createAndRefresh creates an updater for the test repository and runs Refresh
@@ -622,6 +624,525 @@ func TestHashMismatchTable(t *testing.T) {
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, tc.wantErrType)
 			assert.ErrorContains(t, err, tc.wantErrMsg)
+		})
+	}
+}
+
+// TestUpdaterConstructorTable exercises Updater construction itself
+// (independently of Refresh): the unsafe variant, the trusted root
+// missing case, and the initial trusted-set assertions.
+func TestUpdaterConstructorTable(t *testing.T) {
+	tests := []struct {
+		name        string
+		buildCfg    func(t *testing.T, repo *simulator.TestRepository) *config.UpdaterConfig
+		wantErr     bool
+		wantErrMsg  string
+		assertTrust func(t *testing.T, up *Updater)
+	}{
+		{
+			name: "constructor loads trusted root",
+			buildCfg: func(t *testing.T, repo *simulator.TestRepository) *config.UpdaterConfig {
+				t.Helper()
+				cfg, err := repo.GetUpdaterConfig()
+				assert.NoError(t, err)
+				return cfg
+			},
+			assertTrust: func(t *testing.T, up *Updater) {
+				t.Helper()
+				ts := up.GetTrustedMetadataSet()
+				assert.Equal(t, metadata.ROOT, ts.Root.Signed.Type)
+				assert.Equal(t, metadata.SPECIFICATION_VERSION, ts.Root.Signed.SpecVersion)
+				assert.True(t, ts.Root.Signed.ConsistentSnapshot)
+				assert.Equal(t, int64(1), ts.Root.Signed.Version)
+				assert.Nil(t, ts.Snapshot)
+				assert.Nil(t, ts.Timestamp)
+				assert.Empty(t, ts.Targets)
+			},
+		},
+		{
+			name: "unsafe constructor loads trusted root",
+			buildCfg: func(t *testing.T, repo *simulator.TestRepository) *config.UpdaterConfig {
+				t.Helper()
+				cfg, err := repo.GetUnsafeUpdaterConfig()
+				assert.NoError(t, err)
+				return cfg
+			},
+			assertTrust: func(t *testing.T, up *Updater) {
+				t.Helper()
+				ts := up.GetTrustedMetadataSet()
+				assert.Equal(t, metadata.ROOT, ts.Root.Signed.Type)
+				assert.Equal(t, int64(1), ts.Root.Signed.Version)
+				assert.True(t, ts.Root.Signed.ConsistentSnapshot)
+				assert.Nil(t, ts.Snapshot)
+				assert.Nil(t, ts.Timestamp)
+				assert.Empty(t, ts.Targets)
+			},
+		},
+		{
+			name: "missing trusted root and remote URL fails construction",
+			buildCfg: func(t *testing.T, repo *simulator.TestRepository) *config.UpdaterConfig {
+				t.Helper()
+				cfg, err := repo.GetUpdaterConfig()
+				assert.NoError(t, err)
+				cfg.LocalTrustedRoot = []byte{}
+				cfg.RemoteMetadataURL = ""
+				return cfg
+			},
+			wantErr:    true,
+			wantErrMsg: "no initial trusted root metadata or remote URL provided",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := simulator.NewTestRepository(t)
+			defer repo.Cleanup()
+
+			cfg := tc.buildCfg(t, repo)
+			up, err := New(cfg)
+			if tc.wantErr {
+				assert.Error(t, err)
+				if tc.wantErrMsg != "" {
+					assert.ErrorContains(t, err, tc.wantErrMsg)
+				}
+				return
+			}
+			assert.NoError(t, err)
+			assert.NotNil(t, up)
+			if tc.assertTrust != nil {
+				tc.assertTrust(t, up)
+			}
+		})
+	}
+}
+
+// TestUnsafeRefreshTable covers refresh behaviour with UnsafeLocalMode:
+// fresh state should fail (no remote fetches), but a previously-warmed
+// cache should be loadable in unsafe mode.
+func TestUnsafeRefreshTable(t *testing.T) {
+	t.Run("fresh unsafe refresh fails -- no remote fetch performed", func(t *testing.T) {
+		repo := simulator.NewTestRepository(t)
+		defer repo.Cleanup()
+
+		repo.BumpVersion(metadata.ROOT)
+
+		cfg, err := repo.GetUnsafeUpdaterConfig()
+		assert.NoError(t, err)
+		up, err := New(cfg)
+		assert.NoError(t, err)
+
+		err = up.Refresh()
+		assert.Error(t, err)
+		// Only the trusted root file should be present on disk.
+		repo.AssertFilesExact([]string{metadata.ROOT})
+	})
+
+	t.Run("unsafe refresh loads cached metadata after a real refresh", func(t *testing.T) {
+		repo := simulator.NewTestRepository(t)
+		defer repo.Cleanup()
+
+		repo.BumpVersion(metadata.ROOT)
+
+		// First, do a real refresh to populate the cache.
+		_, err := createAndRefresh(t, repo)
+		assert.NoError(t, err)
+		repo.AssertFilesExist(metadata.TOP_LEVEL_ROLE_NAMES[:])
+
+		// Now construct an unsafe updater pointing at the same dirs;
+		// it should load the cached set without any new fetches.
+		unsafeCfg, err := repo.GetUnsafeUpdaterConfig()
+		assert.NoError(t, err)
+		up, err := New(unsafeCfg)
+		assert.NoError(t, err)
+		err = up.Refresh()
+		assert.NoError(t, err)
+
+		ts := up.GetTrustedMetadataSet()
+		assert.NotNil(t, ts.Snapshot)
+		assert.NotNil(t, ts.Timestamp)
+		assert.Equal(t, 1, len(ts.Targets))
+	})
+}
+
+// TestTrustedRootUnsignedTable: if the locally-stored root.json has its
+// signatures cleared, New must reject it via the standard threshold
+// verification path.
+func TestTrustedRootUnsignedTable(t *testing.T) {
+	repo := simulator.NewTestRepository(t)
+	defer repo.Cleanup()
+
+	rootPath := filepath.Join(repo.MetadataDir, "root.json")
+	mdRoot, err := repo.Simulator.MDRoot.FromFile(rootPath)
+	assert.NoError(t, err)
+	mdRoot.ClearSignatures()
+	assert.NoError(t, mdRoot.ToFile(rootPath, true))
+	assert.NoError(t, repo.ReloadRootBytes())
+
+	_, err = createAndRefresh(t, repo)
+	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 0, want 1"})
+
+	// The on-disk root must remain the unsigned one we just wrote.
+	repo.AssertFilesExist([]string{metadata.ROOT})
+	mdRootAfter, err := repo.Simulator.MDRoot.FromFile(rootPath)
+	assert.NoError(t, err)
+	expected, err := mdRoot.ToBytes(false)
+	assert.NoError(t, err)
+	actual, err := mdRootAfter.ToBytes(false)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, actual)
+}
+
+// TestIntermediateRootIncorrectlySignedTable: a published intermediate
+// root that wasn't signed by the trusted root keys is rejected.
+func TestIntermediateRootIncorrectlySignedTable(t *testing.T) {
+	repo := simulator.NewTestRepository(t)
+	defer repo.Cleanup()
+
+	repo.Simulator.MDRoot.Signed.Version += 1
+	// Drop all root signers so PublishRoot writes an unsigned root v2.
+	for k := range repo.Simulator.Signers[metadata.ROOT] {
+		delete(repo.Simulator.Signers[metadata.ROOT], k)
+	}
+	repo.PublishRoot()
+
+	_, err := createAndRefresh(t, repo)
+	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 0, want 1"})
+	repo.AssertFilesExist([]string{metadata.ROOT})
+	repo.AssertVersionEquals(metadata.ROOT, 1)
+}
+
+// TestMaxRootRotationsTable: the client stops walking root versions
+// once MaxRootRotations have been applied.
+func TestMaxRootRotationsTable(t *testing.T) {
+	repo := simulator.NewTestRepository(t)
+	defer repo.Cleanup()
+
+	cfg, err := repo.GetUpdaterConfig()
+	assert.NoError(t, err)
+	cfg.MaxRootRotations = 3
+	up, err := New(cfg)
+	assert.NoError(t, err)
+
+	for repo.Simulator.MDRoot.Signed.Version < cfg.MaxRootRotations+3 {
+		repo.BumpVersion(metadata.ROOT)
+	}
+
+	rootPath := filepath.Join(repo.MetadataDir, "root.json")
+	mdRoot, err := repo.Simulator.MDRoot.FromFile(rootPath)
+	assert.NoError(t, err)
+	initialRootVersion := mdRoot.Signed.Version
+
+	assert.NoError(t, up.Refresh())
+	repo.AssertVersionEquals(metadata.ROOT, initialRootVersion+cfg.MaxRootRotations)
+}
+
+// TestTrustedRootExpiredRecoveryTable: after the trusted root expires,
+// publishing a fresh (non-expired) root must let the next refresh
+// recover. Exercises the recovery half that TestRootUpdatesTable's
+// "trusted root expired fails" only sets up.
+func TestTrustedRootExpiredRecoveryTable(t *testing.T) {
+	repo := simulator.NewTestRepository(t)
+	defer repo.Cleanup()
+
+	// Publish an expired root v2.
+	repo.SetExpired(metadata.ROOT)
+	repo.BumpVersion(metadata.ROOT)
+
+	cfg, err := repo.GetUpdaterConfig()
+	assert.NoError(t, err)
+	up, err := New(cfg)
+	assert.NoError(t, err)
+	err = up.Refresh()
+	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "final root.json is expired"})
+	repo.AssertFilesExist([]string{metadata.ROOT})
+	repo.AssertVersionEquals(metadata.ROOT, 2)
+
+	// Now publish a fresh root v3 with a future expiry.
+	repo.Simulator.MDRoot.Signed.Expires = repo.Simulator.SafeExpiry
+	repo.BumpVersion(metadata.ROOT)
+
+	up, err = New(cfg)
+	assert.NoError(t, err)
+	assert.NoError(t, up.Refresh())
+	repo.AssertFilesExist(metadata.TOP_LEVEL_ROLE_NAMES[:])
+	repo.AssertVersionEquals(metadata.ROOT, 3)
+}
+
+// TestExpiredTimestampVersionRollbackTable: rollback protection must
+// use the trusted local timestamp even when that local timestamp has
+// expired. The harness uses UnsafeSetRefTime to simulate the clock
+// moving forward past the local timestamp's expiry.
+func TestExpiredTimestampVersionRollbackTable(t *testing.T) {
+	repo := simulator.NewTestRepository(t)
+	defer repo.Cleanup()
+
+	now := time.Now()
+	// Timestamp v2 expires in 7 days. First refresh stores it in cache.
+	repo.SetExpiresAt(metadata.TIMESTAMP, now.Add(7*24*time.Hour))
+	repo.SetVersion(metadata.TIMESTAMP, 2)
+
+	cfg, err := repo.GetUpdaterConfig()
+	assert.NoError(t, err)
+	up, err := New(cfg)
+	assert.NoError(t, err)
+	assert.NoError(t, up.Refresh())
+
+	// Repository now serves timestamp v1 (rollback attempt) with a 21-day
+	// expiry. Simulate the client clock 18 days later: local v2 has
+	// expired, but the rollback rule must still reject v1.
+	repo.SetExpiresAt(metadata.TIMESTAMP, now.Add(21*24*time.Hour))
+	repo.SetVersion(metadata.TIMESTAMP, 1)
+
+	up, err = New(cfg)
+	assert.NoError(t, err)
+	up.UnsafeSetRefTime(now.Add(18 * 24 * time.Hour))
+	err = up.Refresh()
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "new timestamp version 1 must be >= 2"})
+	repo.AssertVersionEquals(metadata.TIMESTAMP, 2)
+}
+
+// TestNewTimestampSnapshotRollbackTable: the timestamp's snapshot meta
+// version must never regress relative to what the client previously
+// trusted, even if the published timestamp is a strictly newer version.
+func TestNewTimestampSnapshotRollbackTable(t *testing.T) {
+	repo := simulator.NewTestRepository(t)
+	defer repo.Cleanup()
+
+	repo.SetVersion(metadata.SNAPSHOT, 2)
+	repo.UpdateTimestamp() // timestamp v2 referencing snapshot v2
+	_, err := createAndRefresh(t, repo)
+	assert.NoError(t, err)
+
+	// Drop snapshot meta version to 1 while bumping timestamp to v3.
+	repo.Simulator.MDTimestamp.Signed.Meta["snapshot.json"].Version = 1
+	repo.Simulator.MDTimestamp.Signed.Version += 1
+
+	_, err = createAndRefresh(t, repo)
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "new snapshot version 1 must be >= 2"})
+	repo.AssertVersionEquals(metadata.TIMESTAMP, 2)
+}
+
+// TestComputeMetafileHashesLengthTable: enabling the simulator's hash
+// computation must not break successive refreshes, and switching it
+// off mid-flight must also still produce a valid refresh.
+func TestComputeMetafileHashesLengthTable(t *testing.T) {
+	repo := simulator.NewTestRepository(t)
+	defer repo.Cleanup()
+
+	repo.EnableComputeHashesAndLength()
+	repo.UpdateSnapshot()
+	_, err := createAndRefresh(t, repo)
+	assert.NoError(t, err)
+	repo.AssertVersionEquals(metadata.TIMESTAMP, 2)
+	repo.AssertVersionEquals(metadata.SNAPSHOT, 2)
+
+	repo.DisableComputeHashesAndLength()
+	repo.UpdateSnapshot()
+	_, err = createAndRefresh(t, repo)
+	assert.NoError(t, err)
+	repo.AssertVersionEquals(metadata.TIMESTAMP, 3)
+	repo.AssertVersionEquals(metadata.SNAPSHOT, 3)
+}
+
+// TestSnapshotRollbackWithLocalSnapshotHashMismatchTable: snapshot
+// rollback detection must still fire on the new snapshot even when
+// the locally-stored snapshot's hash disagrees with timestamp.meta.
+func TestSnapshotRollbackWithLocalSnapshotHashMismatchTable(t *testing.T) {
+	repo := simulator.NewTestRepository(t)
+	defer repo.Cleanup()
+
+	repo.EnableComputeHashesAndLength()
+	// Targets starts at version 2; snapshot meta now references targets@2.
+	repo.SetVersion(metadata.TARGETS, 2)
+	repo.UpdateSnapshot()
+	_, err := createAndRefresh(t, repo)
+	assert.NoError(t, err)
+
+	// Now the repository tries to ship targets@1 -- rollback.
+	repo.SetVersion(metadata.TARGETS, 1)
+	repo.UpdateSnapshot()
+	_, err = createAndRefresh(t, repo)
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected targets.json version 1, got 2"})
+}
+
+// TestExpiredMetadataTable: an expired local timestamp/snapshot must
+// still be usable to fetch and validate newer remote metadata.
+func TestExpiredMetadataTable(t *testing.T) {
+	repo := simulator.NewTestRepository(t)
+	defer repo.Cleanup()
+
+	now := time.Now()
+	repo.SetExpiresAt(metadata.TIMESTAMP, now.Add(7*24*time.Hour))
+
+	cfg, err := repo.GetUpdaterConfig()
+	assert.NoError(t, err)
+	up, err := New(cfg)
+	assert.NoError(t, err)
+	assert.NoError(t, up.Refresh())
+
+	// Repository bumps targets and snapshot, refreshes timestamp expiry.
+	repo.Simulator.MDTargets.Signed.Version += 1
+	repo.UpdateSnapshot()
+	repo.SetExpiresAt(metadata.TIMESTAMP, now.Add(21*24*time.Hour))
+
+	// 18 days later the local timestamp v1 is expired; the client must
+	// still successfully refresh to v2.
+	up, err = New(cfg)
+	assert.NoError(t, err)
+	up.UnsafeSetRefTime(now.Add(18 * 24 * time.Hour))
+	assert.NoError(t, up.Refresh())
+
+	mdTs, err := metadata.Timestamp().FromFile(filepath.Join(repo.MetadataDir, "timestamp.json"))
+	assert.NoError(t, err)
+	assert.Equal(t, int64(2), mdTs.Signed.Version)
+
+	mdSn, err := metadata.Snapshot().FromFile(filepath.Join(repo.MetadataDir, "snapshot.json"))
+	assert.NoError(t, err)
+	assert.Equal(t, int64(2), mdSn.Signed.Version)
+
+	mdTg, err := metadata.Targets().FromFile(filepath.Join(repo.MetadataDir, "targets.json"))
+	assert.NoError(t, err)
+	assert.Equal(t, int64(2), mdTg.Signed.Version)
+}
+
+// TestMaxMetadataLengthsTable: lowering the per-role MaxLength below
+// the actual payload must trip ErrDownloadLengthMismatch for that role.
+func TestMaxMetadataLengthsTable(t *testing.T) {
+	tests := []struct {
+		name      string
+		applyLow  func(cfg *config.UpdaterConfig)
+		wantErrIs error
+	}{
+		{
+			name:      "root max length too low",
+			applyLow:  func(cfg *config.UpdaterConfig) { cfg.RootMaxLength = 100 },
+			wantErrIs: &metadata.ErrDownloadLengthMismatch{},
+		},
+		{
+			name:      "timestamp max length too low",
+			applyLow:  func(cfg *config.UpdaterConfig) { cfg.TimestampMaxLength = 100 },
+			wantErrIs: &metadata.ErrDownloadLengthMismatch{},
+		},
+		{
+			name:      "snapshot max length too low",
+			applyLow:  func(cfg *config.UpdaterConfig) { cfg.SnapshotMaxLength = 100 },
+			wantErrIs: &metadata.ErrDownloadLengthMismatch{},
+		},
+		{
+			name:      "targets max length too low",
+			applyLow:  func(cfg *config.UpdaterConfig) { cfg.TargetsMaxLength = 100 },
+			wantErrIs: &metadata.ErrDownloadLengthMismatch{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := simulator.NewTestRepository(t)
+			defer repo.Cleanup()
+
+			// Ensure there's a root v2 to fetch so RootMaxLength bites.
+			repo.BumpVersion(metadata.ROOT)
+
+			cfg, err := repo.GetUpdaterConfig()
+			assert.NoError(t, err)
+			tc.applyLow(cfg)
+			up, err := New(cfg)
+			assert.NoError(t, err)
+
+			err = up.Refresh()
+			assert.ErrorIs(t, err, tc.wantErrIs)
+		})
+	}
+}
+
+// TestTimestampEqVersionsCheckTable: a timestamp whose version matches
+// the locally-trusted version (but with different meta) must not
+// replace the trusted copy.
+func TestTimestampEqVersionsCheckTable(t *testing.T) {
+	repo := simulator.NewTestRepository(t)
+	defer repo.Cleanup()
+
+	_, err := createAndRefresh(t, repo)
+	assert.NoError(t, err)
+
+	initial := repo.Simulator.MDTimestamp.Signed.Meta["snapshot.json"].Version
+	// Mutate meta without bumping timestamp version.
+	repo.Simulator.MDTimestamp.Signed.Meta["snapshot.json"].Version = 100
+
+	_, err = createAndRefresh(t, repo)
+	assert.NoError(t, err)
+
+	stored, err := metadata.Timestamp().FromFile(filepath.Join(repo.MetadataDir, "timestamp.json"))
+	assert.NoError(t, err)
+	assert.Equal(t, initial, stored.Signed.Meta["snapshot.json"].Version)
+}
+
+// TestDelegatesConsistentSnapshotTable verifies the delegated-targets
+// fetch behaviour under both consistent-snapshot modes. The fetch
+// tracker records every metadata GET so we can assert the exact set
+// of version-prefixed (or unprefixed) names the client requested.
+func TestDelegatesConsistentSnapshotTable(t *testing.T) {
+	tests := []struct {
+		name               string
+		consistentSnapshot bool
+		expectedDelegates  []simulator.FTMetadata
+	}{
+		{
+			name:               "consistent snapshot disabled -- no version prefix on delegate fetches",
+			consistentSnapshot: false,
+			expectedDelegates: []simulator.FTMetadata{
+				{Name: "role1", Value: -1},
+				{Name: "..", Value: -1},
+				{Name: ".", Value: -1},
+			},
+		},
+		{
+			name:               "consistent snapshot enabled -- version prefix on delegate fetches",
+			consistentSnapshot: true,
+			expectedDelegates: []simulator.FTMetadata{
+				{Name: "role1", Value: 1},
+				{Name: "..", Value: 1},
+				{Name: ".", Value: 1},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := simulator.NewTestRepository(t)
+			defer repo.Cleanup()
+
+			repo.Simulator.MDRoot.Signed.ConsistentSnapshot = tc.consistentSnapshot
+			repo.BumpVersion(metadata.ROOT)
+
+			// Register three delegated roles with distinctive names.
+			target := metadata.Targets(repo.Simulator.SafeExpiry)
+			for _, name := range []string{"role1", "..", "."} {
+				dr := metadata.DelegatedRole{
+					Name:        name,
+					KeyIDs:      []string{},
+					Threshold:   1,
+					Terminating: false,
+					Paths:       []string{"*"},
+				}
+				repo.Simulator.AddDelegation("targets", dr, target.Signed)
+			}
+			repo.UpdateSnapshot()
+
+			cfg, err := repo.GetUpdaterConfig()
+			assert.NoError(t, err)
+			up, err := New(cfg)
+			assert.NoError(t, err)
+			assert.NoError(t, up.Refresh())
+
+			// Reset tracker to isolate the delegate-fetch requests
+			// triggered by GetTargetInfo.
+			repo.Simulator.FetchTracker.Metadata = []simulator.FTMetadata{}
+			_, err = up.GetTargetInfo("anything")
+			assert.ErrorContains(t, err, "target anything not found")
+
+			assert.ElementsMatch(t, tc.expectedDelegates, repo.Simulator.FetchTracker.Metadata)
+			repo.AssertFilesExist(metadata.TOP_LEVEL_ROLE_NAMES[:])
 		})
 	}
 }
