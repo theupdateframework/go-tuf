@@ -777,64 +777,67 @@ func TestClearSignatures(t *testing.T) {
 	assert.Equal(t, []Signature{}, meta.Signatures)
 }
 
-func TestIsExpiredRoot(t *testing.T) {
-	// without setting expiration
-	meta := Root()
-	assert.NotNil(t, meta)
-	// ensure time passed
-	time.Sleep(1 * time.Microsecond)
-	assert.True(t, meta.Signed.IsExpired(time.Now().UTC()))
-
-	// setting expiration in 2 days from now
-	expire := time.Now().AddDate(0, 0, 2).UTC()
-	meta = Root(expire)
-	assert.NotNil(t, meta)
-	assert.False(t, meta.Signed.IsExpired(time.Now().UTC()))
-}
-
-func TestIsExpiredSnapshot(t *testing.T) {
-	// without setting expiration
-	meta := Snapshot()
-	assert.NotNil(t, meta)
-	// ensure time passed
-	time.Sleep(1 * time.Microsecond)
-	assert.True(t, meta.Signed.IsExpired(time.Now().UTC()))
-
-	// setting expiration in 2 days from now
-	expire := time.Now().AddDate(0, 0, 2).UTC()
-	meta = Snapshot(expire)
-	assert.NotNil(t, meta)
-	assert.False(t, meta.Signed.IsExpired(time.Now().UTC()))
-}
-
-func TestIsExpiredTimestamp(t *testing.T) {
-	// without setting expiration
-	meta := Timestamp()
-	assert.NotNil(t, meta)
-	// ensure time passed
-	time.Sleep(1 * time.Microsecond)
-	assert.True(t, meta.Signed.IsExpired(time.Now().UTC()))
-
-	// setting expiration in 2 days from now
-	expire := time.Now().AddDate(0, 0, 2).UTC()
-	meta = Timestamp(expire)
-	assert.NotNil(t, meta)
-	assert.False(t, meta.Signed.IsExpired(time.Now().UTC()))
-}
-
-func TestIsExpiredTargets(t *testing.T) {
-	// without setting expiration
-	meta := Targets()
-	assert.NotNil(t, meta)
-	// ensure time passed
-	time.Sleep(1 * time.Microsecond)
-	assert.True(t, meta.Signed.IsExpired(time.Now().UTC()))
-
-	// setting expiration in 2 days from now
-	expire := time.Now().AddDate(0, 0, 2).UTC()
-	meta = Targets(expire)
-	assert.NotNil(t, meta)
-	assert.False(t, meta.Signed.IsExpired(time.Now().UTC()))
+// TestIsExpiredTable verifies that each top-level role's default-constructed
+// metadata is already expired and that a future-dated expiry makes it not
+// expired. Replaces the per-role TestIsExpiredRoot/Snapshot/Timestamp/Targets.
+func TestIsExpiredTable(t *testing.T) {
+	// The closure constructs both metadata copies (default + future-dated) and
+	// reports whether each is expired relative to a freshly-sampled "now". The
+	// short sleep guarantees the no-arg constructor's "expires == time.Now()"
+	// is reliably in the past by the time IsExpired is asked.
+	tests := []struct {
+		name     string
+		expirers func(expire time.Time) (defaultExpired, futureExpired bool)
+	}{
+		{
+			name: "root",
+			expirers: func(expire time.Time) (bool, bool) {
+				def := Root()
+				time.Sleep(1 * time.Microsecond)
+				future := Root(expire)
+				now := time.Now().UTC()
+				return def.Signed.IsExpired(now), future.Signed.IsExpired(now)
+			},
+		},
+		{
+			name: "snapshot",
+			expirers: func(expire time.Time) (bool, bool) {
+				def := Snapshot()
+				time.Sleep(1 * time.Microsecond)
+				future := Snapshot(expire)
+				now := time.Now().UTC()
+				return def.Signed.IsExpired(now), future.Signed.IsExpired(now)
+			},
+		},
+		{
+			name: "timestamp",
+			expirers: func(expire time.Time) (bool, bool) {
+				def := Timestamp()
+				time.Sleep(1 * time.Microsecond)
+				future := Timestamp(expire)
+				now := time.Now().UTC()
+				return def.Signed.IsExpired(now), future.Signed.IsExpired(now)
+			},
+		},
+		{
+			name: "targets",
+			expirers: func(expire time.Time) (bool, bool) {
+				def := Targets()
+				time.Sleep(1 * time.Microsecond)
+				future := Targets(expire)
+				now := time.Now().UTC()
+				return def.Signed.IsExpired(now), future.Signed.IsExpired(now)
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expire := time.Now().AddDate(0, 0, 2).UTC()
+			defaultExpired, futureExpired := tt.expirers(expire)
+			assert.True(t, defaultExpired, "default-constructed metadata should be expired")
+			assert.False(t, futureExpired, "metadata with future expiry should not be expired")
+		})
+	}
 }
 
 func TestUnrecognizedFieldRolesSigned(t *testing.T) {
@@ -1541,92 +1544,123 @@ func TestCompareFromBytesFromFileToBytes(t *testing.T) {
 	assert.Equal(t, stripWhitespaces(timestampBytesWant), stripWhitespaces(timestampBytesActual))
 }
 
-func TestRootReadWriteReadCompare(t *testing.T) {
-	src := filepath.Join(testutils.RepoDir, "root.json")
-	srcRoot, err := Root().FromFile(src)
-	assert.NoError(t, err)
+// TestRoundtripFileTable verifies that each top-level role's metadata can
+// be read from a fixture file, written back out, re-read, and reproduces
+// identical bytes. Replaces the per-role TestRootReadWriteReadCompare,
+// TestSnapshotReadWriteReadCompare, TestTargetsReadWriteReadCompare,
+// TestTimestampReadWriteReadCompare.
+func TestRoundtripFileTable(t *testing.T) {
+	// roundtrip reads src, writes to dst, reads dst back, and returns the
+	// canonical byte form of both copies for comparison.
+	tests := []struct {
+		name      string
+		srcRel    string
+		roundtrip func(src, dst string) (srcBytes, dstBytes []byte, err error)
+	}{
+		{
+			name:   "root",
+			srcRel: "root.json",
+			roundtrip: func(src, dst string) ([]byte, []byte, error) {
+				m, err := Root().FromFile(src)
+				if err != nil {
+					return nil, nil, err
+				}
+				if err := m.ToFile(dst, false); err != nil {
+					return nil, nil, err
+				}
+				m2, err := Root().FromFile(dst)
+				if err != nil {
+					return nil, nil, err
+				}
+				a, err := m.ToBytes(false)
+				if err != nil {
+					return nil, nil, err
+				}
+				b, err := m2.ToBytes(false)
+				return a, b, err
+			},
+		},
+		{
+			name:   "snapshot",
+			srcRel: "snapshot.json",
+			roundtrip: func(src, dst string) ([]byte, []byte, error) {
+				m, err := Snapshot().FromFile(src)
+				if err != nil {
+					return nil, nil, err
+				}
+				if err := m.ToFile(dst, false); err != nil {
+					return nil, nil, err
+				}
+				m2, err := Snapshot().FromFile(dst)
+				if err != nil {
+					return nil, nil, err
+				}
+				a, err := m.ToBytes(false)
+				if err != nil {
+					return nil, nil, err
+				}
+				b, err := m2.ToBytes(false)
+				return a, b, err
+			},
+		},
+		{
+			name:   "targets",
+			srcRel: "targets.json",
+			roundtrip: func(src, dst string) ([]byte, []byte, error) {
+				m, err := Targets().FromFile(src)
+				if err != nil {
+					return nil, nil, err
+				}
+				if err := m.ToFile(dst, false); err != nil {
+					return nil, nil, err
+				}
+				m2, err := Targets().FromFile(dst)
+				if err != nil {
+					return nil, nil, err
+				}
+				a, err := m.ToBytes(false)
+				if err != nil {
+					return nil, nil, err
+				}
+				b, err := m2.ToBytes(false)
+				return a, b, err
+			},
+		},
+		{
+			name:   "timestamp",
+			srcRel: "timestamp.json",
+			roundtrip: func(src, dst string) ([]byte, []byte, error) {
+				m, err := Timestamp().FromFile(src)
+				if err != nil {
+					return nil, nil, err
+				}
+				if err := m.ToFile(dst, false); err != nil {
+					return nil, nil, err
+				}
+				m2, err := Timestamp().FromFile(dst)
+				if err != nil {
+					return nil, nil, err
+				}
+				a, err := m.ToBytes(false)
+				if err != nil {
+					return nil, nil, err
+				}
+				b, err := m2.ToBytes(false)
+				return a, b, err
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			src := filepath.Join(testutils.RepoDir, tt.srcRel)
+			dst := src + ".tmp"
+			t.Cleanup(func() { _ = os.RemoveAll(dst) })
 
-	dst := src + ".tmp"
-	err = srcRoot.ToFile(dst, false)
-	assert.NoError(t, err)
-
-	dstRoot, err := Root().FromFile(dst)
-	assert.NoError(t, err)
-
-	srcBytes, err := srcRoot.ToBytes(false)
-	assert.NoError(t, err)
-	dstBytes, err := dstRoot.ToBytes(false)
-	assert.NoError(t, err)
-	assert.Equal(t, srcBytes, dstBytes)
-
-	err = os.RemoveAll(dst)
-	assert.NoError(t, err)
-}
-
-func TestSnapshotReadWriteReadCompare(t *testing.T) {
-	path1 := filepath.Join(testutils.RepoDir, "snapshot.json")
-	snaphot1, err := Snapshot().FromFile(path1)
-	assert.NoError(t, err)
-
-	path2 := path1 + ".tmp"
-	err = snaphot1.ToFile(path2, false)
-	assert.NoError(t, err)
-
-	snapshot2, err := Snapshot().FromFile(path2)
-	assert.NoError(t, err)
-
-	bytes1, err := snaphot1.ToBytes(false)
-	assert.NoError(t, err)
-	bytes2, err := snapshot2.ToBytes(false)
-	assert.NoError(t, err)
-	assert.Equal(t, bytes1, bytes2)
-
-	err = os.RemoveAll(path2)
-	assert.NoError(t, err)
-}
-
-func TestTargetsReadWriteReadCompare(t *testing.T) {
-	path1 := filepath.Join(testutils.RepoDir, "targets.json")
-	targets1, err := Targets().FromFile(path1)
-	assert.NoError(t, err)
-
-	path2 := path1 + ".tmp"
-	err = targets1.ToFile(path2, false)
-	assert.NoError(t, err)
-
-	targets2, err := Targets().FromFile(path2)
-	assert.NoError(t, err)
-
-	bytes1, err := targets1.ToBytes(false)
-	assert.NoError(t, err)
-	bytes2, err := targets2.ToBytes(false)
-	assert.NoError(t, err)
-	assert.Equal(t, bytes1, bytes2)
-
-	err = os.RemoveAll(path2)
-	assert.NoError(t, err)
-}
-
-func TestTimestampReadWriteReadCompare(t *testing.T) {
-	path1 := filepath.Join(testutils.RepoDir, "timestamp.json")
-	timestamp1, err := Timestamp().FromFile(path1)
-	assert.NoError(t, err)
-
-	path2 := path1 + ".tmp"
-	err = timestamp1.ToFile(path2, false)
-	assert.NoError(t, err)
-
-	timestamp2, err := Timestamp().FromFile(path2)
-	assert.NoError(t, err)
-
-	bytes1, err := timestamp1.ToBytes(false)
-	assert.NoError(t, err)
-	bytes2, err := timestamp2.ToBytes(false)
-	assert.NoError(t, err)
-	assert.Equal(t, bytes1, bytes2)
-
-	err = os.RemoveAll(path2)
-	assert.NoError(t, err)
+			a, b, err := tt.roundtrip(src, dst)
+			assert.NoError(t, err)
+			assert.Equal(t, a, b)
+		})
+	}
 }
 
 func stripWhitespaces(b []byte) []byte {
