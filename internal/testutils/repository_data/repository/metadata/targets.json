@@ -2,7 +2,7 @@
  "signatures": [
   {
    "keyid": "282612f348dcd7fe3f19e0f890e89fad48d45335deeb91deef92873934e6fe6d",
-   "sig": "699c0c762032f6471fceabfd2d61b80f352ad6bf2ba5fd7b114fd0b9b1ab8d94f1482776b3fef43c53183a9c9cd7f5de671cbdafdd5032bbe2c42273e953bf3ce9f99c2d46dac8802d6155082e10313e22c4886af2be113b626f2a8af930e01ed41df50a5dbe6ca4cedf5f5d2a7f3b7e7090abacc8aebd6e021ad021d3580cad"
+   "sig": "2f887b7661d41f0a695b543feb8e9928420548fa45e4e0a9585cbce85fcd75d1a4787c0847045c38798cd2cc322ca322f3ac49293e311b60455c815aeab7cda6241cea5380f85ff0d2fb9ebe29feb3cb3600c7c9b203852e286842e3e7cccbb2d3836616fe58cd3fe46da127c9b12a3f6cab43a1e6dd1ea206044bc732f0128d"
   }
  ],
  "signed": {
@@ -35,7 +35,7 @@
     }
    ]
   },
-  "expires": "2030-08-15T14:30:45.0000001Z",
+  "expires": "2030-08-15T14:30:45Z",
   "spec_version": "1.0.31",
   "targets": {
    "file1.txt": {
