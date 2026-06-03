@@ -20,7 +20,132 @@ package multirepo
 import (
 	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
+
+func TestNewConfig(t *testing.T) {
+	validMapJSON := []byte(`{
+		"repositories": {
+			"test-repo": ["https://example.com/repo"]
+		},
+		"mapping": []
+	}`)
+
+	tests := []struct {
+		name    string
+		desc    string
+		repoMap []byte
+		roots   map[string][]byte
+		wantErr bool
+	}{
+		{
+			name:    "empty map file returns error",
+			desc:    "Creating config with empty map file should fail",
+			repoMap: []byte(""),
+			roots:   map[string][]byte{},
+			wantErr: true,
+		},
+		{
+			name:    "empty roots returns error",
+			desc:    "Creating config with empty roots should fail",
+			repoMap: validMapJSON,
+			roots:   map[string][]byte{},
+			wantErr: true,
+		},
+		{
+			name:    "valid config succeeds",
+			desc:    "Creating config with valid map and roots should succeed",
+			repoMap: validMapJSON,
+			roots:   map[string][]byte{"test-repo": []byte(`{"signatures":[],"signed":{}}`)},
+			wantErr: false,
+		},
+		{
+			name:    "missing root for repo returns error",
+			desc:    "Creating config with missing root metadata for a repository should fail",
+			repoMap: validMapJSON,
+			roots:   map[string][]byte{"other-repo": []byte(`{"signatures":[],"signed":{}}`)},
+			wantErr: true,
+		},
+		{
+			name:    "invalid JSON map file returns error",
+			desc:    "Creating config with invalid JSON should fail",
+			repoMap: []byte(`{invalid json}`),
+			roots:   map[string][]byte{"test-repo": []byte(`{"signatures":[],"signed":{}}`)},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Logf("Desc: %s", tt.desc)
+
+			cfg, err := NewConfig(tt.repoMap, tt.roots)
+
+			if tt.wantErr {
+				assert.Error(t, err, "expected error but got none")
+				return
+			}
+
+			assert.NoError(t, err, "expected no error but got %v", err)
+			assert.NotNil(t, cfg, "expected config to be non-nil")
+		})
+	}
+}
+
+// TestNewConfigErrorWrapping asserts that NewConfig's input-validation
+// error wraps only the sentinel matching the actually-missing input, so
+// callers can use errors.Is to discriminate.
+func TestNewConfigErrorWrapping(t *testing.T) {
+	validMapJSON := []byte(`{
+		"repositories": {
+			"test-repo": ["https://example.com/repo"]
+		},
+		"mapping": []
+	}`)
+	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
+
+	tests := []struct {
+		name         string
+		repoMap      []byte
+		roots        map[string][]byte
+		shouldWrap   []error
+		shouldNotWrap []error
+	}{
+		{
+			name:          "only map file missing",
+			repoMap:       nil,
+			roots:         map[string][]byte{"test-repo": rootBytes},
+			shouldWrap:    []error{ErrNoMapFile},
+			shouldNotWrap: []error{ErrNoTrustedRoots},
+		},
+		{
+			name:          "only trusted roots missing",
+			repoMap:       validMapJSON,
+			roots:         map[string][]byte{},
+			shouldWrap:    []error{ErrNoTrustedRoots},
+			shouldNotWrap: []error{ErrNoMapFile},
+		},
+		{
+			name:       "both missing",
+			repoMap:    nil,
+			roots:      map[string][]byte{},
+			shouldWrap: []error{ErrNoMapFile, ErrNoTrustedRoots},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewConfig(tt.repoMap, tt.roots)
+			assert.Error(t, err)
+			for _, target := range tt.shouldWrap {
+				assert.ErrorIs(t, err, target, "error should wrap %v", target)
+			}
+			for _, target := range tt.shouldNotWrap {
+				assert.NotErrorIs(t, err, target, "error must not wrap %v", target)
+			}
+		})
+	}
+}
 
 func TestValidateRepoName(t *testing.T) {
 	tests := []struct {
