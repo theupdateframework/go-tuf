@@ -298,10 +298,11 @@ func FuzzMetadataFieldsValidation(f *testing.F) {
 			}
 		}()
 
-		// Create metadata structure with fuzz data. The expires field is
-		// a fixed constant so the fuzz payload stays reproducible for a
-		// given input across runs.
-		metadata := map[string]interface{}{
+		// Build the fuzz payload. The expires field is a fixed constant
+		// so the payload stays reproducible for a given input across
+		// runs. Local variable is named `payload` rather than `metadata`
+		// to avoid shadowing the enclosing package name.
+		payload := map[string]interface{}{
 			"signed": map[string]interface{}{
 				"_type":        metadataType,
 				"version":      version,
@@ -311,7 +312,7 @@ func FuzzMetadataFieldsValidation(f *testing.F) {
 			"signatures": []interface{}{},
 		}
 
-		jsonData, err := json.Marshal(metadata)
+		jsonData, err := json.Marshal(payload)
 		if err != nil {
 			return
 		}
