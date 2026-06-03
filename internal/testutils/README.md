@@ -10,8 +10,7 @@ internal/testutils/
 ├── setup.go                         # legacy setup helpers (compatibility)
 ├── helpers/
 │   ├── helpers.go                   # core test helper functions
-│   ├── fuzz.go                      # fuzz data generation utilities
-│   └── updater.go                   # updater-specific test helpers
+│   └── fuzz.go                      # fuzz data generation utilities
 ├── rsapss/                          # RSA-PSS signing utilities
 ├── signer/                          # generic signing test utilities
 └── simulator/
@@ -82,14 +81,6 @@ gen.CreateFuzzTestMetadata(metadataType string) []byte
 
 // Register standard seeds and run f.Fuzz:
 helpers.FuzzMetadataOperations(f, func(data []byte) error { ... })
-```
-
-### Updater utilities (`updater.go`)
-
-```go
-helpers.ContainsTargetWithPrefix(targets []string, prefix string) bool
-helpers.AssertTargetDownloaded(t, targetDir, targetName string)
-helpers.AssertTargetNotDownloaded(t, targetDir, targetName string)
 ```
 
 ## simulator package
