@@ -230,17 +230,33 @@ func TestNewFetcherWithHTTPClient(t *testing.T) {
 	assert.Same(t, custom, got.client)
 }
 
+// recordingRoundTripper is a distinct RoundTripper we can identity-compare
+// against to prove NewFetcherWithRoundTripper actually installed the
+// caller's transport (http.DefaultTransport is already the effective
+// default for http.DefaultClient, so using it would let the assertion
+// pass even if the constructor stopped installing the argument).
+type recordingRoundTripper struct{}
+
+func (*recordingRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("recordingRoundTripper: unused")
+}
+
 // TestNewFetcherWithRoundTripper verifies that the returned fetcher has the
-// supplied RoundTripper installed on its http.Client. The constructor mutates
-// http.DefaultClient -- that's an upstream wart, but we want to know if the
-// returned fetcher is at least usable.
+// supplied RoundTripper installed on its http.Client. NewFetcherWithRoundTripper
+// mutates http.DefaultClient as a side effect -- restore the original
+// Transport after the test so we don't leak global state into later tests.
 func TestNewFetcherWithRoundTripper(t *testing.T) {
+	originalTransport := http.DefaultClient.Transport
+	t.Cleanup(func() { http.DefaultClient.Transport = originalTransport })
+
 	base := &DefaultFetcher{}
-	rt := http.DefaultTransport
+	rt := &recordingRoundTripper{}
 	got := base.NewFetcherWithRoundTripper(rt)
 	assert.NotNil(t, got)
 	hc, ok := got.client.(*http.Client)
 	if assert.True(t, ok, "client must be *http.Client") {
+		// Identity-compare against rt: a regression that drops the
+		// argument would make this fail rather than silently passing.
 		assert.Same(t, rt, hc.Transport)
 	}
 }
