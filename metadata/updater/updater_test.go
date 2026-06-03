@@ -18,7 +18,9 @@
 package updater
 
 import (
+	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -28,6 +30,18 @@ import (
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"github.com/theupdateframework/go-tuf/v2/metadata/config"
 )
+
+// skipIfWindows guards the target-download tables -- the simulator's URL
+// routing for target files uses filepath.Separator, which is "\" on
+// Windows; that combined with hardcoded "/targets/" prefix checks makes
+// the routing unreachable from these tests. The underlying code under
+// test still gets coverage from Linux and macOS runners.
+func skipIfWindows(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("simulator target URL routing is broken on windows; see metadata/updater/updater_test.go")
+	}
+}
 
 // createAndRefresh creates an updater for the test repository and runs Refresh
 func createAndRefresh(t *testing.T, repo *simulator.TestRepository) (*Updater, error) {
@@ -1145,4 +1159,247 @@ func TestDelegatesConsistentSnapshotTable(t *testing.T) {
 			repo.AssertFilesExist(metadata.TOP_LEVEL_ROLE_NAMES[:])
 		})
 	}
+}
+
+// TestGetTargetInfoTable covers GetTargetInfo lookup behaviour: returning
+// the right TargetFiles for a known path, and returning the canonical "not
+// found" error for an unknown one. The known-target case also exercises
+// the implicit Refresh that GetTargetInfo triggers when targets isn't
+// trusted yet.
+func TestGetTargetInfoTable(t *testing.T) {
+	skipIfWindows(t)
+	const targetPath = "hello.txt"
+	targetContent := []byte("hello, table-driven world")
+
+	tests := []struct {
+		name       string
+		targetPath string
+		wantErr    bool
+		wantErrMsg string
+	}{
+		{name: "known target is returned", targetPath: targetPath},
+		{
+			name:       "unknown target returns not-found",
+			targetPath: "does-not-exist",
+			wantErr:    true,
+			wantErrMsg: "target does-not-exist not found",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := simulator.NewTestRepository(t)
+			defer repo.Cleanup()
+
+			repo.AddTarget(metadata.TARGETS, targetContent, targetPath)
+			repo.UpdateSnapshot()
+
+			// Construct the updater without a preceding Refresh so the
+			// GetTargetInfo call exercises its implicit "if Targets
+			// isn't trusted yet, Refresh first" branch.
+			cfg, err := repo.GetUpdaterConfig()
+			assert.NoError(t, err)
+			up, err := New(cfg)
+			assert.NoError(t, err)
+
+			info, err := up.GetTargetInfo(tc.targetPath)
+			if tc.wantErr {
+				assert.ErrorContains(t, err, tc.wantErrMsg)
+				assert.Nil(t, info)
+				return
+			}
+			assert.NoError(t, err)
+			if assert.NotNil(t, info) {
+				assert.Equal(t, tc.targetPath, info.Path)
+				assert.Equal(t, int64(len(targetContent)), info.Length)
+			}
+		})
+	}
+}
+
+// TestDownloadTargetTable covers DownloadTarget across its main branches:
+// happy path with the configured base URL, happy path with an explicit
+// targetBaseURL argument, and the rejection when neither is set.
+func TestDownloadTargetTable(t *testing.T) {
+	skipIfWindows(t)
+	// The simulator's URL routing for targets has multiple bugs that
+	// compound under consistent-snapshot mode -- a flat target path
+	// panics lastIndex, and a nested one collides with the hash-prefix
+	// parser. Use a doubly-nested layout and switch consistent_snapshot
+	// off below.
+	const targetPath = "a/b/doc.txt"
+	targetContent := []byte("doc body")
+
+	tests := []struct {
+		name        string
+		useExplicit bool // pass cfg.RemoteTargetsURL as the explicit baseURL arg
+		clearCfgURL bool // wipe cfg.RemoteTargetsURL before the call
+		wantErr     bool
+		wantErrMsg  string
+	}{
+		{name: "uses cfg.RemoteTargetsURL when baseURL is empty"},
+		{
+			name:        "uses explicit baseURL argument",
+			useExplicit: true,
+		},
+		{
+			name:        "errors when both cfg URL and arg are empty",
+			clearCfgURL: true,
+			wantErr:     true,
+			wantErrMsg:  "targetBaseURL must be set",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := simulator.NewTestRepository(t)
+			defer repo.Cleanup()
+			// Disable consistent-snapshot to dodge the simulator's
+			// hash-prefix URL parsing path for targets.
+			repo.Simulator.MDRoot.Signed.ConsistentSnapshot = false
+			repo.BumpVersion(metadata.ROOT)
+			repo.AddTarget(metadata.TARGETS, targetContent, targetPath)
+			repo.UpdateSnapshot()
+
+			cfg, err := repo.GetUpdaterConfig()
+			assert.NoError(t, err)
+			// The simulator's URL routing keys off the LocalDir layout
+			// (/metadata/* vs /targets/*); TestRepository's default
+			// RemoteTargetsURL (MetadataDir + "/targets") doesn't match
+			// either branch, so we point it at the actual TargetsDir.
+			cfg.RemoteTargetsURL = repo.TargetsDir
+			savedURL := cfg.RemoteTargetsURL
+			if tc.clearCfgURL {
+				cfg.RemoteTargetsURL = ""
+			}
+			up, err := New(cfg)
+			assert.NoError(t, err)
+			assert.NoError(t, up.Refresh())
+
+			info, err := up.GetTargetInfo(targetPath)
+			assert.NoError(t, err)
+			assert.NotNil(t, info)
+
+			// When the case wants to exercise the "explicit baseURL"
+			// branch, pass the saved cfg URL so the download still
+			// resolves through the simulator. Otherwise pass empty.
+			var baseURL string
+			if tc.useExplicit {
+				baseURL = savedURL
+			}
+
+			targetDir := t.TempDir()
+			dst := filepath.Join(targetDir, "downloaded")
+			path, data, err := up.DownloadTarget(info, dst, baseURL)
+			if tc.wantErr {
+				assert.ErrorContains(t, err, tc.wantErrMsg)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, dst, path)
+			assert.Equal(t, targetContent, data)
+
+			// The file is also persisted on disk.
+			onDisk, err := os.ReadFile(dst)
+			assert.NoError(t, err)
+			assert.Equal(t, targetContent, onDisk)
+		})
+	}
+}
+
+// TestFindCachedTargetTable covers FindCachedTarget after a known
+// DownloadTarget call, after a hash-mismatching local file, and when the
+// local file is missing entirely.
+func TestFindCachedTargetTable(t *testing.T) {
+	skipIfWindows(t)
+	// As in TestDownloadTargetTable, use a doubly-nested path so the
+	// simulator's URL parser doesn't trip on shallow names.
+	const targetPath = "a/b/cached.txt"
+	targetContent := []byte("cached payload")
+
+	t.Run("returns cached path and bytes after a download", func(t *testing.T) {
+		repo := simulator.NewTestRepository(t)
+		defer repo.Cleanup()
+		repo.Simulator.MDRoot.Signed.ConsistentSnapshot = false
+		repo.BumpVersion(metadata.ROOT)
+		repo.AddTarget(metadata.TARGETS, targetContent, targetPath)
+		repo.UpdateSnapshot()
+
+		cfg, err := repo.GetUpdaterConfig()
+		assert.NoError(t, err)
+		cfg.RemoteTargetsURL = repo.TargetsDir
+		up, err := New(cfg)
+		assert.NoError(t, err)
+		assert.NoError(t, up.Refresh())
+		info, err := up.GetTargetInfo(targetPath)
+		assert.NoError(t, err)
+
+		dst := filepath.Join(t.TempDir(), "out")
+		_, _, err = up.DownloadTarget(info, dst, "")
+		assert.NoError(t, err)
+
+		gotPath, gotData, err := up.FindCachedTarget(info, dst)
+		assert.NoError(t, err)
+		assert.Equal(t, dst, gotPath)
+		assert.Equal(t, targetContent, gotData)
+	})
+
+	t.Run("returns empty when the cached file is missing", func(t *testing.T) {
+		repo := simulator.NewTestRepository(t)
+		defer repo.Cleanup()
+		repo.AddTarget(metadata.TARGETS, targetContent, targetPath)
+		repo.UpdateSnapshot()
+
+		up, err := createAndRefresh(t, repo)
+		assert.NoError(t, err)
+		info, err := up.GetTargetInfo(targetPath)
+		assert.NoError(t, err)
+
+		// Point at a file that doesn't exist.
+		gotPath, gotData, err := up.FindCachedTarget(info, filepath.Join(t.TempDir(), "absent"))
+		assert.NoError(t, err)
+		assert.Empty(t, gotPath)
+		assert.Empty(t, gotData)
+	})
+
+	t.Run("returns empty when the cached file is corrupted", func(t *testing.T) {
+		repo := simulator.NewTestRepository(t)
+		defer repo.Cleanup()
+		repo.AddTarget(metadata.TARGETS, targetContent, targetPath)
+		repo.UpdateSnapshot()
+
+		up, err := createAndRefresh(t, repo)
+		assert.NoError(t, err)
+		info, err := up.GetTargetInfo(targetPath)
+		assert.NoError(t, err)
+
+		// Write a file with mismatching content; the cache lookup must
+		// reject it on hash verification.
+		dst := filepath.Join(t.TempDir(), "bad")
+		assert.NoError(t, os.WriteFile(dst, []byte("not the right bytes"), 0644))
+
+		gotPath, gotData, err := up.FindCachedTarget(info, dst)
+		assert.NoError(t, err)
+		assert.Empty(t, gotPath)
+		assert.Empty(t, gotData)
+	})
+
+	t.Run("no-op when local cache is disabled", func(t *testing.T) {
+		repo := simulator.NewTestRepository(t)
+		defer repo.Cleanup()
+		repo.AddTarget(metadata.TARGETS, targetContent, targetPath)
+		repo.UpdateSnapshot()
+
+		cfg, err := repo.GetUpdaterConfig()
+		assert.NoError(t, err)
+		cfg.DisableLocalCache = true
+		up, err := New(cfg)
+		assert.NoError(t, err)
+		assert.NoError(t, up.Refresh())
+		info, err := up.GetTargetInfo(targetPath)
+		assert.NoError(t, err)
+
+		gotPath, gotData, err := up.FindCachedTarget(info, "")
+		assert.NoError(t, err)
+		assert.Empty(t, gotPath)
+		assert.Empty(t, gotData)
+	})
 }

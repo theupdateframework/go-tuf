@@ -19,6 +19,8 @@ package multirepo
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -247,4 +249,129 @@ func TestNewRejectsInvalidRepoNames(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestEnsurePathsExistTable exercises MultiRepoConfig.EnsurePathsExist
+// directly: it's the one method that has no dependence on the
+// per-repository updater plumbing, so we can hit every branch with a
+// plain config struct.
+func TestEnsurePathsExistTable(t *testing.T) {
+	tests := []struct {
+		name        string
+		buildCfg    func(t *testing.T) *MultiRepoConfig
+		expectError bool
+		errorIs     error
+	}{
+		{
+			name: "creates metadata and targets directories",
+			buildCfg: func(t *testing.T) *MultiRepoConfig {
+				t.Helper()
+				tmp := t.TempDir()
+				return &MultiRepoConfig{
+					LocalMetadataDir: filepath.Join(tmp, "metadata"),
+					LocalTargetsDir:  filepath.Join(tmp, "targets"),
+				}
+			},
+		},
+		{
+			name: "no-op when local cache is disabled",
+			buildCfg: func(t *testing.T) *MultiRepoConfig {
+				t.Helper()
+				return &MultiRepoConfig{
+					DisableLocalCache: true,
+					LocalMetadataDir:  "", // would otherwise fail
+					LocalTargetsDir:   "",
+				}
+			},
+		},
+		{
+			name: "already-existing directories succeed",
+			buildCfg: func(t *testing.T) *MultiRepoConfig {
+				t.Helper()
+				tmp := t.TempDir()
+				md := filepath.Join(tmp, "metadata")
+				td := filepath.Join(tmp, "targets")
+				assert.NoError(t, os.MkdirAll(md, 0700))
+				assert.NoError(t, os.MkdirAll(td, 0700))
+				return &MultiRepoConfig{LocalMetadataDir: md, LocalTargetsDir: td}
+			},
+		},
+		{
+			name: "fails when paths are empty and cache is enabled",
+			buildCfg: func(t *testing.T) *MultiRepoConfig {
+				t.Helper()
+				return &MultiRepoConfig{LocalMetadataDir: "", LocalTargetsDir: ""}
+			},
+			expectError: true,
+			errorIs:     os.ErrNotExist,
+		},
+		{
+			name: "fails when a path collides with an existing file",
+			buildCfg: func(t *testing.T) *MultiRepoConfig {
+				t.Helper()
+				tmp := t.TempDir()
+				file := filepath.Join(tmp, "blocking_file")
+				assert.NoError(t, os.WriteFile(file, []byte("x"), 0600))
+				return &MultiRepoConfig{
+					LocalMetadataDir: file,
+					LocalTargetsDir:  filepath.Join(tmp, "targets"),
+				}
+			},
+			expectError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := tt.buildCfg(t)
+			err := cfg.EnsurePathsExist()
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorIs != nil {
+					assert.ErrorIs(t, err, tt.errorIs)
+				}
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
+// TestNewFailureCases covers the New() construction error paths that
+// fire before any per-repository updater is created. The happy path
+// requires a working network of TUF repositories and is out of scope
+// for this unit-level test.
+func TestNewFailureCases(t *testing.T) {
+	validMapJSON := []byte(`{
+		"repositories": {
+			"test-repo": ["https://example.com/repo"]
+		},
+		"mapping": []
+	}`)
+	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
+
+	t.Run("invalid root bytes fail updater construction", func(t *testing.T) {
+		cfg, err := NewConfig(validMapJSON, map[string][]byte{"test-repo": rootBytes})
+		assert.NoError(t, err)
+		cfg.LocalMetadataDir = t.TempDir()
+		cfg.LocalTargetsDir = t.TempDir()
+
+		// The root bytes pass NewConfig (which only checks "is the key
+		// present") but fail when updater.New tries to parse them.
+		_, err = New(cfg)
+		assert.Error(t, err)
+	})
+
+	t.Run("empty trusted roots after NewConfig", func(t *testing.T) {
+		cfg, err := NewConfig(validMapJSON, map[string][]byte{"test-repo": rootBytes})
+		assert.NoError(t, err)
+		cfg.LocalMetadataDir = t.TempDir()
+		cfg.LocalTargetsDir = t.TempDir()
+		// Sabotage the trusted-roots map after config construction so
+		// initTUFClients hits the "trusted root missing" branch.
+		cfg.TrustedRoots = map[string][]byte{}
+
+		_, err = New(cfg)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get trusted root metadata from config")
+	})
 }
