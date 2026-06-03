@@ -18,10 +18,13 @@
 package config
 
 import (
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/cenkalti/backoff/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils/helpers"
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
@@ -317,4 +320,181 @@ func TestUpdaterConfigCustomFetcher(t *testing.T) {
 	cfg.Fetcher = customFetcher
 
 	assert.Same(t, customFetcher, cfg.Fetcher)
+}
+
+// nonDefaultFetcher implements fetcher.Fetcher but is intentionally not a
+// *fetcher.DefaultFetcher, so it triggers the type-assertion failure path
+// in each SetDefaultFetcher* method below.
+type nonDefaultFetcher struct{}
+
+func (nonDefaultFetcher) DownloadFile(string, int64, time.Duration) ([]byte, error) {
+	return nil, nil
+}
+
+// newCfgWithFetcher builds a fresh UpdaterConfig and swaps in the given
+// fetcher. The "wrong type" cases below use this to force the type
+// assertion in the SetDefaultFetcher* methods to fail.
+func newCfgWithFetcher(t *testing.T, f fetcher.Fetcher) *UpdaterConfig {
+	t.Helper()
+	cfg, err := New("https://example.com", helpers.CreateTestRootJSON(t))
+	assert.NoError(t, err)
+	cfg.Fetcher = f
+	return cfg
+}
+
+// TestSetDefaultFetcherHTTPClientTable covers cfg.SetDefaultFetcherHTTPClient.
+// The method only does anything if cfg.Fetcher is the default fetcher.
+func TestSetDefaultFetcherHTTPClientTable(t *testing.T) {
+	tests := []struct {
+		name        string
+		fetcher     fetcher.Fetcher
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:    "default fetcher accepts a custom http.Client",
+			fetcher: fetcher.NewDefaultFetcher(),
+		},
+		{
+			name:        "non-default fetcher is rejected",
+			fetcher:     nonDefaultFetcher{},
+			expectError: true,
+			errorMsg:    "fetcher is not type fetcher.DefaultFetcher",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := newCfgWithFetcher(t, tt.fetcher)
+			err := cfg.SetDefaultFetcherHTTPClient(&http.Client{Timeout: 5 * time.Second})
+			if tt.expectError {
+				assert.ErrorContains(t, err, tt.errorMsg)
+				return
+			}
+			assert.NoError(t, err)
+			// On success the config's fetcher must still be the same
+			// DefaultFetcher instance (the method reassigns it inline).
+			assert.Same(t, tt.fetcher, cfg.Fetcher)
+		})
+	}
+}
+
+// TestSetDefaultFetcherTransportTable covers cfg.SetDefaultFetcherTransport.
+func TestSetDefaultFetcherTransportTable(t *testing.T) {
+	tests := []struct {
+		name        string
+		fetcher     fetcher.Fetcher
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:    "default fetcher accepts a custom RoundTripper",
+			fetcher: fetcher.NewDefaultFetcher(),
+		},
+		{
+			name:        "non-default fetcher is rejected",
+			fetcher:     nonDefaultFetcher{},
+			expectError: true,
+			errorMsg:    "fetcher is not type fetcher.DefaultFetcher",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := newCfgWithFetcher(t, tt.fetcher)
+			err := cfg.SetDefaultFetcherTransport(http.DefaultTransport)
+			if tt.expectError {
+				assert.ErrorContains(t, err, tt.errorMsg)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Same(t, tt.fetcher, cfg.Fetcher)
+		})
+	}
+}
+
+// TestSetDefaultFetcherRetryTable covers cfg.SetDefaultFetcherRetry, which
+// configures constant-interval retries via the underlying fetcher.
+func TestSetDefaultFetcherRetryTable(t *testing.T) {
+	tests := []struct {
+		name        string
+		fetcher     fetcher.Fetcher
+		interval    time.Duration
+		count       uint
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:     "default fetcher accepts retry settings",
+			fetcher:  fetcher.NewDefaultFetcher(),
+			interval: 100 * time.Millisecond,
+			count:    3,
+		},
+		{
+			name:     "zero retry count is accepted",
+			fetcher:  fetcher.NewDefaultFetcher(),
+			interval: 0,
+			count:    0,
+		},
+		{
+			name:        "non-default fetcher is rejected",
+			fetcher:     nonDefaultFetcher{},
+			interval:    50 * time.Millisecond,
+			count:       1,
+			expectError: true,
+			errorMsg:    "fetcher is not type fetcher.DefaultFetcher",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := newCfgWithFetcher(t, tt.fetcher)
+			err := cfg.SetDefaultFetcherRetry(tt.interval, tt.count)
+			if tt.expectError {
+				assert.ErrorContains(t, err, tt.errorMsg)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Same(t, tt.fetcher, cfg.Fetcher)
+		})
+	}
+}
+
+// TestSetRetryOptionsTable covers cfg.SetRetryOptions, which forwards
+// variadic backoff.RetryOption values to the underlying fetcher.
+func TestSetRetryOptionsTable(t *testing.T) {
+	tests := []struct {
+		name        string
+		fetcher     fetcher.Fetcher
+		opts        []backoff.RetryOption
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:    "default fetcher accepts no options",
+			fetcher: fetcher.NewDefaultFetcher(),
+			opts:    nil,
+		},
+		{
+			name:    "default fetcher accepts max-tries option",
+			fetcher: fetcher.NewDefaultFetcher(),
+			opts:    []backoff.RetryOption{backoff.WithMaxTries(5)},
+		},
+		{
+			name:        "non-default fetcher is rejected",
+			fetcher:     nonDefaultFetcher{},
+			opts:        []backoff.RetryOption{backoff.WithMaxTries(1)},
+			expectError: true,
+			errorMsg:    "fetcher is not type fetcher.DefaultFetcher",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := newCfgWithFetcher(t, tt.fetcher)
+			err := cfg.SetRetryOptions(tt.opts...)
+			if tt.expectError {
+				assert.ErrorContains(t, err, tt.errorMsg)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Same(t, tt.fetcher, cfg.Fetcher)
+		})
+	}
 }
