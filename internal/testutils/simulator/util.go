@@ -71,6 +71,6 @@ func hasPrefix(path, prefix string) bool {
 	return strings.HasPrefix(filepath.ToSlash(path), prefix)
 }
 
-func hasSuffix(path, prefix string) bool {
-	return strings.HasSuffix(filepath.ToSlash(path), prefix)
+func hasSuffix(path, suffix string) bool {
+	return strings.HasSuffix(filepath.ToSlash(path), suffix)
 }
