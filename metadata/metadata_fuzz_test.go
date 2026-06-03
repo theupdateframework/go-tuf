@@ -20,7 +20,6 @@ package metadata
 import (
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils/helpers"
 )
@@ -38,7 +37,7 @@ func FuzzRootFromBytes(f *testing.F) {
 	f.Add([]byte(`{"signed": {"_type": "root"}}`))
 	f.Add([]byte(`{"signed": {"_type": "wrong"}, "signatures": []}`))
 
-	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
+	generator := helpers.NewFuzzDataGenerator(0, 0)
 
 	// Add corrupted metadata
 	for i := 0; i < 5; i++ {
@@ -70,7 +69,7 @@ func FuzzTargetsFromBytes(f *testing.F) {
 	f.Add([]byte("{}"))
 	f.Add([]byte(`{"signed": {"_type": "targets"}}`))
 
-	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
+	generator := helpers.NewFuzzDataGenerator(0, 0)
 
 	for i := 0; i < 5; i++ {
 		f.Add(generator.CreateFuzzTestMetadata("targets"))
@@ -99,7 +98,7 @@ func FuzzSnapshotFromBytes(f *testing.F) {
 	f.Add([]byte("{}"))
 	f.Add([]byte(`{"signed": {"_type": "snapshot"}}`))
 
-	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
+	generator := helpers.NewFuzzDataGenerator(0, 0)
 
 	for i := 0; i < 5; i++ {
 		f.Add(generator.CreateFuzzTestMetadata("snapshot"))
@@ -128,7 +127,7 @@ func FuzzTimestampFromBytes(f *testing.F) {
 	f.Add([]byte("{}"))
 	f.Add([]byte(`{"signed": {"_type": "timestamp"}}`))
 
-	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
+	generator := helpers.NewFuzzDataGenerator(0, 0)
 
 	for i := 0; i < 5; i++ {
 		f.Add(generator.CreateFuzzTestMetadata("timestamp"))
@@ -194,7 +193,7 @@ func FuzzMetadataToBytes(f *testing.F) {
 
 // FuzzJSONMarshaling tests JSON marshaling of metadata structures
 func FuzzJSONMarshaling(f *testing.F) {
-	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
+	generator := helpers.NewFuzzDataGenerator(0, 0)
 
 	// Add valid JSON samples
 	f.Add([]byte(`{"test": "value"}`))
@@ -238,7 +237,7 @@ func FuzzHexBytes(f *testing.F) {
 	f.Add([]byte("0123456789abcdef"))
 	f.Add([]byte{0, 1, 2, 3, 255})
 
-	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
+	generator := helpers.NewFuzzDataGenerator(0, 0)
 	for i := 0; i < 10; i++ {
 		f.Add(generator.GenerateRandomBytes(100))
 	}
@@ -274,7 +273,7 @@ func FuzzHexBytes(f *testing.F) {
 
 // FuzzMetadataFieldsValidation tests validation of metadata fields
 func FuzzMetadataFieldsValidation(f *testing.F) {
-	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
+	generator := helpers.NewFuzzDataGenerator(0, 0)
 
 	// Add seed test cases
 	f.Add("root", int64(1), "1.0.31")
@@ -299,13 +298,15 @@ func FuzzMetadataFieldsValidation(f *testing.F) {
 			}
 		}()
 
-		// Create metadata structure with fuzz data
+		// Create metadata structure with fuzz data. The expires field is
+		// a fixed constant so the fuzz payload stays reproducible for a
+		// given input across runs.
 		metadata := map[string]interface{}{
 			"signed": map[string]interface{}{
 				"_type":        metadataType,
 				"version":      version,
 				"spec_version": specVersion,
-				"expires":      time.Now().Add(24 * time.Hour).Format(time.RFC3339),
+				"expires":      "2030-01-01T00:00:00Z",
 			},
 			"signatures": []interface{}{},
 		}
@@ -325,7 +326,7 @@ func FuzzMetadataFieldsValidation(f *testing.F) {
 
 // FuzzSignatureOperations tests signature-related operations
 func FuzzSignatureOperations(f *testing.F) {
-	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
+	generator := helpers.NewFuzzDataGenerator(0, 0)
 
 	// Add seed data
 	f.Add("valid-keyid", []byte("signature-data"))
@@ -377,7 +378,7 @@ func FuzzSignatureOperations(f *testing.F) {
 
 // FuzzCompleteMetadataStructure tests complete metadata structure with random data
 func FuzzCompleteMetadataStructure(f *testing.F) {
-	generator := helpers.NewFuzzDataGenerator(uint64(time.Now().UnixNano()), 0)
+	generator := helpers.NewFuzzDataGenerator(0, 0)
 
 	// Add seed data for complete metadata structures
 	for _, metadataType := range []string{"root", "targets", "snapshot", "timestamp"} {
