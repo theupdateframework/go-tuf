@@ -1193,7 +1193,12 @@ func TestGetTargetInfoTable(t *testing.T) {
 			repo.AddTarget(metadata.TARGETS, targetContent, targetPath)
 			repo.UpdateSnapshot()
 
-			up, err := createAndRefresh(t, repo)
+			// Construct the updater without a preceding Refresh so the
+			// GetTargetInfo call exercises its implicit "if Targets
+			// isn't trusted yet, Refresh first" branch.
+			cfg, err := repo.GetUpdaterConfig()
+			assert.NoError(t, err)
+			up, err := New(cfg)
 			assert.NoError(t, err)
 
 			info, err := up.GetTargetInfo(tc.targetPath)
@@ -1225,21 +1230,19 @@ func TestDownloadTargetTable(t *testing.T) {
 	targetContent := []byte("doc body")
 
 	tests := []struct {
-		name         string
-		baseURL      string // value passed as targetBaseURL to DownloadTarget
-		clearCfgURL  bool   // wipe cfg.RemoteTargetsURL before the call
-		wantErr      bool
-		wantErrMsg   string
+		name        string
+		useExplicit bool // pass cfg.RemoteTargetsURL as the explicit baseURL arg
+		clearCfgURL bool // wipe cfg.RemoteTargetsURL before the call
+		wantErr     bool
+		wantErrMsg  string
 	}{
-		{name: "uses cfg.RemoteTargetsURL when baseURL is empty", baseURL: ""},
+		{name: "uses cfg.RemoteTargetsURL when baseURL is empty"},
 		{
-			name: "uses explicit baseURL argument",
-			// repo.Simulator's URL is implicit; reusing the cfg one here as
-			// a known-good value just exercises the non-empty branch.
+			name:        "uses explicit baseURL argument",
+			useExplicit: true,
 		},
 		{
 			name:        "errors when both cfg URL and arg are empty",
-			baseURL:     "",
 			clearCfgURL: true,
 			wantErr:     true,
 			wantErrMsg:  "targetBaseURL must be set",
@@ -1275,11 +1278,11 @@ func TestDownloadTargetTable(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, info)
 
-			// Pass the saved cfg URL for the "explicit baseURL" case so the
-			// download still resolves through the simulator. Otherwise pass
-			// whatever tc.baseURL says (empty or otherwise).
-			baseURL := tc.baseURL
-			if tc.name == "uses explicit baseURL argument" {
+			// When the case wants to exercise the "explicit baseURL"
+			// branch, pass the saved cfg URL so the download still
+			// resolves through the simulator. Otherwise pass empty.
+			var baseURL string
+			if tc.useExplicit {
 				baseURL = savedURL
 			}
 
