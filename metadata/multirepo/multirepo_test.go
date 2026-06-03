@@ -93,6 +93,60 @@ func TestNewConfig(t *testing.T) {
 	}
 }
 
+// TestNewConfigErrorWrapping asserts that NewConfig's input-validation
+// error wraps only the sentinel matching the actually-missing input, so
+// callers can use errors.Is to discriminate.
+func TestNewConfigErrorWrapping(t *testing.T) {
+	validMapJSON := []byte(`{
+		"repositories": {
+			"test-repo": ["https://example.com/repo"]
+		},
+		"mapping": []
+	}`)
+	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
+
+	tests := []struct {
+		name         string
+		repoMap      []byte
+		roots        map[string][]byte
+		shouldWrap   []error
+		shouldNotWrap []error
+	}{
+		{
+			name:          "only map file missing",
+			repoMap:       nil,
+			roots:         map[string][]byte{"test-repo": rootBytes},
+			shouldWrap:    []error{ErrNoMapFile},
+			shouldNotWrap: []error{ErrNoTrustedRoots},
+		},
+		{
+			name:          "only trusted roots missing",
+			repoMap:       validMapJSON,
+			roots:         map[string][]byte{},
+			shouldWrap:    []error{ErrNoTrustedRoots},
+			shouldNotWrap: []error{ErrNoMapFile},
+		},
+		{
+			name:       "both missing",
+			repoMap:    nil,
+			roots:      map[string][]byte{},
+			shouldWrap: []error{ErrNoMapFile, ErrNoTrustedRoots},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewConfig(tt.repoMap, tt.roots)
+			assert.Error(t, err)
+			for _, target := range tt.shouldWrap {
+				assert.ErrorIs(t, err, target, "error should wrap %v", target)
+			}
+			for _, target := range tt.shouldNotWrap {
+				assert.NotErrorIs(t, err, target, "error must not wrap %v", target)
+			}
+		})
+	}
+}
+
 func TestValidateRepoName(t *testing.T) {
 	tests := []struct {
 		name    string

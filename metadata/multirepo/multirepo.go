@@ -88,9 +88,17 @@ type targetMatch struct {
 
 // NewConfig returns configuration for a multi-repo TUF client
 func NewConfig(repoMap []byte, roots map[string][]byte) (*MultiRepoConfig, error) {
-	// error if we don't have the necessary arguments
-	if len(repoMap) == 0 || len(roots) == 0 {
-		return nil, fmt.Errorf("failed to create multi-repository config: %w and/or %w", ErrNoMapFile, ErrNoTrustedRoots)
+	// error if we don't have the necessary arguments. Wrap only the
+	// sentinel that actually corresponds to the missing input so callers
+	// can use errors.Is(err, ErrNoMapFile) or errors.Is(err, ErrNoTrustedRoots)
+	// to discriminate.
+	switch {
+	case len(repoMap) == 0 && len(roots) == 0:
+		return nil, fmt.Errorf("failed to create multi-repository config: %w and %w", ErrNoMapFile, ErrNoTrustedRoots)
+	case len(repoMap) == 0:
+		return nil, fmt.Errorf("failed to create multi-repository config: %w", ErrNoMapFile)
+	case len(roots) == 0:
+		return nil, fmt.Errorf("failed to create multi-repository config: %w", ErrNoTrustedRoots)
 	}
 
 	// unmarshal the map file (note: should we expect/support unrecognized values here?)
