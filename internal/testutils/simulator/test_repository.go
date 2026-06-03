@@ -145,9 +145,18 @@ func (r *TestRepository) initializeRepositoryWithBuilder(builder *SimulatorBuild
 // call-site compatibility.
 func (r *TestRepository) Cleanup() {}
 
-// GetUpdaterConfig returns an UpdaterConfig configured to use this test repository
+// GetUpdaterConfig returns an UpdaterConfig configured to use this test
+// repository. The root.json bytes are re-read from MetadataDir on every
+// call: after a successful Refresh, Updater persists an updated root.json
+// to disk, and re-using the bytes captured at repository initialization
+// would silently roll the persisted root back to its initial version on
+// the next Updater.New.
 func (r *TestRepository) GetUpdaterConfig() (*config.UpdaterConfig, error) {
-	cfg, err := config.New(r.MetadataDir, r.RootBytes)
+	rootBytes, err := os.ReadFile(filepath.Join(r.MetadataDir, "root.json"))
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := config.New(r.MetadataDir, rootBytes)
 	if err != nil {
 		return nil, err
 	}
