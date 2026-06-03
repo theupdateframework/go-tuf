@@ -376,25 +376,25 @@ func TestUnrecognizedFieldRolesSigned(t *testing.T) {
 	root.Signed.UnrecognizedFields = testUnrecognizedField
 	rootJSON, err := root.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1}}"), rootJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45Z\",\"keys\":{},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1}}"), rootJSON)
 
 	targets := Targets(fixedExpire)
 	targets.Signed.UnrecognizedFields = testUnrecognizedField
 	targetsJSON, err := targets.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"targets\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"spec_version\":\"1.0.31\",\"targets\":{},\"test\":\"true\",\"version\":1}}"), targetsJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"targets\",\"expires\":\"2030-08-15T14:30:45Z\",\"spec_version\":\"1.0.31\",\"targets\":{},\"test\":\"true\",\"version\":1}}"), targetsJSON)
 
 	snapshot := Snapshot(fixedExpire)
 	snapshot.Signed.UnrecognizedFields = testUnrecognizedField
 	snapshotJSON, err := snapshot.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"snapshot\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"targets.json\":{\"version\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1}}"), snapshotJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"snapshot\",\"expires\":\"2030-08-15T14:30:45Z\",\"meta\":{\"targets.json\":{\"version\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1}}"), snapshotJSON)
 
 	timestamp := Timestamp(fixedExpire)
 	timestamp.Signed.UnrecognizedFields = testUnrecognizedField
 	timestampJSON, err := timestamp.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"timestamp\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"snapshot.json\":{\"version\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1}}"), timestampJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"timestamp\",\"expires\":\"2030-08-15T14:30:45Z\",\"meta\":{\"snapshot.json\":{\"version\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1}}"), timestampJSON)
 }
 func TestUnrecognizedFieldGenericMetadata(t *testing.T) {
 	// fixed expire
@@ -408,7 +408,7 @@ func TestUnrecognizedFieldGenericMetadata(t *testing.T) {
 	root.UnrecognizedFields = testUnrecognizedField
 	rootJSON, err := root.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"version\":1},\"test\":\"true\"}"), rootJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45Z\",\"keys\":{},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"version\":1},\"test\":\"true\"}"), rootJSON)
 }
 func TestTargetFilesCustomField(t *testing.T) {
 	// custom JSON to test
@@ -426,7 +426,7 @@ func TestTargetFilesCustomField(t *testing.T) {
 	targets.Signed.Targets["testTarget"] = targetFile
 	targetsJSON, err := targets.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"targets\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"spec_version\":\"1.0.31\",\"targets\":{\"testTarget\":{\"custom\":{\"test\":true},\"hashes\":{},\"length\":0}},\"version\":1}}"), targetsJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"targets\",\"expires\":\"2030-08-15T14:30:45Z\",\"spec_version\":\"1.0.31\",\"targets\":{\"testTarget\":{\"custom\":{\"test\":true},\"hashes\":{},\"length\":0}},\"version\":1}}"), targetsJSON)
 }
 
 func TestFromBytes(t *testing.T) {
@@ -509,7 +509,10 @@ func TestToByte(t *testing.T) {
 	root.Signatures = append(root.Signatures, Signature{KeyID: "roothash", Signature: hash["ed25519"]})
 	rootBytes, err := root.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, string(testRootBytes), string(rootBytes))
+	// Even though the input expires string carries sub-second precision, the
+	// serialized output must use the spec-required whole-second UTC format.
+	expectedRootBytes := []byte("{\"signatures\":[{\"keyid\":\"roothash\",\"sig\":\"1307990e6ba5ca145eb35e99182a9bec46531bc54ddf656a602c780fa0240dee\"}],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45Z\",\"keys\":{\"roothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubrootval\"},\"scheme\":\"ed25519\"},\"snapshothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubsval\"},\"scheme\":\"ed25519\"},\"targetshash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtrval\"},\"scheme\":\"ed25519\"},\"timestamphash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtmval\"},\"scheme\":\"ed25519\"}},\"roles\":{\"root\":{\"keyids\":[\"roothash\"],\"threshold\":1},\"snapshot\":{\"keyids\":[\"snapshothash\"],\"threshold\":1},\"targets\":{\"keyids\":[\"targetshash\"],\"threshold\":1},\"timestamp\":{\"keyids\":[\"timestamphash\"],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"version\":1}}")
+	assert.Equal(t, string(expectedRootBytes), string(rootBytes))
 }
 
 func TestFromFile(t *testing.T) {
@@ -573,7 +576,10 @@ func TestToFile(t *testing.T) {
 	assert.FileExists(t, fileName)
 	data, err := os.ReadFile(fileName)
 	assert.NoError(t, err)
-	assert.Equal(t, string(testRootBytes), string(data))
+	// The input bytes carry a sub-second expires; the written output must use
+	// the spec-required whole-second UTC format.
+	expectedBytes := []byte("{\"signatures\":[{\"keyid\":\"roothash\",\"sig\":\"1307990e6ba5ca145eb35e99182a9bec46531bc54ddf656a602c780fa0240dee\"}],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45Z\",\"keys\":{\"roothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubrootval\"},\"scheme\":\"ed25519\"},\"snapshothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubsval\"},\"scheme\":\"ed25519\"},\"targetshash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtrval\"},\"scheme\":\"ed25519\"},\"timestamphash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtmval\"},\"scheme\":\"ed25519\"}},\"roles\":{\"root\":{\"keyids\":[\"roothash\"],\"threshold\":1},\"snapshot\":{\"keyids\":[\"snapshothash\"],\"threshold\":1},\"targets\":{\"keyids\":[\"targetshash\"],\"threshold\":1},\"timestamp\":{\"keyids\":[\"timestamphash\"],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"version\":1}}")
+	assert.Equal(t, string(expectedBytes), string(data))
 
 	err = os.RemoveAll(tmpDir)
 	assert.NoError(t, err)
