@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/cenkalti/backoff/v5"
 	"github.com/stretchr/testify/assert"
@@ -175,4 +176,131 @@ func TestDownloadFile_NoHTTPClientSet(t *testing.T) {
 	fetcher := DefaultFetcher{}
 	_, err := fetcher.DownloadFile("https://jku.github.io/tuf-demo/metadata/1.root.json", 512000, 0)
 	assert.NoError(t, err)
+}
+
+// TestNewFetcherWithHTTPClient verifies that the constructor returns a
+// fetcher whose internal client is the one we passed in.
+func TestNewFetcherWithHTTPClient(t *testing.T) {
+	base := &DefaultFetcher{}
+	custom := &MockHTTPClient{SucceedOnTryN: 1}
+	got := base.NewFetcherWithHTTPClient(custom)
+	assert.NotNil(t, got)
+	assert.Same(t, custom, got.client)
+}
+
+// TestNewFetcherWithRoundTripper verifies that the returned fetcher has the
+// supplied RoundTripper installed on its http.Client. The constructor mutates
+// http.DefaultClient -- that's an upstream wart, but we want to know if the
+// returned fetcher is at least usable.
+func TestNewFetcherWithRoundTripper(t *testing.T) {
+	base := &DefaultFetcher{}
+	rt := http.DefaultTransport
+	got := base.NewFetcherWithRoundTripper(rt)
+	assert.NotNil(t, got)
+	hc, ok := got.client.(*http.Client)
+	if assert.True(t, ok, "client must be *http.Client") {
+		assert.Same(t, rt, hc.Transport)
+	}
+}
+
+// TestSetHTTPClient verifies the setter swaps the underlying client.
+func TestSetHTTPClient(t *testing.T) {
+	f := NewDefaultFetcher()
+	custom := &MockHTTPClient{SucceedOnTryN: 1}
+	f.SetHTTPClient(custom)
+	assert.Same(t, custom, f.client)
+}
+
+// TestSetTransportTable covers both branches of SetTransport: the happy
+// path on a *http.Client, and the failure path when the underlying client
+// is something else (e.g. a test mock).
+func TestSetTransportTable(t *testing.T) {
+	tests := []struct {
+		name        string
+		setup       func() *DefaultFetcher
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "fetcher backed by *http.Client accepts a new transport",
+			setup: func() *DefaultFetcher {
+				return NewDefaultFetcher() // internal client is *http.Client
+			},
+		},
+		{
+			name: "fetcher backed by a mock client rejects SetTransport",
+			setup: func() *DefaultFetcher {
+				f := NewDefaultFetcher()
+				f.SetHTTPClient(&MockHTTPClient{SucceedOnTryN: 1})
+				return f
+			},
+			expectError: true,
+			errorMsg:    "fetcher is not type fetcher.DefaultFetcher",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := tt.setup()
+			rt := http.DefaultTransport
+			err := f.SetTransport(rt)
+			if tt.expectError {
+				assert.ErrorContains(t, err, tt.errorMsg)
+				return
+			}
+			assert.NoError(t, err)
+			hc, ok := f.client.(*http.Client)
+			if assert.True(t, ok) {
+				assert.Same(t, rt, hc.Transport)
+			}
+		})
+	}
+}
+
+// TestSetRetry verifies that SetRetry installs constant-interval retry
+// options on the fetcher.
+func TestSetRetry(t *testing.T) {
+	tests := []struct {
+		name     string
+		interval time.Duration
+		count    uint
+	}{
+		{name: "non-zero interval and count", interval: 100 * time.Millisecond, count: 3},
+		{name: "zero interval and count", interval: 0, count: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := NewDefaultFetcher()
+			f.SetRetry(tt.interval, tt.count)
+			// SetRetry replaces retryOptions with [constantBackOff, maxTries].
+			assert.Len(t, f.retryOptions, 2)
+		})
+	}
+}
+
+// TestSetRetryOptions verifies that SetRetryOptions replaces the entire
+// retryOptions slice with whatever the caller passes.
+func TestSetRetryOptions(t *testing.T) {
+	tests := []struct {
+		name     string
+		opts     []backoff.RetryOption
+		expected int
+	}{
+		{name: "nil clears retry options", opts: nil, expected: 0},
+		{name: "one option installs one", opts: []backoff.RetryOption{backoff.WithMaxTries(5)}, expected: 1},
+		{
+			name: "multiple options install all of them",
+			opts: []backoff.RetryOption{
+				backoff.WithMaxTries(5),
+				backoff.WithBackOff(backoff.NewConstantBackOff(0)),
+			},
+			expected: 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := NewDefaultFetcher()
+			f.SetRetryOptions(tt.opts...)
+			assert.Len(t, f.retryOptions, tt.expected)
+		})
+	}
 }
