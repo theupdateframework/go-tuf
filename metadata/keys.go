@@ -78,6 +78,10 @@ func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 		if err != nil {
 			return nil, err
 		}
+		// ed25519.Verify panics on a wrong-length public key
+		if len(publicKey) != ed25519.PublicKeySize {
+			return nil, fmt.Errorf("invalid ed25519 public key length %d, expected %d", len(publicKey), ed25519.PublicKeySize)
+		}
 		ed25519Key := ed25519.PublicKey(publicKey)
 		// done for verification - ref. https://github.com/theupdateframework/go-tuf/pull/357
 		if _, err := x509.MarshalPKIXPublicKey(ed25519Key); err != nil {
