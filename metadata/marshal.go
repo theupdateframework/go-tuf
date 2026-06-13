@@ -303,7 +303,7 @@ func (meta *Metadata[T]) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(data, &dict); err != nil {
 			return err
 		}
-		var i interface{} = dict.Signed
+		var i any = dict.Signed
 		meta.Signed = i.(T)
 		meta.Signatures = dict.Signatures
 	case *SnapshotType:
@@ -314,7 +314,7 @@ func (meta *Metadata[T]) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(data, &dict); err != nil {
 			return err
 		}
-		var i interface{} = dict.Signed
+		var i any = dict.Signed
 		meta.Signed = i.(T)
 		meta.Signatures = dict.Signatures
 	case *TimestampType:
@@ -325,7 +325,7 @@ func (meta *Metadata[T]) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(data, &dict); err != nil {
 			return err
 		}
-		var i interface{} = dict.Signed
+		var i any = dict.Signed
 		meta.Signed = i.(T)
 		meta.Signatures = dict.Signatures
 	case *TargetsType:
@@ -336,7 +336,7 @@ func (meta *Metadata[T]) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(data, &dict); err != nil {
 			return err
 		}
-		var i interface{} = dict.Signed
+		var i any = dict.Signed
 		meta.Signed = i.(T)
 		meta.Signatures = dict.Signatures
 	default:
