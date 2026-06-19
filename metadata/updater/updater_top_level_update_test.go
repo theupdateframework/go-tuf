@@ -20,6 +20,7 @@ package updater
 import (
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"testing"
@@ -417,9 +418,7 @@ func TestIntermediateRootInclorrectlySigned(t *testing.T) {
 
 	simulator.Sim.MDRoot.Signed.Version += 1
 	rootSigners := make(map[string]*signature.Signer)
-	for k, v := range simulator.Sim.Signers[metadata.ROOT] {
-		rootSigners[k] = v
-	}
+	maps.Copy(rootSigners, simulator.Sim.Signers[metadata.ROOT])
 	for k := range simulator.Sim.Signers[metadata.ROOT] {
 		delete(simulator.Sim.Signers[metadata.ROOT], k)
 	}
