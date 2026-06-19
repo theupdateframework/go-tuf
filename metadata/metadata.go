@@ -581,7 +581,7 @@ func isTargetInPathPattern(targetpath string, pathpattern string) bool {
 
 	// Every part in the pathpattern could include a glob pattern, that's why
 	// each of the target and pathpattern parts should match.
-	for i := 0; i < len(targetParts); i++ {
+	for i := range targetParts {
 		if ok, _ := filepath.Match(patternParts[i], targetParts[i]); !ok {
 			return false
 		}
