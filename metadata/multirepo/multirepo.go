@@ -103,7 +103,10 @@ func NewConfig(repoMap []byte, roots map[string][]byte) (*MultiRepoConfig, error
 	}
 
 	// validation pass against malformed or adversarially crafted map
-	for _, m := range mapFile.Mapping {
+	for i, m := range mapFile.Mapping {
+		if m == nil {
+			return nil, fmt.Errorf("mapping[%d] is null", i)
+		}
 		for _, repo := range m.Repositories {
 			if _, ok := mapFile.Repositories[repo]; !ok {
 				return nil, fmt.Errorf("mapping references unknown repository %q", repo)
