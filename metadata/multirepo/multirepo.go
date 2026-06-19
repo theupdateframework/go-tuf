@@ -136,6 +136,12 @@ func (client *MultiRepoClient) initTUFClients() error {
 
 	// loop through each repository listed in the map file and initialize it
 	for repoName, repoURL := range client.Config.RepoMap.Repositories {
+		
+		// Make sure we have at least one repo URL
+		if len(repoURL) == 0 {
+			continue
+		}
+		
 		log.Info("Initializing", "name", repoName, "url", repoURL[0])
 
 		// get the trusted root file from the location specified in the map file relevant to its path
