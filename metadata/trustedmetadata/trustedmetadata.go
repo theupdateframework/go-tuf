@@ -280,11 +280,7 @@ func (trusted *TrustedMetadata) UpdateDelegatedTargets(targetsData []byte, roleN
 	}
 	// check if delegator metadata is present
 	if delegatorName == metadata.ROOT {
-		if trusted.Root != nil {
-			ok = true
-		} else {
-			ok = false
-		}
+		ok = true
 	} else {
 		_, ok = trusted.Targets[delegatorName]
 	}
