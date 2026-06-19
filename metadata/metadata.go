@@ -889,7 +889,7 @@ func verifyHashes(data []byte, hashes Hashes) error {
 			return &ErrLengthOrHashMismatch{Msg: fmt.Sprintf("hash verification failed - unknown hashing algorithm - %s", k)}
 		}
 		hasher.Write(data)
-		if hex.EncodeToString(v) != hex.EncodeToString(hasher.Sum(nil)) {
+		if !hmac.Equal(v, hasher.Sum(nil)) {
 			return &ErrLengthOrHashMismatch{Msg: fmt.Sprintf("hash verification failed - mismatch for algorithm %s", k)}
 		}
 	}
