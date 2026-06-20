@@ -138,8 +138,8 @@ func (client *MultiRepoClient) initTUFClients() error {
 	for repoName, repoURL := range client.Config.RepoMap.Repositories {
 		
 		// Make sure we have at least one repo URL
-		if len(repoURL) == 0 {
-			continue
+		if len(repoURL) == 0 || repoURL[0] == "" {
+			return fmt.Errorf("repository %q has no URL configured", repoName)
 		}
 		
 		log.Info("Initializing", "name", repoName, "url", repoURL[0])
