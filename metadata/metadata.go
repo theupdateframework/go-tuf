@@ -258,6 +258,26 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 
 	log.Info("Verifying", "role", delegatedRole)
 
+	// Early check for duplicate signatures in the delegated metadata
+	switch d := delegatedMetadata.(type) {
+	case *Metadata[RootType]:
+		if err := checkUniqueSignatures(*d); err != nil {
+			return err
+		}
+	case *Metadata[SnapshotType]:
+		if err := checkUniqueSignatures(*d); err != nil {
+			return err
+		}
+	case *Metadata[TimestampType]:
+		if err := checkUniqueSignatures(*d); err != nil {
+			return err
+		}
+	case *Metadata[TargetsType]:
+		if err := checkUniqueSignatures(*d); err != nil {
+			return err
+		}
+	}
+
 	// collect keys, keyIDs and threshold based on delegator type
 	switch i := i.(type) {
 	// Root delegator
@@ -365,6 +385,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			for _, signature := range d.Signatures {
 				if signature.KeyID == keyID {
 					sign = signature
+					break
 				}
 			}
 			payload, err = cjson.EncodeCanonical(d.Signed)
@@ -375,6 +396,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			for _, signature := range d.Signatures {
 				if signature.KeyID == keyID {
 					sign = signature
+					break
 				}
 			}
 			payload, err = cjson.EncodeCanonical(d.Signed)
@@ -385,6 +407,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			for _, signature := range d.Signatures {
 				if signature.KeyID == keyID {
 					sign = signature
+					break
 				}
 			}
 			payload, err = cjson.EncodeCanonical(d.Signed)
@@ -395,6 +418,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			for _, signature := range d.Signatures {
 				if signature.KeyID == keyID {
 					sign = signature
+					break
 				}
 			}
 			payload, err = cjson.EncodeCanonical(d.Signed)
