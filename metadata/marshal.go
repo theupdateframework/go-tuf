@@ -23,7 +23,22 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"time"
 )
+
+// expiresFormat is the TUF spec date/time layout for the "expires" field:
+// an ISO 8601 / RFC 3339 timestamp in UTC truncated to whole seconds, e.g.
+// "2030-01-01T00:00:00Z". A raw time.Time would otherwise be serialized by
+// encoding/json with sub-second (RFC3339Nano) precision, which is not valid
+// per the spec.
+const expiresFormat = "2006-01-02T15:04:05Z"
+
+// formatExpires renders an "expires" time in the spec-required second-precision
+// UTC format. It is the single source of truth shared by the role MarshalJSON
+// methods so they always agree.
+func formatExpires(t time.Time) string {
+	return t.UTC().Format(expiresFormat)
+}
 
 // The following marshal/unmarshal methods override the default behavior for for each TUF type
 // in order to support unrecognized fields
@@ -37,7 +52,7 @@ func (signed RootType) MarshalJSON() ([]byte, error) {
 	dict["spec_version"] = signed.SpecVersion
 	dict["consistent_snapshot"] = signed.ConsistentSnapshot
 	dict["version"] = signed.Version
-	dict["expires"] = signed.Expires
+	dict["expires"] = formatExpires(signed.Expires)
 	dict["keys"] = signed.Keys
 	dict["roles"] = signed.Roles
 	return json.Marshal(dict)
@@ -74,7 +89,7 @@ func (signed SnapshotType) MarshalJSON() ([]byte, error) {
 	dict["_type"] = signed.Type
 	dict["spec_version"] = signed.SpecVersion
 	dict["version"] = signed.Version
-	dict["expires"] = signed.Expires
+	dict["expires"] = formatExpires(signed.Expires)
 	dict["meta"] = signed.Meta
 	return json.Marshal(dict)
 }
@@ -108,7 +123,7 @@ func (signed TimestampType) MarshalJSON() ([]byte, error) {
 	dict["_type"] = signed.Type
 	dict["spec_version"] = signed.SpecVersion
 	dict["version"] = signed.Version
-	dict["expires"] = signed.Expires
+	dict["expires"] = formatExpires(signed.Expires)
 	dict["meta"] = signed.Meta
 	return json.Marshal(dict)
 }
@@ -142,7 +157,7 @@ func (signed TargetsType) MarshalJSON() ([]byte, error) {
 	dict["_type"] = signed.Type
 	dict["spec_version"] = signed.SpecVersion
 	dict["version"] = signed.Version
-	dict["expires"] = signed.Expires
+	dict["expires"] = formatExpires(signed.Expires)
 	dict["targets"] = signed.Targets
 	if signed.Delegations != nil {
 		dict["delegations"] = signed.Delegations
