@@ -24,7 +24,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/cenkalti/backoff/v5"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
 
