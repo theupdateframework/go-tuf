@@ -24,7 +24,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/cenkalti/backoff/v7"
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
 
@@ -136,7 +135,7 @@ func (cfg *UpdaterConfig) SetDefaultFetcherRetry(retryInterval time.Duration, re
 	return nil
 }
 
-func (cfg *UpdaterConfig) SetRetryOptions(retryOptions ...backoff.RetryOption) error {
+func (cfg *UpdaterConfig) SetRetryOptions(retryOptions ...fetcher.RetryOption) error {
 	// Check if the configured fetcher is the default fetcher
 	// since we are only configuring retry options for the default fetcher
 	df, ok := cfg.Fetcher.(*fetcher.DefaultFetcher)

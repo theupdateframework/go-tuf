@@ -152,7 +152,7 @@ func TestDownloadFile_Retry(t *testing.T) {
 			client := tt.httpClient
 			fetcher := &DefaultFetcher{
 				client: client,
-				retryOptions: []backoff.RetryOption{
+				retryOptions: []RetryOption{
 					backoff.WithMaxTries(3),
 				},
 			}

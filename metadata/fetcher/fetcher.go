@@ -45,13 +45,16 @@ type Fetcher interface {
 	DownloadFile(urlPath string, maxLength int64, _ time.Duration) ([]byte, error)
 }
 
+// RetryOption is an alias for backoff.RetryOption to avoid exposing the underlying dependency in exported signatures.
+type RetryOption = backoff.RetryOption
+
 // DefaultFetcher implements Fetcher
 type DefaultFetcher struct {
 	//  httpClient configuration
 	httpUserAgent string
 	client        httpClient
 	// retry logic configuration
-	retryOptions []backoff.RetryOption
+	retryOptions []RetryOption
 }
 
 func (d *DefaultFetcher) SetHTTPUserAgent(httpUserAgent string) {
@@ -126,7 +129,7 @@ func NewDefaultFetcher() *DefaultFetcher {
 	return &DefaultFetcher{
 		client: http.DefaultClient,
 		// default to attempting the HTTP request once
-		retryOptions: []backoff.RetryOption{backoff.WithMaxTries(1)},
+		retryOptions: []RetryOption{backoff.WithMaxTries(1)},
 	}
 }
 
@@ -167,6 +170,6 @@ func (f *DefaultFetcher) SetRetry(retryInterval time.Duration, retryCount uint) 
 	f.SetRetryOptions(constantBackOff, maxTryCount)
 }
 
-func (f *DefaultFetcher) SetRetryOptions(retryOptions ...backoff.RetryOption) {
+func (f *DefaultFetcher) SetRetryOptions(retryOptions ...RetryOption) {
 	f.retryOptions = retryOptions
 }
