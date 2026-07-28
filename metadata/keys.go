@@ -25,8 +25,13 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"encoding/pem"
 	"fmt"
+	"strconv"
+	"strings"
 
+	"filippo.io/mldsa"
+	mldsax509 "filippo.io/mldsa/x509"
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
@@ -36,10 +41,14 @@ const (
 	KeyTypeECDSA_SHA2_P256_COMPAT = "ecdsa-sha2-nistp256"
 	KeyTypeECDSA_SHA2_P256        = "ecdsa"
 	KeyTypeRSASSA_PSS_SHA256      = "rsa"
+	KeyTypeMLDSA                  = "ml-dsa"
 	KeySchemeEd25519              = "ed25519"
 	KeySchemeECDSA_SHA2_P256      = "ecdsa-sha2-nistp256"
 	KeySchemeECDSA_SHA2_P384      = "ecdsa-sha2-nistp384"
 	KeySchemeRSASSA_PSS_SHA256    = "rsassa-pss-sha256"
+	KeySchemeMLDSA44              = "ml-dsa-44/1"
+	KeySchemeMLDSA65              = "ml-dsa-65/1"
+	KeySchemeMLDSA87              = "ml-dsa-87/1"
 )
 
 // ToPublicKey generate crypto.PublicKey from metadata type Key
@@ -84,6 +93,39 @@ func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 			return nil, err
 		}
 		return ed25519Key, nil
+	case KeyTypeMLDSA:
+		block, _ := pem.Decode([]byte(k.Value.PublicKey))
+		if block == nil {
+			return nil, fmt.Errorf("failed to decode PEM block containing public key")
+		}
+		if block.Type != "PUBLIC KEY" {
+			return nil, fmt.Errorf("unexpected PEM block type: %s", block.Type)
+		}
+		publicKey, err := mldsax509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		mldsaKey, ok := publicKey.(*mldsa.PublicKey)
+		if !ok {
+			return nil, fmt.Errorf("invalid mldsa public key")
+		}
+		switch k.Scheme {
+		case KeySchemeMLDSA44:
+			if mldsaKey.Parameters() != mldsa.MLDSA44() {
+				return nil, fmt.Errorf("ML-DSA key parameters mismatch for scheme %s", k.Scheme)
+			}
+		case KeySchemeMLDSA65:
+			if mldsaKey.Parameters() != mldsa.MLDSA65() {
+				return nil, fmt.Errorf("ML-DSA key parameters mismatch for scheme %s", k.Scheme)
+			}
+		case KeySchemeMLDSA87:
+			if mldsaKey.Parameters() != mldsa.MLDSA87() {
+				return nil, fmt.Errorf("ML-DSA key parameters mismatch for scheme %s", k.Scheme)
+			}
+		default:
+			return nil, fmt.Errorf("unsupported ML-DSA scheme: %s", k.Scheme)
+		}
+		return mldsaKey, nil
 	}
 	return nil, fmt.Errorf("unsupported public key type")
 }
@@ -112,6 +154,24 @@ func KeyFromPublicKey(k crypto.PublicKey) (*Key, error) {
 		key.Type = KeyTypeEd25519
 		key.Scheme = KeySchemeEd25519
 		key.Value.PublicKey = hex.EncodeToString(k)
+	case *mldsa.PublicKey:
+		key.Type = KeyTypeMLDSA
+		switch k.Parameters() {
+		case mldsa.MLDSA44():
+			key.Scheme = KeySchemeMLDSA44
+		case mldsa.MLDSA65():
+			key.Scheme = KeySchemeMLDSA65
+		case mldsa.MLDSA87():
+			key.Scheme = KeySchemeMLDSA87
+		default:
+			return nil, fmt.Errorf("unsupported mldsa parameters")
+		}
+		derBytes, err := mldsax509.MarshalPKIXPublicKey(k)
+		if err != nil {
+			return nil, err
+		}
+		pemKey := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: derBytes})
+		key.Value.PublicKey = string(pemKey)
 	default:
 		return nil, fmt.Errorf("unsupported public key type")
 	}
@@ -131,4 +191,18 @@ func (k *Key) ID() (string, error) {
 		k.id = hex.EncodeToString(digest[:])
 	}
 	return k.id, nil
+}
+
+// extractMLDSAVersion extracts the version byte from a TUF ML-DSA scheme.
+// e.g. "ml-dsa-44/1" -> 1
+func extractMLDSAVersion(scheme string) (byte, error) {
+	parts := strings.Split(scheme, "/")
+	if len(parts) != 2 || !strings.HasPrefix(parts[0], "ml-dsa-") {
+		return 0, fmt.Errorf("invalid ML-DSA scheme format: %s", scheme)
+	}
+	v, err := strconv.Atoi(parts[1])
+	if err != nil || v < 1 || v > 255 {
+		return 0, fmt.Errorf("invalid ML-DSA version in scheme: %s", scheme)
+	}
+	return byte(v), nil
 }

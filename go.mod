@@ -3,6 +3,7 @@ module github.com/theupdateframework/go-tuf/v2
 go 1.25.0
 
 require (
+	filippo.io/mldsa v0.0.0-20260711112038-ff3f469cee29
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/go-logr/stdr v1.2.2
 	github.com/secure-systems-lab/go-securesystemslib v0.11.0
