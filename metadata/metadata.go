@@ -34,7 +34,7 @@ import (
 	"io"
 	"math"
 	"os"
-	"path/filepath"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -540,7 +540,11 @@ func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) 
 		for _, pathPattern := range role.Paths {
 			//  A delegated role path may be an explicit path or glob
 			//  pattern (Unix shell-style wildcards).
-			if isTargetInPathPattern(targetFilepath, pathPattern) {
+			matched, err := isTargetInPathPattern(targetFilepath, pathPattern)
+			if err != nil {
+				return false, err
+			}
+			if matched {
 				return true, nil
 			}
 		}
@@ -557,24 +561,32 @@ func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) 
 }
 
 // Determine whether “targetpath“ matches the “pathpattern“.
-func isTargetInPathPattern(targetpath string, pathpattern string) bool {
+func isTargetInPathPattern(targetpath string, pathpattern string) (bool, error) {
 	// We need to make sure that targetpath and pathpattern are pointing to
 	// the same directory as fnmatch doesn't threat "/" as a special symbol.
 	targetParts := strings.Split(targetpath, "/")
 	patternParts := strings.Split(pathpattern, "/")
 	if len(targetParts) != len(patternParts) {
-		return false
+		return false, nil
 	}
 
 	// Every part in the pathpattern could include a glob pattern, that's why
-	// each of the target and pathpattern parts should match.
+	// each of the target and pathpattern parts should match. We use path.Match
+	// (not filepath.Match) so matching is independent of the host OS: TUF target
+	// paths are always "/"-separated and "\" is a glob escape, not a separator.
+	// A malformed pattern surfaces path.ErrBadPattern instead of being silently
+	// treated as a non-match.
 	for i := 0; i < len(targetParts); i++ {
-		if ok, _ := filepath.Match(patternParts[i], targetParts[i]); !ok {
-			return false
+		ok, err := path.Match(patternParts[i], targetParts[i])
+		if err != nil {
+			return false, err
+		}
+		if !ok {
+			return false, nil
 		}
 	}
 
-	return true
+	return true, nil
 }
 
 // GetRolesForTarget return the names and terminating status of all

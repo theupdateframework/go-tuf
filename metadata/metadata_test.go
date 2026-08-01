@@ -28,6 +28,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 	"time"
@@ -286,6 +287,18 @@ func TestIsDelegatedPath(t *testing.T) {
 		assert.Equal(t, match.Expected, ok)
 		assert.Nil(t, err)
 	}
+}
+
+func TestIsDelegatedPathInvalidPattern(t *testing.T) {
+	// A malformed glob (unterminated character class) must surface an error
+	// rather than being silently treated as a non-match, so callers can tell
+	// "does not match" apart from "invalid pattern".
+	role := &DelegatedRole{
+		Paths: []string{"targets/["},
+	}
+	ok, err := role.IsDelegatedPath("targets/anything")
+	assert.False(t, ok)
+	assert.ErrorIs(t, err, path.ErrBadPattern)
 }
 
 func TestClearSignatures(t *testing.T) {
