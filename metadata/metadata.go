@@ -568,7 +568,7 @@ func isTargetInPathPattern(targetpath string, pathpattern string) bool {
 
 	// Every part in the pathpattern could include a glob pattern, that's why
 	// each of the target and pathpattern parts should match.
-	for i := 0; i < len(targetParts); i++ {
+	for i := range targetParts {
 		if ok, _ := filepath.Match(patternParts[i], targetParts[i]); !ok {
 			return false
 		}
@@ -876,7 +876,7 @@ func verifyHashes(data []byte, hashes Hashes) error {
 			return &ErrLengthOrHashMismatch{Msg: fmt.Sprintf("hash verification failed - unknown hashing algorithm - %s", k)}
 		}
 		hasher.Write(data)
-		if hex.EncodeToString(v) != hex.EncodeToString(hasher.Sum(nil)) {
+		if !hmac.Equal(v, hasher.Sum(nil)) {
 			return &ErrLengthOrHashMismatch{Msg: fmt.Sprintf("hash verification failed - mismatch for algorithm %s", k)}
 		}
 	}
