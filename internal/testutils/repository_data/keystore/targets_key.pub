@@ -1,1 +1,9 @@
-{"keyval": {"public": "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCjm6HPktvTGsygQ8Gvmu+zydTNe1zqoxLxV7mVRbmsCI4kn7JTHc4fmWZwvo7f/Wbto6Xj5HqGJFSlYIGZuTwZqPg3w8wqv8cuPxbmsFSxMoHfzBBIuJe0FlwXFysojbdhrSUqNL84tlwTFXEhePYrpTNMDn+9T55B0WJYT/VPxwIDAQAB"}, "keytype": "ed25519", "scheme": "ed25519", "keyid_hash_algorithms": ["sha256", "sha512"]}
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0kPkSQ34jonc9dSjLjsf
+rgq4LU1LD8NE3iJSBqUVVJIAS2HkEoSCaxSbkGa/WqJtGLGpsTzvjwmv9G+YCKaC
+rpzE45FMKnHNSxklOB6sHhlJrcNfcNXedLtrhXr05lxvnonmEWLFkFxQZcCuoMHo
+7NlOSY1Ai5TQ9LsUdBCFxtBDEiTR1NL9J9oNDZRDGYqT30CCUinlWGbxxc/oxWvc
+mVp4MyMv33oIra3ySIvbN5PaA1n7pBwqeW5al+SCequJOMA0tXP9WUjiiOo+uhPF
+tjg/NwZoqoLBf/FBplcywFjY3VUp4mDMU05FoG8I9XRw7nnyKt4NJnyvepf7NoU+
+LwIDAQAB
+-----END PUBLIC KEY-----
