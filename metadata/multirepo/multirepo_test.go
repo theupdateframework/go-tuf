@@ -228,3 +228,12 @@ func TestNewRejectsConfigWithoutRepoMap(t *testing.T) {
 		t.Fatal("New() should reject a config with no repository map")
 	}
 }
+
+func TestNewRejectsNilConfig(t *testing.T) {
+	// NewConfig returns a nil config alongside its error, so a caller that
+	// ignores the error passes nil straight into New.
+	_, err := New(nil)
+	if err == nil {
+		t.Fatal("New() should reject a nil config")
+	}
+}

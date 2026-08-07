@@ -122,10 +122,8 @@ func NewConfig(repoMap []byte, roots map[string][]byte) (*MultiRepoConfig, error
 
 // New returns a multi-repository TUF client. All repositories described in the provided map file are initialized too
 func New(config *MultiRepoConfig) (*MultiRepoClient, error) {
-	// create a multi repo client instance
-	client := &MultiRepoClient{
-		Config:     config,
-		TUFClients: map[string]*updater.Updater{},
+	if config == nil {
+		return nil, fmt.Errorf("no multi-repository config provided")
 	}
 
 	// validate the map file before initializing anything, so that a malformed map
@@ -133,6 +131,12 @@ func New(config *MultiRepoConfig) (*MultiRepoClient, error) {
 	// initialization failure or a panic during target lookup
 	if err := validateRepoMap(config.RepoMap); err != nil {
 		return nil, err
+	}
+
+	// create a multi repo client instance
+	client := &MultiRepoClient{
+		Config:     config,
+		TUFClients: map[string]*updater.Updater{},
 	}
 
 	// create TUF clients for each repository listed in the map file
