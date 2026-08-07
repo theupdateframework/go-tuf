@@ -123,3 +123,108 @@ func TestNewRejectsInvalidRepoNames(t *testing.T) {
 		})
 	}
 }
+
+func TestNewRejectsRepositoriesWithoutURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		repoURLs string
+	}{
+		{"empty URL list", `[]`},
+		{"null URL list", `null`},
+		{"empty URL string", `[""]`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mapJSON := []byte(`{
+				"repositories": {
+					"my-repo": ` + tt.repoURLs + `
+				},
+				"mapping": []
+			}`)
+
+			rootBytes := []byte(`{"signatures":[],"signed":{}}`)
+
+			cfg, err := NewConfig(mapJSON, map[string][]byte{"my-repo": rootBytes})
+			if err != nil {
+				t.Fatalf("NewConfig() unexpected error: %v", err)
+			}
+
+			_, err = New(cfg)
+			if err == nil {
+				t.Fatalf("New() should reject repository with URLs %s", tt.repoURLs)
+			}
+
+			if !errors.Is(err, ErrMissingRepoURL) {
+				t.Errorf("New() error should wrap ErrMissingRepoURL, got: %v", err)
+			}
+		})
+	}
+}
+
+func TestNewRejectsMappingWithUnknownRepository(t *testing.T) {
+	// A mapping that references a repository absent from the top-level
+	// "repositories" object leaves no TUF client for that name, which makes
+	// GetTargetInfo dereference a nil *updater.Updater.
+	mapJSON := []byte(`{
+		"repositories": {
+			"real-repo": ["https://example.com/repo"]
+		},
+		"mapping": [
+			{
+				"paths": ["*"],
+				"repositories": ["typo-repo"],
+				"threshold": 1,
+				"terminating": true
+			}
+		]
+	}`)
+
+	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
+
+	cfg, err := NewConfig(mapJSON, map[string][]byte{"real-repo": rootBytes})
+	if err != nil {
+		t.Fatalf("NewConfig() unexpected error: %v", err)
+	}
+
+	_, err = New(cfg)
+	if err == nil {
+		t.Fatal("New() should reject a mapping referencing an unknown repository")
+	}
+
+	if !errors.Is(err, ErrUnknownMappingRepo) {
+		t.Errorf("New() error should wrap ErrUnknownMappingRepo, got: %v", err)
+	}
+}
+
+func TestNewRejectsNullMapping(t *testing.T) {
+	// "mapping": [null] unmarshals into a []*Mapping holding a nil element,
+	// which GetTargetInfo would dereference while walking the mappings.
+	mapJSON := []byte(`{
+		"repositories": {
+			"real-repo": ["https://example.com/repo"]
+		},
+		"mapping": [null]
+	}`)
+
+	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
+
+	cfg, err := NewConfig(mapJSON, map[string][]byte{"real-repo": rootBytes})
+	if err != nil {
+		t.Fatalf("NewConfig() unexpected error: %v", err)
+	}
+
+	_, err = New(cfg)
+	if err == nil {
+		t.Fatal("New() should reject a null mapping entry")
+	}
+}
+
+func TestNewRejectsConfigWithoutRepoMap(t *testing.T) {
+	// MultiRepoConfig has exported fields, so callers can build one directly
+	// without going through NewConfig and leave RepoMap unset.
+	_, err := New(&MultiRepoConfig{})
+	if err == nil {
+		t.Fatal("New() should reject a config with no repository map")
+	}
+}
