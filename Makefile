@@ -46,7 +46,7 @@ build-%:
 # Test target
 .PHONY: test
 test:
-	GODEBUG=rsa1024min=0 go test -race -covermode atomic ./...
+	go test -race -covermode atomic ./...
 
 #####################
 # lint section
