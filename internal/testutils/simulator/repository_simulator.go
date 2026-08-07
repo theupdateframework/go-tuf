@@ -580,7 +580,7 @@ func (rs *RepositorySimulator) AddDelegation(delegatorName string, role metadata
 	if _, ok := rs.MDDelegates[role.Name]; !ok {
 		rs.MDDelegates[role.Name] = metadata.Metadata[metadata.TargetsType]{
 			Signed:             targets,
-			UnrecognizedFields: map[string]interface{}{},
+			UnrecognizedFields: map[string]any{},
 		}
 	}
 }

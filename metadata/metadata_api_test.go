@@ -889,7 +889,7 @@ func TestLengthAndHashValidation(t *testing.T) {
 	snapshotMetafile.Hashes = map[string]HexBytes{
 		"sha256": h,
 	}
-	snapshotMetafile.Length = 652
+	snapshotMetafile.Length = int64(len(snapshotData))
 
 	data, err := os.ReadFile(filepath.Join(testutils.RepoDir, "snapshot.json"))
 	assert.NoError(t, err)
