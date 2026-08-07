@@ -26,3 +26,8 @@ updates:
       prefix: "chore"
       include: "scope"
     open-pull-requests-limit: 10
+    groups:
+      # Bundle all GitHub Actions updates into a single pull request
+      github-actions:
+        patterns:
+          - "*"
