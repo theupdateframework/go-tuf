@@ -858,3 +858,25 @@ func TestTargetFilesEmptyHashesRejected(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "hashes must not be empty")
 }
+
+func TestToPublicKeyEd25519InvalidLength(t *testing.T) {
+	// A valid-hex but wrong-length ed25519 public key must be rejected: a
+	// non-32-byte key panics in ed25519.Verify during delegate verification.
+	key := &Key{
+		Type:   KeyTypeEd25519,
+		Scheme: KeySchemeEd25519,
+		Value:  KeyVal{PublicKey: "abcd"}, // decodes to 2 bytes
+	}
+
+	_, err := key.ToPublicKey()
+	assert.ErrorContains(t, err, "invalid ed25519 public key length")
+
+	// And it must not panic when reached through VerifyDelegate.
+	root := Root(time.Now().AddDate(1, 0, 0).UTC())
+	err = root.Signed.AddKey(key, ROOT)
+	assert.NoError(t, err)
+	assert.NotPanics(t, func() {
+		err = root.VerifyDelegate(ROOT, root)
+	})
+	assert.Error(t, err)
+}
