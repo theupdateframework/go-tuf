@@ -308,6 +308,30 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			delegatedRole)}
 	}
 
+	var payload []byte
+	var allSignatures []Signature
+	var err error
+
+	switch d := delegatedMetadata.(type) {
+	case *Metadata[RootType]:
+		payload, err = cjson.EncodeCanonical(d.Signed)
+		allSignatures = d.Signatures
+	case *Metadata[SnapshotType]:
+		payload, err = cjson.EncodeCanonical(d.Signed)
+		allSignatures = d.Signatures
+	case *Metadata[TimestampType]:
+		payload, err = cjson.EncodeCanonical(d.Signed)
+		allSignatures = d.Signatures
+	case *Metadata[TargetsType]:
+		payload, err = cjson.EncodeCanonical(d.Signed)
+		allSignatures = d.Signatures
+	default:
+		return &ErrType{Msg: "unknown delegated metadata type"}
+	}
+	if err != nil {
+		return err
+	}
+
 	// loop through each role keyID
 	for _, keyID := range roleKeyIDs {
 		key, ok := keys[keyID]
@@ -315,8 +339,6 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			return &ErrValue{Msg: fmt.Sprintf("key with ID %s not found in %s keyids", keyID, delegatedRole)}
 		}
 		sign := Signature{}
-		var payload []byte
-		// convert to a PublicKey type
 		publicKey, err := key.ToPublicKey()
 		if err != nil {
 			return err
@@ -360,49 +382,14 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 		}
 		// collect the signature for that key and build the payload we'll verify
 		// based on the Signed part of the delegated metadata
-		switch d := delegatedMetadata.(type) {
-		case *Metadata[RootType]:
-			for _, signature := range d.Signatures {
-				if signature.KeyID == keyID {
-					sign = signature
-				}
+		for _, signature := range allSignatures {
+			if signature.KeyID == keyID {
+				sign = signature
 			}
-			payload, err = cjson.EncodeCanonical(d.Signed)
-			if err != nil {
-				return err
-			}
-		case *Metadata[SnapshotType]:
-			for _, signature := range d.Signatures {
-				if signature.KeyID == keyID {
-					sign = signature
-				}
-			}
-			payload, err = cjson.EncodeCanonical(d.Signed)
-			if err != nil {
-				return err
-			}
-		case *Metadata[TimestampType]:
-			for _, signature := range d.Signatures {
-				if signature.KeyID == keyID {
-					sign = signature
-				}
-			}
-			payload, err = cjson.EncodeCanonical(d.Signed)
-			if err != nil {
-				return err
-			}
-		case *Metadata[TargetsType]:
-			for _, signature := range d.Signatures {
-				if signature.KeyID == keyID {
-					sign = signature
-				}
-			}
-			payload, err = cjson.EncodeCanonical(d.Signed)
-			if err != nil {
-				return err
-			}
-		default:
-			return &ErrType{Msg: "unknown delegated metadata type"}
+		}
+		if len(sign.Signature) == 0 {
+			log.Info("Signature not found for key ID", "role", delegatedRole, "ID", keyID)
+			continue
 		}
 		// verify if the signature for that payload corresponds to the given key
 		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payload)); err != nil {
