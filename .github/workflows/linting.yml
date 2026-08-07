@@ -23,7 +23,7 @@ jobs:
     name: govulncheck
     steps:
       - id: govulncheck
-        uses: golang/govulncheck-action@3a32958c2706f7048305d5a2e53633d7e37e97d0
+        uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f
         with:
           go-version-input: 'stable'
           go-package: ./...
