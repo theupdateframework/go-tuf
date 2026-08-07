@@ -420,8 +420,10 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 	if ok {
 		return role, nil
 	}
-	// try to read local targets
-	data, err := update.loadLocalMetadata(filepath.Join(update.cfg.LocalMetadataDir, roleName))
+	// try to read local targets; the file name must be escaped the same way
+	// persistMetadata writes it, otherwise a delegated role whose name contains
+	// characters like a space or "/" is never found in the cache.
+	data, err := os.ReadFile(update.localMetadataPath(roleName))
 	if err != nil {
 		// this means there's no existing local target file so we should proceed downloading it without the need to UpdateDelegatedTargets
 		log.Info("Local role does not exist", "role", roleName)
@@ -595,7 +597,7 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 		return nil
 	}
 	// caching enabled, proceed with persisting the metadata locally
-	fileName := filepath.Join(update.cfg.LocalMetadataDir, fmt.Sprintf("%s.json", url.PathEscape(roleName)))
+	fileName := update.localMetadataPath(roleName)
 	// create a temporary file
 	file, err := os.CreateTemp(update.cfg.LocalMetadataDir, "tuf_tmp")
 	if err != nil {
@@ -664,6 +666,17 @@ func (update *Updater) generateTargetFilePath(tf *metadata.TargetFiles) (string,
 	}
 	// Use URL encoded target path as filename
 	return filepath.Join(update.cfg.LocalTargetsDir, url.PathEscape(tf.Path)), nil
+}
+
+// localMetadataPath returns the path of the cache file for roleName inside
+// LocalMetadataDir. The role name is URL-escaped so a delegated role whose name
+// contains a path separator or other special character maps to a single file
+// inside the directory. persistMetadata and the delegated read in loadTargets
+// share this helper so the two sides always agree on the file name. The ".json"
+// suffix is appended before joining so a role named "." or ".." cannot be
+// collapsed by filepath.Join and escape the directory.
+func (update *Updater) localMetadataPath(roleName string) string {
+	return filepath.Join(update.cfg.LocalMetadataDir, fmt.Sprintf("%s.json", url.PathEscape(roleName)))
 }
 
 // loadLocalMetadata reads a local <roleName>.json file and returns its bytes
