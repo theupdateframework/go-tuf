@@ -43,6 +43,10 @@ const TEST_REPOSITORY_DATA = "../internal/testutils/repository_data/repository/m
 
 var fixedExpire = time.Date(2030, 8, 15, 14, 30, 45, 100, time.UTC)
 
+// the constructors truncate expires to second precision per the TUF spec, so
+// anything that has been through Root/Snapshot/Targets/Timestamp carries this.
+var fixedExpireTruncated = fixedExpire.Truncate(time.Second)
+
 func getSignatureByKeyID(signatures []Signature, keyID string) (HexBytes, int) {
 	for i, sig := range signatures {
 		if sig.KeyID == keyID {
@@ -59,10 +63,11 @@ func TestDefaultValuesRoot(t *testing.T) {
 	assert.GreaterOrEqual(t, []time.Time{time.Now().UTC()}[0], meta.Signed.Expires)
 
 	// setting expiration
+	// the constructors truncate expires to second precision, per the TUF spec
 	expire := time.Now().AddDate(0, 0, 2).UTC()
 	meta = Root(expire)
 	assert.NotNil(t, meta)
-	assert.Equal(t, expire, meta.Signed.Expires)
+	assert.Equal(t, expire.Truncate(time.Second), meta.Signed.Expires)
 
 	// Type
 	assert.Equal(t, ROOT, meta.Signed.Type)
@@ -99,7 +104,7 @@ func TestDefaultValuesSnapshot(t *testing.T) {
 	expire := time.Now().AddDate(0, 0, 2).UTC()
 	meta = Snapshot(expire)
 	assert.NotNil(t, meta)
-	assert.Equal(t, expire, meta.Signed.Expires)
+	assert.Equal(t, expire.Truncate(time.Second), meta.Signed.Expires)
 
 	// Type
 	assert.Equal(t, SNAPSHOT, meta.Signed.Type)
@@ -127,7 +132,7 @@ func TestDefaultValuesTimestamp(t *testing.T) {
 	expire := time.Now().AddDate(0, 0, 2).UTC()
 	meta = Timestamp(expire)
 	assert.NotNil(t, meta)
-	assert.Equal(t, expire, meta.Signed.Expires)
+	assert.Equal(t, expire.Truncate(time.Second), meta.Signed.Expires)
 
 	// Type
 	assert.Equal(t, TIMESTAMP, meta.Signed.Type)
@@ -155,7 +160,7 @@ func TestDefaultValuesTargets(t *testing.T) {
 	expire := time.Now().AddDate(0, 0, 2).UTC()
 	meta = Targets(expire)
 	assert.NotNil(t, meta)
-	assert.Equal(t, expire, meta.Signed.Expires)
+	assert.Equal(t, expire.Truncate(time.Second), meta.Signed.Expires)
 
 	// Type
 	assert.Equal(t, TARGETS, meta.Signed.Type)
@@ -431,12 +436,13 @@ func TestTargetFilesCustomField(t *testing.T) {
 
 func TestFromBytes(t *testing.T) {
 	root := Root(fixedExpire)
-	assert.Equal(t, fixedExpire, root.Signed.Expires)
+	assert.Equal(t, fixedExpireTruncated, root.Signed.Expires)
 
 	_, err := root.FromBytes(testRootBytes)
 	assert.NoError(t, err)
 
-	assert.Equal(t, fixedExpire, root.Signed.Expires)
+	// parsed metadata keeps the precision it was signed with, so this is the
+	// untruncated fixture value rather than what the constructor would produce
 	assert.Equal(t, fixedExpire, root.Signed.Expires)
 	assert.Equal(t, ROOT, root.Signed.Type)
 	assert.True(t, root.Signed.ConsistentSnapshot)
@@ -509,8 +515,6 @@ func TestToByte(t *testing.T) {
 	root.Signatures = append(root.Signatures, Signature{KeyID: "roothash", Signature: hash["ed25519"]})
 	rootBytes, err := root.ToBytes(false)
 	assert.NoError(t, err)
-	// Even though the input expires string carries sub-second precision, the
-	// serialized output must use the spec-required whole-second UTC format.
 	expectedRootBytes := []byte("{\"signatures\":[{\"keyid\":\"roothash\",\"sig\":\"1307990e6ba5ca145eb35e99182a9bec46531bc54ddf656a602c780fa0240dee\"}],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45Z\",\"keys\":{\"roothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubrootval\"},\"scheme\":\"ed25519\"},\"snapshothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubsval\"},\"scheme\":\"ed25519\"},\"targetshash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtrval\"},\"scheme\":\"ed25519\"},\"timestamphash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtmval\"},\"scheme\":\"ed25519\"}},\"roles\":{\"root\":{\"keyids\":[\"roothash\"],\"threshold\":1},\"snapshot\":{\"keyids\":[\"snapshothash\"],\"threshold\":1},\"targets\":{\"keyids\":[\"targetshash\"],\"threshold\":1},\"timestamp\":{\"keyids\":[\"timestamphash\"],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"version\":1}}")
 	assert.Equal(t, string(expectedRootBytes), string(rootBytes))
 }
@@ -520,7 +524,7 @@ func TestFromFile(t *testing.T) {
 	_, err := root.FromFile(filepath.Join(TEST_REPOSITORY_DATA, "1.root.json"))
 	assert.NoError(t, err)
 
-	assert.Equal(t, fixedExpire, root.Signed.Expires)
+	// parsed from disk, so the original precision is preserved
 	assert.Equal(t, fixedExpire, root.Signed.Expires)
 	assert.Equal(t, ROOT, root.Signed.Type)
 	assert.True(t, root.Signed.ConsistentSnapshot)
@@ -576,9 +580,10 @@ func TestToFile(t *testing.T) {
 	assert.FileExists(t, fileName)
 	data, err := os.ReadFile(fileName)
 	assert.NoError(t, err)
-	// The input bytes carry a sub-second expires; the written output must use
-	// the spec-required whole-second UTC format.
-	expectedBytes := []byte("{\"signatures\":[{\"keyid\":\"roothash\",\"sig\":\"1307990e6ba5ca145eb35e99182a9bec46531bc54ddf656a602c780fa0240dee\"}],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45Z\",\"keys\":{\"roothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubrootval\"},\"scheme\":\"ed25519\"},\"snapshothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubsval\"},\"scheme\":\"ed25519\"},\"targetshash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtrval\"},\"scheme\":\"ed25519\"},\"timestamphash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtmval\"},\"scheme\":\"ed25519\"}},\"roles\":{\"root\":{\"keyids\":[\"roothash\"],\"threshold\":1},\"snapshot\":{\"keyids\":[\"snapshothash\"],\"threshold\":1},\"targets\":{\"keyids\":[\"targetshash\"],\"threshold\":1},\"timestamp\":{\"keyids\":[\"timestamphash\"],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"version\":1}}")
+	// This root was parsed from bytes rather than constructed, so its expires is
+	// written back exactly as it arrived. Rewriting it here would change the
+	// signed bytes and invalidate the signature over them.
+	expectedBytes := []byte("{\"signatures\":[{\"keyid\":\"roothash\",\"sig\":\"1307990e6ba5ca145eb35e99182a9bec46531bc54ddf656a602c780fa0240dee\"}],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{\"roothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubrootval\"},\"scheme\":\"ed25519\"},\"snapshothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubsval\"},\"scheme\":\"ed25519\"},\"targetshash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtrval\"},\"scheme\":\"ed25519\"},\"timestamphash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtmval\"},\"scheme\":\"ed25519\"}},\"roles\":{\"root\":{\"keyids\":[\"roothash\"],\"threshold\":1},\"snapshot\":{\"keyids\":[\"snapshothash\"],\"threshold\":1},\"targets\":{\"keyids\":[\"targetshash\"],\"threshold\":1},\"timestamp\":{\"keyids\":[\"timestamphash\"],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"version\":1}}")
 	assert.Equal(t, string(expectedBytes), string(data))
 
 	err = os.RemoveAll(tmpDir)

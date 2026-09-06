@@ -19,86 +19,74 @@ package metadata
 
 import (
 	"encoding/json"
-	"regexp"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// secondPrecisionUTC matches the TUF spec date/time format for "expires":
-// an ISO 8601 / RFC 3339 timestamp in UTC, truncated to whole seconds with
-// a trailing Z and no fractional-second component.
-var secondPrecisionUTC = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`)
-
-// expiresFromJSON pulls the raw "expires" string out of a marshaled signed body.
+// expiresFromJSON pulls the raw "expires" string out of marshaled metadata so
+// the assertions below are about the bytes on the wire rather than the
+// in-memory time.Time.
 func expiresFromJSON(t *testing.T, data []byte) string {
 	t.Helper()
-	var dict map[string]any
-	if err := json.Unmarshal(data, &dict); err != nil {
-		t.Fatalf("unmarshal signed body: %v", err)
+	var outer struct {
+		Signed struct {
+			Expires string `json:"expires"`
+		} `json:"signed"`
 	}
-	v, ok := dict["expires"]
-	if !ok {
-		t.Fatalf("no expires field in %s", string(data))
-	}
-	s, ok := v.(string)
-	if !ok {
-		t.Fatalf("expires is not a string: %T (%v)", v, v)
-	}
-	return s
+	assert.NoError(t, json.Unmarshal(data, &outer))
+	return outer.Signed.Expires
 }
 
-// TestExpiresMarshalSecondPrecision verifies that every role type serializes
-// "expires" with whole-second UTC precision (YYYY-MM-DDTHH:MM:SSZ), per the TUF
-// spec, even when the in-memory time.Time carries sub-second precision.
-func TestExpiresMarshalSecondPrecision(t *testing.T) {
-	// A time with sub-second precision (100 nanoseconds). Marshaling a raw
-	// time.Time would emit "2030-08-15T14:30:45.0000001Z".
-	subSecond := time.Date(2030, 8, 15, 14, 30, 45, 100, time.UTC)
-	wantExpires := "2030-08-15T14:30:45Z"
+// The TUF specification writes "expires" as an RFC 3339 timestamp in UTC with
+// second precision. encoding/json uses RFC3339Nano for a time.Time, so a value
+// carrying nanoseconds would otherwise be serialized as
+// "2030-01-01T00:00:00.0000001Z".
+func TestConstructorsTruncateExpiresToSeconds(t *testing.T) {
+	expires := time.Date(2030, 1, 1, 0, 0, 0, 100, time.UTC)
+	const want = "2030-01-01T00:00:00Z"
 
-	cases := []struct {
-		name string
-		body json.Marshaler
-	}{
-		{"root", Root(subSecond).Signed},
-		{"snapshot", Snapshot(subSecond).Signed},
-		{"timestamp", Timestamp(subSecond).Signed},
-		{"targets", Targets(subSecond).Signed},
-	}
+	root, err := Root(expires).MarshalJSON()
+	assert.NoError(t, err)
+	assert.Equal(t, want, expiresFromJSON(t, root))
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			data, err := tc.body.MarshalJSON()
-			assert.NoError(t, err)
+	snapshot, err := Snapshot(expires).MarshalJSON()
+	assert.NoError(t, err)
+	assert.Equal(t, want, expiresFromJSON(t, snapshot))
 
-			got := expiresFromJSON(t, data)
-			assert.Regexp(t, secondPrecisionUTC, got,
-				"expires must be whole-second UTC per the TUF spec, got %q", got)
-			assert.Equal(t, wantExpires, got)
-		})
-	}
+	targets, err := Targets(expires).MarshalJSON()
+	assert.NoError(t, err)
+	assert.Equal(t, want, expiresFromJSON(t, targets))
+
+	timestamp, err := Timestamp(expires).MarshalJSON()
+	assert.NoError(t, err)
+	assert.Equal(t, want, expiresFromJSON(t, timestamp))
 }
 
-// TestExpiresMarshalUnmarshalRoundTrip confirms that the second-precision
-// formatting still round-trips: parsing the formatted output back yields the
-// truncated time, and re-marshaling is stable.
-func TestExpiresMarshalUnmarshalRoundTrip(t *testing.T) {
-	subSecond := time.Date(2030, 8, 15, 14, 30, 45, 100, time.UTC)
-	truncated := time.Date(2030, 8, 15, 14, 30, 45, 0, time.UTC)
-
-	root := Root(subSecond)
-	data, err := root.Signed.MarshalJSON()
+// A non-UTC expiry is normalized to UTC as well as truncated.
+func TestConstructorsNormalizeExpiresToUTC(t *testing.T) {
+	zone := time.FixedZone("UTC+2", 2*60*60)
+	root, err := Root(time.Date(2030, 1, 1, 2, 0, 0, 500, zone)).MarshalJSON()
 	assert.NoError(t, err)
+	assert.Equal(t, "2030-01-01T00:00:00Z", expiresFromJSON(t, root))
+}
 
-	var parsed RootType
-	assert.NoError(t, parsed.UnmarshalJSON(data))
-	assert.True(t, parsed.Expires.Equal(truncated),
-		"round-tripped expires %v should equal %v", parsed.Expires, truncated)
+// Truncation deliberately does not happen in MarshalJSON. Verification
+// re-marshals parsed metadata to recover the bytes that were signed, so
+// reformatting there would change those bytes and invalidate signatures over
+// existing metadata whose expires carries sub-second precision. Metadata that
+// arrives with nanoseconds must round-trip unchanged.
+func TestParsedExpiresRoundTripsUnchanged(t *testing.T) {
+	const original = "2030-08-15T14:30:45.0000001Z"
 
-	// Re-marshaling the parsed value is stable and still second-precision.
-	data2, err := parsed.MarshalJSON()
+	root := Root()
+	raw := []byte(`{"signatures":[],"signed":{"_type":"root","spec_version":"1.0.31","version":1,` +
+		`"expires":"` + original + `","consistent_snapshot":true,"keys":{},"roles":{}}}`)
+	assert.NoError(t, json.Unmarshal(raw, root))
+
+	out, err := root.MarshalJSON()
 	assert.NoError(t, err)
-	assert.Equal(t, "2030-08-15T14:30:45Z", expiresFromJSON(t, data2))
+	assert.Equal(t, original, expiresFromJSON(t, out),
+		"re-marshaling parsed metadata must not rewrite expires, or signatures over it break")
 }
