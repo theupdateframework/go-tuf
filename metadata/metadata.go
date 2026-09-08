@@ -44,12 +44,29 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 )
 
+// truncateExpires returns t in UTC with sub-second precision removed.
+//
+// The TUF specification defines "expires" as an ISO 8601 / RFC 3339 timestamp
+// in UTC with second precision. encoding/json serializes a time.Time with
+// RFC3339Nano, so a value carrying nanoseconds would be written out as
+// "2030-01-01T00:00:00.0000001Z", which is not spec conformant.
+//
+// This is applied when metadata is constructed rather than during MarshalJSON.
+// Signature verification re-marshals parsed metadata to recover the bytes that
+// were signed, so reformatting there would change those bytes and invalidate
+// signatures over any existing metadata whose expires carries sub-second
+// precision.
+func truncateExpires(t time.Time) time.Time {
+	return t.UTC().Truncate(time.Second)
+}
+
 // Root return new metadata instance of type Root
 func Root(expires ...time.Time) *Metadata[RootType] {
 	// expire now if there's nothing set
 	if len(expires) == 0 {
 		expires = []time.Time{time.Now().UTC()}
 	}
+	expires[0] = truncateExpires(expires[0])
 	// populate Roles
 	roles := map[string]*Role{}
 	for _, r := range []string{ROOT, SNAPSHOT, TARGETS, TIMESTAMP} {
@@ -79,6 +96,7 @@ func Snapshot(expires ...time.Time) *Metadata[SnapshotType] {
 	if len(expires) == 0 {
 		expires = []time.Time{time.Now().UTC()}
 	}
+	expires[0] = truncateExpires(expires[0])
 	log.Info("Created metadata", "type", SNAPSHOT)
 	return &Metadata[SnapshotType]{
 		Signed: SnapshotType{
@@ -102,6 +120,7 @@ func Timestamp(expires ...time.Time) *Metadata[TimestampType] {
 	if len(expires) == 0 {
 		expires = []time.Time{time.Now().UTC()}
 	}
+	expires[0] = truncateExpires(expires[0])
 	log.Info("Created metadata", "type", TIMESTAMP)
 	return &Metadata[TimestampType]{
 		Signed: TimestampType{
@@ -125,6 +144,7 @@ func Targets(expires ...time.Time) *Metadata[TargetsType] {
 	if len(expires) == 0 {
 		expires = []time.Time{time.Now().UTC()}
 	}
+	expires[0] = truncateExpires(expires[0])
 	log.Info("Created metadata", "type", TARGETS)
 	return &Metadata[TargetsType]{
 		Signed: TargetsType{
