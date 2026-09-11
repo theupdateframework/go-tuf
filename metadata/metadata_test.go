@@ -24,17 +24,16 @@ import (
 	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/mldsa"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/json"
-	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"filippo.io/mldsa"
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
@@ -896,32 +895,8 @@ func TestToPublicKeyEd25519InvalidLength(t *testing.T) {
 	assert.Error(t, err)
 }
 
-type mldsaSigner struct {
-	priv *mldsa.PrivateKey
-}
-
-func (s *mldsaSigner) PublicKey(opts ...signature.PublicKeyOption) (crypto.PublicKey, error) {
-	return s.priv.PublicKey(), nil
-}
-
-func (s *mldsaSigner) Public() crypto.PublicKey {
-	return s.priv.PublicKey()
-}
-
-func (s *mldsaSigner) SignMessage(message io.Reader, opts ...signature.SignOption) ([]byte, error) {
-	b, err := io.ReadAll(message)
-	if err != nil {
-		return nil, err
-	}
-	return s.priv.Sign(nil, b, nil)
-}
-
-func (s *mldsaSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
-	return s.priv.Sign(rand, digest, opts)
-}
-
 func TestSignVerifyMLDSA(t *testing.T) {
-	for _, params := range []*mldsa.Parameters{
+	for _, params := range []mldsa.Parameters{
 		mldsa.MLDSA44(),
 		mldsa.MLDSA65(),
 		mldsa.MLDSA87(),
@@ -929,7 +904,8 @@ func TestSignVerifyMLDSA(t *testing.T) {
 		priv, err := mldsa.GenerateKey(params)
 		assert.NoError(t, err)
 
-		signer := &mldsaSigner{priv: priv}
+		signer, err := signature.LoadSignerVerifier(priv, crypto.Hash(0))
+		assert.NoError(t, err)
 
 		targets := Targets(time.Now().Add(time.Hour))
 
@@ -980,12 +956,12 @@ func TestMLDSAVerificationFailures(t *testing.T) {
 	}
 	_, err := invalidPEMKey.ToPublicKey()
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to decode PEM block")
 
 	// 3. Test VerifyDelegate with mutated signature
 	priv, err := mldsa.GenerateKey(mldsa.MLDSA44())
 	assert.NoError(t, err)
-	signer := &mldsaSigner{priv: priv}
+	signer, err := signature.LoadSignerVerifier(priv, crypto.Hash(0))
+	assert.NoError(t, err)
 
 	targets := Targets(time.Now().Add(time.Hour))
 	key, err := KeyFromPublicKey(priv.PublicKey())
@@ -1009,4 +985,31 @@ func TestMLDSAVerificationFailures(t *testing.T) {
 	err = root.VerifyDelegate(TARGETS, targets)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not enough signatures")
+}
+
+func TestVerifyDelegateDuplicatePublicKeyMLDSA(t *testing.T) {
+	priv, err := mldsa.GenerateKey(mldsa.MLDSA44())
+	assert.NoError(t, err)
+
+	keyA, err := KeyFromPublicKey(priv.PublicKey())
+	assert.NoError(t, err)
+	keyB := &Key{
+		Type:               keyA.Type,
+		Scheme:             keyA.Scheme,
+		Value:              keyA.Value,
+		UnrecognizedFields: map[string]any{"duplicate": true},
+	}
+
+	targets := Targets(fixedExpire)
+	payload, err := cjson.EncodeCanonical(targets.Signed)
+	assert.NoError(t, err)
+	signer, err := signature.LoadSignerVerifier(priv, crypto.Hash(0))
+	assert.NoError(t, err)
+
+	payloadToSign, err := preparePayload(keyA, payload)
+	assert.NoError(t, err)
+	sigBytes, err := signer.SignMessage(bytes.NewReader(payloadToSign))
+	assert.NoError(t, err)
+
+	assertDuplicatePublicKeyCountsOnce(t, keyA, keyB, targets, sigBytes)
 }

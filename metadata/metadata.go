@@ -40,8 +40,6 @@ import (
 	"strings"
 	"time"
 
-	"filippo.io/mldsa"
-	mldsax509 "filippo.io/mldsa/x509"
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/sigstore/sigstore/pkg/signature"
 )
@@ -229,33 +227,15 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 		return nil, err
 	}
 
-	payloadToSign := payload
-	// Generate payload as defined in TAP 21
-	if key.Type == KeyTypeMLDSA {
-		version, err := extractMLDSAVersion(key.Scheme)
-		if err != nil {
-			return nil, err
-		}
-		h := sha512.New()
-		h.Write(payload)
-		prefix := append([]byte("tuf"), version)
-		payloadToSign = append(prefix, h.Sum(nil)...)
+	payloadToSign, err := preparePayload(key, payload)
+	if err != nil {
+		return nil, err
 	}
 
 	// sign the Signed part
-	var sb []byte
-	cryptoSigner, isCryptoSigner := signer.(crypto.Signer)
-	_, isMLDSA := publ.(*mldsa.PublicKey)
-
-	if isCryptoSigner && isMLDSA {
-		// ML-DSA signatures are hedged with internal randomness by default.
-		// The io.Reader is ignored by the implementation.
-		sb, err = cryptoSigner.Sign(nil, payloadToSign, crypto.Hash(0))
-	} else {
-		sb, err = signer.SignMessage(bytes.NewReader(payloadToSign))
-	}
+	sb, err := signer.SignMessage(bytes.NewReader(payloadToSign))
 	if err != nil {
-		return nil, fmt.Errorf("problem signing metadata: %w", err)
+		return nil, &ErrUnsignedMetadata{Msg: fmt.Sprintf("problem signing metadata: %v", err)}
 	}
 	// build signature
 	sig := &Signature{
@@ -267,6 +247,21 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	// return the new signature
 	log.Info("Signed metadata with key", "ID", keyID)
 	return sig, nil
+}
+
+// preparePayload returns the payload to sign or verify, applying protocol
+// pre-hashing and domain separation if required by the key type (e.g. TAP 21 for ML-DSA).
+func preparePayload(key *Key, payload []byte) ([]byte, error) {
+	if key.Type != KeyTypeMLDSA {
+		return payload, nil
+	}
+	version, err := extractMLDSAVersion(key.Scheme)
+	if err != nil {
+		return nil, err
+	}
+	h := sha512.Sum512(payload)
+	prefix := []byte{'t', 'u', 'f', version}
+	return append(prefix, h[:]...), nil
 }
 
 // VerifyDelegate verifies that delegatedMetadata is signed with the required
@@ -382,12 +377,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			return err
 		}
 
-		var pubBytes []byte
-		if mldsaKey, ok := publicKey.(*mldsa.PublicKey); ok {
-			pubBytes, err = mldsax509.MarshalPKIXPublicKey(mldsaKey)
-		} else {
-			pubBytes, err = x509.MarshalPKIXPublicKey(publicKey)
-		}
+		pubBytes, err := x509.MarshalPKIXPublicKey(publicKey)
 		if err != nil {
 			return err
 		}
@@ -417,45 +407,27 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 				return &ErrType{Msg: "failed to convert public key to RSA PSS key"}
 			}
 			verifier, err = signature.LoadRSAPSSVerifier(publicKeyRSAPSS, hash, &rsa.PSSOptions{Hash: crypto.SHA256})
-		} else if key.Type != KeyTypeMLDSA {
-			// Load a verifier for ed25519 and ecdsa
+		} else {
+			// Load a verifier for ed25519, ecdsa, and ml-dsa
 			verifier, err = signature.LoadVerifier(publicKey, hash)
 		}
 		if err != nil {
 			return err
 		}
 
-		if key.Type == KeyTypeMLDSA {
-			mldsaKey, ok := publicKey.(*mldsa.PublicKey)
-			if !ok {
-				return &ErrType{Msg: "failed to convert public key to ML-DSA key"}
-			}
-			version, err := extractMLDSAVersion(key.Scheme)
-			if err != nil {
-				return err
-			}
-			h := sha512.New()
-			h.Write(payload)
-			prefix := append([]byte("tuf"), version)
-			messageForVerify := append(prefix, h.Sum(nil)...)
+		payloadToVerify, err := preparePayload(key, payload)
+		if err != nil {
+			return err
+		}
 
-			if err := mldsa.Verify(mldsaKey, messageForVerify, sign.Signature, nil); err != nil {
-				// failed to verify the metadata with that key ID
-				log.Info("Failed to verify role with key ID", "role", delegatedRole, "ID", keyID)
-			} else {
-				// save the verified public-key fingerprint only if verification passed
-				signingKeys[fingerprint] = true
-				log.Info("Verified with key", "role", delegatedRole, "ID", keyID)
-			}
+		// verify if the signature for that payload corresponds to the given key
+		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payloadToVerify)); err != nil {
+			// failed to verify the metadata with that key ID
+			log.Info("Failed to verify role with key ID", "role", delegatedRole, "ID", keyID)
 		} else {
-			if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payload)); err != nil {
-				// failed to verify the metadata with that key ID
-				log.Info("Failed to verify role with key ID", "role", delegatedRole, "ID", keyID)
-			} else {
-				// save the verified public-key fingerprint only if verification passed
-				signingKeys[fingerprint] = true
-				log.Info("Verified with key", "role", delegatedRole, "ID", keyID)
-			}
+			// save the verified public-key fingerprint only if verification passed
+			signingKeys[fingerprint] = true
+			log.Info("Verified with key", "role", delegatedRole, "ID", keyID)
 		}
 	}
 	// check if the amount of valid signatures is enough

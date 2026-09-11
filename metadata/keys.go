@@ -21,17 +21,15 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/mldsa"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
-	"encoding/pem"
 	"fmt"
 	"strconv"
 	"strings"
 
-	"filippo.io/mldsa"
-	mldsax509 "filippo.io/mldsa/x509"
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
@@ -98,14 +96,7 @@ func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 		}
 		return ed25519Key, nil
 	case KeyTypeMLDSA:
-		block, _ := pem.Decode([]byte(k.Value.PublicKey))
-		if block == nil {
-			return nil, fmt.Errorf("failed to decode PEM block containing public key")
-		}
-		if block.Type != "PUBLIC KEY" {
-			return nil, fmt.Errorf("unexpected PEM block type: %s", block.Type)
-		}
-		publicKey, err := mldsax509.ParsePKIXPublicKey(block.Bytes)
+		publicKey, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(k.Value.PublicKey))
 		if err != nil {
 			return nil, err
 		}
@@ -170,11 +161,10 @@ func KeyFromPublicKey(k crypto.PublicKey) (*Key, error) {
 		default:
 			return nil, fmt.Errorf("unsupported mldsa parameters")
 		}
-		derBytes, err := mldsax509.MarshalPKIXPublicKey(k)
+		pemKey, err := cryptoutils.MarshalPublicKeyToPEM(k)
 		if err != nil {
 			return nil, err
 		}
-		pemKey := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: derBytes})
 		key.Value.PublicKey = string(pemKey)
 	default:
 		return nil, fmt.Errorf("unsupported public key type")
