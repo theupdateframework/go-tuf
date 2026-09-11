@@ -957,7 +957,14 @@ func TestMLDSAVerificationFailures(t *testing.T) {
 	_, err := invalidPEMKey.ToPublicKey()
 	assert.Error(t, err)
 
-	// 3. Test VerifyDelegate with mutated signature
+	// 3. Test KeyFromPublicKey with nil and uninitialized keys
+	_, err = KeyFromPublicKey((*mldsa.PublicKey)(nil))
+	assert.Error(t, err)
+
+	_, err = KeyFromPublicKey(&mldsa.PublicKey{})
+	assert.Error(t, err)
+
+	// 4. Test VerifyDelegate with mutated signature
 	priv, err := mldsa.GenerateKey(mldsa.MLDSA44())
 	assert.NoError(t, err)
 	signer, err := signature.LoadSignerVerifier(priv, crypto.Hash(0))

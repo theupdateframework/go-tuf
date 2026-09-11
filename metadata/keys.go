@@ -150,8 +150,12 @@ func KeyFromPublicKey(k crypto.PublicKey) (*Key, error) {
 		key.Scheme = KeySchemeEd25519
 		key.Value.PublicKey = hex.EncodeToString(k)
 	case *mldsa.PublicKey:
+		params, err := cryptoutils.ValidateMLDSAPublicKey(k)
+		if err != nil {
+			return nil, err
+		}
 		key.Type = KeyTypeMLDSA
-		switch k.Parameters() {
+		switch params {
 		case mldsa.MLDSA44():
 			key.Scheme = KeySchemeMLDSA44
 		case mldsa.MLDSA65():
