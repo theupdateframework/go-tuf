@@ -235,7 +235,7 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	// sign the Signed part
 	sb, err := signer.SignMessage(bytes.NewReader(payloadToSign))
 	if err != nil {
-		return nil, &ErrUnsignedMetadata{Msg: fmt.Sprintf("problem signing metadata: %v", err)}
+		return nil, fmt.Errorf("%w: %w", &ErrUnsignedMetadata{Msg: "problem signing metadata"}, err)
 	}
 	// build signature
 	sig := &Signature{
