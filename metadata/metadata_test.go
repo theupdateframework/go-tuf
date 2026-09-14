@@ -24,6 +24,7 @@ import (
 	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/mldsa"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/json"
@@ -892,4 +893,130 @@ func TestToPublicKeyEd25519InvalidLength(t *testing.T) {
 		err = root.VerifyDelegate(ROOT, root)
 	})
 	assert.Error(t, err)
+}
+
+func TestSignVerifyMLDSA(t *testing.T) {
+	for _, params := range []mldsa.Parameters{
+		mldsa.MLDSA44(),
+		mldsa.MLDSA65(),
+		mldsa.MLDSA87(),
+	} {
+		priv, err := mldsa.GenerateKey(params)
+		assert.NoError(t, err)
+
+		signer, err := signature.LoadSignerVerifier(priv, crypto.Hash(0))
+		assert.NoError(t, err)
+
+		targets := Targets(time.Now().Add(time.Hour))
+
+		// Create delegation
+		key, err := KeyFromPublicKey(priv.PublicKey())
+		assert.NoError(t, err)
+		keyID, err := key.ID()
+		assert.NoError(t, err)
+
+		root := Root(time.Now().Add(time.Hour))
+		root.Signed.Keys[keyID] = key
+		root.Signed.Roles[TARGETS] = &Role{
+			KeyIDs:    []string{keyID},
+			Threshold: 1,
+		}
+
+		sig, err := targets.Sign(signer)
+		assert.NoError(t, err)
+		assert.NotNil(t, sig)
+		assert.Equal(t, keyID, sig.KeyID)
+
+		err = root.VerifyDelegate(TARGETS, targets)
+		assert.NoError(t, err)
+	}
+}
+
+func TestMLDSAVerificationFailures(t *testing.T) {
+	// 1. Test extractMLDSAVersion with invalid schemes directly
+	invalidSchemes := []string{
+		"ml-dsa-44",     // missing slash
+		"ml-dsa-44/0",   // version 0 is invalid
+		"ml-dsa-44/256", // version 256 is out of byte bounds
+		"ml-dsa/1",      // invalid prefix
+		"invalid",
+	}
+	for _, scheme := range invalidSchemes {
+		_, err := extractMLDSAVersion(scheme)
+		assert.Error(t, err, "expected error for scheme: %s", scheme)
+	}
+
+	// 2. Test ToPublicKey with invalid PEM
+	invalidPEMKey := &Key{
+		Type:   KeyTypeMLDSA,
+		Scheme: KeySchemeMLDSA44,
+		Value: KeyVal{
+			PublicKey: "not a valid pem block",
+		},
+	}
+	_, err := invalidPEMKey.ToPublicKey()
+	assert.Error(t, err)
+
+	// 3. Test KeyFromPublicKey with nil and uninitialized keys
+	_, err = KeyFromPublicKey((*mldsa.PublicKey)(nil))
+	assert.Error(t, err)
+
+	_, err = KeyFromPublicKey(&mldsa.PublicKey{})
+	assert.Error(t, err)
+
+	// 4. Test VerifyDelegate with mutated signature
+	priv, err := mldsa.GenerateKey(mldsa.MLDSA44())
+	assert.NoError(t, err)
+	signer, err := signature.LoadSignerVerifier(priv, crypto.Hash(0))
+	assert.NoError(t, err)
+
+	targets := Targets(time.Now().Add(time.Hour))
+	key, err := KeyFromPublicKey(priv.PublicKey())
+	assert.NoError(t, err)
+	keyID, err := key.ID()
+	assert.NoError(t, err)
+
+	root := Root(time.Now().Add(time.Hour))
+	root.Signed.Keys[keyID] = key
+	root.Signed.Roles[TARGETS] = &Role{
+		KeyIDs:    []string{keyID},
+		Threshold: 1,
+	}
+
+	_, err = targets.Sign(signer)
+	assert.NoError(t, err)
+
+	// mutate the signature to make it invalid
+	targets.Signatures[0].Signature[0] ^= 0xFF
+
+	err = root.VerifyDelegate(TARGETS, targets)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not enough signatures")
+}
+
+func TestVerifyDelegateDuplicatePublicKeyMLDSA(t *testing.T) {
+	priv, err := mldsa.GenerateKey(mldsa.MLDSA44())
+	assert.NoError(t, err)
+
+	keyA, err := KeyFromPublicKey(priv.PublicKey())
+	assert.NoError(t, err)
+	keyB := &Key{
+		Type:               keyA.Type,
+		Scheme:             keyA.Scheme,
+		Value:              keyA.Value,
+		UnrecognizedFields: map[string]any{"duplicate": true},
+	}
+
+	targets := Targets(fixedExpire)
+	payload, err := cjson.EncodeCanonical(targets.Signed)
+	assert.NoError(t, err)
+	signer, err := signature.LoadSignerVerifier(priv, crypto.Hash(0))
+	assert.NoError(t, err)
+
+	payloadToSign, err := preparePayload(keyA, payload)
+	assert.NoError(t, err)
+	sigBytes, err := signer.SignMessage(bytes.NewReader(payloadToSign))
+	assert.NoError(t, err)
+
+	assertDuplicatePublicKeyCountsOnce(t, keyA, keyB, targets, sigBytes)
 }

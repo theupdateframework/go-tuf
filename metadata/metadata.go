@@ -212,11 +212,6 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	if err != nil {
 		return nil, err
 	}
-	// sign the Signed part
-	sb, err := signer.SignMessage(bytes.NewReader(payload))
-	if err != nil {
-		return nil, &ErrUnsignedMetadata{Msg: "problem signing metadata"}
-	}
 	// get the signer's PublicKey
 	publ, err := signer.PublicKey()
 	if err != nil {
@@ -231,6 +226,17 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	payloadToSign, err := preparePayload(key, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	// sign the Signed part
+	sb, err := signer.SignMessage(bytes.NewReader(payloadToSign))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", &ErrUnsignedMetadata{Msg: "problem signing metadata"}, err)
+	}
 	// build signature
 	sig := &Signature{
 		KeyID:     keyID,
@@ -241,6 +247,21 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	// return the new signature
 	log.Info("Signed metadata with key", "ID", keyID)
 	return sig, nil
+}
+
+// preparePayload returns the payload to sign or verify, applying protocol
+// pre-hashing and domain separation if required by the key type (e.g. TAP 21 for ML-DSA).
+func preparePayload(key *Key, payload []byte) ([]byte, error) {
+	if key.Type != KeyTypeMLDSA {
+		return payload, nil
+	}
+	version, err := extractMLDSAVersion(key.Scheme)
+	if err != nil {
+		return nil, err
+	}
+	h := sha512.Sum512(payload)
+	prefix := []byte{'t', 'u', 'f', version}
+	return append(prefix, h[:]...), nil
 }
 
 // VerifyDelegate verifies that delegatedMetadata is signed with the required
@@ -338,11 +359,24 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 		if !ok {
 			return &ErrValue{Msg: fmt.Sprintf("key with ID %s not found in %s keyids", keyID, delegatedRole)}
 		}
-		sign := Signature{}
+
+		var sign Signature
+		for _, signature := range allSignatures {
+			if signature.KeyID == keyID {
+				sign = signature
+			}
+		}
+		if len(sign.Signature) == 0 {
+			log.Info("Signature not found for key ID", "role", delegatedRole, "ID", keyID)
+			continue
+		}
+
+		// convert to a PublicKey type
 		publicKey, err := key.ToPublicKey()
 		if err != nil {
 			return err
 		}
+
 		pubBytes, err := x509.MarshalPKIXPublicKey(publicKey)
 		if err != nil {
 			return err
@@ -351,7 +385,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 		fingerprint := hex.EncodeToString(pubFingerprint[:])
 		// use corresponding hash function for key type
 		hash := crypto.Hash(0)
-		if key.Type != KeyTypeEd25519 {
+		if key.Type != KeyTypeEd25519 && key.Type != KeyTypeMLDSA {
 			switch key.Scheme {
 			case KeySchemeECDSA_SHA2_P256:
 				hash = crypto.SHA256
@@ -374,25 +408,20 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			}
 			verifier, err = signature.LoadRSAPSSVerifier(publicKeyRSAPSS, hash, &rsa.PSSOptions{Hash: crypto.SHA256})
 		} else {
-			// Load a verifier for ed25519 and ecdsa
+			// Load a verifier for ed25519, ecdsa, and ml-dsa
 			verifier, err = signature.LoadVerifier(publicKey, hash)
 		}
 		if err != nil {
 			return err
 		}
-		// collect the signature for that key and build the payload we'll verify
-		// based on the Signed part of the delegated metadata
-		for _, signature := range allSignatures {
-			if signature.KeyID == keyID {
-				sign = signature
-			}
+
+		payloadToVerify, err := preparePayload(key, payload)
+		if err != nil {
+			return err
 		}
-		if len(sign.Signature) == 0 {
-			log.Info("Signature not found for key ID", "role", delegatedRole, "ID", keyID)
-			continue
-		}
+
 		// verify if the signature for that payload corresponds to the given key
-		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payload)); err != nil {
+		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payloadToVerify)); err != nil {
 			// failed to verify the metadata with that key ID
 			log.Info("Failed to verify role with key ID", "role", delegatedRole, "ID", keyID)
 		} else {
