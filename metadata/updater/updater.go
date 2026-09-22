@@ -380,6 +380,9 @@ func (update *Updater) loadSnapshot() error {
 	}
 	// extract the snapshot meta from the trusted timestamp metadata
 	snapshotMeta := update.trusted.Timestamp.Signed.Meta[fmt.Sprintf("%s.json", metadata.SNAPSHOT)]
+	if snapshotMeta == nil {
+		return fmt.Errorf("snapshot metadata not found in timestamp")
+	}
 	// extract the length of the snapshot metadata to be downloaded
 	length := snapshotMeta.Length
 	if length == 0 {
@@ -446,7 +449,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 	}
 	// extract the targets' meta from the trusted snapshot metadata
 	metaInfo, ok := update.trusted.Snapshot.Signed.Meta[fmt.Sprintf("%s.json", roleName)]
-	if !ok {
+	if !ok || metaInfo == nil {
 		return nil, fmt.Errorf("role %s not found in snapshot", roleName)
 	}
 	// extract the length of the target metadata to be downloaded
@@ -547,7 +550,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 			return nil, err
 		}
 		target, ok := targets.Signed.Targets[targetFilePath]
-		if ok {
+		if ok && target != nil {
 			log.Info("Found target in current role", "role", delegation.Role)
 			return target, nil
 		}

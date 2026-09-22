@@ -126,6 +126,103 @@ func TestCheckTypeMalformedMetadata(t *testing.T) {
 	}
 }
 
+func TestFromBytesRejectsNullMapValues(t *testing.T) {
+	testCases := []struct {
+		name        string
+		input       string
+		parse       func([]byte) error
+		expectedErr string
+	}{
+		{
+			name:  "root key",
+			input: `{"signed":{"_type":"root","keys":{"keyid":null},"roles":{}}}`,
+			parse: func(data []byte) error {
+				_, err := Root().FromBytes(data)
+				return err
+			},
+			expectedErr: `keys entry "keyid" is null`,
+		},
+		{
+			name:  "root keys map",
+			input: `{"signed":{"_type":"root","keys":null,"roles":{}}}`,
+			parse: func(data []byte) error {
+				_, err := Root().FromBytes(data)
+				return err
+			},
+			expectedErr: `keys must not be null`,
+		},
+		{
+			name:  "root role",
+			input: `{"signed":{"_type":"root","keys":{},"roles":{"root":null}}}`,
+			parse: func(data []byte) error {
+				_, err := Root().FromBytes(data)
+				return err
+			},
+			expectedErr: `roles entry "root" is null`,
+		},
+		{
+			name:  "snapshot meta",
+			input: `{"signed":{"_type":"snapshot","meta":{"targets.json":null}}}`,
+			parse: func(data []byte) error {
+				_, err := Snapshot().FromBytes(data)
+				return err
+			},
+			expectedErr: `meta entry "targets.json" is null`,
+		},
+		{
+			name:  "timestamp meta",
+			input: `{"signed":{"_type":"timestamp","meta":{"snapshot.json":null}}}`,
+			parse: func(data []byte) error {
+				_, err := Timestamp().FromBytes(data)
+				return err
+			},
+			expectedErr: `meta entry "snapshot.json" is null`,
+		},
+		{
+			name:  "timestamp missing snapshot meta",
+			input: `{"signed":{"_type":"timestamp","meta":{}}}`,
+			parse: func(data []byte) error {
+				_, err := Timestamp().FromBytes(data)
+				return err
+			},
+			expectedErr: `meta is missing required "snapshot.json" entry`,
+		},
+		{
+			name:  "target file",
+			input: `{"signed":{"_type":"targets","targets":{"file.txt":null}}}`,
+			parse: func(data []byte) error {
+				_, err := Targets().FromBytes(data)
+				return err
+			},
+			expectedErr: `targets entry "file.txt" is null`,
+		},
+		{
+			name:  "targets map",
+			input: `{"signed":{"_type":"targets","targets":null}}`,
+			parse: func(data []byte) error {
+				_, err := Targets().FromBytes(data)
+				return err
+			},
+			expectedErr: `targets must not be null`,
+		},
+		{
+			name:  "delegation key",
+			input: `{"signed":{"_type":"targets","targets":{},"delegations":{"keys":{"keyid":null}}}}`,
+			parse: func(data []byte) error {
+				_, err := Targets().FromBytes(data)
+				return err
+			},
+			expectedErr: `delegation keys entry "keyid" is null`,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			assert.EqualError(t, testCase.parse([]byte(testCase.input)), testCase.expectedErr)
+		})
+	}
+}
+
 func TestGenericRead(t *testing.T) {
 	// Assert that it chokes correctly on an unknown metadata type
 	badMetadata := "{\"signed\": {\"_type\": \"bad-metadata\"}}"
