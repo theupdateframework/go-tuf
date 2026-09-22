@@ -1009,7 +1009,7 @@ func TestIsDelegatedRole(t *testing.T) {
 		KeyIDs:           []string{},
 		Threshold:        1,
 		Terminating:      false,
-		PathHashPrefixes: []string{"knsOz5xYT", "other prefix", "knsOz5xYT", "knsOz", "kn"},
+		PathHashPrefixes: []string{"927b0ecf9", "other prefix", "927b0ecf9", "927b0", "92"},
 	}
 	nonMatching, err = role.IsDelegatedPath("a/non-matching-path")
 	assert.NoError(t, err)
