@@ -23,8 +23,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/mldsa"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/json"
@@ -599,6 +599,13 @@ func TestVerifyDelegate(t *testing.T) {
 	root := Root(fixedExpire)
 	err := root.VerifyDelegate("test", root)
 	assert.EqualError(t, err, "value error: no delegation found for test")
+	root.Signed.Roles["test"] = nil
+	err = root.VerifyDelegate("test", root)
+	assert.EqualError(t, err, "value error: no delegation found for test")
+	root.Signed.Roles["test"] = &Role{KeyIDs: []string{"nil-key"}, Threshold: 1}
+	root.Signed.Keys["nil-key"] = nil
+	err = root.VerifyDelegate("test", root)
+	assert.EqualError(t, err, "value error: key with ID nil-key not found in test keyids")
 
 	targets := Targets(fixedExpire)
 	err = targets.VerifyDelegate("test", targets)
@@ -646,6 +653,15 @@ func TestVerifyDelegate(t *testing.T) {
 	snapshot := Snapshot(fixedExpire)
 	err = snapshot.VerifyDelegate("test", snapshot)
 	assert.EqualError(t, err, "type error: call is valid only on delegator metadata (should be either root or targets)")
+}
+
+func TestAddKeyRejectsNilKey(t *testing.T) {
+	root := Root(fixedExpire)
+	assert.EqualError(t, root.Signed.AddKey(nil, ROOT), "value error: key must not be nil")
+
+	targets := Targets(fixedExpire)
+	targets.Signed.Delegations = &Delegations{Keys: map[string]*Key{}}
+	assert.EqualError(t, targets.Signed.AddKey(nil, "role"), "value error: key must not be nil")
 }
 
 func TestVerifyDelegateThreshold(t *testing.T) {

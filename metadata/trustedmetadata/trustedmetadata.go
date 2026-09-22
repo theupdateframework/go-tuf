@@ -141,6 +141,9 @@ func (trusted *TrustedMetadata) UpdateTimestamp(timestampData []byte) (*metadata
 		// prevent rolling back snapshot version
 		snapshotMeta := trusted.Timestamp.Signed.Meta[fmt.Sprintf("%s.json", metadata.SNAPSHOT)]
 		newSnapshotMeta := newTimestamp.Signed.Meta[fmt.Sprintf("%s.json", metadata.SNAPSHOT)]
+		if snapshotMeta == nil || newSnapshotMeta == nil {
+			return nil, &metadata.ErrRepository{Msg: "timestamp is missing snapshot metadata"}
+		}
 		if newSnapshotMeta.Version < snapshotMeta.Version {
 			return nil, &metadata.ErrBadVersionNumber{Msg: fmt.Sprintf("new snapshot version %d must be >= %d", newSnapshotMeta.Version, snapshotMeta.Version)}
 		}
@@ -193,6 +196,9 @@ func (trusted *TrustedMetadata) UpdateSnapshot(snapshotData []byte, isTrusted bo
 		return nil, err
 	}
 	snapshotMeta := trusted.Timestamp.Signed.Meta[fmt.Sprintf("%s.json", metadata.SNAPSHOT)]
+	if snapshotMeta == nil {
+		return nil, &metadata.ErrRepository{Msg: "timestamp is missing snapshot metadata"}
+	}
 	// verify non-trusted data against the hashes in timestamp, if any.
 	// trusted snapshot data has already been verified once.
 	if !isTrusted {
@@ -223,7 +229,7 @@ func (trusted *TrustedMetadata) UpdateSnapshot(snapshotData []byte, isTrusted bo
 		for name, info := range trusted.Snapshot.Signed.Meta {
 			newFileInfo, ok := newSnapshot.Signed.Meta[name]
 			// prevent removal of any metadata in meta
-			if !ok {
+			if !ok || info == nil || newFileInfo == nil {
 				return nil, &metadata.ErrRepository{Msg: fmt.Sprintf("new snapshot is missing info for %s", name)}
 			}
 			// prevent rollback of any metadata versions
@@ -253,6 +259,9 @@ func (trusted *TrustedMetadata) checkFinalSnapshot() error {
 		return &metadata.ErrExpiredMetadata{Msg: "snapshot.json is expired"}
 	}
 	snapshotMeta := trusted.Timestamp.Signed.Meta[fmt.Sprintf("%s.json", metadata.SNAPSHOT)]
+	if snapshotMeta == nil {
+		return &metadata.ErrRepository{Msg: "timestamp is missing snapshot metadata"}
+	}
 	if trusted.Snapshot.Signed.Version != snapshotMeta.Version {
 		return &metadata.ErrBadVersionNumber{Msg: fmt.Sprintf("expected %d, got %d", snapshotMeta.Version, trusted.Snapshot.Signed.Version)}
 	}
@@ -294,7 +303,7 @@ func (trusted *TrustedMetadata) UpdateDelegatedTargets(targetsData []byte, roleN
 	log.Info("Updating delegated role", "role", roleName, "delegator", delegatorName)
 	// Verify against the hashes in snapshot, if any
 	meta, ok := trusted.Snapshot.Signed.Meta[fmt.Sprintf("%s.json", roleName)]
-	if !ok {
+	if !ok || meta == nil {
 		return nil, &metadata.ErrRepository{Msg: fmt.Sprintf("snapshot does not contain information for %s", roleName)}
 	}
 	err = meta.VerifyLengthHashes(targetsData)

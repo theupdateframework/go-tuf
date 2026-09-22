@@ -283,7 +283,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 	// Root delegator
 	case *Metadata[RootType]:
 		keys = i.Signed.Keys
-		if role, ok := (*i).Signed.Roles[delegatedRole]; ok {
+		if role, ok := (*i).Signed.Roles[delegatedRole]; ok && role != nil {
 			roleKeyIDs = role.KeyIDs
 			roleThreshold = role.Threshold
 		} else {
@@ -355,7 +355,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 	// loop through each role keyID
 	for _, keyID := range roleKeyIDs {
 		key, ok := keys[keyID]
-		if !ok {
+		if !ok || key == nil {
 			return &ErrValue{Msg: fmt.Sprintf("key with ID %s not found in %s keyids", keyID, delegatedRole)}
 		}
 
@@ -718,8 +718,11 @@ func (role *SuccinctRoles) IsDelegatedRole(roleName string) bool {
 // role: Name of the role, for which "key" is added.
 func (signed *RootType) AddKey(key *Key, role string) error {
 	// verify role is present
-	if _, ok := signed.Roles[role]; !ok {
+	if signed.Roles[role] == nil {
 		return &ErrValue{Msg: fmt.Sprintf("role %s doesn't exist", role)}
+	}
+	if key == nil {
+		return &ErrValue{Msg: "key must not be nil"}
 	}
 	keyID, err := key.ID()
 	if err != nil {
@@ -739,7 +742,7 @@ func (signed *RootType) AddKey(key *Key, role string) error {
 // role: Name of the role, for which a signing key is removed.
 func (signed *RootType) RevokeKey(keyID, role string) error {
 	// verify role is present
-	if _, ok := signed.Roles[role]; !ok {
+	if signed.Roles[role] == nil {
 		return &ErrValue{Msg: fmt.Sprintf("role %s doesn't exist", role)}
 	}
 	// verify keyID is present for given role
@@ -757,7 +760,7 @@ func (signed *RootType) RevokeKey(keyID, role string) error {
 	signed.Roles[role].KeyIDs = filteredKeyIDs
 	// check if keyID is used by other roles too
 	for _, r := range signed.Roles {
-		if slices.Contains(r.KeyIDs, keyID) {
+		if r != nil && slices.Contains(r.KeyIDs, keyID) {
 			return nil
 		}
 	}
@@ -774,6 +777,9 @@ func (signed *TargetsType) AddKey(key *Key, role string) error {
 	// check if Delegations are even present
 	if signed.Delegations == nil {
 		return &ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
+	}
+	if key == nil {
+		return &ErrValue{Msg: "key must not be nil"}
 	}
 	keyID, err := key.ID()
 	if err != nil {

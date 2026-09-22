@@ -182,18 +182,13 @@ func TestNewRejectsMappingWithUnknownRepository(t *testing.T) {
 
 	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
 
-	cfg, err := NewConfig(mapJSON, map[string][]byte{"real-repo": rootBytes})
-	if err != nil {
-		t.Fatalf("NewConfig() unexpected error: %v", err)
-	}
-
-	_, err = New(cfg)
+	_, err := NewConfig(mapJSON, map[string][]byte{"real-repo": rootBytes})
 	if err == nil {
-		t.Fatal("New() should reject a mapping referencing an unknown repository")
+		t.Fatal("NewConfig() should reject a mapping referencing an unknown repository")
 	}
 
 	if !errors.Is(err, ErrUnknownMappingRepo) {
-		t.Errorf("New() error should wrap ErrUnknownMappingRepo, got: %v", err)
+		t.Errorf("NewConfig() error should wrap ErrUnknownMappingRepo, got: %v", err)
 	}
 }
 
@@ -209,14 +204,9 @@ func TestNewRejectsNullMapping(t *testing.T) {
 
 	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
 
-	cfg, err := NewConfig(mapJSON, map[string][]byte{"real-repo": rootBytes})
-	if err != nil {
-		t.Fatalf("NewConfig() unexpected error: %v", err)
-	}
-
-	_, err = New(cfg)
+	_, err := NewConfig(mapJSON, map[string][]byte{"real-repo": rootBytes})
 	if err == nil {
-		t.Fatal("New() should reject a null mapping entry")
+		t.Fatal("NewConfig() should reject a null mapping entry")
 	}
 }
 

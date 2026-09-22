@@ -121,7 +121,7 @@ func NewConfig(repoMap []byte, roots map[string][]byte) (*MultiRepoConfig, error
 		}
 		for _, repo := range m.Repositories {
 			if _, ok := mapFile.Repositories[repo]; !ok {
-				return nil, fmt.Errorf("mapping references unknown repository %q", repo)
+				return nil, fmt.Errorf("mapping[%d]: %w: %q", i, ErrUnknownMappingRepo, repo)
 			}
 		}
 	}
