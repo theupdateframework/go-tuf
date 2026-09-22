@@ -105,6 +105,17 @@ func NewConfig(repoMap []byte, roots map[string][]byte) (*MultiRepoConfig, error
 		return nil, errors.New("map file is null")
 	}
 
+	// make sure we have enough trusted root metadata files provided
+	// based on the repository list
+	for repo := range mapFile.Repositories {
+		// check if we have a trusted root metadata for this
+		// repository
+		_, ok := roots[repo]
+		if !ok {
+			return nil, fmt.Errorf("no trusted root metadata provided for repository - %s", repo)
+		}
+	}
+
 	if err := validateRepoMap(mapFile); err != nil {
 		return nil, fmt.Errorf("invalid repo map provided: %w", err)
 	}
