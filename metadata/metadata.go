@@ -934,7 +934,7 @@ func fromBytes[T Roles](data []byte) (*Metadata[T], error) {
 	}
 	// if all is okay, unmarshal meta to the desired Metadata[T] type
 	if err := json.Unmarshal(data, meta); err != nil {
-		return nil, err
+		return nil, &ErrDeserialization{Msg: err.Error()}
 	}
 	// Make sure signature key IDs are unique
 	if err := checkUniqueSignatures(*meta); err != nil {
@@ -960,36 +960,36 @@ func checkType[T Roles](data []byte) error {
 	var m map[string]any
 	i := any(new(T))
 	if err := json.Unmarshal(data, &m); err != nil {
-		return err
+		return &ErrDeserialization{Msg: err.Error()}
 	}
 	signed, ok := m["signed"].(map[string]any)
 	if !ok {
-		return &ErrValue{Msg: "metadata 'signed' field is missing or not an object"}
+		return &ErrDeserialization{Msg: "metadata 'signed' field is missing or not an object"}
 	}
 	signedType, ok := signed["_type"].(string)
 	if !ok {
-		return &ErrValue{Msg: "no _type found in signed"}
+		return &ErrDeserialization{Msg: "no _type found in signed"}
 	}
 
 	switch i.(type) {
 	case *RootType:
 		if ROOT != signedType {
-			return &ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", ROOT, signedType)}
+			return &ErrDeserialization{Msg: fmt.Sprintf("expected metadata type %s, got - %s", ROOT, signedType)}
 		}
 	case *SnapshotType:
 		if SNAPSHOT != signedType {
-			return &ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", SNAPSHOT, signedType)}
+			return &ErrDeserialization{Msg: fmt.Sprintf("expected metadata type %s, got - %s", SNAPSHOT, signedType)}
 		}
 	case *TimestampType:
 		if TIMESTAMP != signedType {
-			return &ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", TIMESTAMP, signedType)}
+			return &ErrDeserialization{Msg: fmt.Sprintf("expected metadata type %s, got - %s", TIMESTAMP, signedType)}
 		}
 	case *TargetsType:
 		if TARGETS != signedType {
-			return &ErrValue{Msg: fmt.Sprintf("expected metadata type %s, got - %s", TARGETS, signedType)}
+			return &ErrDeserialization{Msg: fmt.Sprintf("expected metadata type %s, got - %s", TARGETS, signedType)}
 		}
 	default:
-		return &ErrValue{Msg: fmt.Sprintf("unrecognized metadata type - %s", signedType)}
+		return &ErrDeserialization{Msg: fmt.Sprintf("unrecognized metadata type - %s", signedType)}
 	}
 	// all okay
 	return nil
