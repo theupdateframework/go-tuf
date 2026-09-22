@@ -44,6 +44,10 @@ var ErrMissingRepoURL = errors.New("repository has no URL configured")
 // repository that is not declared in the top-level repositories object.
 var ErrUnknownMappingRepo = errors.New("mapping references an unknown repository")
 
+// ErrMissingTrustedRoot is returned when a repository listed in the map file
+// has no corresponding trusted root metadata provided.
+var ErrMissingTrustedRoot = errors.New("no trusted root metadata provided for repository")
+
 // validRepoNamePattern defines the allowed characters for repository names.
 // Names must start with an alphanumeric character and may contain alphanumeric
 // characters, dots, hyphens, and underscores. This prevents path traversal
@@ -112,7 +116,7 @@ func NewConfig(repoMap []byte, roots map[string][]byte) (*MultiRepoConfig, error
 		// repository
 		_, ok := roots[repo]
 		if !ok {
-			return nil, fmt.Errorf("no trusted root metadata provided for repository - %s", repo)
+			return nil, fmt.Errorf("%w - %s", ErrMissingTrustedRoot, repo)
 		}
 	}
 
