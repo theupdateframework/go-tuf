@@ -704,3 +704,23 @@ func TestUpdateTargetsExpiredMewTarget(t *testing.T) {
 	_, err = trustedSet.UpdateTargets(targets)
 	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "new targets is expired"})
 }
+
+func TestUpdateTargetsEmptyTargetHashes(t *testing.T) {
+	trustedSet, err := New(allRoles[metadata.ROOT])
+	require.NoError(t, err)
+	err = updateAllBesidesTargets(trustedSet, allRoles[metadata.TIMESTAMP], allRoles[metadata.SNAPSHOT])
+	assert.NoError(t, err)
+
+	// Per TUF spec, hashes are mandatory for target files. Targets metadata
+	// with empty hashes should be rejected at validation time even if the
+	// target is never fetched.
+	clearTargetHashes := func(targets *metadata.Metadata[metadata.TargetsType]) {
+		for _, target := range targets.Signed.Targets {
+			clear(target.Hashes)
+		}
+	}
+	targets, err := modifyTargetsMetadata(clearTargetHashes)
+	assert.NoError(t, err)
+	_, err = trustedSet.UpdateTargets(targets)
+	assert.ErrorIs(t, err, &metadata.ErrLengthOrHashMismatch{Msg: "hashes must not be empty for target files"})
+}

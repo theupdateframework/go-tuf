@@ -865,30 +865,6 @@ func TestVerifyLengthHashesMetaFiles(t *testing.T) {
 	assert.Error(t, err, "length/hash verification error: length verification failed - expected 0, got 9")
 }
 
-func TestTargetFilesEmptyHashesRejected(t *testing.T) {
-	// Per TUF spec, hashes are mandatory for target files.
-	// Targets metadata with empty hashes should be rejected at parse time.
-	targetsJSON := []byte(`{
-		"signatures": [],
-		"signed": {
-			"_type": "targets",
-			"expires": "2030-08-15T14:30:45Z",
-			"spec_version": "1.0.31",
-			"targets": {
-				"test.txt": {
-					"hashes": {},
-					"length": 100
-				}
-			},
-			"version": 1
-		}
-	}`)
-
-	_, err := Targets().FromBytes(targetsJSON)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "hashes must not be empty")
-}
-
 func TestToPublicKeyEd25519InvalidLength(t *testing.T) {
 	// A valid-hex but wrong-length ed25519 public key must be rejected: a
 	// non-32-byte key panics in ed25519.Verify during delegate verification.
