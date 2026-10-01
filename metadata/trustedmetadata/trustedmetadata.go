@@ -18,6 +18,7 @@
 package trustedmetadata
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -337,6 +338,19 @@ func (trusted *TrustedMetadata) UpdateDelegatedTargets(targetsData []byte, roleN
 	// check expiration
 	if newDelegate.Signed.IsExpired(trusted.RefTime) {
 		return nil, &metadata.ErrExpiredMetadata{Msg: fmt.Sprintf("new %s is expired", roleName)}
+	}
+	// pre-check that all targets have at least one hash
+	for _, target := range newDelegate.Signed.Targets {
+		var errs []error
+		if len(target.Hashes) == 0 {
+			errs = append(errs,
+				fmt.Errorf("target %s: %w",
+					target.Path,
+					&metadata.ErrLengthOrHashMismatch{Msg: "hashes must not be empty for target files"}))
+		}
+		if err := errors.Join(errs...); err != nil {
+			return nil, err
+		}
 	}
 	trusted.Targets[roleName] = newDelegate
 	log.Info("Updated role", "role", roleName, "version", trusted.Targets[roleName].Signed.Version)
