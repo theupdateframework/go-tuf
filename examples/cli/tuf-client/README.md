@@ -43,15 +43,17 @@ $ tuf-client init --url https://jku.github.io/tuf-demo/metadata
 #
 # Usage: tuf-client get --url <https://path/to/repository/metadata> <targetfile_to_download>
 #
-$ tuf-client get --url https://jku.github.io/tuf-demo/metadata demo/succinctly-delegated-5.txt
+# Note: This example wouldn't work properly. See another example with --turl(-t) option below.
+#
+$ tuf-client get --url https://jku.github.io/tuf-demo/metadata rdimitrov/artifact-example.md
 
 # Get a target by providing a URL of where target files are located
 #
 # Usage: tuf-client get --url <https://path/to/repository/metadata> -t <https://path/to/targetfiles/location> <targetfile_to_download> 
 #
-# Use --nonprefixed for non-prefixed target files
+# Note: You can use --nonprefixed for non-prefixed target files. This example works properly without it.
 #
-$ tuf-client get --url https://jku.github.io/tuf-demo/metadata --turl https://jku.github.io/tuf-demo/targets --nonprefixed demo/succinctly-delegated-5.txt
+$ tuf-client get --url https://jku.github.io/tuf-demo/metadata -t https://jku.github.io/tuf-demo/targets rdimitrov/artifact-example.md
 
 # Reset your local environment
 $ tuf-client reset
