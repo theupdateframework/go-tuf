@@ -25,7 +25,6 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -34,7 +33,7 @@ import (
 	"io"
 	"math"
 	"os"
-	"path/filepath"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -212,11 +211,6 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	if err != nil {
 		return nil, err
 	}
-	// sign the Signed part
-	sb, err := signer.SignMessage(bytes.NewReader(payload))
-	if err != nil {
-		return nil, &ErrUnsignedMetadata{Msg: "problem signing metadata"}
-	}
 	// get the signer's PublicKey
 	publ, err := signer.PublicKey()
 	if err != nil {
@@ -231,6 +225,17 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	payloadToSign, err := preparePayload(key, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	// sign the Signed part
+	sb, err := signer.SignMessage(bytes.NewReader(payloadToSign))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", &ErrUnsignedMetadata{Msg: "problem signing metadata"}, err)
+	}
 	// build signature
 	sig := &Signature{
 		KeyID:     keyID,
@@ -241,6 +246,21 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	// return the new signature
 	log.Info("Signed metadata with key", "ID", keyID)
 	return sig, nil
+}
+
+// preparePayload returns the payload to sign or verify, applying protocol
+// pre-hashing and domain separation if required by the key type (e.g. TAP 21 for ML-DSA).
+func preparePayload(key *Key, payload []byte) ([]byte, error) {
+	if key.Type != KeyTypeMLDSA {
+		return payload, nil
+	}
+	version, err := extractMLDSAVersion(key.Scheme)
+	if err != nil {
+		return nil, err
+	}
+	h := sha512.Sum512(payload)
+	prefix := []byte{'t', 'u', 'f', version}
+	return append(prefix, h[:]...), nil
 }
 
 // VerifyDelegate verifies that delegatedMetadata is signed with the required
@@ -263,7 +283,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 	// Root delegator
 	case *Metadata[RootType]:
 		keys = i.Signed.Keys
-		if role, ok := (*i).Signed.Roles[delegatedRole]; ok {
+		if role, ok := (*i).Signed.Roles[delegatedRole]; ok && role != nil {
 			roleKeyIDs = role.KeyIDs
 			roleThreshold = role.Threshold
 		} else {
@@ -335,14 +355,27 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 	// loop through each role keyID
 	for _, keyID := range roleKeyIDs {
 		key, ok := keys[keyID]
-		if !ok {
+		if !ok || key == nil {
 			return &ErrValue{Msg: fmt.Sprintf("key with ID %s not found in %s keyids", keyID, delegatedRole)}
 		}
-		sign := Signature{}
+
+		var sign Signature
+		for _, signature := range allSignatures {
+			if signature.KeyID == keyID {
+				sign = signature
+			}
+		}
+		if len(sign.Signature) == 0 {
+			log.Info("Signature not found for key ID", "role", delegatedRole, "ID", keyID)
+			continue
+		}
+
+		// convert to a PublicKey type
 		publicKey, err := key.ToPublicKey()
 		if err != nil {
 			return err
 		}
+
 		pubBytes, err := x509.MarshalPKIXPublicKey(publicKey)
 		if err != nil {
 			return err
@@ -351,7 +384,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 		fingerprint := hex.EncodeToString(pubFingerprint[:])
 		// use corresponding hash function for key type
 		hash := crypto.Hash(0)
-		if key.Type != KeyTypeEd25519 {
+		if key.Type != KeyTypeEd25519 && key.Type != KeyTypeMLDSA {
 			switch key.Scheme {
 			case KeySchemeECDSA_SHA2_P256:
 				hash = crypto.SHA256
@@ -374,25 +407,20 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			}
 			verifier, err = signature.LoadRSAPSSVerifier(publicKeyRSAPSS, hash, &rsa.PSSOptions{Hash: crypto.SHA256})
 		} else {
-			// Load a verifier for ed25519 and ecdsa
+			// Load a verifier for ed25519, ecdsa, and ml-dsa
 			verifier, err = signature.LoadVerifier(publicKey, hash)
 		}
 		if err != nil {
 			return err
 		}
-		// collect the signature for that key and build the payload we'll verify
-		// based on the Signed part of the delegated metadata
-		for _, signature := range allSignatures {
-			if signature.KeyID == keyID {
-				sign = signature
-			}
+
+		payloadToVerify, err := preparePayload(key, payload)
+		if err != nil {
+			return err
 		}
-		if len(sign.Signature) == 0 {
-			log.Info("Signature not found for key ID", "role", delegatedRole, "ID", keyID)
-			continue
-		}
+
 		// verify if the signature for that payload corresponds to the given key
-		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payload)); err != nil {
+		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payloadToVerify)); err != nil {
 			// failed to verify the metadata with that key ID
 			log.Info("Failed to verify role with key ID", "role", delegatedRole, "ID", keyID)
 		} else {
@@ -540,7 +568,11 @@ func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) 
 		for _, pathPattern := range role.Paths {
 			//  A delegated role path may be an explicit path or glob
 			//  pattern (Unix shell-style wildcards).
-			if isTargetInPathPattern(targetFilepath, pathPattern) {
+			matched, err := isTargetInPathPattern(targetFilepath, pathPattern)
+			if err != nil {
+				return false, err
+			}
+			if matched {
 				return true, nil
 			}
 		}
@@ -548,7 +580,7 @@ func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) 
 		// hash bin delegations - calculate the hash of the filepath to determine in which bin to find the target.
 		targetFilepathHash := sha256.Sum256([]byte(targetFilepath))
 		for _, pathHashPrefix := range role.PathHashPrefixes {
-			if strings.HasPrefix(base64.URLEncoding.EncodeToString(targetFilepathHash[:]), pathHashPrefix) {
+			if strings.HasPrefix(hex.EncodeToString(targetFilepathHash[:]), pathHashPrefix) {
 				return true, nil
 			}
 		}
@@ -557,24 +589,32 @@ func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) 
 }
 
 // Determine whether “targetpath“ matches the “pathpattern“.
-func isTargetInPathPattern(targetpath string, pathpattern string) bool {
+func isTargetInPathPattern(targetpath string, pathpattern string) (bool, error) {
 	// We need to make sure that targetpath and pathpattern are pointing to
 	// the same directory as fnmatch doesn't threat "/" as a special symbol.
 	targetParts := strings.Split(targetpath, "/")
 	patternParts := strings.Split(pathpattern, "/")
 	if len(targetParts) != len(patternParts) {
-		return false
+		return false, nil
 	}
 
 	// Every part in the pathpattern could include a glob pattern, that's why
-	// each of the target and pathpattern parts should match.
+	// each of the target and pathpattern parts should match. We use path.Match
+	// (not filepath.Match) so matching is independent of the host OS: TUF target
+	// paths are always "/"-separated and "\" is a glob escape, not a separator.
+	// A malformed pattern surfaces path.ErrBadPattern instead of being silently
+	// treated as a non-match.
 	for i := range targetParts {
-		if ok, _ := filepath.Match(patternParts[i], targetParts[i]); !ok {
-			return false
+		ok, err := path.Match(patternParts[i], targetParts[i])
+		if err != nil {
+			return false, err
+		}
+		if !ok {
+			return false, nil
 		}
 	}
 
-	return true
+	return true, nil
 }
 
 // GetRolesForTarget return the names and terminating status of all
@@ -678,8 +718,11 @@ func (role *SuccinctRoles) IsDelegatedRole(roleName string) bool {
 // role: Name of the role, for which "key" is added.
 func (signed *RootType) AddKey(key *Key, role string) error {
 	// verify role is present
-	if _, ok := signed.Roles[role]; !ok {
+	if signed.Roles[role] == nil {
 		return &ErrValue{Msg: fmt.Sprintf("role %s doesn't exist", role)}
+	}
+	if key == nil {
+		return &ErrValue{Msg: "key must not be nil"}
 	}
 	keyID, err := key.ID()
 	if err != nil {
@@ -699,7 +742,7 @@ func (signed *RootType) AddKey(key *Key, role string) error {
 // role: Name of the role, for which a signing key is removed.
 func (signed *RootType) RevokeKey(keyID, role string) error {
 	// verify role is present
-	if _, ok := signed.Roles[role]; !ok {
+	if signed.Roles[role] == nil {
 		return &ErrValue{Msg: fmt.Sprintf("role %s doesn't exist", role)}
 	}
 	// verify keyID is present for given role
@@ -717,7 +760,7 @@ func (signed *RootType) RevokeKey(keyID, role string) error {
 	signed.Roles[role].KeyIDs = filteredKeyIDs
 	// check if keyID is used by other roles too
 	for _, r := range signed.Roles {
-		if slices.Contains(r.KeyIDs, keyID) {
+		if r != nil && slices.Contains(r.KeyIDs, keyID) {
 			return nil
 		}
 	}
@@ -734,6 +777,9 @@ func (signed *TargetsType) AddKey(key *Key, role string) error {
 	// check if Delegations are even present
 	if signed.Delegations == nil {
 		return &ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
+	}
+	if key == nil {
+		return &ErrValue{Msg: "key must not be nil"}
 	}
 	keyID, err := key.ID()
 	if err != nil {

@@ -49,6 +49,12 @@ func (signed *RootType) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return err
 	}
+	if err := rejectNilMapValues("keys", s.Keys); err != nil {
+		return err
+	}
+	if err := rejectNilMapValues("roles", s.Roles); err != nil {
+		return err
+	}
 	*signed = RootType(s)
 
 	var dict map[string]any
@@ -85,6 +91,9 @@ func (signed *SnapshotType) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return err
 	}
+	if err := rejectNilMapValues("meta", s.Meta); err != nil {
+		return err
+	}
 	*signed = SnapshotType(s)
 
 	var dict map[string]any
@@ -118,6 +127,12 @@ func (signed *TimestampType) UnmarshalJSON(data []byte) error {
 	var s Alias
 	if err := json.Unmarshal(data, &s); err != nil {
 		return err
+	}
+	if err := rejectNilMapValues("meta", s.Meta); err != nil {
+		return err
+	}
+	if s.Meta[SNAPSHOT+".json"] == nil {
+		return fmt.Errorf("meta is missing required %q entry", SNAPSHOT+".json")
 	}
 	*signed = TimestampType(s)
 
@@ -154,6 +169,9 @@ func (signed *TargetsType) UnmarshalJSON(data []byte) error {
 	type Alias TargetsType
 	var s Alias
 	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	if err := rejectNilMapValues("targets", s.Targets); err != nil {
 		return err
 	}
 	*signed = TargetsType(s)
@@ -452,6 +470,9 @@ func (d *Delegations) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &a); err != nil {
 		return err
 	}
+	if err := rejectNilMapValues("delegation keys", a.Keys); err != nil {
+		return err
+	}
 	*d = Delegations(a)
 
 	var dict map[string]any
@@ -462,6 +483,18 @@ func (d *Delegations) UnmarshalJSON(data []byte) error {
 	delete(dict, "roles")
 	delete(dict, "succinct_roles")
 	d.UnrecognizedFields = dict
+	return nil
+}
+
+func rejectNilMapValues[T any](field string, values map[string]*T) error {
+	if values == nil {
+		return fmt.Errorf("%s must not be null", field)
+	}
+	for name, value := range values {
+		if value == nil {
+			return fmt.Errorf("%s entry %q is null", field, name)
+		}
+	}
 	return nil
 }
 

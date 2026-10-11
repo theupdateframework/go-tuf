@@ -1,0 +1,6 @@
+# go-tuf does not support these optional RSA schemes.
+test_rsa_keytype_and_scheme[rsa/rsassa-pss-sha384]
+test_rsa_keytype_and_scheme[rsa/rsassa-pss-sha512]
+
+# https://github.com/theupdateframework/go-tuf/issues/759
+test_cached_role_is_verified_against_current_delegator

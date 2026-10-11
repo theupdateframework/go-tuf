@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -233,20 +234,15 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 	targetRemotePath := targetFilePath
 	consistentSnapshot := update.trusted.Root.Signed.ConsistentSnapshot
 	if consistentSnapshot && update.cfg.PrefixTargetsWithHash {
-		hashes := ""
-		// get first hex value of hashes
-		for _, v := range targetFile.Hashes {
-			hashes = hex.EncodeToString(v)
-			break
-		}
+		hashPrefix := hex.EncodeToString(targetFile.Hashes[selectTargetHashAlgorithm(targetFile.Hashes)])
 		baseName := filepath.Base(targetFilePath)
 		dirName, ok := strings.CutSuffix(targetFilePath, "/"+baseName)
 		if !ok {
 			// <hash>.<target-name>
-			targetRemotePath = fmt.Sprintf("%s.%s", hashes, baseName)
+			targetRemotePath = fmt.Sprintf("%s.%s", hashPrefix, baseName)
 		} else {
 			// <dir-prefix>/<hash>.<target-name>
-			targetRemotePath = fmt.Sprintf("%s/%s.%s", dirName, hashes, baseName)
+			targetRemotePath = fmt.Sprintf("%s/%s.%s", dirName, hashPrefix, baseName)
 		}
 	}
 	fullURL := fmt.Sprintf("%s%s", targetBaseURL, targetRemotePath)
@@ -384,6 +380,9 @@ func (update *Updater) loadSnapshot() error {
 	}
 	// extract the snapshot meta from the trusted timestamp metadata
 	snapshotMeta := update.trusted.Timestamp.Signed.Meta[fmt.Sprintf("%s.json", metadata.SNAPSHOT)]
+	if snapshotMeta == nil {
+		return fmt.Errorf("snapshot metadata not found in timestamp")
+	}
 	// extract the length of the snapshot metadata to be downloaded
 	length := snapshotMeta.Length
 	if length == 0 {
@@ -450,7 +449,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 	}
 	// extract the targets' meta from the trusted snapshot metadata
 	metaInfo, ok := update.trusted.Snapshot.Signed.Meta[fmt.Sprintf("%s.json", roleName)]
-	if !ok {
+	if !ok || metaInfo == nil {
 		return nil, fmt.Errorf("role %s not found in snapshot", roleName)
 	}
 	// extract the length of the target metadata to be downloaded
@@ -551,7 +550,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 			return nil, err
 		}
 		target, ok := targets.Signed.Targets[targetFilePath]
-		if ok {
+		if ok && target != nil {
 			log.Info("Found target in current role", "role", delegation.Role)
 			return target, nil
 		}
@@ -664,6 +663,38 @@ func (update *Updater) generateTargetFilePath(tf *metadata.TargetFiles) (string,
 	}
 	// Use URL encoded target path as filename
 	return filepath.Join(update.cfg.LocalTargetsDir, url.PathEscape(tf.Path)), nil
+}
+
+// preferredTargetHashAlgorithms lists, in order of preference, the hash
+// algorithms used to build the hash-prefixed path of a target file
+var preferredTargetHashAlgorithms = [...]string{"sha256", "sha512"}
+
+// selectTargetHashAlgorithm picks which of a target's hashes is used to build its
+// hash-prefixed path when consistent snapshots are enabled
+// (ref. https://theupdateframework.github.io/specification/latest/#fetch-target).
+//
+// The specification lets a client use any of the hashes listed for a target, so this
+// choice carries no security weight - DownloadTarget verifies the downloaded bytes
+// against every hash in the metadata regardless of which one the URL was built from.
+// It only has to be deterministic, so that a given target always resolves to the same
+// URL. Ranging over the map directly would not be, since Go randomizes map iteration
+// order.
+//
+// The algorithms in preferredTargetHashAlgorithms win, in that order, as those are the
+// ones a repository is most likely to have published a copy for. Any other algorithm
+// falls back to lexicographic order. Returns an empty string if there are no hashes,
+// mirroring the empty prefix the previous implementation produced (such a target fails
+// verification later on anyway).
+func selectTargetHashAlgorithm(hashes metadata.Hashes) string {
+	if len(hashes) == 0 {
+		return ""
+	}
+	for _, algorithm := range preferredTargetHashAlgorithms {
+		if _, ok := hashes[algorithm]; ok {
+			return algorithm
+		}
+	}
+	return slices.Min(slices.Collect(maps.Keys(hashes)))
 }
 
 // loadLocalMetadata reads a local <roleName>.json file and returns its bytes

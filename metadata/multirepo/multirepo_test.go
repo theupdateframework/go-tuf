@@ -19,6 +19,7 @@ package multirepo
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -107,12 +108,7 @@ func TestNewRejectsInvalidRepoNames(t *testing.T) {
 
 			rootBytes := []byte(`{"signatures":[],"signed":{}}`)
 
-			cfg, err := NewConfig(mapJSON, map[string][]byte{tt.repoName: rootBytes})
-			if err != nil {
-				t.Fatalf("NewConfig() unexpected error: %v", err)
-			}
-
-			_, err = New(cfg)
+			_, err := NewConfig(mapJSON, map[string][]byte{tt.repoName: rootBytes})
 			if err == nil {
 				t.Fatalf("New() should reject repository name %q", tt.repoName)
 			}
@@ -145,12 +141,7 @@ func TestNewRejectsRepositoriesWithoutURL(t *testing.T) {
 
 			rootBytes := []byte(`{"signatures":[],"signed":{}}`)
 
-			cfg, err := NewConfig(mapJSON, map[string][]byte{"my-repo": rootBytes})
-			if err != nil {
-				t.Fatalf("NewConfig() unexpected error: %v", err)
-			}
-
-			_, err = New(cfg)
+			_, err := NewConfig(mapJSON, map[string][]byte{"my-repo": rootBytes})
 			if err == nil {
 				t.Fatalf("New() should reject repository with URLs %s", tt.repoURLs)
 			}
@@ -182,18 +173,13 @@ func TestNewRejectsMappingWithUnknownRepository(t *testing.T) {
 
 	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
 
-	cfg, err := NewConfig(mapJSON, map[string][]byte{"real-repo": rootBytes})
-	if err != nil {
-		t.Fatalf("NewConfig() unexpected error: %v", err)
-	}
-
-	_, err = New(cfg)
+	_, err := NewConfig(mapJSON, map[string][]byte{"real-repo": rootBytes})
 	if err == nil {
-		t.Fatal("New() should reject a mapping referencing an unknown repository")
+		t.Fatal("NewConfig() should reject a mapping referencing an unknown repository")
 	}
 
 	if !errors.Is(err, ErrUnknownMappingRepo) {
-		t.Errorf("New() error should wrap ErrUnknownMappingRepo, got: %v", err)
+		t.Errorf("NewConfig() error should wrap ErrUnknownMappingRepo, got: %v", err)
 	}
 }
 
@@ -209,14 +195,42 @@ func TestNewRejectsNullMapping(t *testing.T) {
 
 	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
 
-	cfg, err := NewConfig(mapJSON, map[string][]byte{"real-repo": rootBytes})
-	if err != nil {
-		t.Fatalf("NewConfig() unexpected error: %v", err)
+	_, err := NewConfig(mapJSON, map[string][]byte{"real-repo": rootBytes})
+	if err == nil {
+		t.Fatal("NewConfig() should reject a null mapping entry")
+	}
+}
+
+func TestNewRejectsMissingTrustedRoot(t *testing.T) {
+	// every repository listed in the map file must come with a trusted root
+	// metadata file, otherwise its TUF client cannot be bootstrapped
+	mapJSON := []byte(`{
+		"repositories": {
+			"repo-with-root": ["https://example.com/repo"],
+			"repo-without-root": ["https://example.com/other"]
+		},
+		"mapping": [
+			{
+				"paths": ["*"],
+				"repositories": ["repo-with-root"],
+				"threshold": 1,
+				"terminating": true
+			}
+		]
+	}`)
+
+	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
+
+	_, err := NewConfig(mapJSON, map[string][]byte{"repo-with-root": rootBytes})
+	if err == nil {
+		t.Fatal("NewConfig() should reject a repository without trusted root metadata")
 	}
 
-	_, err = New(cfg)
-	if err == nil {
-		t.Fatal("New() should reject a null mapping entry")
+	if !errors.Is(err, ErrMissingTrustedRoot) {
+		t.Errorf("NewConfig() error should wrap ErrMissingTrustedRoot, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "repo-without-root") {
+		t.Errorf("NewConfig() error should name the offending repository, got: %v", err)
 	}
 }
 
