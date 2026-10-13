@@ -203,6 +203,37 @@ func (e *ErrDownloadHTTP) Is(target error) bool {
 	return false
 }
 
+// ErrDeserialization - metadata that could not be read at all: JSON that does
+// not parse, or a signed._type that is not the role being loaded.
+//
+// It is a subset of both ErrRepository and ErrValue. Repository, because a file
+// that does not deserialize is a statement about the file and the repository or
+// cache holding it, not about the caller, and that is the classification a
+// client needs in order to discard the copy it has and fetch another. python-tuf
+// makes the same call: DeserializationError derives from RepositoryError there.
+// Value, because this path returned an ErrValue before and callers testing for
+// one keep working.
+type ErrDeserialization struct {
+	Msg string
+}
+
+func (e *ErrDeserialization) Error() string {
+	return fmt.Sprintf("deserialization error: %s", e.Msg)
+}
+
+func (e *ErrDeserialization) Is(target error) bool {
+	if _, ok := target.(*ErrDeserialization); ok {
+		return true
+	}
+	if _, ok := target.(*ErrValue); ok {
+		return true
+	}
+	if _, ok := target.(*ErrRepository); ok {
+		return true
+	}
+	return false
+}
+
 // ValueError
 type ErrValue struct {
 	Msg string
