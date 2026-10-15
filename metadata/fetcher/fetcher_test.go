@@ -26,7 +26,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cenkalti/backoff/v5"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/stretchr/testify/assert"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
@@ -161,7 +161,7 @@ func TestDownloadFile_Retry(t *testing.T) {
 			client := tt.httpClient
 			fetcher := &DefaultFetcher{
 				client: client,
-				retryOptions: []backoff.RetryOption{
+				retryOptions: []RetryOption{
 					backoff.WithMaxTries(3),
 				},
 			}
