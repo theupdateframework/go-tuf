@@ -781,6 +781,9 @@ func (signed *TargetsType) AddKey(key *Key, role string) error {
 	if key == nil {
 		return &ErrValue{Msg: "key must not be nil"}
 	}
+	if signed.Delegations.Roles == nil && signed.Delegations.SuccinctRoles == nil {
+		return &ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
+	}
 	keyID, err := key.ID()
 	if err != nil {
 		return err
