@@ -140,10 +140,8 @@ func (f *DefaultFetcher) NewFetcherWithHTTPClient(hc httpClient) *DefaultFetcher
 // NewFetcherWithRoundTripper creates a new DefaultFetcher with a custom RoundTripper
 // The function will create a default http.Client and replace the transport with the provided RoundTripper implementation
 func (f *DefaultFetcher) NewFetcherWithRoundTripper(rt http.RoundTripper) *DefaultFetcher {
-	client := http.DefaultClient
-	client.Transport = rt
 	return &DefaultFetcher{
-		client: client,
+		client: &http.Client{Transport: rt},
 	}
 }
 
@@ -156,8 +154,11 @@ func (f *DefaultFetcher) SetTransport(rt http.RoundTripper) error {
 	if !ok {
 		return fmt.Errorf("fetcher is not type fetcher.DefaultFetcher")
 	}
-	hc.Transport = rt
-	f.client = hc
+	// The client may be http.DefaultClient, which is shared with the rest of
+	// the process, so copy it rather than setting the transport in place.
+	client := *hc
+	client.Transport = rt
+	f.client = &client
 	return nil
 }
 
