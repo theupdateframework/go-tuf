@@ -18,6 +18,7 @@
 package updater
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -43,6 +44,19 @@ func createAndRefresh(t *testing.T, repo *simulator.TestRepository) (*Updater, e
 	return up, up.Refresh()
 }
 
+// assertCachedMetadata checks the exact bytes persisted by a successful refresh.
+func assertCachedMetadata(t *testing.T, repo *simulator.TestRepository, rootVersion int) {
+	t.Helper()
+	repo.AssertFilesExact(metadata.TOP_LEVEL_ROLE_NAMES[:])
+	for _, role := range metadata.TOP_LEVEL_ROLE_NAMES {
+		version := -1
+		if role == metadata.ROOT {
+			version = rootVersion
+		}
+		repo.AssertContentEquals(role, &version)
+	}
+}
+
 // TestRootUpdatesTable tests root metadata update scenarios using table-driven tests
 func TestRootUpdatesTable(t *testing.T) {
 	tests := []struct {
@@ -60,7 +74,7 @@ func TestRootUpdatesTable(t *testing.T) {
 			},
 			wantErr: false,
 			assert: func(t *testing.T, repo *simulator.TestRepository) {
-				repo.AssertFilesExist(metadata.TOP_LEVEL_ROLE_NAMES[:])
+				assertCachedMetadata(t, repo, 2)
 			},
 		},
 		{
@@ -74,6 +88,8 @@ func TestRootUpdatesTable(t *testing.T) {
 			wantErrMsg:  "final root.json is expired",
 			assert: func(t *testing.T, repo *simulator.TestRepository) {
 				repo.AssertFilesExist([]string{metadata.ROOT})
+				version := 2
+				repo.AssertContentEquals(metadata.ROOT, &version)
 			},
 		},
 		{
@@ -87,6 +103,8 @@ func TestRootUpdatesTable(t *testing.T) {
 			wantErrMsg:  "bad version number, expected 2, got 1",
 			assert: func(t *testing.T, repo *simulator.TestRepository) {
 				repo.AssertFilesExist([]string{metadata.ROOT})
+				version := 1
+				repo.AssertContentEquals(metadata.ROOT, &version)
 			},
 		},
 		{
@@ -100,6 +118,8 @@ func TestRootUpdatesTable(t *testing.T) {
 			wantErrMsg:  "bad version number, expected 2, got 3",
 			assert: func(t *testing.T, repo *simulator.TestRepository) {
 				repo.AssertFilesExist([]string{metadata.ROOT})
+				version := 1
+				repo.AssertContentEquals(metadata.ROOT, &version)
 			},
 		},
 		{
@@ -114,8 +134,7 @@ func TestRootUpdatesTable(t *testing.T) {
 			},
 			wantErr: false,
 			assert: func(t *testing.T, repo *simulator.TestRepository) {
-				repo.AssertFilesExist(metadata.TOP_LEVEL_ROLE_NAMES[:])
-				repo.AssertVersionEquals(metadata.ROOT, 3)
+				assertCachedMetadata(t, repo, 3)
 			},
 		},
 	}
@@ -746,10 +765,11 @@ func TestUnsafeRefreshTable(t *testing.T) {
 		// First, do a real refresh to populate the cache.
 		_, err := createAndRefresh(t, repo)
 		assert.NoError(t, err)
-		repo.AssertFilesExist(metadata.TOP_LEVEL_ROLE_NAMES[:])
+		assertCachedMetadata(t, repo, 2)
 
 		// Now construct an unsafe updater pointing at the same dirs;
 		// it should load the cached set without any new fetches.
+		repo.Simulator.FetchTracker.Metadata = nil
 		unsafeCfg, err := repo.GetUnsafeUpdaterConfig()
 		assert.NoError(t, err)
 		up, err := New(unsafeCfg)
@@ -757,7 +777,13 @@ func TestUnsafeRefreshTable(t *testing.T) {
 		err = up.Refresh()
 		assert.NoError(t, err)
 
+		assert.Empty(t, repo.Simulator.FetchTracker.Metadata)
+		assertCachedMetadata(t, repo, 2)
 		ts := up.GetTrustedMetadataSet()
+		assert.Equal(t, metadata.ROOT, ts.Root.Signed.Type)
+		assert.Equal(t, metadata.SPECIFICATION_VERSION, ts.Root.Signed.SpecVersion)
+		assert.True(t, ts.Root.Signed.ConsistentSnapshot)
+		assert.Equal(t, int64(2), ts.Root.Signed.Version)
 		assert.NotNil(t, ts.Snapshot)
 		assert.NotNil(t, ts.Timestamp)
 		assert.Equal(t, 1, len(ts.Targets))
@@ -772,22 +798,20 @@ func TestTrustedRootUnsignedTable(t *testing.T) {
 	defer repo.Cleanup()
 
 	rootPath := filepath.Join(repo.MetadataDir, "root.json")
-	mdRoot, err := repo.Simulator.MDRoot.FromFile(rootPath)
+	mdRoot, err := metadata.Root().FromFile(rootPath)
 	assert.NoError(t, err)
 	mdRoot.ClearSignatures()
 	assert.NoError(t, mdRoot.ToFile(rootPath, true))
 	assert.NoError(t, repo.ReloadRootBytes())
+	expected, err := os.ReadFile(rootPath)
+	assert.NoError(t, err)
 
 	_, err = createAndRefresh(t, repo)
 	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 0, want 1"})
 
 	// The on-disk root must remain the unsigned one we just wrote.
 	repo.AssertFilesExist([]string{metadata.ROOT})
-	mdRootAfter, err := repo.Simulator.MDRoot.FromFile(rootPath)
-	assert.NoError(t, err)
-	expected, err := mdRoot.ToBytes(false)
-	assert.NoError(t, err)
-	actual, err := mdRootAfter.ToBytes(false)
+	actual, err := os.ReadFile(rootPath)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, actual)
 }
@@ -809,6 +833,8 @@ func TestIntermediateRootIncorrectlySignedTable(t *testing.T) {
 	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 0, want 1"})
 	repo.AssertFilesExist([]string{metadata.ROOT})
 	repo.AssertVersionEquals(metadata.ROOT, 1)
+	version := 1
+	repo.AssertContentEquals(metadata.ROOT, &version)
 }
 
 // TestMaxRootRotationsTable: the client stops walking root versions
@@ -856,6 +882,8 @@ func TestTrustedRootExpiredRecoveryTable(t *testing.T) {
 	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "final root.json is expired"})
 	repo.AssertFilesExist([]string{metadata.ROOT})
 	repo.AssertVersionEquals(metadata.ROOT, 2)
+	version := 2
+	repo.AssertContentEquals(metadata.ROOT, &version)
 
 	// Now publish a fresh root v3 with a future expiry.
 	repo.Simulator.MDRoot.Signed.Expires = repo.Simulator.SafeExpiry
@@ -866,6 +894,8 @@ func TestTrustedRootExpiredRecoveryTable(t *testing.T) {
 	assert.NoError(t, up.Refresh())
 	repo.AssertFilesExist(metadata.TOP_LEVEL_ROLE_NAMES[:])
 	repo.AssertVersionEquals(metadata.ROOT, 3)
+	version = 3
+	repo.AssertContentEquals(metadata.ROOT, &version)
 }
 
 // TestExpiredTimestampVersionRollbackTable: rollback protection must
