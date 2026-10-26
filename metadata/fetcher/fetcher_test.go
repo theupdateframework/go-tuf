@@ -111,11 +111,11 @@ func TestDownLoadFile(t *testing.T) {
 			fetcher := NewDefaultFetcher()
 			fetcher.SetHTTPUserAgent("Metadata_Unit_Test/1.0")
 			data, err := fetcher.DownloadFile(tt.makeURL(server), tt.maxLength, 0)
+			assert.Equal(t, tt.data, data, "fetched data did not match")
 			if tt.wantErr == nil {
 				assert.NoErrorf(t, err, "expected no error but got %v", err)
 				return
 			}
-			assert.Equal(t, tt.data, data, "fetched data did not match")
 			assert.IsTypef(t, tt.wantErr, err, "expected %v but got %v", tt.wantErr, err)
 		})
 	}
@@ -128,7 +128,9 @@ func TestDownLoadFile_BodyExceedsLimit(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// No Content-Length so the in-flight check is skipped; rely on
 		// the LimitReader path that fires after io.ReadAll returns.
-		w.Header().Del("Content-Length")
+		// Flush headers before writing, otherwise net/http adds a
+		// Content-Length automatically for this small response.
+		w.(http.Flusher).Flush()
 		_, _ = io.Copy(w, strings.NewReader(strings.Repeat("x", 200)))
 	}))
 	t.Cleanup(s.Close)
@@ -136,6 +138,7 @@ func TestDownLoadFile_BodyExceedsLimit(t *testing.T) {
 	f := NewDefaultFetcher()
 	_, err := f.DownloadFile(s.URL, 10, 0)
 	assert.ErrorAs(t, err, new(*metadata.ErrDownloadLengthMismatch))
+	assert.ErrorContains(t, err, "length 11 is larger than expected 10")
 }
 
 // MockHTTPClient is a mock implementation of httpClient
@@ -273,6 +276,9 @@ func TestSetHTTPClient(t *testing.T) {
 // path on a *http.Client, and the failure path when the underlying client
 // is something else (e.g. a test mock).
 func TestSetTransportTable(t *testing.T) {
+	originalTransport := http.DefaultClient.Transport
+	t.Cleanup(func() { http.DefaultClient.Transport = originalTransport })
+
 	tests := []struct {
 		name        string
 		setup       func() *DefaultFetcher
@@ -299,7 +305,7 @@ func TestSetTransportTable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := tt.setup()
-			rt := http.DefaultTransport
+			rt := &recordingRoundTripper{}
 			err := f.SetTransport(rt)
 			if tt.expectError {
 				assert.ErrorContains(t, err, tt.errorMsg)
