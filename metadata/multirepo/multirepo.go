@@ -32,9 +32,15 @@ import (
 	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
 
-// ErrInvalidRepoName is returned when a repository name contains path traversal
-// components or is otherwise invalid for use as a directory name.
-var ErrInvalidRepoName = errors.New("invalid repository name")
+var (
+	// ErrNoMapFile is returned when no map file is provided
+	ErrNoMapFile = errors.New("no map file provided")
+	// ErrNoTrustedRoots is returned when no trusted root metadata is provided
+	ErrNoTrustedRoots = errors.New("no trusted root metadata provided")
+	// ErrInvalidRepoName is returned when a repository name contains path traversal
+	// components or is otherwise invalid for use as a directory name.
+	ErrInvalidRepoName = errors.New("invalid repository name")
+)
 
 // ErrMissingRepoURL is returned when a repository listed in the map file has no
 // usable URL, i.e. an empty URL list or an empty first URL.
@@ -95,15 +101,23 @@ type targetMatch struct {
 
 // NewConfig returns configuration for a multi-repo TUF client
 func NewConfig(repoMap []byte, roots map[string][]byte) (*MultiRepoConfig, error) {
-	// error if we don't have the necessary arguments
-	if len(repoMap) == 0 || len(roots) == 0 {
-		return nil, fmt.Errorf("failed to create multi-repository config: no map file and/or trusted root metadata is provided")
+	// error if we don't have the necessary arguments. Wrap only the
+	// sentinel that actually corresponds to the missing input so callers
+	// can use errors.Is(err, ErrNoMapFile) or errors.Is(err, ErrNoTrustedRoots)
+	// to discriminate.
+	switch {
+	case len(repoMap) == 0 && len(roots) == 0:
+		return nil, fmt.Errorf("failed to create multi-repository config: %w and %w", ErrNoMapFile, ErrNoTrustedRoots)
+	case len(repoMap) == 0:
+		return nil, fmt.Errorf("failed to create multi-repository config: %w", ErrNoMapFile)
+	case len(roots) == 0:
+		return nil, fmt.Errorf("failed to create multi-repository config: %w", ErrNoTrustedRoots)
 	}
 
 	// unmarshal the map file (note: should we expect/support unrecognized values here?)
 	var mapFile *MultiRepoMapType
 	if err := json.Unmarshal(repoMap, &mapFile); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal map file: %w", err)
 	}
 	if mapFile == nil {
 		return nil, errors.New("map file is null")

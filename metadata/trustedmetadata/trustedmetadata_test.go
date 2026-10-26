@@ -13,7 +13,6 @@
 // limitations under the License
 //
 // SPDX-License-Identifier: Apache-2.0
-//
 
 package trustedmetadata
 
@@ -30,6 +29,9 @@ import (
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
+// allRoles is the canonical set of metadata bytes loaded from the
+// repository fixture by TestMain. Every Update* call in this file reads
+// inputs from here.
 var allRoles map[string][]byte
 
 func setAllRolesBytes(path string) {
@@ -102,6 +104,9 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
+// modifyRootMetadata returns the canonical root.json mutated by fn and
+// re-signed with the fixture root key. The mirror helpers below do the
+// same for the other top-level roles.
 type modifyRoot func(*metadata.Metadata[metadata.RootType])
 
 func modifyRootMetadata(fn modifyRoot) ([]byte, error) {
@@ -194,335 +199,10 @@ func modifyTargetsMetadata(fn modifyTargets) ([]byte, error) {
 	return targets.ToBytes(true)
 }
 
-func TestUpdate(t *testing.T) {
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateDelegatedTargets(allRoles["role1"], "role1", metadata.TARGETS)
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateDelegatedTargets(allRoles["role2"], "role2", "role1")
-	assert.NoError(t, err)
-
-	// The 4 top level metadata objects + 2 additional delegated targets
-	// self.assertTrue(len(self.trusted_set), 6)
-	assert.NotNil(t, trustedSet.Root)
-	assert.NotNil(t, trustedSet.Timestamp)
-	assert.NotNil(t, trustedSet.Snapshot)
-	assert.NotNil(t, trustedSet.Targets)
-}
-
-func TestOutOfOrderOps(t *testing.T) {
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-
-	//  Update snapshot before timestamp
-	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.ErrorIs(t, err, &metadata.ErrRuntime{Msg: "cannot update snapshot before timestamp"})
-
-	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.NoError(t, err)
-
-	// Update root after timestamp
-	_, err = trustedSet.UpdateRoot(allRoles[metadata.ROOT])
-	assert.ErrorIs(t, err, &metadata.ErrRuntime{Msg: "cannot update root after timestamp"})
-
-	// Update targets before snapshot
-	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
-	assert.ErrorIs(t, err, &metadata.ErrRuntime{Msg: "cannot load targets before snapshot"})
-
-	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.NoError(t, err)
-
-	// Update timestamp after snapshot
-	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.ErrorIs(t, err, &metadata.ErrRuntime{Msg: "cannot update timestamp after snapshot"})
-
-	// Update delegated targets before targets
-	_, err = trustedSet.UpdateDelegatedTargets(allRoles["role1"], "role1", metadata.TARGETS)
-	assert.ErrorIs(t, err, &metadata.ErrRuntime{Msg: "cannot load targets before delegator"})
-
-	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
-	assert.NoError(t, err)
-
-	//  Update snapshot after sucessful targets update
-	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.ErrorIs(t, err, &metadata.ErrRuntime{Msg: "cannot update snapshot after targets"})
-
-	_, err = trustedSet.UpdateDelegatedTargets(allRoles["role1"], "role1", metadata.TARGETS)
-	assert.NoError(t, err)
-}
-
-func TestRootWithInvalidJson(t *testing.T) {
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-
-	// Test loading initial root and root update
-
-	// root is not json
-	_, err = trustedSet.UpdateRoot([]byte(""))
-	assert.ErrorContains(t, err, "unexpected end of JSON input")
-
-	// root is not valid
-	root, err := metadata.Root().FromBytes(allRoles[metadata.ROOT])
-	assert.NoError(t, err)
-	root.Signed.Version += 1
-	rootBytes, err := root.ToBytes(true)
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateRoot(rootBytes)
-	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 0, want 1"})
-
-	// metadata is of wrong type
-	_, err = trustedSet.UpdateRoot(allRoles[metadata.SNAPSHOT])
-	assert.ErrorIs(t, err, &metadata.ErrValue{Msg: "expected metadata type root, got - snapshot"})
-}
-
-func TestTopLevelMetadataWithInvalidJSON(t *testing.T) {
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-
-	//TIMESTAMP
-	// timestamp is not json
-	_, err = trustedSet.UpdateTimestamp([]byte(""))
-	assert.ErrorContains(t, err, "unexpected end of JSON input")
-
-	// timestamp is not valid
-	timestamp, err := metadata.Timestamp().FromBytes(allRoles[metadata.TIMESTAMP])
-	assert.NoError(t, err)
-	properTimestampBytes, err := timestamp.ToBytes(true)
-	assert.NoError(t, err)
-	timestamp.Signed.Version += 1
-	timestampBytes, err := timestamp.ToBytes(true)
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateTimestamp(timestampBytes)
-	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying timestamp failed, not enough signatures, got 0, want 1"})
-
-	// timestamp is of wrong type
-	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.ROOT])
-	assert.ErrorIs(t, err, &metadata.ErrValue{Msg: "expected metadata type timestamp, got - root"})
-
-	// SNAPSHOT
-	_, err = trustedSet.UpdateTimestamp(properTimestampBytes)
-	assert.NoError(t, err)
-	// snapshot is not json
-	_, err = trustedSet.UpdateSnapshot([]byte(""), false)
-	assert.ErrorContains(t, err, "unexpected end of JSON input")
-
-	// snapshot is not valid
-	snapshot, err := metadata.Snapshot().FromBytes(allRoles[metadata.SNAPSHOT])
-	assert.NoError(t, err)
-	properSnapshotBytes, err := snapshot.ToBytes(true)
-	assert.NoError(t, err)
-	snapshot.Signed.Version += 1
-	snapshotBytes, err := snapshot.ToBytes(true)
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateSnapshot(snapshotBytes, false)
-	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying snapshot failed, not enough signatures, got 0, want 1"})
-
-	// snapshot is of wrong type
-	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.ROOT], false)
-	assert.ErrorIs(t, err, &metadata.ErrValue{Msg: "expected metadata type snapshot, got - root"})
-
-	// TARGETS
-	_, err = trustedSet.UpdateSnapshot(properSnapshotBytes, false)
-	assert.NoError(t, err)
-	// targets is not json
-	_, err = trustedSet.UpdateTargets([]byte(""))
-	assert.ErrorContains(t, err, "unexpected end of JSON input")
-
-	// targets is not valid
-	targets, err := metadata.Targets().FromBytes(allRoles[metadata.TARGETS])
-	assert.NoError(t, err)
-	targets.Signed.Version += 1
-	targetsBytes, err := targets.ToBytes(true)
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateTargets(targetsBytes)
-	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying targets failed, not enough signatures, got 0, want 1"})
-
-	// targets is of wrong type
-	_, err = trustedSet.UpdateTargets(allRoles[metadata.ROOT])
-	assert.ErrorIs(t, err, &metadata.ErrValue{Msg: "expected metadata type targets, got - root"})
-}
-
-func TestUpdateRootNewRoot(t *testing.T) {
-	// Test that root can be updated with a new valid version
-	modifyRootVersion := func(root *metadata.Metadata[metadata.RootType]) {
-		root.Signed.Version += 1
-	}
-
-	root, err := modifyRootMetadata(modifyRootVersion)
-	assert.NoError(t, err)
-
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	_, err = trustedSet.UpdateRoot(root)
-	assert.NoError(t, err)
-}
-
-func TestUpdateRootNewRootFailTreshholdVerification(t *testing.T) {
-	// Increase threshold in new root, do not add enough keys
-	bumpRootThreshold := func(root *metadata.Metadata[metadata.RootType]) {
-		root.Signed.Version += 1
-		root.Signed.Roles[metadata.ROOT].Threshold += 1
-	}
-	root, err := modifyRootMetadata(bumpRootThreshold)
-	assert.NoError(t, err)
-
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	_, err = trustedSet.UpdateRoot(root)
-	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 1, want 2"})
-}
-
-func TestUpdateRootNewRootVerSameAsTrustedRootVer(t *testing.T) {
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-
-	_, err = trustedSet.UpdateRoot(allRoles[metadata.ROOT])
-	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "bad version number, expected 2, got 1"})
-}
-
-func TestRootExpiredFinalRoot(t *testing.T) {
-	// test that root can be updated with a new valid version
-	modifyRootExpiry := func(root *metadata.Metadata[metadata.RootType]) {
-		root.Signed.Expires = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
-	}
-
-	// Intermediate root can be expired
-	root, err := modifyRootMetadata(modifyRootExpiry)
-	assert.NoError(t, err)
-	trustedSet, err := New(root)
-	require.NoError(t, err)
-
-	// Update timestamp to trigger final root expiry check
-	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "final root.json is expired"})
-}
-
-func TestUpdateTimestampNewTimestampVerBelowTrustedVer(t *testing.T) {
-	// newTimestamp.Version < trustedTimestamp.Version
-	modifyTimestampVersion := func(timestamp *metadata.Metadata[metadata.TimestampType]) {
-		timestamp.Signed.Version = 3
-	}
-	timestamp, err := modifyTimestamptMetadata(modifyTimestampVersion)
-	assert.NoError(t, err)
-
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	_, err = trustedSet.UpdateTimestamp(timestamp)
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "new timestamp version 1 must be >= 3"})
-}
-
-func TestUpdateTimestampWithSameTimestamp(t *testing.T) {
-	// Test that timestamp is NOT updated if:
-	// newTimestamp.Version = trustedTimestamp.Version
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.NoError(t, err)
-
-	initialTimestamp := trustedSet.Timestamp
-	// Update timestamp with the same version.
-	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	// EqualVersionNumberError
-	assert.ErrorIs(t, err, &metadata.ErrEqualVersionNumber{Msg: "new timestamp version 1 equals the old one 1"})
-
-	// Verify that the timestamp object was not updated.
-	assert.Equal(t, initialTimestamp, trustedSet.Timestamp)
-}
-
-func TestUpdateTimestampSnapshotCerBellowCurrent(t *testing.T) {
-	bumpSnapshotVersion := func(timestamp *metadata.Metadata[metadata.TimestampType]) {
-		timestamp.Signed.Meta["snapshot.json"].Version = 2
-		// The timestamp version must be increased to initiate a update.
-		timestamp.Signed.Version += 1
-	}
-	// Set current known snapshot.json version to 2
-	timestamp, err := modifyTimestamptMetadata(bumpSnapshotVersion)
-	assert.NoError(t, err)
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	_, err = trustedSet.UpdateTimestamp(timestamp)
-	assert.NoError(t, err)
-
-	// new timestamp meta version < trusted timestamp meta version
-	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "new timestamp version 1 must be >= 2"})
-}
-
-func TestUpdateTimestampExpired(t *testing.T) {
-	// New timestamp has expired
-	modifyTimestampExpiry := func(timestamp *metadata.Metadata[metadata.TimestampType]) {
-		timestamp.Signed.Expires = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
-	}
-	// Expired intermediate timestamp is loaded but raises ExpiredMetadataError
-	timestamp, err := modifyTimestamptMetadata(modifyTimestampExpiry)
-	assert.NoError(t, err)
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	_, err = trustedSet.UpdateTimestamp(timestamp)
-	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "timestamp.json is expired"})
-	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "timestamp.json is expired"})
-}
-
-func TestUpdateSnapshotLengthOrHashMismatch(t *testing.T) {
-	modifySnapshotLength := func(timestamp *metadata.Metadata[metadata.TimestampType]) {
-		timestamp.Signed.Meta["snapshot.json"].Length = 1
-	}
-	// Set known snapshot.json length to 1
-	timestamp, err := modifyTimestamptMetadata(modifySnapshotLength)
-	assert.NoError(t, err)
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	_, err = trustedSet.UpdateTimestamp(timestamp)
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.ErrorIs(t, err, &metadata.ErrLengthOrHashMismatch{Msg: "length verification failed - expected 1, got 652"})
-}
-
-func TestUpdateSnapshotFailThreshholdVerification(t *testing.T) {
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.NoError(t, err)
-
-	snapshot, err := metadata.Snapshot().FromBytes(allRoles[metadata.SNAPSHOT])
-	assert.NoError(t, err)
-	snapshot.ClearSignatures()
-	snapshotBytes, err := snapshot.ToBytes(true)
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateSnapshot(snapshotBytes, false)
-	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying snapshot failed, not enough signatures, got 0, want 1"})
-}
-
-func TestUpdateSnapshotVersionDivergeTimestampSnapshotVersion(t *testing.T) {
-	modifyTimestampVersion := func(timestamp *metadata.Metadata[metadata.TimestampType]) {
-		timestamp.Signed.Meta["snapshot.json"].Version = 2
-	}
-	timestamp, err := modifyTimestamptMetadata(modifyTimestampVersion)
-	assert.NoError(t, err)
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	_, err = trustedSet.UpdateTimestamp(timestamp)
-	assert.NoError(t, err)
-
-	// If intermediate snapshot version is incorrect, load it but also raise
-	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected 2, got 1"})
-
-	// Targets update starts but fails if snapshot version does not match
-	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
-	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected 2, got 1"})
-}
-
-// Update all metadata roles besides targets.
+// updateAllBesidesTargets loads timestamp and snapshot onto trustedSet,
+// substituting the canonical fixtures for empty inputs. Used by the
+// targets-focused subtests to set up a state where only the targets
+// update remains.
 func updateAllBesidesTargets(trustedSet *TrustedMetadata, timestampBytes []byte, snapshotBytes []byte) error {
 	if len(timestampBytes) <= 0 {
 		timestampBytes = allRoles[metadata.TIMESTAMP]
@@ -541,166 +221,720 @@ func updateAllBesidesTargets(trustedSet *TrustedMetadata, timestampBytes []byte,
 	return nil
 }
 
-func TestUpdateSnapshotFileRemovedFromMeta(t *testing.T) {
-	trustedSet, err := New(allRoles[metadata.ROOT])
+// newTrustedSetT is a small require-style helper: construct a fresh
+// TrustedMetadata from the canonical root fixture or fail the test.
+func newTrustedSetT(t *testing.T) *TrustedMetadata {
+	t.Helper()
+	ts, err := New(allRoles[metadata.ROOT])
 	require.NoError(t, err)
-	err = updateAllBesidesTargets(trustedSet, allRoles[metadata.TIMESTAMP], []byte{})
-	assert.NoError(t, err)
-	removeFileFromMeta := func(snaphot *metadata.Metadata[metadata.SnapshotType]) {
-		delete(snaphot.Signed.Meta, "targets.json")
-	}
-	// Test removing a meta_file in new_snapshot compared to the old snapshot
-	snapshot, err := modifySnapshotMetadata(removeFileFromMeta)
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateSnapshot(snapshot, false)
-	assert.ErrorIs(t, err, &metadata.ErrRepository{Msg: "new snapshot is missing info for targets.json"})
+	return ts
 }
 
-func TestUpdateSnapshotMetaVersionDecreases(t *testing.T) {
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.NoError(t, err)
-
-	modifyMetaVersion := func(snaphot *metadata.Metadata[metadata.SnapshotType]) {
-		snaphot.Signed.Meta["targets.json"].Version += 1
+// expectErr asserts the test's expectation about err. Order:
+//   - errIs (errors.Is)
+//   - errContains (substring)
+//   - nil (no error expected)
+func expectErr(t *testing.T, err error, errIs error, errContains string) {
+	t.Helper()
+	switch {
+	case errIs != nil:
+		assert.ErrorIs(t, err, errIs)
+	case errContains != "":
+		assert.ErrorContains(t, err, errContains)
+	default:
+		assert.NoError(t, err)
 	}
-	snapshot, err := modifySnapshotMetadata(modifyMetaVersion)
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateSnapshot(snapshot, false)
-	assert.NoError(t, err)
-
-	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected targets.json version 1, got 2"})
 }
 
-func TestUpdateSnapshotExpiredNewSnapshot(t *testing.T) {
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.NoError(t, err)
-
-	modifySnapshotExpired := func(snaphot *metadata.Metadata[metadata.SnapshotType]) {
-		snaphot.Signed.Expires = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+// TestUpdateFlowTable covers TestUpdate (happy path) and TestOutOfOrderOps
+// (the ordering rules) via a single sequenced table. Each case is a list of
+// (action, input, expectErr) tuples that we apply in order to a fresh
+// TrustedMetadata.
+func TestUpdateFlowTable(t *testing.T) {
+	type step struct {
+		op          string // root|timestamp|snapshot|targets|delegated
+		input       string // role name (e.g. metadata.ROOT, "role1") to pull from allRoles
+		role        string // delegated role name, only for op=="delegated"
+		delegator   string // delegator role name, only for op=="delegated"
+		errIs       error
+		errContains string
 	}
-	// Expired intermediate snapshot is loaded but will raise
-	snapshot, err := modifySnapshotMetadata(modifySnapshotExpired)
-	assert.NoError(t, err)
-
-	_, err = trustedSet.UpdateSnapshot(snapshot, false)
-	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "snapshot.json is expired"})
-
-	// Targets update does start but fails because snapshot is expired
-	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
-	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "snapshot.json is expired"})
-
-}
-
-func TestUpdateSnapshotSuccessfulRollbackChecks(t *testing.T) {
-	// Load a "local" timestamp, then update to newer one:
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	_, err = trustedSet.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
-	assert.NoError(t, err)
-
-	bumpMetaVersion := func(timestamp *metadata.Metadata[metadata.TimestampType]) {
-		timestamp.Signed.Meta["snapshot.json"].Version += 1
-		// The timestamp version must be increased to initiate a update.
-		timestamp.Signed.Version += 1
-	}
-	newTimestamp, err := modifyTimestamptMetadata(bumpMetaVersion)
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateTimestamp(newTimestamp)
-	assert.NoError(t, err)
-
-	// Load a "local" snapshot with mismatching version (loading happens but
-	// ErrBadVersionNumber is raised), then update to newer one:
-	_, err = trustedSet.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
-	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected 2, got 1"})
-
-	bumpVersion := func(snapahot *metadata.Metadata[metadata.SnapshotType]) {
-		snapahot.Signed.Version += 1
-	}
-	newSnapshot, err := modifySnapshotMetadata(bumpVersion)
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateSnapshot(newSnapshot, false)
-	assert.NoError(t, err)
-
-	// Update targets to trigger final snapshot meta version check
-	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
-	assert.NoError(t, err)
-}
-
-func TestUpdateTargetsMoMetaInSnapshot(t *testing.T) {
-	clearMeta := func(snapshot *metadata.Metadata[metadata.SnapshotType]) {
-		for key := range snapshot.Signed.Meta {
-			delete(snapshot.Signed.Meta, key)
+	apply := func(t *testing.T, ts *TrustedMetadata, s step) error {
+		t.Helper()
+		switch s.op {
+		case "root":
+			_, err := ts.UpdateRoot(allRoles[s.input])
+			return err
+		case "timestamp":
+			_, err := ts.UpdateTimestamp(allRoles[s.input])
+			return err
+		case "snapshot":
+			_, err := ts.UpdateSnapshot(allRoles[s.input], false)
+			return err
+		case "targets":
+			_, err := ts.UpdateTargets(allRoles[s.input])
+			return err
+		case "delegated":
+			_, err := ts.UpdateDelegatedTargets(allRoles[s.input], s.role, s.delegator)
+			return err
 		}
+		t.Fatalf("unknown op %q", s.op)
+		return nil
 	}
-	snapshot, err := modifySnapshotMetadata(clearMeta)
-	assert.NoError(t, err)
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	err = updateAllBesidesTargets(trustedSet, allRoles[metadata.TIMESTAMP], snapshot)
-	assert.NoError(t, err)
 
-	// Remove meta information with information about targets from snapshot
-	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
-	assert.ErrorIs(t, err, &metadata.ErrRepository{Msg: "snapshot does not contain information for targets"})
+	tests := []struct {
+		name  string
+		steps []step
+		// finalCheck is run after all steps have been applied.
+		finalCheck func(t *testing.T, ts *TrustedMetadata)
+	}{
+		{
+			name: "happy path: root -> timestamp -> snapshot -> targets -> delegated chain",
+			steps: []step{
+				{op: "timestamp", input: metadata.TIMESTAMP},
+				{op: "snapshot", input: metadata.SNAPSHOT},
+				{op: "targets", input: metadata.TARGETS},
+				{op: "delegated", input: "role1", role: "role1", delegator: metadata.TARGETS},
+				{op: "delegated", input: "role2", role: "role2", delegator: "role1"},
+			},
+			finalCheck: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				assert.NotNil(t, ts.Root)
+				assert.NotNil(t, ts.Timestamp)
+				assert.NotNil(t, ts.Snapshot)
+				assert.NotNil(t, ts.Targets)
+			},
+		},
+		{
+			name: "out of order: snapshot before timestamp / root after timestamp / targets before snapshot / timestamp after snapshot / delegated before targets / snapshot after targets",
+			steps: []step{
+				{op: "snapshot", input: metadata.SNAPSHOT, errIs: &metadata.ErrRuntime{Msg: "cannot update snapshot before timestamp"}},
+				{op: "timestamp", input: metadata.TIMESTAMP},
+				{op: "root", input: metadata.ROOT, errIs: &metadata.ErrRuntime{Msg: "cannot update root after timestamp"}},
+				{op: "targets", input: metadata.TARGETS, errIs: &metadata.ErrRuntime{Msg: "cannot load targets before snapshot"}},
+				{op: "snapshot", input: metadata.SNAPSHOT},
+				{op: "timestamp", input: metadata.TIMESTAMP, errIs: &metadata.ErrRuntime{Msg: "cannot update timestamp after snapshot"}},
+				{op: "delegated", input: "role1", role: "role1", delegator: metadata.TARGETS, errIs: &metadata.ErrRuntime{Msg: "cannot load targets before delegator"}},
+				{op: "targets", input: metadata.TARGETS},
+				{op: "snapshot", input: metadata.SNAPSHOT, errIs: &metadata.ErrRuntime{Msg: "cannot update snapshot after targets"}},
+				{op: "delegated", input: "role1", role: "role1", delegator: metadata.TARGETS},
+			},
+		},
+	}
 
-}
-
-func TestUpdateTargetsHashDiverfeFromSnapshotMetaHash(t *testing.T) {
-	modifyMetaLength := func(snapshot *metadata.Metadata[metadata.SnapshotType]) {
-		for metafilePath := range snapshot.Signed.Meta {
-			snapshot.Signed.Meta[metafilePath] = &metadata.MetaFiles{
-				Version: 1,
-				Length:  1,
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := newTrustedSetT(t)
+			for i, s := range tt.steps {
+				err := apply(t, ts, s)
+				expectErr(t, err, s.errIs, s.errContains)
+				_ = i
 			}
-		}
+			if tt.finalCheck != nil {
+				tt.finalCheck(t, ts)
+			}
+		})
 	}
-	snapshot, err := modifySnapshotMetadata(modifyMetaLength)
-	assert.NoError(t, err)
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	err = updateAllBesidesTargets(trustedSet, allRoles[metadata.TIMESTAMP], snapshot)
-	assert.NoError(t, err)
-
-	// Observed hash != stored hash in snapshot meta for targets
-	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
-	assert.ErrorIs(t, err, &metadata.ErrLengthOrHashMismatch{Msg: "length verification failed - expected 1, got 1266"})
 }
 
-func TestUpdateTargetsVersionDivergeSnapshotMetaVersion(t *testing.T) {
-	modifyMeta := func(snapshot *metadata.Metadata[metadata.SnapshotType]) {
-		for metafilePath := range snapshot.Signed.Meta {
-			snapshot.Signed.Meta[metafilePath] = &metadata.MetaFiles{Version: 2}
-		}
+// TestUpdateRootTable covers UpdateRoot scenarios:
+//   - happy path with bumped version
+//   - threshold bumped without enough sigs
+//   - same version as trusted
+//   - invalid JSON (empty / unsigned-bump / wrong type)
+// Plus the cross-cutting "intermediate root can expire, final root cannot"
+// flow.
+func TestUpdateRootTable(t *testing.T) {
+	tests := []struct {
+		name string
+		// rootBytes computes the bytes passed to UpdateRoot. Built per-case
+		// so each subtest gets its own derived metadata.
+		rootBytes   func(t *testing.T) []byte
+		errIs       error
+		errContains string
+	}{
+		{
+			name: "valid new root version",
+			rootBytes: func(t *testing.T) []byte {
+				t.Helper()
+				b, err := modifyRootMetadata(func(r *metadata.Metadata[metadata.RootType]) {
+					r.Signed.Version += 1
+				})
+				require.NoError(t, err)
+				return b
+			},
+		},
+		{
+			name: "threshold bumped without adding signing keys",
+			rootBytes: func(t *testing.T) []byte {
+				t.Helper()
+				b, err := modifyRootMetadata(func(r *metadata.Metadata[metadata.RootType]) {
+					r.Signed.Version += 1
+					r.Signed.Roles[metadata.ROOT].Threshold += 1
+				})
+				require.NoError(t, err)
+				return b
+			},
+			errIs: &metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 1, want 2"},
+		},
+		{
+			name: "new root version equals trusted root version",
+			rootBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return allRoles[metadata.ROOT]
+			},
+			errIs: &metadata.ErrBadVersionNumber{Msg: "bad version number, expected 2, got 1"},
+		},
+		{
+			name: "empty input is invalid JSON",
+			rootBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return []byte("")
+			},
+			errContains: "unexpected end of JSON input",
+		},
+		{
+			name: "version-bumped root with no matching signature",
+			rootBytes: func(t *testing.T) []byte {
+				t.Helper()
+				root, err := metadata.Root().FromBytes(allRoles[metadata.ROOT])
+				require.NoError(t, err)
+				root.Signed.Version += 1
+				b, err := root.ToBytes(true)
+				require.NoError(t, err)
+				return b
+			},
+			errIs: &metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 0, want 1"},
+		},
+		{
+			name: "wrong metadata type (snapshot bytes)",
+			rootBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return allRoles[metadata.SNAPSHOT]
+			},
+			errIs: &metadata.ErrValue{Msg: "expected metadata type root, got - snapshot"},
+		},
 	}
-	snapshot, err := modifySnapshotMetadata(modifyMeta)
-	assert.NoError(t, err)
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	err = updateAllBesidesTargets(trustedSet, allRoles[metadata.TIMESTAMP], snapshot)
-	assert.NoError(t, err)
 
-	// New delegate sigfned version != meta version stored in snapshot
-	_, err = trustedSet.UpdateTargets(allRoles[metadata.TARGETS])
-	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected targets version 2, got 1"})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := newTrustedSetT(t)
+			_, err := ts.UpdateRoot(tt.rootBytes(t))
+			expectErr(t, err, tt.errIs, tt.errContains)
+		})
+	}
+
+	// "Expired final root" exercises UpdateTimestamp, since UpdateRoot
+	// allows an expired intermediate root. Keep it adjacent for proximity
+	// to the other root-expiry semantics.
+	t.Run("expired final root is rejected on first UpdateTimestamp", func(t *testing.T) {
+		rootBytes, err := modifyRootMetadata(func(r *metadata.Metadata[metadata.RootType]) {
+			r.Signed.Expires = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+		})
+		require.NoError(t, err)
+		ts, err := New(rootBytes)
+		require.NoError(t, err)
+		_, err = ts.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
+		assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "final root.json is expired"})
+	})
 }
 
-func TestUpdateTargetsExpiredMewTarget(t *testing.T) {
-	trustedSet, err := New(allRoles[metadata.ROOT])
-	require.NoError(t, err)
-	err = updateAllBesidesTargets(trustedSet, allRoles[metadata.TIMESTAMP], allRoles[metadata.SNAPSHOT])
-	assert.NoError(t, err)
-
-	// New delegated target has expired
-	modifyTargetExpiry := func(targets *metadata.Metadata[metadata.TargetsType]) {
-		targets.Signed.Expires = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+// TestUpdateTimestampTable covers UpdateTimestamp scenarios.
+func TestUpdateTimestampTable(t *testing.T) {
+	tests := []struct {
+		name string
+		// preload runs before the timestamp under test is applied. nil
+		// means "no preload — apply the case input to a fresh trust set".
+		preload func(t *testing.T, ts *TrustedMetadata)
+		// timestampBytes returns the input bytes for the timestamp call.
+		timestampBytes func(t *testing.T) []byte
+		errIs          error
+		errContains    string
+		// finalCheck runs after the UpdateTimestamp under test.
+		finalCheck func(t *testing.T, ts *TrustedMetadata, snapshotOldRef *metadata.Metadata[metadata.TimestampType])
+	}{
+		{
+			name: "empty input is invalid JSON",
+			timestampBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return []byte("")
+			},
+			errContains: "unexpected end of JSON input",
+		},
+		{
+			name: "version-bumped timestamp with no matching signature",
+			timestampBytes: func(t *testing.T) []byte {
+				t.Helper()
+				ts, err := metadata.Timestamp().FromBytes(allRoles[metadata.TIMESTAMP])
+				require.NoError(t, err)
+				ts.Signed.Version += 1
+				b, err := ts.ToBytes(true)
+				require.NoError(t, err)
+				return b
+			},
+			errIs: &metadata.ErrUnsignedMetadata{Msg: "Verifying timestamp failed, not enough signatures, got 0, want 1"},
+		},
+		{
+			name: "wrong metadata type (root bytes)",
+			timestampBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return allRoles[metadata.ROOT]
+			},
+			errIs: &metadata.ErrValue{Msg: "expected metadata type timestamp, got - root"},
+		},
+		{
+			name: "new timestamp version below trusted version is rejected",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				b, err := modifyTimestamptMetadata(func(meta *metadata.Metadata[metadata.TimestampType]) {
+					meta.Signed.Version = 3
+				})
+				require.NoError(t, err)
+				_, err = ts.UpdateTimestamp(b)
+				require.NoError(t, err)
+			},
+			timestampBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return allRoles[metadata.TIMESTAMP]
+			},
+			errIs: &metadata.ErrBadVersionNumber{Msg: "new timestamp version 1 must be >= 3"},
+		},
+		{
+			name: "same timestamp version is rejected and trusted state is preserved",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				_, err := ts.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
+				require.NoError(t, err)
+			},
+			timestampBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return allRoles[metadata.TIMESTAMP]
+			},
+			errIs: &metadata.ErrEqualVersionNumber{Msg: "new timestamp version 1 equals the old one 1"},
+			finalCheck: func(t *testing.T, ts *TrustedMetadata, initial *metadata.Metadata[metadata.TimestampType]) {
+				t.Helper()
+				// Trusted timestamp object pointer must be unchanged.
+				assert.Equal(t, initial, ts.Timestamp)
+			},
+		},
+		{
+			name: "snapshot meta version regressing below trusted is rejected",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				b, err := modifyTimestamptMetadata(func(meta *metadata.Metadata[metadata.TimestampType]) {
+					meta.Signed.Meta["snapshot.json"].Version = 2
+					meta.Signed.Version += 1
+				})
+				require.NoError(t, err)
+				_, err = ts.UpdateTimestamp(b)
+				require.NoError(t, err)
+			},
+			timestampBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return allRoles[metadata.TIMESTAMP]
+			},
+			errIs: &metadata.ErrBadVersionNumber{Msg: "new timestamp version 1 must be >= 2"},
+		},
+		{
+			name: "expired timestamp is loaded but raises ExpiredMetadata, then blocks snapshot",
+			timestampBytes: func(t *testing.T) []byte {
+				t.Helper()
+				b, err := modifyTimestamptMetadata(func(meta *metadata.Metadata[metadata.TimestampType]) {
+					meta.Signed.Expires = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+				})
+				require.NoError(t, err)
+				return b
+			},
+			errIs: &metadata.ErrExpiredMetadata{Msg: "timestamp.json is expired"},
+			finalCheck: func(t *testing.T, ts *TrustedMetadata, _ *metadata.Metadata[metadata.TimestampType]) {
+				t.Helper()
+				// Subsequent snapshot update fails with the same error.
+				_, err := ts.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
+				assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "timestamp.json is expired"})
+			},
+		},
 	}
-	targets, err := modifyTargetsMetadata(modifyTargetExpiry)
-	assert.NoError(t, err)
-	_, err = trustedSet.UpdateTargets(targets)
-	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "new targets is expired"})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := newTrustedSetT(t)
+			if tt.preload != nil {
+				tt.preload(t, ts)
+			}
+			// Snapshot the timestamp pointer before the operation for finalCheck.
+			beforeTimestamp := ts.Timestamp
+			_, err := ts.UpdateTimestamp(tt.timestampBytes(t))
+			expectErr(t, err, tt.errIs, tt.errContains)
+			if tt.finalCheck != nil {
+				tt.finalCheck(t, ts, beforeTimestamp)
+			}
+		})
+	}
+}
+
+// TestUpdateSnapshotTable covers UpdateSnapshot scenarios. Each case
+// starts from a fresh trust set with the canonical timestamp already
+// loaded (unless preload overrides that).
+func TestUpdateSnapshotTable(t *testing.T) {
+	tests := []struct {
+		name string
+		// preload customises the trusted set before the UpdateSnapshot
+		// under test. The default (nil) is "load the canonical timestamp".
+		preload func(t *testing.T, ts *TrustedMetadata)
+		// snapshotBytes returns the bytes to pass to UpdateSnapshot.
+		snapshotBytes func(t *testing.T) []byte
+		errIs         error
+		errContains   string
+		// finalCheck runs after the operation under test.
+		finalCheck func(t *testing.T, ts *TrustedMetadata)
+	}{
+		{
+			name: "empty input is invalid JSON",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				_, err := ts.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
+				require.NoError(t, err)
+			},
+			snapshotBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return []byte("")
+			},
+			errContains: "unexpected end of JSON input",
+		},
+		{
+			name: "version-bumped snapshot with no matching signature",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				_, err := ts.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
+				require.NoError(t, err)
+			},
+			snapshotBytes: func(t *testing.T) []byte {
+				t.Helper()
+				s, err := metadata.Snapshot().FromBytes(allRoles[metadata.SNAPSHOT])
+				require.NoError(t, err)
+				s.Signed.Version += 1
+				b, err := s.ToBytes(true)
+				require.NoError(t, err)
+				return b
+			},
+			errIs: &metadata.ErrUnsignedMetadata{Msg: "Verifying snapshot failed, not enough signatures, got 0, want 1"},
+		},
+		{
+			name: "wrong metadata type (root bytes)",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				_, err := ts.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
+				require.NoError(t, err)
+			},
+			snapshotBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return allRoles[metadata.ROOT]
+			},
+			errIs: &metadata.ErrValue{Msg: "expected metadata type snapshot, got - root"},
+		},
+		{
+			name: "snapshot length disagrees with timestamp meta",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				b, err := modifyTimestamptMetadata(func(meta *metadata.Metadata[metadata.TimestampType]) {
+					meta.Signed.Meta["snapshot.json"].Length = 1
+				})
+				require.NoError(t, err)
+				_, err = ts.UpdateTimestamp(b)
+				require.NoError(t, err)
+			},
+			snapshotBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return allRoles[metadata.SNAPSHOT]
+			},
+			errIs: &metadata.ErrLengthOrHashMismatch{Msg: "length verification failed - expected 1, got 652"},
+		},
+		{
+			name: "snapshot signed with cleared signatures fails threshold",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				_, err := ts.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
+				require.NoError(t, err)
+			},
+			snapshotBytes: func(t *testing.T) []byte {
+				t.Helper()
+				s, err := metadata.Snapshot().FromBytes(allRoles[metadata.SNAPSHOT])
+				require.NoError(t, err)
+				s.ClearSignatures()
+				b, err := s.ToBytes(true)
+				require.NoError(t, err)
+				return b
+			},
+			errIs: &metadata.ErrUnsignedMetadata{Msg: "Verifying snapshot failed, not enough signatures, got 0, want 1"},
+		},
+		{
+			name: "snapshot version disagrees with timestamp meta blocks targets too",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				b, err := modifyTimestamptMetadata(func(meta *metadata.Metadata[metadata.TimestampType]) {
+					meta.Signed.Meta["snapshot.json"].Version = 2
+				})
+				require.NoError(t, err)
+				_, err = ts.UpdateTimestamp(b)
+				require.NoError(t, err)
+			},
+			snapshotBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return allRoles[metadata.SNAPSHOT]
+			},
+			errIs: &metadata.ErrBadVersionNumber{Msg: "expected 2, got 1"},
+			finalCheck: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				_, err := ts.UpdateTargets(allRoles[metadata.TARGETS])
+				assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected 2, got 1"})
+			},
+		},
+		{
+			name: "new snapshot drops a meta entry present in trusted snapshot",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				err := updateAllBesidesTargets(ts, allRoles[metadata.TIMESTAMP], nil)
+				require.NoError(t, err)
+			},
+			snapshotBytes: func(t *testing.T) []byte {
+				t.Helper()
+				b, err := modifySnapshotMetadata(func(s *metadata.Metadata[metadata.SnapshotType]) {
+					delete(s.Signed.Meta, "targets.json")
+				})
+				require.NoError(t, err)
+				return b
+			},
+			errIs: &metadata.ErrRepository{Msg: "new snapshot is missing info for targets.json"},
+		},
+		{
+			name: "new snapshot's meta version regresses below trusted",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				_, err := ts.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
+				require.NoError(t, err)
+				b, err := modifySnapshotMetadata(func(s *metadata.Metadata[metadata.SnapshotType]) {
+					s.Signed.Meta["targets.json"].Version += 1
+				})
+				require.NoError(t, err)
+				_, err = ts.UpdateSnapshot(b, false)
+				require.NoError(t, err)
+			},
+			snapshotBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return allRoles[metadata.SNAPSHOT]
+			},
+			errIs: &metadata.ErrBadVersionNumber{Msg: "expected targets.json version 1, got 2"},
+		},
+		{
+			name: "expired snapshot is loaded but raises ExpiredMetadata, then blocks targets",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				_, err := ts.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
+				require.NoError(t, err)
+			},
+			snapshotBytes: func(t *testing.T) []byte {
+				t.Helper()
+				b, err := modifySnapshotMetadata(func(s *metadata.Metadata[metadata.SnapshotType]) {
+					s.Signed.Expires = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+				})
+				require.NoError(t, err)
+				return b
+			},
+			errIs: &metadata.ErrExpiredMetadata{Msg: "snapshot.json is expired"},
+			finalCheck: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				_, err := ts.UpdateTargets(allRoles[metadata.TARGETS])
+				assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "snapshot.json is expired"})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := newTrustedSetT(t)
+			if tt.preload != nil {
+				tt.preload(t, ts)
+			}
+			_, err := ts.UpdateSnapshot(tt.snapshotBytes(t), false)
+			expectErr(t, err, tt.errIs, tt.errContains)
+			if tt.finalCheck != nil {
+				tt.finalCheck(t, ts)
+			}
+		})
+	}
+
+	// Rollback flow is a multi-step assertion that doesn't fit the
+	// single-input table cleanly. Keep it as a dedicated subtest in this
+	// file so all snapshot scenarios live together.
+	t.Run("rollback flow: load local snapshot with mismatching version, then update to newer", func(t *testing.T) {
+		ts := newTrustedSetT(t)
+		_, err := ts.UpdateTimestamp(allRoles[metadata.TIMESTAMP])
+		require.NoError(t, err)
+
+		bumpedTimestamp, err := modifyTimestamptMetadata(func(meta *metadata.Metadata[metadata.TimestampType]) {
+			meta.Signed.Meta["snapshot.json"].Version += 1
+			meta.Signed.Version += 1
+		})
+		require.NoError(t, err)
+		_, err = ts.UpdateTimestamp(bumpedTimestamp)
+		require.NoError(t, err)
+
+		// Local snapshot (version 1) is loaded but raises bad-version.
+		_, err = ts.UpdateSnapshot(allRoles[metadata.SNAPSHOT], false)
+		assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected 2, got 1"})
+
+		// New snapshot (version 2) succeeds.
+		newSnapshot, err := modifySnapshotMetadata(func(s *metadata.Metadata[metadata.SnapshotType]) {
+			s.Signed.Version += 1
+		})
+		require.NoError(t, err)
+		_, err = ts.UpdateSnapshot(newSnapshot, false)
+		assert.NoError(t, err)
+
+		// Targets update triggers the final snapshot meta version check.
+		_, err = ts.UpdateTargets(allRoles[metadata.TARGETS])
+		assert.NoError(t, err)
+	})
+}
+
+// TestUpdateTargetsTable covers UpdateTargets scenarios. Each case
+// preloads canonical timestamp + snapshot (customisable via preload).
+func TestUpdateTargetsTable(t *testing.T) {
+	tests := []struct {
+		name          string
+		preload       func(t *testing.T, ts *TrustedMetadata)
+		targetsBytes  func(t *testing.T) []byte
+		errIs         error
+		errContains   string
+	}{
+		{
+			name: "empty input is invalid JSON",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				err := updateAllBesidesTargets(ts, nil, nil)
+				require.NoError(t, err)
+			},
+			targetsBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return []byte("")
+			},
+			errContains: "unexpected end of JSON input",
+		},
+		{
+			name: "version-bumped targets with no matching signature",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				err := updateAllBesidesTargets(ts, nil, nil)
+				require.NoError(t, err)
+			},
+			targetsBytes: func(t *testing.T) []byte {
+				t.Helper()
+				tg, err := metadata.Targets().FromBytes(allRoles[metadata.TARGETS])
+				require.NoError(t, err)
+				tg.Signed.Version += 1
+				b, err := tg.ToBytes(true)
+				require.NoError(t, err)
+				return b
+			},
+			errIs: &metadata.ErrUnsignedMetadata{Msg: "Verifying targets failed, not enough signatures, got 0, want 1"},
+		},
+		{
+			name: "wrong metadata type (root bytes)",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				err := updateAllBesidesTargets(ts, nil, nil)
+				require.NoError(t, err)
+			},
+			targetsBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return allRoles[metadata.ROOT]
+			},
+			errIs: &metadata.ErrValue{Msg: "expected metadata type targets, got - root"},
+		},
+		{
+			name: "snapshot has no meta entry for targets",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				cleared, err := modifySnapshotMetadata(func(s *metadata.Metadata[metadata.SnapshotType]) {
+					for k := range s.Signed.Meta {
+						delete(s.Signed.Meta, k)
+					}
+				})
+				require.NoError(t, err)
+				err = updateAllBesidesTargets(ts, allRoles[metadata.TIMESTAMP], cleared)
+				require.NoError(t, err)
+			},
+			targetsBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return allRoles[metadata.TARGETS]
+			},
+			errIs: &metadata.ErrRepository{Msg: "snapshot does not contain information for targets"},
+		},
+		{
+			name: "targets length disagrees with snapshot meta",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				broken, err := modifySnapshotMetadata(func(s *metadata.Metadata[metadata.SnapshotType]) {
+					for p := range s.Signed.Meta {
+						s.Signed.Meta[p] = &metadata.MetaFiles{Version: 1, Length: 1}
+					}
+				})
+				require.NoError(t, err)
+				err = updateAllBesidesTargets(ts, allRoles[metadata.TIMESTAMP], broken)
+				require.NoError(t, err)
+			},
+			targetsBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return allRoles[metadata.TARGETS]
+			},
+			errIs: &metadata.ErrLengthOrHashMismatch{Msg: "length verification failed - expected 1, got 1266"},
+		},
+		{
+			name: "targets version disagrees with snapshot meta version",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				bumped, err := modifySnapshotMetadata(func(s *metadata.Metadata[metadata.SnapshotType]) {
+					for p := range s.Signed.Meta {
+						s.Signed.Meta[p] = &metadata.MetaFiles{Version: 2}
+					}
+				})
+				require.NoError(t, err)
+				err = updateAllBesidesTargets(ts, allRoles[metadata.TIMESTAMP], bumped)
+				require.NoError(t, err)
+			},
+			targetsBytes: func(t *testing.T) []byte {
+				t.Helper()
+				return allRoles[metadata.TARGETS]
+			},
+			errIs: &metadata.ErrBadVersionNumber{Msg: "expected targets version 2, got 1"},
+		},
+		{
+			name: "new targets is expired",
+			preload: func(t *testing.T, ts *TrustedMetadata) {
+				t.Helper()
+				err := updateAllBesidesTargets(ts, allRoles[metadata.TIMESTAMP], allRoles[metadata.SNAPSHOT])
+				require.NoError(t, err)
+			},
+			targetsBytes: func(t *testing.T) []byte {
+				t.Helper()
+				b, err := modifyTargetsMetadata(func(tg *metadata.Metadata[metadata.TargetsType]) {
+					tg.Signed.Expires = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+				})
+				require.NoError(t, err)
+				return b
+			},
+			errIs: &metadata.ErrExpiredMetadata{Msg: "new targets is expired"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := newTrustedSetT(t)
+			if tt.preload != nil {
+				tt.preload(t, ts)
+			}
+			_, err := ts.UpdateTargets(tt.targetsBytes(t))
+			expectErr(t, err, tt.errIs, tt.errContains)
+		})
+	}
 }
