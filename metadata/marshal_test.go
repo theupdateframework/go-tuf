@@ -36,22 +36,22 @@ func TestMarshalUnmarshalJSON(t *testing.T) {
 	}{
 		{
 			name:    "RootType Marshal/Unmarshal",
-			input:   RootType{Type: "root", SpecVersion: "1.0", ConsistentSnapshot: true, Version: 1, Expires: fixedTime},
+			input:   RootType{Type: "root", SpecVersion: "1.0", ConsistentSnapshot: true, Version: 1, Expires: fixedTime, Keys: map[string]*Key{}, Roles: map[string]*Role{}},
 			wantErr: false,
 		},
 		{
 			name:    "SnapshotType Marshal/Unmarshal",
-			input:   SnapshotType{Type: "snapshot", SpecVersion: "1.0", Version: 1, Expires: fixedTime},
+			input:   SnapshotType{Type: "snapshot", SpecVersion: "1.0", Version: 1, Expires: fixedTime, Meta: map[string]*MetaFiles{}},
 			wantErr: false,
 		},
 		{
 			name:    "TimestampType Marshal/Unmarshal",
-			input:   TimestampType{Type: "timestamp", SpecVersion: "1.0", Version: 1, Expires: fixedTime},
+			input:   TimestampType{Type: "timestamp", SpecVersion: "1.0", Version: 1, Expires: fixedTime, Meta: map[string]*MetaFiles{"snapshot.json": MetaFile(1)}},
 			wantErr: false,
 		},
 		{
 			name:    "TargetsType Marshal/Unmarshal",
-			input:   TargetsType{Type: "targets", SpecVersion: "1.0", Version: 1, Expires: fixedTime},
+			input:   TargetsType{Type: "targets", SpecVersion: "1.0", Version: 1, Expires: fixedTime, Targets: map[string]*TargetFiles{}},
 			wantErr: false,
 		},
 		{
@@ -352,7 +352,7 @@ func TestUnmarshalErrorCases(t *testing.T) {
 			name:       "Missing required fields",
 			targetType: "RootType",
 			jsonData:   "{}",
-			wantErr:    false, // JSON unmarshaling might use zero values
+			wantErr:    true, // Required maps must not be missing or null.
 		},
 		{
 			name:       "Wrong type for numeric field",
