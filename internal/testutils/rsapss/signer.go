@@ -22,7 +22,7 @@ func LoadRSAPSSSignerFromPEMFile(p string) (signature.Signer, error) {
 		return nil, err
 	}
 
-	if block, _ = pem.Decode(b); len(block.Bytes) == 0 {
+	if block, _ = pem.Decode(b); block == nil || len(block.Bytes) == 0 {
 		return nil, errors.New("empty PEM block")
 	}
 
