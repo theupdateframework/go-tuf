@@ -12,6 +12,7 @@ internal/testutils/
 │   ├── helpers.go                   # core test helper functions
 │   ├── fuzz.go                      # fuzz data generation utilities
 │   └── updater.go                   # updater-specific test helpers
+├── fixtures/                        # verified static fixture regeneration
 ├── rsapss/                          # RSA-PSS signing utilities
 ├── signer/                          # generic signing test utilities
 └── simulator/
@@ -150,60 +151,97 @@ repo := simulator.NewTestRepositoryWithBuilder(t, simulator.NewSimulator().
     WithTarget("artifact.txt", []byte("data")))
 ```
 
+Builder options apply to the initial published root. `WithVersion` sets the
+initial version; explicit version bumps and `WithRootRotations` are applied on
+top. For example, root version 7 with two root updates bootstraps at 7 and serves
+8 and 9 to the updater. `WithRootRotations` publishes new versions using the same
+keys; use `RotateKeys` for actual key replacement. Snapshot/timestamp versions
+are not implicitly incremented by `Build`. Dependency references and optional
+hashes/lengths are computed after configuration. An expired or unsigned root
+option intentionally creates an invalid repository for rejection tests.
+
+Assertions read cached metadata without changing the simulated remote state.
+Use `AssertContentEquals` when the exact downloaded bytes must be preserved,
+not just a version number or a file's existence.
+
 ## Static fixtures (`repository_data/`)
 
 `repository_data/` holds a pre-signed TUF repository used by the tests in
 `metadata/` and `metadata/trustedmetadata/`. Other packages (e.g.
 `metadata/updater/`) now build their fixtures in memory via the
-`simulator` package below and do not depend on these files.
+`simulator` package and do not depend on these files.
 
 ```
 repository_data/
-├── keystore/        # PEM key pairs for each top-level role + delegations
+├── keystore/        # top-level PEM keys + encrypted legacy delegation key
 └── repository/
     ├── metadata/    # signed root/targets/snapshot/timestamp/role1/role2 JSON
     └── targets/     # dummy target files (file1.txt, file2.txt, file3.txt)
 ```
 
-### Regenerating signatures
+### Regenerating the static repository
 
-The fixture keys are stored as PEM PKCS1 RSA but their roles use the
-`rsassa-pss-sha256` scheme. Stock signing utilities don't combine those,
-so we ship a small helper at `internal/testutils/signer/signer.go` that
-loads a PKCS1 key, signs a metadata JSON file with the given scheme, and
-writes the result back in place.
-
-If you edit any file under `repository_data/repository/metadata/`, re-sign
-the affected role before running tests:
+From the repository root, after editing a metadata fixture or a target file:
 
 ```bash
-go run internal/testutils/signer/signer.go \
-    -k internal/testutils/repository_data/keystore/timestamp_key \
-    -s rsassa-pss-sha256 \
-    -f internal/testutils/repository_data/repository/metadata/timestamp.json
+make fixtures
+make check-fixtures
+make test
 ```
 
-Substitute the matching key (`root_key`, `snapshot_key`, `targets_key`,
-`delegation_key`, etc.) for the role you changed.
+Only Go and the dependencies in `go.mod` are needed. To work on a copy:
 
-Note: prefer adding new test scenarios via the in-memory
-`simulator.TestRepository` / `simulator.SimulatorBuilder` builders below
-rather than editing the static tree -- they generate fresh signed
-metadata per test and avoid this regeneration step entirely.
+```bash
+make fixtures FIXTURE_DIR=/path/to/copied/repository_data
+```
+
+`make fixtures` recalculates target hashes/lengths, updates snapshot's references
+for every targets role, and updates timestamp's snapshot reference. It recomputes
+optional metadata hashes/lengths when those fields are present, signs the result,
+and verifies the full signature/dependency chain and target contents before
+writing metadata. Invalid inputs fail without writing metadata. Each output
+file is replaced atomically; the directory as a whole is not a transactional
+update. An unchanged valid repository is a no-op, including its signatures.
+
+Versions and expiration dates are intentional fixture inputs: edit them in the
+JSON when your scenario requires different values. The command preserves them
+and updates parent references to match. For example, changing targets to version
+2 also changes snapshot's `targets.json` reference to version 2. It does not
+choose new versions or extend expired fixtures automatically. Add new delegated
+roles to their parent's `delegations` and to snapshot's `meta` before regenerating.
+
+Top-level roles use the existing RSA-PSS test keys in `keystore/`. Delegated roles
+are re-signed with public, deterministic **test-only** Ed25519 keys derived from
+the role name; the generator updates their parents' key declarations as well.
+This avoids the encrypted legacy `delegation_key`. The static generator supports
+explicit delegated roles with threshold 1; use the simulator for threshold/key
+rotation or succinct-role scenarios. This tool and its keys are only for tests.
+
+The historical `1.root.json` is a separate parse-only fixture, with different
+keys from `root.json`. Regeneration leaves it untouched. The single-file tool in
+`signer/` remains available for specialized cases, but signing a file alone does
+not repair its parents' versions, lengths or hashes.
+
+For most new scenarios prefer `simulator.TestRepository` and `SimulatorBuilder`:
+they produce fresh signed metadata in isolated temporary directories and avoid
+editing static fixtures altogether.
 
 ## Running tests
 
 ```bash
-# All tests (RSA-1024 compat needed for test fixtures)
-GODEBUG=rsa1024min=0 go test -race ./...
+# All tests
+make test
+
+# Include the opt-in external fetcher tests on branches that still have them
+GO_TUF_NETWORK_TESTS=1 make test
 
 # Specific packages
 go test ./metadata/...
 go test ./metadata/updater/...
 
 # Fuzz tests (run for a fixed duration)
-go test -fuzz=FuzzRootFromBytes -fuzztime=30s ./metadata/
+make test-fuzz FUZZ=FuzzRootFromBytes FUZZTIME=30s
 
 # Benchmarks
-go test -bench=. ./metadata/
+make test-bench
 ```
