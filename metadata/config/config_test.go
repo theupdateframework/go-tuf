@@ -380,6 +380,9 @@ func TestSetDefaultFetcherHTTPClientTable(t *testing.T) {
 
 // TestSetDefaultFetcherTransportTable covers cfg.SetDefaultFetcherTransport.
 func TestSetDefaultFetcherTransportTable(t *testing.T) {
+	originalTransport := http.DefaultClient.Transport
+	t.Cleanup(func() { http.DefaultClient.Transport = originalTransport })
+
 	tests := []struct {
 		name        string
 		fetcher     fetcher.Fetcher
