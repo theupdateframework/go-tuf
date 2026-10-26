@@ -33,20 +33,20 @@ type DelegationSpec struct {
 
 // SimulatorBuilder creates configured RepositorySimulator instances using a fluent API
 type SimulatorBuilder struct {
-	expiry                         time.Duration
-	consistentSnapshot             bool
-	computeHashesAndLength         bool
-	prefixTargetsWithHash          bool
-	targets                        map[string][]byte
-	delegations                    []DelegationSpec
-	expiredRoles                   map[string]bool
-	roleVersions                   map[string]int64
-	unsignedRoles                  map[string]bool
-	succinctRoles                  map[string]succinctRoleSpec
-	rootRotations                  int
-	timestampVersionBump           int64
-	snapshotVersionBump            int64
-	targetsVersionBump             int64
+	expiry                 time.Duration
+	consistentSnapshot     bool
+	computeHashesAndLength bool
+	prefixTargetsWithHash  bool
+	targets                map[string][]byte
+	delegations            []DelegationSpec
+	expiredRoles           map[string]bool
+	roleVersions           map[string]int64
+	unsignedRoles          map[string]bool
+	succinctRoles          map[string]succinctRoleSpec
+	rootRotations          int
+	timestampVersionBump   int64
+	snapshotVersionBump    int64
+	targetsVersionBump     int64
 }
 
 type succinctRoleSpec struct {
@@ -115,7 +115,8 @@ func (b *SimulatorBuilder) WithExpiredRole(role string) *SimulatorBuilder {
 	return b
 }
 
-// WithVersion sets the version for a specific role
+// WithVersion sets the initial version for a top-level role. Explicit version
+// bumps and root rotations are applied on top of this version.
 func (b *SimulatorBuilder) WithVersion(role string, version int64) *SimulatorBuilder {
 	b.roleVersions[role] = version
 	return b
@@ -245,19 +246,23 @@ func (b *SimulatorBuilder) Build(t *testing.T) *RepositorySimulator {
 		sim.AddSuccinctRoles(delegatorName, spec.bitLength, spec.namePrefix)
 	}
 
-	// Perform root rotations
+	// Apply unsigned-role fixtures before serializing the configured root.
+	for role := range b.unsignedRoles {
+		delete(sim.Signers, role)
+	}
+
+	// NewRepository published its defaults. Replace that bootstrap with the
+	// configured root, then publish any subsequent root versions.
+	sim.SignedRoots = nil
+	sim.initialRootVersion = int(sim.MDRoot.Signed.Version)
+	sim.PublishRoot()
 	for i := 0; i < b.rootRotations; i++ {
 		sim.MDRoot.Signed.Version++
 		sim.PublishRoot()
 	}
 
-	// Remove signers for unsigned roles (do this after other setup)
-	for role := range b.unsignedRoles {
-		delete(sim.Signers, role)
-	}
-
-	// Update snapshot and timestamp to reflect changes
-	sim.UpdateSnapshot()
+	// Wire dependencies without incrementing the requested fixture versions.
+	sim.updateSnapshot()
 
 	return sim
 }

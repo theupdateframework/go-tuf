@@ -364,7 +364,7 @@ func (r *TestRepository) AssertVersionEquals(role string, expectedVersion int64)
 
 	switch role {
 	case metadata.ROOT:
-		md, err := r.Simulator.MDRoot.FromFile(path)
+		md, err := metadata.Root().FromFile(path)
 		if err != nil {
 			r.t.Fatalf("failed to load %s: %v", role, err)
 		}
@@ -372,7 +372,7 @@ func (r *TestRepository) AssertVersionEquals(role string, expectedVersion int64)
 			r.t.Errorf("expected %s version %d, got %d", role, expectedVersion, md.Signed.Version)
 		}
 	case metadata.TARGETS:
-		md, err := r.Simulator.MDTargets.FromFile(path)
+		md, err := metadata.Targets().FromFile(path)
 		if err != nil {
 			r.t.Fatalf("failed to load %s: %v", role, err)
 		}
@@ -380,7 +380,7 @@ func (r *TestRepository) AssertVersionEquals(role string, expectedVersion int64)
 			r.t.Errorf("expected %s version %d, got %d", role, expectedVersion, md.Signed.Version)
 		}
 	case metadata.TIMESTAMP:
-		md, err := r.Simulator.MDTimestamp.FromFile(path)
+		md, err := metadata.Timestamp().FromFile(path)
 		if err != nil {
 			r.t.Fatalf("failed to load %s: %v", role, err)
 		}
@@ -388,7 +388,7 @@ func (r *TestRepository) AssertVersionEquals(role string, expectedVersion int64)
 			r.t.Errorf("expected %s version %d, got %d", role, expectedVersion, md.Signed.Version)
 		}
 	case metadata.SNAPSHOT:
-		md, err := r.Simulator.MDSnapshot.FromFile(path)
+		md, err := metadata.Snapshot().FromFile(path)
 		if err != nil {
 			r.t.Fatalf("failed to load %s: %v", role, err)
 		}
@@ -402,7 +402,7 @@ func (r *TestRepository) AssertVersionEquals(role string, expectedVersion int64)
 func (r *TestRepository) AssertContentEquals(role string, version *int) {
 	r.t.Helper()
 
-	expectedContent, err := r.Simulator.FetchMetadata(role, version)
+	expectedContent, err := r.metadataBytes(role, version)
 	if err != nil {
 		r.t.Fatalf("failed to fetch expected metadata: %v", err)
 	}
@@ -414,6 +414,36 @@ func (r *TestRepository) AssertContentEquals(role string, version *int) {
 
 	if string(expectedContent) != string(actualContent) {
 		r.t.Errorf("content mismatch for %s", role)
+	}
+}
+
+// metadataBytes serializes copies so content assertions neither fetch metadata
+// nor replace signatures on the live repository.
+func (r *TestRepository) metadataBytes(role string, version *int) ([]byte, error) {
+	switch role {
+	case metadata.ROOT:
+		if version != nil {
+			index := *version - r.Simulator.initialRootVersion
+			if index >= 0 && index < len(r.Simulator.SignedRoots) {
+				return r.Simulator.SignedRoots[index], nil
+			}
+		}
+		return nil, fmt.Errorf("invalid root version")
+	case metadata.TARGETS:
+		md := *r.Simulator.MDTargets
+		return signMetadata(role, &md, r.Simulator)
+	case metadata.SNAPSHOT:
+		md := *r.Simulator.MDSnapshot
+		return signMetadata(role, &md, r.Simulator)
+	case metadata.TIMESTAMP:
+		md := *r.Simulator.MDTimestamp
+		return signMetadata(role, &md, r.Simulator)
+	default:
+		md, ok := r.Simulator.MDDelegates[role]
+		if !ok {
+			return nil, fmt.Errorf("unknown role %s", role)
+		}
+		return signMetadata(role, &md, r.Simulator)
 	}
 }
 
@@ -430,9 +460,10 @@ func (r *TestRepository) ReloadRootBytes() error {
 
 // WriteRoot writes root metadata to the metadata directory
 func (r *TestRepository) WriteRoot(version int) error {
-	if version < 1 || version > len(r.Simulator.SignedRoots) {
+	index := version - r.Simulator.initialRootVersion
+	if index < 0 || index >= len(r.Simulator.SignedRoots) {
 		return fmt.Errorf("invalid root version: %d", version)
 	}
 	rootPath := filepath.Join(r.MetadataDir, "root.json")
-	return os.WriteFile(rootPath, r.Simulator.SignedRoots[version-1], 0644)
+	return os.WriteFile(rootPath, r.Simulator.SignedRoots[index], 0644)
 }
