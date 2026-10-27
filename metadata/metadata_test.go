@@ -664,6 +664,34 @@ func TestAddKeyRejectsNilKey(t *testing.T) {
 	assert.EqualError(t, targets.Signed.AddKey(nil, "role"), "value error: key must not be nil")
 }
 
+func TestTargetsAddKeyWithoutDelegatedRole(t *testing.T) {
+	publicKey, _, err := ed25519.GenerateKey(nil)
+	assert.NoError(t, err)
+	key, err := KeyFromPublicKey(publicKey)
+	assert.NoError(t, err)
+
+	for _, tc := range []struct {
+		name  string
+		keys  map[string]*Key
+		roles []DelegatedRole
+	}{
+		{"zero value delegations", nil, nil},
+		{"initialized keys", map[string]*Key{}, nil},
+		{"empty roles", map[string]*Key{}, []DelegatedRole{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			targets := Targets(fixedExpire)
+			targets.Signed.Delegations = &Delegations{Keys: tc.keys, Roles: tc.roles}
+			assert.EqualError(t, targets.Signed.AddKey(key, "missing"), "value error: delegated role missing doesn't exist")
+			if tc.keys == nil {
+				assert.Nil(t, targets.Signed.Delegations.Keys)
+			} else {
+				assert.Empty(t, targets.Signed.Delegations.Keys)
+			}
+		})
+	}
+}
+
 func TestVerifyDelegateThreshold(t *testing.T) {
 	root := Root(fixedExpire)
 	err := root.VerifyDelegate("test", root)
