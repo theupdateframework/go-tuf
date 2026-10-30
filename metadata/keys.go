@@ -18,6 +18,7 @@
 package metadata
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
@@ -26,6 +27,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"encoding/pem"
 	"fmt"
 	"strconv"
 	"strings"
@@ -96,7 +98,11 @@ func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 		}
 		return ed25519Key, nil
 	case KeyTypeMLDSA:
-		publicKey, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(k.Value.PublicKey))
+		block, rest := pem.Decode([]byte(k.Value.PublicKey))
+		if block == nil || block.Type != "PUBLIC KEY" || len(block.Headers) != 0 || len(bytes.TrimSpace(rest)) != 0 {
+			return nil, fmt.Errorf("invalid ML-DSA SubjectPublicKeyInfo")
+		}
+		publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
 		if err != nil {
 			return nil, err
 		}
