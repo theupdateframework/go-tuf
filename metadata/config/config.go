@@ -28,7 +28,19 @@ import (
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
 
+// MetadataStore optionally replaces the default filesystem metadata cache.
+// Implementations must preserve accepted metadata across restarts, atomically
+// persist each document before returning, and return an error for missing roles.
+// They must not treat corruption or I/O failure as an empty trusted repository.
+type MetadataStore interface {
+	Load(role string) ([]byte, error)
+	Persist(role string, data []byte) error
+}
+
 type UpdaterConfig struct {
+	// MetadataStore takes precedence over the filesystem cache. The caller owns
+	// synchronization and store lifetime. It is independent of target storage.
+	MetadataStore MetadataStore
 	// TUF configuration
 	MaxRootRotations   int64
 	MaxDelegations     int
@@ -83,7 +95,14 @@ func (cfg *UpdaterConfig) EnsurePathsExist() error {
 		return nil
 	}
 
-	for _, path := range []string{cfg.LocalMetadataDir, cfg.LocalTargetsDir} {
+	paths := []string{cfg.LocalMetadataDir, cfg.LocalTargetsDir}
+	if cfg.MetadataStore != nil {
+		paths = nil
+		if cfg.LocalTargetsDir != "" {
+			paths = append(paths, cfg.LocalTargetsDir)
+		}
+	}
+	for _, path := range paths {
 		// Use 0700 for cache directories: only the owner can read, write, and
 		// access the directory. This prevents other users on shared systems from
 		// reading or writing to the TUF cache, which could be a security risk.
