@@ -51,15 +51,12 @@ package simulator
 
 import (
 	"bytes"
-	"crypto"
-	"crypto/ed25519"
 	"crypto/sha256"
 	"fmt"
 	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -100,6 +97,7 @@ type RepositorySimulator struct {
 	fetcher.Fetcher
 	MDDelegates                    map[string]metadata.Metadata[metadata.TargetsType]
 	SignedRoots                    [][]byte
+	initialRootVersion             int
 	Signers                        map[string]map[string]*signature.Signer
 	TargetFiles                    map[string]RepositoryTarget
 	ComputeMetafileHashesAndLength bool
@@ -124,7 +122,8 @@ func NewRepository() *RepositorySimulator {
 
 		// Other metadata is signed on-demand (when fetched) but roots must be
 		// explicitly published with PublishRoot() which maintains this list
-		SignedRoots: [][]byte{},
+		SignedRoots:        [][]byte{},
+		initialRootVersion: 1,
 
 		// Signers are used on-demand at fetch time to sign metadata
 		// keys are roles, values are map of {keyid: signer}
@@ -161,7 +160,7 @@ func (rs *RepositorySimulator) setupMinimalValidRepository() {
 	rs.MDRoot = metadata.Root(rs.SafeExpiry)
 
 	for _, role := range metadata.TOP_LEVEL_ROLE_NAMES {
-		publicKey, _, signer := CreateKey()
+		publicKey, _, signer := createKey()
 
 		mtdkey, err := metadata.KeyFromPublicKey(*publicKey)
 		if err != nil {
@@ -217,20 +216,6 @@ func (rs *RepositorySimulator) AllTargets() <-chan metadata.TargetsType {
 	return ch
 }
 
-func CreateKey() (*ed25519.PublicKey, *ed25519.PrivateKey, *signature.Signer) {
-	public, private, err := ed25519.GenerateKey(nil)
-	if err != nil {
-		slog.Error("Failed to generate key", "err", err)
-	}
-
-	signer, err := signature.LoadSigner(private, crypto.Hash(0))
-	if err != nil {
-		slog.Error("failed to load signer", "err", err)
-	}
-
-	return &public, &private, &signer
-}
-
 func (rs *RepositorySimulator) AddSigner(role string, keyID string, signer signature.Signer) {
 	if _, ok := rs.Signers[role]; !ok {
 		rs.Signers[role] = make(map[string]*signature.Signer)
@@ -246,7 +231,7 @@ func (rs *RepositorySimulator) RotateKeys(role string) {
 	}
 
 	for i := 0; i < rs.MDRoot.Signed.Roles[role].Threshold; i++ {
-		publicKey, _, signer := CreateKey()
+		publicKey, _, signer := createKey()
 		mtdkey, err := metadata.KeyFromPublicKey(*publicKey)
 		if err != nil {
 			slog.Error("Repository simulator: key conversion failed while rotating keys", "err", err)
@@ -326,34 +311,6 @@ func (rs *RepositorySimulator) DownloadFile(urlPath string, maxLength int64, _ t
 	return data, err
 }
 
-func IsWindowsPath(path string) bool {
-	match, _ := regexp.MatchString(`^[a-zA-Z]:\\`, path)
-	return match
-}
-
-func trimPrefix(path string, prefix string) (string, error) {
-	var toTrim string
-	if IsWindowsPath(path) {
-		toTrim = path
-	} else {
-		parsedURL, e := url.Parse(path)
-		if e != nil {
-			return "", e
-		}
-		toTrim = parsedURL.Path
-	}
-
-	return strings.TrimPrefix(toTrim, prefix), nil
-}
-
-func hasPrefix(path, prefix string) bool {
-	return strings.HasPrefix(filepath.ToSlash(path), prefix)
-}
-
-func hasSuffix(path, prefix string) bool {
-	return strings.HasSuffix(filepath.ToSlash(path), prefix)
-}
-
 func (rs *RepositorySimulator) fetch(urlPath string) ([]byte, error) {
 	path, err := trimPrefix(urlPath, rs.LocalDir)
 	if err != nil {
@@ -423,17 +380,20 @@ func contains(hashes map[string]metadata.HexBytes, targetHash []byte) bool {
 // FetchMetadata returns signed metadata for 'role', using 'version' if it is given.
 // If version is None, non-versioned metadata is being requested
 func (rs *RepositorySimulator) FetchMetadata(role string, version *int) ([]byte, error) {
-	rs.FetchTracker.Metadata = append(rs.FetchTracker.Metadata, FTMetadata{Name: role, Value: *version})
+	requestedVersion := -1
+	if version != nil {
+		requestedVersion = *version
+	}
+	rs.FetchTracker.Metadata = append(rs.FetchTracker.Metadata, FTMetadata{Name: role, Value: requestedVersion})
 	// Decode role for the metadata
 	// role, _ = strconv.Unquote(role)
 	if role == metadata.ROOT {
 		// Return a version previously serialized in PublishRoot()
-		if version == nil || *version > len(rs.SignedRoots) && *version > 0 {
-			slog.Error("Unknown root version", "version", *version)
-			return []byte{}, &metadata.ErrDownloadHTTP{StatusCode: 404}
+		index := requestedVersion - rs.initialRootVersion
+		if index < 0 || index >= len(rs.SignedRoots) {
+			return nil, &metadata.ErrDownloadHTTP{StatusCode: 404}
 		}
-		slog.Info("Fetched root", "version", version)
-		return rs.SignedRoots[*version-1], nil
+		return rs.SignedRoots[index], nil
 	}
 
 	// Sign and serialize the requested metadata
@@ -486,6 +446,11 @@ func (rs *RepositorySimulator) computeHashesAndLength(role string) (map[string]m
 // UpdateTimestamp updates timestamp and assign snapshot version
 // to snapshot meta version
 func (rs *RepositorySimulator) UpdateTimestamp() {
+	rs.MDTimestamp.Signed.Version++
+	rs.updateTimestamp()
+}
+
+func (rs *RepositorySimulator) updateTimestamp() {
 	hashes := make(map[string]metadata.HexBytes)
 	length := 0
 	if rs.ComputeMetafileHashesAndLength {
@@ -496,13 +461,17 @@ func (rs *RepositorySimulator) UpdateTimestamp() {
 		Hashes:  hashes,
 		Version: rs.MDSnapshot.Signed.Version,
 	}
-
-	rs.MDTimestamp.Signed.Version += 1
 }
 
 // UpdateSnapshot updates snapshot, assigns targets versions
 // and updates timestamp
 func (rs *RepositorySimulator) UpdateSnapshot() {
+	rs.MDSnapshot.Signed.Version++
+	rs.MDTimestamp.Signed.Version++
+	rs.updateSnapshot()
+}
+
+func (rs *RepositorySimulator) updateSnapshot() {
 	for target := range rs.AllTargets() {
 		hashes := make(map[string]metadata.HexBytes)
 		length := 0
@@ -516,8 +485,7 @@ func (rs *RepositorySimulator) UpdateSnapshot() {
 			Version: target.Version,
 		}
 	}
-	rs.MDSnapshot.Signed.Version += 1
-	rs.UpdateTimestamp()
+	rs.updateTimestamp()
 }
 
 // Given a delegator name return, its corresponding TargetsType object
@@ -562,7 +530,7 @@ func (rs *RepositorySimulator) AddDelegation(delegatorName string, role metadata
 	delegator.Delegations.Roles = append(delegator.Delegations.Roles, role)
 
 	// By default add one new key for the role
-	publicKey, _, signer := CreateKey()
+	publicKey, _, signer := createKey()
 	mdkey, err := metadata.KeyFromPublicKey(*publicKey)
 	if err != nil {
 		slog.Error("Repository simulator: key conversion failed while adding delegation", "err", err)
@@ -595,7 +563,7 @@ func (rs *RepositorySimulator) AddSuccinctRoles(delegatorName string, bitLength 
 		slog.Error("Can't add a SuccinctRoles when delegated roles are used")
 		os.Exit(1)
 	}
-	publicKey, _, signer := CreateKey()
+	publicKey, _, signer := createKey()
 	mdkey, err := metadata.KeyFromPublicKey(*publicKey)
 	if err != nil {
 		slog.Error("Repository simulator: key conversion failed while adding succinct roles", "err", err)
@@ -641,7 +609,7 @@ func (rs *RepositorySimulator) Write() {
 	if err := os.MkdirAll(destDir, os.ModePerm); err != nil {
 		slog.Error("Repository simulator: failed to create dir", "err", err)
 	}
-	for ver := 1; ver < len(rs.SignedRoots)+1; ver++ {
+	for ver := rs.initialRootVersion; ver < rs.initialRootVersion+len(rs.SignedRoots); ver++ {
 		f, _ := os.Create(filepath.Join(destDir, fmt.Sprintf("%d.root.json", ver)))
 		defer f.Close()
 		meta, err := rs.FetchMetadata(metadata.ROOT, &ver)

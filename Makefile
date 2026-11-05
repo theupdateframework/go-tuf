@@ -48,6 +48,45 @@ build-%:
 test:
 	go test -race -covermode atomic ./...
 
+# Regenerate or verify the checked-in static test repository. Override
+# FIXTURE_DIR to work on a copy without touching the checked-in files.
+FIXTURE_DIR ?= internal/testutils/repository_data
+.PHONY: fixtures check-fixtures
+fixtures:
+	go run ./internal/testutils/fixtures/cmd -dir "$(FIXTURE_DIR)"
+
+check-fixtures:
+	go run ./internal/testutils/fixtures/cmd -dir "$(FIXTURE_DIR)" -check
+
+# Focused fuzzing and benchmark entry points.
+FUZZ ?= FuzzRootFromBytes
+FUZZTIME ?= 30s
+.PHONY: test-fuzz test-bench
+test-fuzz:
+	go test -run '^$$' -fuzz '^$(FUZZ)$$' -fuzztime=$(FUZZTIME) ./metadata
+
+test-bench:
+	go test -run '^$$' -bench . ./metadata
+
+#####################
+# conformance section
+#####################
+
+# Build the tuf-conformance client-under-test binary.
+.PHONY: build-conformance-client
+build-conformance-client:
+	@echo "Building tuf-conformance-client"
+	@go build -o tuf-conformance-client ./cmd/tuf-conformance-client
+
+# Run the tuf-conformance test suite against this implementation.
+# Requires tuf-conformance to be installed:
+#   pip install tuf-conformance
+# or clone https://github.com/theupdateframework/tuf-conformance and run:
+#   make dev
+.PHONY: conformance
+conformance: build-conformance-client
+	pytest tuf_conformance --entrypoint ./tuf-conformance-client
+
 #####################
 # lint section
 #####################
