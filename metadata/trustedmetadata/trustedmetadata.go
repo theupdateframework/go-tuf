@@ -30,11 +30,12 @@ import (
 // goroutines need to access a TrustedMetadata instance concurrently, external
 // synchronization is required (e.g., a sync.Mutex).
 type TrustedMetadata struct {
-	Root      *metadata.Metadata[metadata.RootType]
-	Snapshot  *metadata.Metadata[metadata.SnapshotType]
-	Timestamp *metadata.Metadata[metadata.TimestampType]
-	Targets   map[string]*metadata.Metadata[metadata.TargetsType]
-	RefTime   time.Time
+	newVerifier func(*metadata.Key) (metadata.Verifier, error)
+	Root        *metadata.Metadata[metadata.RootType]
+	Snapshot    *metadata.Metadata[metadata.SnapshotType]
+	Timestamp   *metadata.Metadata[metadata.TimestampType]
+	Targets     map[string]*metadata.Metadata[metadata.TargetsType]
+	RefTime     time.Time
 }
 
 // New creates a new TrustedMetadata instance which ensures that the
@@ -42,9 +43,16 @@ type TrustedMetadata struct {
 // client update workflow. It provides easy ways to update the metadata
 // with the caller making decisions on what is updated
 func New(rootData []byte) (*TrustedMetadata, error) {
+	return NewWithVerifier(rootData, nil)
+}
+
+// NewWithVerifier applies the same verifier constructor to the initial root,
+// both sides of every root rotation, and all top-level and delegated metadata.
+func NewWithVerifier(rootData []byte, newVerifier func(*metadata.Key) (metadata.Verifier, error)) (*TrustedMetadata, error) {
 	res := &TrustedMetadata{
-		Targets: map[string]*metadata.Metadata[metadata.TargetsType]{},
-		RefTime: time.Now().UTC(),
+		newVerifier: newVerifier,
+		Targets:     map[string]*metadata.Metadata[metadata.TargetsType]{},
+		RefTime:     time.Now().UTC(),
 	}
 	// load and validate the local root metadata
 	// valid initial trusted root metadata is required
@@ -75,7 +83,7 @@ func (trusted *TrustedMetadata) UpdateRoot(rootData []byte) (*metadata.Metadata[
 		return nil, &metadata.ErrRepository{Msg: fmt.Sprintf("expected %s, got %s", metadata.ROOT, newRoot.Signed.Type)}
 	}
 	// verify that new root is signed by trusted root
-	err = trusted.Root.VerifyDelegate(metadata.ROOT, newRoot)
+	err = trusted.Root.VerifyDelegateWithVerifier(metadata.ROOT, newRoot, trusted.newVerifier)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +92,7 @@ func (trusted *TrustedMetadata) UpdateRoot(rootData []byte) (*metadata.Metadata[
 		return nil, &metadata.ErrBadVersionNumber{Msg: fmt.Sprintf("bad version number, expected %d, got %d", trusted.Root.Signed.Version+1, newRoot.Signed.Version)}
 	}
 	// verify that new root is signed by itself
-	err = newRoot.VerifyDelegate(metadata.ROOT, newRoot)
+	err = newRoot.VerifyDelegateWithVerifier(metadata.ROOT, newRoot, trusted.newVerifier)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +130,7 @@ func (trusted *TrustedMetadata) UpdateTimestamp(timestampData []byte) (*metadata
 		return nil, &metadata.ErrRepository{Msg: fmt.Sprintf("expected %s, got %s", metadata.TIMESTAMP, newTimestamp.Signed.Type)}
 	}
 	// verify that new timestamp is signed by trusted root
-	err = trusted.Root.VerifyDelegate(metadata.TIMESTAMP, newTimestamp)
+	err = trusted.Root.VerifyDelegateWithVerifier(metadata.TIMESTAMP, newTimestamp, trusted.newVerifier)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +224,7 @@ func (trusted *TrustedMetadata) UpdateSnapshot(snapshotData []byte, isTrusted bo
 		return nil, &metadata.ErrRepository{Msg: fmt.Sprintf("expected %s, got %s", metadata.SNAPSHOT, newSnapshot.Signed.Type)}
 	}
 	// verify that new snapshot is signed by trusted root
-	err = trusted.Root.VerifyDelegate(metadata.SNAPSHOT, newSnapshot)
+	err = trusted.Root.VerifyDelegateWithVerifier(metadata.SNAPSHOT, newSnapshot, trusted.newVerifier)
 	if err != nil {
 		return nil, err
 	}
@@ -320,12 +328,12 @@ func (trusted *TrustedMetadata) UpdateDelegatedTargets(targetsData []byte, roleN
 	}
 	// get delegator metadata and verify the new delegatee
 	if delegatorName == metadata.ROOT {
-		err = trusted.Root.VerifyDelegate(roleName, newDelegate)
+		err = trusted.Root.VerifyDelegateWithVerifier(roleName, newDelegate, trusted.newVerifier)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		err = trusted.Targets[delegatorName].VerifyDelegate(roleName, newDelegate)
+		err = trusted.Targets[delegatorName].VerifyDelegateWithVerifier(roleName, newDelegate, trusted.newVerifier)
 		if err != nil {
 			return nil, err
 		}
@@ -359,7 +367,7 @@ func (trusted *TrustedMetadata) loadTrustedRoot(rootData []byte) error {
 		return &metadata.ErrRepository{Msg: fmt.Sprintf("expected %s, got %s", metadata.ROOT, newRoot.Signed.Type)}
 	}
 	// verify root by itself
-	err = newRoot.VerifyDelegate(metadata.ROOT, newRoot)
+	err = newRoot.VerifyDelegateWithVerifier(metadata.ROOT, newRoot, trusted.newVerifier)
 	if err != nil {
 		return err
 	}

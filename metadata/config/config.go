@@ -25,10 +25,15 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v5"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
 
 type UpdaterConfig struct {
+	// NewVerifier optionally supplies a verifier for each key. Nil uses
+	// metadata.NewVerifier; callers can wrap it to restrict algorithms or
+	// supply another implementation. TUF thresholds remain enforced.
+	NewVerifier func(*metadata.Key) (metadata.Verifier, error)
 	// TUF configuration
 	MaxRootRotations   int64
 	MaxDelegations     int
