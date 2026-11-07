@@ -1,3 +1,8 @@
+// Package util provides helpers shared by the go-tuf packages, such as
+// hashing, length and version checks for metadata and target files.
+//
+// Deprecated: The legacy go-tuf module is deprecated in favour of
+// github.com/theupdateframework/go-tuf/v2.
 package util
 
 import (

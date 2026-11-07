@@ -8,3 +8,10 @@ linters:
     - unused
     - typecheck
     - forbidigo
+issues:
+  exclude-rules:
+    # Every package in this legacy module is deprecated in favour of
+    # go-tuf/v2, so don't report the module's packages importing each other.
+    - linters:
+        - staticcheck
+      text: '^SA1019: "github\.com/theupdateframework/go-tuf[/"]'

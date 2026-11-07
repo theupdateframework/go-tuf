@@ -1,3 +1,8 @@
+// Package client provides a client.LocalStore that stores TUF metadata
+// as JSON files in a directory.
+//
+// Deprecated: The legacy go-tuf module is deprecated in favour of
+// github.com/theupdateframework/go-tuf/v2.
 package client
 
 import (

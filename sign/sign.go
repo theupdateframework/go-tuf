@@ -1,3 +1,7 @@
+// Package sign provides functions to sign TUF metadata.
+//
+// Deprecated: The legacy go-tuf module is deprecated in favour of
+// github.com/theupdateframework/go-tuf/v2.
 package sign
 
 import (

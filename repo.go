@@ -1,3 +1,9 @@
+// Package tuf implements the management of a TUF repository: generating
+// and revoking keys, adding targets and delegations, and signing and
+// committing metadata.
+//
+// Deprecated: The legacy go-tuf module is deprecated in favour of
+// github.com/theupdateframework/go-tuf/v2.
 package tuf
 
 import (
