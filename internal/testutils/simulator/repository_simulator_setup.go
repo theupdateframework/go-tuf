@@ -21,6 +21,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"testing"
 	"time"
 )
 
@@ -95,3 +96,50 @@ func RepositoryCleanup(tmpDir string) {
 	slog.Info("Cleaning temporary directory", "dir", tmpDir)
 	os.RemoveAll(tmpDir)
 }
+
+// TestEnv encapsulates an isolated, hermetic simulator test environment
+// that does not rely on shared package-level globals.
+type TestEnv struct {
+	Sim         *RepositorySimulator
+	MetadataDir string
+	TargetsDir  string
+	RootBytes   []byte
+}
+
+// NewTestEnv returns an isolated test environment with fresh metadata and targets
+// directories, cleaned up automatically when the test finishes.
+func NewTestEnv(tb testing.TB) (*TestEnv, error) {
+	tb.Helper()
+	tmpDir := tb.TempDir()
+
+	metadataDir := filepath.Join(tmpDir, metadataPath)
+	targetsDir := filepath.Join(tmpDir, targetsPath)
+
+	if err := os.MkdirAll(metadataDir, 0750); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(targetsDir, 0750); err != nil {
+		return nil, err
+	}
+
+	sim := NewRepository()
+	sim.LocalDir = tmpDir
+
+	rootPath := filepath.Join(metadataDir, "root.json")
+	if err := os.WriteFile(rootPath, sim.SignedRoots[0], 0600); err != nil {
+		return nil, err
+	}
+
+	rootBytes, err := os.ReadFile(rootPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TestEnv{
+		Sim:         sim,
+		MetadataDir: metadataDir,
+		TargetsDir:  targetsDir,
+		RootBytes:   rootBytes,
+	}, nil
+}
+

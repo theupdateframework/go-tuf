@@ -350,8 +350,8 @@ func hasPrefix(path, prefix string) bool {
 	return strings.HasPrefix(filepath.ToSlash(path), prefix)
 }
 
-func hasSuffix(path, prefix string) bool {
-	return strings.HasSuffix(filepath.ToSlash(path), prefix)
+func hasSuffix(path, suffix string) bool {
+	return strings.HasSuffix(filepath.ToSlash(path), suffix)
 }
 
 func (rs *RepositorySimulator) fetch(urlPath string) ([]byte, error) {
@@ -377,14 +377,25 @@ func (rs *RepositorySimulator) fetch(urlPath string) ([]byte, error) {
 		return rs.FetchMetadata(role, &version)
 	} else if hasPrefix(path, "/targets/") {
 		targetPath := path[len("/targets/"):]
-		dirParts, sep, prefixedFilename := lastIndex(targetPath, string(filepath.Separator))
+		var dirParts, prefixedFilename string
+		if idx := strings.LastIndex(targetPath, "/"); idx != -1 {
+			dirParts = targetPath[:idx]
+			prefixedFilename = targetPath[idx+1:]
+		} else {
+			dirParts = ""
+			prefixedFilename = targetPath
+		}
 		var filename string
 		prefix := ""
 		filename = prefixedFilename
 		if rs.MDRoot.Signed.ConsistentSnapshot && rs.PrefixTargetsWithHash {
 			prefix, filename = partition(prefixedFilename, ".")
 		}
-		targetPath = filepath.Join(dirParts, sep, filename)
+		if dirParts != "" {
+			targetPath = dirParts + "/" + filename
+		} else {
+			targetPath = filename
+		}
 		target, err := rs.FetchTarget(targetPath, prefix)
 		if err != nil {
 			slog.Error("Failed to fetch target", "err", err)
