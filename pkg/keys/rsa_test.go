@@ -73,7 +73,13 @@ func (RsaSuite) TestMarshalUnmarshalPrivateKey(c *C) {
 	c.Assert(privateData.Algorithms, DeepEquals, data.HashAlgorithms)
 	s, err := GetSigner(privateData)
 	c.Assert(err, IsNil)
-	c.Assert(s, DeepEquals, signer)
+	// Compare the keys with rsa.PrivateKey.Equal rather than DeepEquals: the
+	// precomputed CRT values that the crypto/rsa package keeps alongside a key
+	// may be stored differently for a freshly generated key than for the same
+	// key parsed back from PKCS #1, which makes DeepEquals fail at random.
+	parsed, ok := s.(*rsaSigner)
+	c.Assert(ok, Equals, true)
+	c.Assert(parsed.PrivateKey.Equal(signer.PrivateKey), Equals, true)
 }
 
 func (ECDSASuite) TestUnmarshalRSA_Invalid(c *C) {
