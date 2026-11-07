@@ -1,3 +1,8 @@
+// Package set_ecdsa, when imported, makes the keys package accept ECDSA
+// public keys in both the hex-encoded and the PEM-encoded format.
+//
+// Deprecated: The legacy go-tuf module is deprecated in favour of
+// github.com/theupdateframework/go-tuf/v2.
 package set_ecdsa
 
 import (

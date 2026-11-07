@@ -1,3 +1,8 @@
+// Package keys implements signers and verifiers for the key types
+// supported by go-tuf.
+//
+// Deprecated: The legacy go-tuf module is deprecated in favour of
+// github.com/theupdateframework/go-tuf/v2.
 package keys
 
 import (

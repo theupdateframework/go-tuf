@@ -1,3 +1,9 @@
+// Package client implements a TUF client that updates trusted metadata
+// from a remote repository and downloads verified target files.
+//
+// Deprecated: The legacy go-tuf module is deprecated in favour of
+// github.com/theupdateframework/go-tuf/v2. Use
+// github.com/theupdateframework/go-tuf/v2/metadata/updater instead.
 package client
 
 import (

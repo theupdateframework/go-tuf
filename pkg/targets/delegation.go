@@ -1,3 +1,8 @@
+// Package targets implements the traversal of targets delegations and
+// the generation of hashed bin delegations.
+//
+// Deprecated: The legacy go-tuf module is deprecated in favour of
+// github.com/theupdateframework/go-tuf/v2.
 package targets
 
 import (
