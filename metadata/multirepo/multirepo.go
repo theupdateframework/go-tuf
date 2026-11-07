@@ -213,19 +213,24 @@ func (client *MultiRepoClient) initTUFClients() error {
 	return nil
 }
 
-// Refresh refreshes all repository clients
+// Refresh refreshes all repository clients.
+//
+// A repository that fails to refresh does not stop the remaining repositories
+// from being refreshed: TAP 4 trusts a target once a threshold of repositories
+// agree on it, so one unavailable repository should not take the others down
+// with it. Repositories are refreshed in name order and the error returned
+// joins the error of every repository that failed, each naming its repository.
 func (client *MultiRepoClient) Refresh() error {
 	log := metadata.GetLogger()
 
-	// loop through each initialized TUF client and refresh it
-	for name, repoTUFClient := range client.TUFClients {
+	var errs []error
+	for _, name := range slices.Sorted(maps.Keys(client.TUFClients)) {
 		log.Info("Refreshing", "name", name)
-		err := repoTUFClient.Refresh()
-		if err != nil {
-			return err
+		if err := client.TUFClients[name].Refresh(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to refresh repository %q: %w", name, err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // GetTopLevelTargets returns the top-level target files for all repositories
