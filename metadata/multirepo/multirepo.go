@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -273,7 +274,10 @@ func (client *MultiRepoClient) GetTargetInfo(targetPath string) (*metadata.Targe
 		// loop through each path for this mapping
 		for _, pathPattern := range eachMap.Paths {
 			// check if the targetPath matches each path mapping
-			patternMatched, err := filepath.Match(pathPattern, targetPath)
+			// We use path.Match (not filepath.Match) so matching is
+			// independent of the host OS: TAP 4 map.json paths are always
+			// "/"-separated and "\" is a glob escape, not a separator.
+			patternMatched, err := path.Match(pathPattern, targetPath)
 			if err != nil {
 				// error looking for a match
 				return nil, nil, err

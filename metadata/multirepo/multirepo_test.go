@@ -19,8 +19,13 @@ package multirepo
 
 import (
 	"errors"
+	"path"
 	"strings"
 	"testing"
+
+	"github.com/theupdateframework/go-tuf/v2/internal/testutils/simulator"
+	"github.com/theupdateframework/go-tuf/v2/metadata/config"
+	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
 
 func TestValidateRepoName(t *testing.T) {
@@ -249,5 +254,142 @@ func TestNewRejectsNilConfig(t *testing.T) {
 	_, err := New(nil)
 	if err == nil {
 		t.Fatal("New() should reject a nil config")
+	}
+}
+
+// newBareMultiRepoClient constructs a MultiRepoClient with the given repo map
+// mapping and no initialized repository clients. GetTargetInfo walks the
+// mappings before it consults TUFClients, so a terminating mapping lets us
+// exercise the path-pattern matching behavior without any TUF repository.
+func newBareMultiRepoClient(mapping []*Mapping) *MultiRepoClient {
+	return &MultiRepoClient{
+		TUFClients: map[string]*updater.Updater{},
+		Config: &MultiRepoConfig{
+			RepoMap: &MultiRepoMapType{
+				Repositories: map[string][]string{"repo": {"https://example.com"}},
+				Mapping:      mapping,
+			},
+		},
+	}
+}
+
+func TestGetTargetInfoInvalidPattern(t *testing.T) {
+	// A malformed glob in a map.json mapping (an unterminated character
+	// class) must surface an error to the caller instead of being silently
+	// treated as a non-match. GetTargetInfo must never claim "target info
+	// not found" for a reason it never checked.
+	client := newBareMultiRepoClient([]*Mapping{
+		{
+			Paths:        []string{"targets/["},
+			Repositories: []string{"repo"},
+			Threshold:    1,
+			Terminating:  true,
+		},
+	})
+	_, _, err := client.GetTargetInfo("targets/foo")
+	if err == nil {
+		t.Fatal("GetTargetInfo() succeeded for a mapping whose path pattern is malformed, want path.ErrBadPattern")
+	}
+	if !errors.Is(err, path.ErrBadPattern) {
+		t.Errorf("GetTargetInfo() error = %v, want it to wrap path.ErrBadPattern", err)
+	}
+}
+
+// TestGetTargetInfoMatchIsOSIndependent verifies that map.json path patterns
+// match "/"-separated target paths the same way on every OS, and that "\" in
+// a pattern is a glob escape rather than a host path separator. Before this
+// fix the multirepo client used filepath.Match, whose separator handling
+// depends on the host OS, so a pattern like "a\/c" or a target name that
+// contains a literal backslash resolved differently on Windows than on
+// POSIX systems, breaking the TAP 4 mapping consensus (see #747).
+func TestGetTargetInfoMatchIsOSIndependent(t *testing.T) {
+	// Set up one fully offline simulated repository serving a single target.
+	sim, metadataDir, targetsDir, err := simulator.InitMetadataDir()
+	if err != nil {
+		t.Fatalf("InitMetadataDir() failed: %v", err)
+	}
+	defer simulator.RepositoryCleanup(simulator.LocalDir)
+	content := []byte("target content")
+	sim.AddTarget("targets", content, "sigstore-tuf-root/root.json")
+	sim.AddTarget("targets", content, `a/\`)
+
+	rootBytes, err := simulator.GetRootBytes(metadataDir)
+	if err != nil {
+		t.Fatalf("GetRootBytes() failed: %v", err)
+	}
+	cfg, err := config.New(metadataDir, rootBytes)
+	if err != nil {
+		t.Fatalf("config.New() failed: %v", err)
+	}
+	cfg.Fetcher = sim
+	cfg.LocalMetadataDir = metadataDir
+	cfg.LocalTargetsDir = targetsDir
+	repoUpdater, err := updater.New(cfg)
+	if err != nil {
+		t.Fatalf("updater.New() failed: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		pattern string
+		target  string
+		want    bool // whether the TAP 4 search should reach the target
+	}{
+		{
+			name:    "escaped separator in pattern matches a plain target",
+			pattern: `sigstore-tuf-root\/root.json`,
+			target:  "sigstore-tuf-root/root.json",
+			want:    true,
+		},
+		{
+			name:    "wildcard with escaped separator matches",
+			pattern: `*\/*`,
+			target:  "sigstore-tuf-root/root.json",
+			want:    true,
+		},
+		{
+			name:    "literal backslash in target matched by a wildcard",
+			pattern: "a/?",
+			target:  `a/\`,
+			want:    true,
+		},
+		{
+			name:    "control single-segment glob matches same-segment target",
+			pattern: "sigstore-tuf-root/*",
+			target:  "sigstore-tuf-root/root.json",
+			want:    true,
+		},
+		{
+			name:    "control unrelated pattern does not match",
+			pattern: "x/*",
+			target:  "sigstore-tuf-root/root.json",
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &MultiRepoClient{
+				TUFClients: map[string]*updater.Updater{"repo": repoUpdater},
+				Config: &MultiRepoConfig{
+					RepoMap: &MultiRepoMapType{
+						Repositories: map[string][]string{"repo": {"https://example.com"}},
+						Mapping: []*Mapping{
+							{
+								Paths:        []string{tt.pattern},
+								Repositories: []string{"repo"},
+								Threshold:    1,
+								Terminating:  true,
+							},
+						},
+					},
+				},
+			}
+			_, _, err := client.GetTargetInfo(tt.target)
+			gotMatch := err == nil
+			if gotMatch != tt.want {
+				t.Errorf("GetTargetInfo(%q) with pattern %q: err = %v, want match = %v", tt.target, tt.pattern, err, tt.want)
+			}
+		})
 	}
 }
