@@ -487,16 +487,24 @@ func TestTargetsFastForwardRecovery(t *testing.T) {
 // TestVersionRollbackTable tests version rollback attack detection
 func TestVersionRollbackTable(t *testing.T) {
 	tests := []struct {
-		name string
-		role string
+		name       string
+		role       string
+		wantErrMsg string
+		// wantCached is the version of role that must remain in the local
+		// cache after the rollback attempt is rejected.
+		wantCached int64
 	}{
 		{
-			name: "timestamp version rollback fails",
-			role: metadata.TIMESTAMP,
+			name:       "timestamp version rollback fails",
+			role:       metadata.TIMESTAMP,
+			wantErrMsg: "new timestamp version 2 must be >= 3",
+			wantCached: 3,
 		},
 		{
-			name: "snapshot version rollback fails",
-			role: metadata.SNAPSHOT,
+			name:       "snapshot version rollback fails",
+			role:       metadata.SNAPSHOT,
+			wantErrMsg: "new snapshot version 2 must be >= 3",
+			wantCached: 3,
 		},
 	}
 
@@ -505,15 +513,17 @@ func TestVersionRollbackTable(t *testing.T) {
 			repo := simulator.NewTestRepository(t)
 			defer repo.Cleanup()
 
-			// Set initial higher version
+			// Set initial higher version. UpdateSnapshot bumps both snapshot
+			// and timestamp, so the trusted version of tc.role becomes 3.
 			repo.SetVersion(tc.role, 2)
 			repo.UpdateSnapshot()
 
 			// First refresh succeeds
 			_, err := createAndRefresh(t, repo)
 			assert.NoError(t, err)
+			repo.AssertVersionEquals(tc.role, tc.wantCached)
 
-			// Now try to rollback
+			// Now try to rollback: the remote version of tc.role becomes 2.
 			repo.SetVersion(tc.role, 1)
 			repo.UpdateSnapshot()
 
@@ -521,8 +531,10 @@ func TestVersionRollbackTable(t *testing.T) {
 			_, err = createAndRefresh(t, repo)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{})
-			// Error message will contain "must be >= X" where X is the previously seen version
-			assert.ErrorContains(t, err, "must be >=")
+			assert.ErrorContains(t, err, tc.wantErrMsg)
+
+			// The rolled-back metadata must not replace the cached version.
+			repo.AssertVersionEquals(tc.role, tc.wantCached)
 		})
 	}
 }
@@ -593,18 +605,23 @@ func TestHashMismatchTable(t *testing.T) {
 		role        string
 		wantErrType error
 		wantErrMsg  string
+		// wantCached lists the cached versions after the failed refresh: the
+		// valid parent is persisted, the mismatching role is not.
+		wantCached map[string]int64
 	}{
 		{
 			name:        "snapshot hash mismatch",
 			role:        metadata.SNAPSHOT,
 			wantErrType: &metadata.ErrLengthOrHashMismatch{},
 			wantErrMsg:  "hash verification failed - mismatch for algorithm sha256",
+			wantCached:  map[string]int64{metadata.TIMESTAMP: 3, metadata.SNAPSHOT: 2},
 		},
 		{
 			name:        "targets hash mismatch",
 			role:        metadata.TARGETS,
 			wantErrType: &metadata.ErrLengthOrHashMismatch{},
 			wantErrMsg:  "hash verification failed - mismatch for algorithm sha256",
+			wantCached:  map[string]int64{metadata.SNAPSHOT: 3, metadata.TARGETS: 1},
 		},
 	}
 
@@ -635,14 +652,15 @@ func TestHashMismatchTable(t *testing.T) {
 				repo.UpdateTimestamp()
 			}
 
-			// Disable hash computation so hashes don't match
-			repo.DisableComputeHashesAndLength()
-
 			// Second refresh should fail with hash mismatch
 			_, err = createAndRefresh(t, repo)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, tc.wantErrType)
 			assert.ErrorContains(t, err, tc.wantErrMsg)
+
+			for role, version := range tc.wantCached {
+				repo.AssertVersionEquals(role, version)
+			}
 		})
 	}
 }
