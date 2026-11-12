@@ -86,6 +86,31 @@ func loadUnsafeUpdaterConfig() (*config.UpdaterConfig, error) {
 	return updaterConfig, nil
 }
 
+// testFixture encapsulates common test setup components, reducing boilerplate
+// and ensuring isolated configuration per test case.
+type testFixture struct {
+	sim           *simulator.RepositorySimulator
+	updaterConfig *config.UpdaterConfig
+	metadataDir   string
+	targetsDir    string
+}
+
+func newTestFixture(t *testing.T) *testFixture {
+	t.Helper()
+	err := loadOrResetTrustedRootMetadata()
+	assert.NoError(t, err)
+
+	cfg, err := loadUpdaterConfig()
+	assert.NoError(t, err)
+
+	return &testFixture{
+		sim:           simulator.Sim,
+		updaterConfig: cfg,
+		metadataDir:   simulator.MetadataDir,
+		targetsDir:    testutils.TargetsDir,
+	}
+}
+
 // runRefresh creates new Updater instance and runs Refresh
 func runRefresh(updaterConfig *config.UpdaterConfig, moveInTime time.Time) (Updater, error) {
 	if len(simulator.Sim.DumpDir) > 0 {
@@ -623,37 +648,33 @@ func TestNewTimestampExpired(t *testing.T) {
 }
 
 func TestNewTimestampFastForwardRecovery(t *testing.T) {
-	//Test timestamp fast-forward recovery using key rotation.
+	// Test timestamp fast-forward recovery using key rotation.
 
-	// The timestamp recovery is made by the following steps
-	//   - Remove the timestamp key
-	//   - Create and add a new key for timestamp
-	//   - Bump and publish root
-	//   - Rollback the timestamp version
+	// The timestamp recovery is made by the following steps:
+	//   - Attacker updates to higher version
+	//   - Repository removes timestamp key, creates and adds new key
+	//   - Bump and publish root, rollback timestamp version
+	//   - Client refreshes and recovers initial version
 
-	err := loadOrResetTrustedRootMetadata()
-	assert.NoError(t, err)
+	f := newTestFixture(t)
 
-	// attacker updates to a higher version
-	simulator.Sim.MDTimestamp.Signed.Version = 99999
+	t.Run("attacker updates to higher version", func(t *testing.T) {
+		f.sim.MDTimestamp.Signed.Version = 99999
+		_, err := runRefresh(f.updaterConfig, time.Now())
+		assert.NoError(t, err)
+		assertVersionEquals(t, metadata.TIMESTAMP, 99999)
+	})
 
-	// client refreshes the metadata and see the new timestamp version
-	updaterConfig, err := loadUpdaterConfig()
-	assert.NoError(t, err)
-	_, err = runRefresh(updaterConfig, time.Now())
-	assert.NoError(t, err)
-	assertVersionEquals(t, metadata.TIMESTAMP, 99999)
+	t.Run("repository rotates keys and client recovers", func(t *testing.T) {
+		f.sim.RotateKeys(metadata.TIMESTAMP)
+		f.sim.MDRoot.Signed.Version += 1
+		f.sim.PublishRoot()
+		f.sim.MDTimestamp.Signed.Version = 1
 
-	// repository rotates timestamp keys, rolls back timestamp version
-	simulator.Sim.RotateKeys(metadata.TIMESTAMP)
-	simulator.Sim.MDRoot.Signed.Version += 1
-	simulator.Sim.PublishRoot()
-	simulator.Sim.MDTimestamp.Signed.Version = 1
-
-	// client refresh the metadata and see the initial timestamp version
-	_, err = runRefresh(updaterConfig, time.Now())
-	assert.NoError(t, err)
-	assertVersionEquals(t, metadata.TIMESTAMP, 1)
+		_, err := runRefresh(f.updaterConfig, time.Now())
+		assert.NoError(t, err)
+		assertVersionEquals(t, metadata.TIMESTAMP, 1)
+	})
 }
 
 func TestNewSnapshotHashMismatch(t *testing.T) {
@@ -740,39 +761,35 @@ func TestNewSnapshotFastForwardRecovery(t *testing.T) {
 
 	// The snapshot recovery requires the snapshot and timestamp key rotation.
 	// It is made by the following steps:
-	// - Remove the snapshot and timestamp keys
-	// - Create and add a new key for snapshot and timestamp
-	// - Rollback snapshot version
-	// - Bump and publish root
-	// - Bump the timestamp
+	// - Attacker updates to higher version (bumping timestamp is required)
+	// - Repository rotates snapshot & timestamp keys, rolls back snapshot
+	// - Bump and publish root, bump timestamp
+	// - Client refreshes and recovers initial snapshot version
 
-	err := loadOrResetTrustedRootMetadata()
-	assert.NoError(t, err)
+	f := newTestFixture(t)
 
-	// attacker updates to a higher version (bumping timestamp is required)
-	simulator.Sim.MDSnapshot.Signed.Version = 99999
-	simulator.Sim.UpdateTimestamp()
+	t.Run("attacker updates to higher version", func(t *testing.T) {
+		f.sim.MDSnapshot.Signed.Version = 99999
+		f.sim.UpdateTimestamp()
 
-	// client refreshes the metadata and see the new snapshot version
-	updaterConfig, err := loadUpdaterConfig()
-	assert.NoError(t, err)
-	_, err = runRefresh(updaterConfig, time.Now())
-	assert.NoError(t, err)
-	assertVersionEquals(t, metadata.SNAPSHOT, 99999)
+		_, err := runRefresh(f.updaterConfig, time.Now())
+		assert.NoError(t, err)
+		assertVersionEquals(t, metadata.SNAPSHOT, 99999)
+	})
 
-	// repository rotates snapshot & timestamp keys, rolls back snapshot
-	simulator.Sim.RotateKeys(metadata.SNAPSHOT)
-	simulator.Sim.RotateKeys(metadata.TIMESTAMP)
-	simulator.Sim.MDRoot.Signed.Version += 1
-	simulator.Sim.PublishRoot()
+	t.Run("repository rotates keys and client recovers", func(t *testing.T) {
+		f.sim.RotateKeys(metadata.SNAPSHOT)
+		f.sim.RotateKeys(metadata.TIMESTAMP)
+		f.sim.MDRoot.Signed.Version += 1
+		f.sim.PublishRoot()
 
-	simulator.Sim.MDSnapshot.Signed.Version = 1
-	simulator.Sim.UpdateTimestamp()
+		f.sim.MDSnapshot.Signed.Version = 1
+		f.sim.UpdateTimestamp()
 
-	// client refresh the metadata and see the initial snapshot version
-	_, err = runRefresh(updaterConfig, time.Now())
-	assert.NoError(t, err)
-	assertVersionEquals(t, metadata.SNAPSHOT, 1)
+		_, err := runRefresh(f.updaterConfig, time.Now())
+		assert.NoError(t, err)
+		assertVersionEquals(t, metadata.SNAPSHOT, 1)
+	})
 }
 
 func TestNewSnapshotExpired(t *testing.T) {
@@ -865,64 +882,62 @@ func TestNewTargetsExpired(t *testing.T) {
 }
 
 func TestComputeMetafileHashesLength(t *testing.T) {
-	err := loadOrResetTrustedRootMetadata()
-	assert.NoError(t, err)
+	f := newTestFixture(t)
 
-	simulator.Sim.ComputeMetafileHashesAndLength = true
-	simulator.Sim.UpdateSnapshot()
-	updaterConfig, err := loadUpdaterConfig()
-	assert.NoError(t, err)
-	_, err = runRefresh(updaterConfig, time.Now())
-	assert.NoError(t, err)
+	t.Run("with hashes and length enabled", func(t *testing.T) {
+		f.sim.ComputeMetafileHashesAndLength = true
+		f.sim.UpdateSnapshot()
+		_, err := runRefresh(f.updaterConfig, time.Now())
+		assert.NoError(t, err)
 
-	assertVersionEquals(t, metadata.TIMESTAMP, 2)
-	assertVersionEquals(t, metadata.SNAPSHOT, 2)
+		assertVersionEquals(t, metadata.TIMESTAMP, 2)
+		assertVersionEquals(t, metadata.SNAPSHOT, 2)
+	})
 
-	simulator.Sim.ComputeMetafileHashesAndLength = false
-	simulator.Sim.UpdateSnapshot()
-	_, err = runRefresh(updaterConfig, time.Now())
-	assert.NoError(t, err)
+	t.Run("with hashes and length disabled", func(t *testing.T) {
+		f.sim.ComputeMetafileHashesAndLength = false
+		f.sim.UpdateSnapshot()
+		_, err := runRefresh(f.updaterConfig, time.Now())
+		assert.NoError(t, err)
 
-	assertVersionEquals(t, metadata.TIMESTAMP, 3)
-	assertVersionEquals(t, metadata.SNAPSHOT, 3)
+		assertVersionEquals(t, metadata.TIMESTAMP, 3)
+		assertVersionEquals(t, metadata.SNAPSHOT, 3)
+	})
 }
 
 func TestNewTargetsFastForwardRecovery(t *testing.T) {
-	//Test targets fast-forward recovery using key rotation.
+	// Test targets fast-forward recovery using key rotation.
 
 	// The targets recovery is made by issuing new Snapshot keys, by following
 	// steps:
-	// 	- Remove the snapshot key
-	// 	- Create and add a new key for snapshot
-	// 	- Bump and publish root
-	// 	- Rollback the target version
+	// 	- Attacker updates to higher version
+	// 	- Repository removes snapshot key, creates and adds new key
+	// 	- Bump and publish root, rollback targets version
+	// 	- Client refreshes and recovers initial targets version
 
-	err := loadOrResetTrustedRootMetadata()
-	assert.NoError(t, err)
+	f := newTestFixture(t)
 
-	// attacker updates to a higher version
-	simulator.Sim.MDTargets.Signed.Version = 99999
-	simulator.Sim.UpdateSnapshot()
+	t.Run("attacker updates to higher version", func(t *testing.T) {
+		f.sim.MDTargets.Signed.Version = 99999
+		f.sim.UpdateSnapshot()
 
-	// client refreshes the metadata and see the new targets version
-	updaterConfig, err := loadUpdaterConfig()
-	assert.NoError(t, err)
-	_, err = runRefresh(updaterConfig, time.Now())
-	assert.NoError(t, err)
-	assertVersionEquals(t, metadata.TARGETS, 99999)
+		_, err := runRefresh(f.updaterConfig, time.Now())
+		assert.NoError(t, err)
+		assertVersionEquals(t, metadata.TARGETS, 99999)
+	})
 
-	// repository rotates snapshot keys, rolls back targets version
-	simulator.Sim.RotateKeys(metadata.SNAPSHOT)
-	simulator.Sim.MDRoot.Signed.Version += 1
-	simulator.Sim.PublishRoot()
+	t.Run("repository rotates snapshot keys and client recovers", func(t *testing.T) {
+		f.sim.RotateKeys(metadata.SNAPSHOT)
+		f.sim.MDRoot.Signed.Version += 1
+		f.sim.PublishRoot()
 
-	simulator.Sim.MDTargets.Signed.Version = 1
-	simulator.Sim.UpdateSnapshot()
+		f.sim.MDTargets.Signed.Version = 1
+		f.sim.UpdateSnapshot()
 
-	// client refreshes the metadata version and see initial targets version
-	_, err = runRefresh(updaterConfig, time.Now())
-	assert.NoError(t, err)
-	assertVersionEquals(t, metadata.TARGETS, 1)
+		_, err := runRefresh(f.updaterConfig, time.Now())
+		assert.NoError(t, err)
+		assertVersionEquals(t, metadata.TARGETS, 1)
+	})
 }
 
 func TestSnapshotRollbackWithLocalSnapshotHashMismatch(t *testing.T) {
@@ -974,84 +989,108 @@ func TestExpiredMetadata(t *testing.T) {
 	//   - Repository bumps snapshot and targets to v2 on day 0
 	//   - Timestamp v2 expiry set to day 21
 	//   - Second updater refresh performed on day 18,
-	//     it is successful and timestamp/snaphot final versions are v2"
+	//     it is successful and timestamp/snapshot final versions are v2
 
-	err := loadOrResetTrustedRootMetadata()
-	assert.NoError(t, err)
+	f := newTestFixture(t)
 
 	now := time.Now()
-	simulator.Sim.MDTimestamp.Signed.Expires = now.Add(time.Hour * 7 * 24)
+	f.sim.MDTimestamp.Signed.Expires = now.Add(time.Hour * 7 * 24)
 
-	// Make a successful update of valid metadata which stores it in cache
-	updaterConfig, err := loadUpdaterConfig()
-	assert.NoError(t, err)
-	_, err = runRefresh(updaterConfig, time.Now())
-	assert.NoError(t, err)
+	t.Run("initial refresh stores valid metadata in cache", func(t *testing.T) {
+		_, err := runRefresh(f.updaterConfig, time.Now())
+		assert.NoError(t, err)
+	})
 
-	simulator.Sim.MDTargets.Signed.Version += 1
-	simulator.Sim.UpdateSnapshot()
-	simulator.Sim.MDTimestamp.Signed.Expires = now.Add(time.Hour * 21 * 24)
+	t.Run("refresh with expired local metadata succeeds against remote", func(t *testing.T) {
+		f.sim.MDTargets.Signed.Version += 1
+		f.sim.UpdateSnapshot()
+		f.sim.MDTimestamp.Signed.Expires = now.Add(time.Hour * 21 * 24)
 
-	// Mocking time so that local timestam has expired
-	// but the new timestamp has not
-	moveInTime := now.Add(time.Hour * 18 * 24)
-	_, err = runRefresh(updaterConfig, moveInTime)
-	assert.NoError(t, err)
+		// Mocking time so that local timestamp has expired but the new timestamp has not
+		moveInTime := now.Add(time.Hour * 18 * 24)
+		_, err := runRefresh(f.updaterConfig, moveInTime)
+		assert.NoError(t, err)
 
-	// Assert that the final version of timestamp/snapshot is version 2
-	// which means a successful refresh is performed
-	// with expired local metadata
+		mdTimestamp, err := metadata.Timestamp().FromFile(filepath.Join(f.metadataDir, "timestamp.json"))
+		assert.NoError(t, err)
+		assert.Equal(t, int64(2), mdTimestamp.Signed.Version)
 
-	mdTimestamp, err := metadata.Timestamp().FromFile(filepath.Join(simulator.MetadataDir, "timestamp.json"))
-	assert.NoError(t, err)
-	assert.Equal(t, int64(2), mdTimestamp.Signed.Version)
+		mdSnapshot, err := metadata.Snapshot().FromFile(filepath.Join(f.metadataDir, "snapshot.json"))
+		assert.NoError(t, err)
+		assert.Equal(t, int64(2), mdSnapshot.Signed.Version)
 
-	mdSnapshot, err := metadata.Snapshot().FromFile(filepath.Join(simulator.MetadataDir, "snapshot.json"))
-	assert.NoError(t, err)
-	assert.Equal(t, int64(2), mdSnapshot.Signed.Version)
-
-	mdTargets, err := metadata.Targets().FromFile(filepath.Join(simulator.MetadataDir, "targets.json"))
-	assert.NoError(t, err)
-	assert.Equal(t, int64(2), mdTargets.Signed.Version)
+		mdTargets, err := metadata.Targets().FromFile(filepath.Join(f.metadataDir, "targets.json"))
+		assert.NoError(t, err)
+		assert.Equal(t, int64(2), mdTargets.Signed.Version)
+	})
 }
 
 func TestMaxMetadataLengths(t *testing.T) {
-	// Test that clients configured max metadata lengths are respected
+	// Test that client configured max metadata lengths are respected.
+	testCases := []struct {
+		name      string
+		configure func(cfg *config.UpdaterConfig)
+		wantErr   error
+	}{
+		{
+			name: "RootMaxLength exceeded",
+			configure: func(cfg *config.UpdaterConfig) {
+				cfg.RootMaxLength = 100
+			},
+			wantErr: &metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"},
+		},
+		{
+			name: "TimestampMaxLength exceeded",
+			configure: func(cfg *config.UpdaterConfig) {
+				cfg.TimestampMaxLength = 100
+			},
+			wantErr: &metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"},
+		},
+		{
+			name: "SnapshotMaxLength exceeded",
+			configure: func(cfg *config.UpdaterConfig) {
+				cfg.SnapshotMaxLength = 100
+			},
+			wantErr: &metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"},
+		},
+		{
+			name: "TargetsMaxLength exceeded",
+			configure: func(cfg *config.UpdaterConfig) {
+				cfg.TargetsMaxLength = 100
+			},
+			wantErr: &metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"},
+		},
+		{
+			name: "Normal length limits",
+			configure: func(cfg *config.UpdaterConfig) {
+				// Default lengths without truncation
+			},
+			wantErr: nil,
+		},
+	}
 
-	err := loadOrResetTrustedRootMetadata()
-	assert.NoError(t, err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := loadOrResetTrustedRootMetadata()
+			assert.NoError(t, err)
 
-	// client has root v1 already: create a new one available for download
-	simulator.Sim.MDRoot.Signed.Version += 1
-	simulator.Sim.PublishRoot()
+			// client has root v1 already: create a new one available for download
+			simulator.Sim.MDRoot.Signed.Version += 1
+			simulator.Sim.PublishRoot()
 
-	// make sure going over any length limit raises DownloadLengthMismatchError
-	updaterConfig, err := loadUpdaterConfig()
-	assert.NoError(t, err)
-	updater := initUpdater(updaterConfig)
-	updater.cfg.RootMaxLength = 100
-	err = updater.Refresh()
-	assert.ErrorIs(t, err, &metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"})
+			cfg, err := loadUpdaterConfig()
+			assert.NoError(t, err)
 
-	updater = initUpdater(updaterConfig)
-	updater.cfg.TimestampMaxLength = 100
-	err = updater.Refresh()
-	assert.ErrorIs(t, err, &metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"})
-
-	updater = initUpdater(updaterConfig)
-	updater.cfg.SnapshotMaxLength = 100
-	err = updater.Refresh()
-	assert.ErrorIs(t, err, &metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"})
-
-	updater = initUpdater(updaterConfig)
-	updater.cfg.TargetsMaxLength = 100
-	err = updater.Refresh()
-	assert.ErrorIs(t, err, &metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"})
-
-	// All good with normal length limits
-	updater = initUpdater(updaterConfig)
-	err = updater.Refresh()
-	assert.ErrorIs(t, err, &metadata.ErrDownloadLengthMismatch{Msg: "Downloaded 1567 bytes exceeding the maximum allowed length of 100"})
+			tc.configure(cfg)
+			updater := initUpdater(cfg)
+			err = updater.Refresh()
+			if tc.wantErr != nil {
+				assert.ErrorIs(t, err, tc.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestTimestampEqVersionsCheck(t *testing.T) {
