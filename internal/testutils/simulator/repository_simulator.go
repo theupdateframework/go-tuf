@@ -283,34 +283,19 @@ func (rs *RepositorySimulator) PublishRoot() {
 }
 
 func lastIndex(str string, delimiter string) (string, string, string) {
-	// TODO: check if contained and lengths
-	spl := strings.Split(str, delimiter)
-	res := strings.SplitAfterN(str, delimiter, len(spl)-1)
-	return res[0], delimiter, res[1]
+	idx := strings.LastIndex(str, delimiter)
+	if idx == -1 {
+		return "", "", str
+	}
+	return str[:idx], delimiter, str[idx+len(delimiter):]
 }
 
 func partition(s string, delimiter string) (string, string) {
-	splitted := strings.Split(s, delimiter)
-	version := ""
-	role := ""
-	switch len(splitted) {
-	case 1:
-		role = splitted[0]
-	case 2:
-		version = splitted[0]
-		role = splitted[1]
-	case 3:
-		version = splitted[0]
-		if splitted[1] == "" && splitted[2] == "" {
-			role = "."
-		}
-	case 4:
-		version = splitted[0]
-		if splitted[1] == "" && splitted[2] == "" && splitted[3] == "" {
-			role = ".."
-		}
+	before, after, found := strings.Cut(s, delimiter)
+	if !found {
+		return "", before
 	}
-	return version, role
+	return before, after
 }
 
 func (rs *RepositorySimulator) DownloadFile(urlPath string, maxLength int64, _ time.Duration) ([]byte, error) {
@@ -350,8 +335,8 @@ func hasPrefix(path, prefix string) bool {
 	return strings.HasPrefix(filepath.ToSlash(path), prefix)
 }
 
-func hasSuffix(path, prefix string) bool {
-	return strings.HasSuffix(filepath.ToSlash(path), prefix)
+func hasSuffix(path, suffix string) bool {
+	return strings.HasSuffix(filepath.ToSlash(path), suffix)
 }
 
 func (rs *RepositorySimulator) fetch(urlPath string) ([]byte, error) {
@@ -377,14 +362,25 @@ func (rs *RepositorySimulator) fetch(urlPath string) ([]byte, error) {
 		return rs.FetchMetadata(role, &version)
 	} else if hasPrefix(path, "/targets/") {
 		targetPath := path[len("/targets/"):]
-		dirParts, sep, prefixedFilename := lastIndex(targetPath, string(filepath.Separator))
+		var dirParts, prefixedFilename string
+		if idx := strings.LastIndex(targetPath, "/"); idx != -1 {
+			dirParts = targetPath[:idx]
+			prefixedFilename = targetPath[idx+1:]
+		} else {
+			dirParts = ""
+			prefixedFilename = targetPath
+		}
 		var filename string
 		prefix := ""
 		filename = prefixedFilename
 		if rs.MDRoot.Signed.ConsistentSnapshot && rs.PrefixTargetsWithHash {
 			prefix, filename = partition(prefixedFilename, ".")
 		}
-		targetPath = filepath.Join(dirParts, sep, filename)
+		if dirParts != "" {
+			targetPath = dirParts + "/" + filename
+		} else {
+			targetPath = filename
+		}
 		target, err := rs.FetchTarget(targetPath, prefix)
 		if err != nil {
 			slog.Error("Failed to fetch target", "err", err)
@@ -403,7 +399,7 @@ func (rs *RepositorySimulator) FetchTarget(targetPath string, targetHash string)
 		return nil, fmt.Errorf("no target %s", targetPath)
 	}
 
-	if targetHash != "" && !contains(repoTarget.TargetFile.Hashes, []byte(targetHash)) {
+	if targetHash != "" && !contains(repoTarget.TargetFile.Hashes, targetHash) {
 		return nil, fmt.Errorf("hash mismatch for %s", targetPath)
 	}
 
@@ -411,9 +407,9 @@ func (rs *RepositorySimulator) FetchTarget(targetPath string, targetHash string)
 	return repoTarget.Data, nil
 }
 
-func contains(hashes map[string]metadata.HexBytes, targetHash []byte) bool {
+func contains(hashes map[string]metadata.HexBytes, targetHash string) bool {
 	for _, value := range hashes {
-		if bytes.Equal(value, targetHash) {
+		if strings.EqualFold(value.String(), targetHash) || bytes.Equal(value, []byte(targetHash)) {
 			return true
 		}
 	}
