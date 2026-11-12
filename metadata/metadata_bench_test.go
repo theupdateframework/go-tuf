@@ -94,37 +94,37 @@ func BenchmarkMetadataToBytes(b *testing.B) {
 		{
 			name: "Root-Compact",
 			metadata: func() ([]byte, error) {
-				return root.ToBytes(true)
+				return root.ToBytes(false)
 			},
 		},
 		{
 			name: "Root-Pretty",
 			metadata: func() ([]byte, error) {
-				return root.ToBytes(false)
+				return root.ToBytes(true)
 			},
 		},
 		{
 			name: "Targets-Compact",
 			metadata: func() ([]byte, error) {
-				return targets.ToBytes(true)
+				return targets.ToBytes(false)
 			},
 		},
 		{
 			name: "Targets-Pretty",
 			metadata: func() ([]byte, error) {
-				return targets.ToBytes(false)
+				return targets.ToBytes(true)
 			},
 		},
 		{
 			name: "Snapshot-Compact",
 			metadata: func() ([]byte, error) {
-				return snapshot.ToBytes(true)
+				return snapshot.ToBytes(false)
 			},
 		},
 		{
 			name: "Timestamp-Compact",
 			metadata: func() ([]byte, error) {
-				return timestamp.ToBytes(true)
+				return timestamp.ToBytes(false)
 			},
 		},
 	}

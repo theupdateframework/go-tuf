@@ -149,15 +149,15 @@ func FuzzTimestampFromBytes(f *testing.F) {
 // FuzzMetadataToBytes tests metadata serialization
 func FuzzMetadataToBytes(f *testing.F) {
 	// Add some variations
-	f.Add(int64(1), true) // version, compact
+	f.Add(int64(1), true) // version, pretty
 	f.Add(int64(999999), false)
 	f.Add(int64(0), true)
 	f.Add(int64(-1), false)
 
-	f.Fuzz(func(t *testing.T, version int64, compact bool) {
+	f.Fuzz(func(t *testing.T, version int64, pretty bool) {
 		defer func() {
 			if r := recover(); r != nil {
-				t.Errorf("ToBytes panicked with version %d, compact %t: %v", version, compact, r)
+				t.Errorf("ToBytes panicked with version %d, pretty %t: %v", version, pretty, r)
 			}
 		}()
 
@@ -166,22 +166,22 @@ func FuzzMetadataToBytes(f *testing.F) {
 			func() {
 				root := Root()
 				root.Signed.Version = version
-				_, _ = root.ToBytes(compact)
+				_, _ = root.ToBytes(pretty)
 			},
 			func() {
 				targets := Targets()
 				targets.Signed.Version = version
-				_, _ = targets.ToBytes(compact)
+				_, _ = targets.ToBytes(pretty)
 			},
 			func() {
 				snapshot := Snapshot()
 				snapshot.Signed.Version = version
-				_, _ = snapshot.ToBytes(compact)
+				_, _ = snapshot.ToBytes(pretty)
 			},
 			func() {
 				timestamp := Timestamp()
 				timestamp.Signed.Version = version
-				_, _ = timestamp.ToBytes(compact)
+				_, _ = timestamp.ToBytes(pretty)
 			},
 		}
 

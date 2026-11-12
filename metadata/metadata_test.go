@@ -299,14 +299,14 @@ func TestMetadataToBytes(t *testing.T) {
 	tests := []struct {
 		name     string
 		metadata any
-		compact  bool
+		pretty   bool
 		wantErr  bool
 	}{
-		{name: "Root to bytes compact", metadata: Root(expiry), compact: true},
-		{name: "Root to bytes non-compact", metadata: Root(expiry), compact: false},
-		{name: "Targets to bytes", metadata: Targets(expiry), compact: true},
-		{name: "Snapshot to bytes", metadata: Snapshot(expiry), compact: true},
-		{name: "Timestamp to bytes", metadata: Timestamp(expiry), compact: true},
+		{name: "Root to bytes compact", metadata: Root(expiry), pretty: false},
+		{name: "Root to bytes pretty", metadata: Root(expiry), pretty: true},
+		{name: "Targets to bytes pretty", metadata: Targets(expiry), pretty: true},
+		{name: "Snapshot to bytes pretty", metadata: Snapshot(expiry), pretty: true},
+		{name: "Timestamp to bytes pretty", metadata: Timestamp(expiry), pretty: true},
 	}
 
 	for _, tt := range tests {
@@ -317,13 +317,13 @@ func TestMetadataToBytes(t *testing.T) {
 			)
 			switch meta := tt.metadata.(type) {
 			case *Metadata[RootType]:
-				data, err = meta.ToBytes(tt.compact)
+				data, err = meta.ToBytes(tt.pretty)
 			case *Metadata[TargetsType]:
-				data, err = meta.ToBytes(tt.compact)
+				data, err = meta.ToBytes(tt.pretty)
 			case *Metadata[SnapshotType]:
-				data, err = meta.ToBytes(tt.compact)
+				data, err = meta.ToBytes(tt.pretty)
 			case *Metadata[TimestampType]:
-				data, err = meta.ToBytes(tt.compact)
+				data, err = meta.ToBytes(tt.pretty)
 			}
 
 			if tt.wantErr {
@@ -336,6 +336,9 @@ func TestMetadataToBytes(t *testing.T) {
 			// Verify the output is valid JSON.
 			var jsonData any
 			assert.NoError(t, json.Unmarshal(data, &jsonData))
+
+			// Only pretty output is indented across multiple lines.
+			assert.Equal(t, tt.pretty, bytes.Contains(data, []byte("\n")))
 		})
 	}
 }
@@ -348,13 +351,13 @@ func TestMetadataToFile(t *testing.T) {
 		name     string
 		metadata any
 		filename string
-		compact  bool
+		pretty   bool
 		wantErr  bool
 	}{
-		{name: "Root to file", metadata: Root(expiry), filename: "root.json"},
-		{name: "Targets to file compact", metadata: Targets(expiry), filename: "targets.json", compact: true},
-		{name: "Snapshot to file", metadata: Snapshot(expiry), filename: "snapshot.json"},
-		{name: "Timestamp to file", metadata: Timestamp(expiry), filename: "timestamp.json"},
+		{name: "Root to file pretty", metadata: Root(expiry), filename: "root.json", pretty: true},
+		{name: "Targets to file compact", metadata: Targets(expiry), filename: "targets.json", pretty: false},
+		{name: "Snapshot to file pretty", metadata: Snapshot(expiry), filename: "snapshot.json", pretty: true},
+		{name: "Timestamp to file pretty", metadata: Timestamp(expiry), filename: "timestamp.json", pretty: true},
 	}
 
 	for _, tt := range tests {
@@ -363,13 +366,13 @@ func TestMetadataToFile(t *testing.T) {
 			var err error
 			switch meta := tt.metadata.(type) {
 			case *Metadata[RootType]:
-				err = meta.ToFile(path, tt.compact)
+				err = meta.ToFile(path, tt.pretty)
 			case *Metadata[TargetsType]:
-				err = meta.ToFile(path, tt.compact)
+				err = meta.ToFile(path, tt.pretty)
 			case *Metadata[SnapshotType]:
-				err = meta.ToFile(path, tt.compact)
+				err = meta.ToFile(path, tt.pretty)
 			case *Metadata[TimestampType]:
-				err = meta.ToFile(path, tt.compact)
+				err = meta.ToFile(path, tt.pretty)
 			}
 
 			if tt.wantErr {
@@ -383,6 +386,9 @@ func TestMetadataToFile(t *testing.T) {
 			assert.NoError(t, err)
 			var jsonData any
 			assert.NoError(t, json.Unmarshal(raw, &jsonData))
+
+			// Only pretty output is indented across multiple lines.
+			assert.Equal(t, tt.pretty, bytes.Contains(raw, []byte("\n")))
 		})
 	}
 }
