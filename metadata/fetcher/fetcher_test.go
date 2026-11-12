@@ -22,9 +22,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/cenkalti/backoff/v5"
 	"github.com/stretchr/testify/assert"
@@ -41,7 +43,29 @@ func requireNetwork(t *testing.T) {
 }
 
 func TestDownLoadFile(t *testing.T) {
-	requireNetwork(t)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/metadata/1.root.json":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(sampleRootData)
+		case "/metadata/oversized.json":
+			w.Header().Set("Content-Length", "1000000")
+			w.WriteHeader(http.StatusOK)
+			w.Write(make([]byte, 1000000))
+		case "/metadata/streaming-too-large.json":
+			w.WriteHeader(http.StatusOK)
+			w.Write(bytes.Repeat([]byte("A"), 2000))
+		case "/metadata/server-error.json":
+			w.WriteHeader(http.StatusInternalServerError)
+		case "/metadata/forbidden.json":
+			w.WriteHeader(http.StatusForbidden)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer ts.Close()
+
 	for _, tt := range []struct {
 		name      string
 		desc      string
@@ -53,7 +77,7 @@ func TestDownLoadFile(t *testing.T) {
 		{
 			name:      "success",
 			desc:      "No errors expected",
-			url:       "https://jku.github.io/tuf-demo/metadata/1.root.json",
+			url:       ts.URL + "/metadata/1.root.json",
 			maxLength: 512000,
 			data:      sampleRootData,
 			wantErr:   nil,
@@ -61,7 +85,7 @@ func TestDownLoadFile(t *testing.T) {
 		{
 			name:    "invalid url",
 			desc:    "URL does not exist",
-			url:     "https://somebadtufrepourl.com/metadata/",
+			url:     "http://127.0.0.1:0/metadata/",
 			data:    nil,
 			wantErr: &url.Error{},
 		},
@@ -73,36 +97,59 @@ func TestDownLoadFile(t *testing.T) {
 			wantErr: &url.Error{},
 		},
 		{
-			name:    "invalid path",
+			name:    "invalid path 404",
 			desc:    "Path does not exist",
-			url:     "https://jku.github.io/tuf-demo/metadata/badPath.json",
+			url:     ts.URL + "/metadata/badPath.json",
 			data:    nil,
-			wantErr: &metadata.ErrDownloadHTTP{},
+			wantErr: &metadata.ErrDownloadHTTP{StatusCode: http.StatusNotFound},
 		},
 		{
-			name:      "data too long",
-			desc:      "Returned data is longer than maxLength",
-			url:       "https://jku.github.io/tuf-demo/metadata/1.root.json",
+			name:    "server error 500",
+			desc:    "Internal server error",
+			url:     ts.URL + "/metadata/server-error.json",
+			data:    nil,
+			wantErr: &metadata.ErrDownloadHTTP{StatusCode: http.StatusInternalServerError},
+		},
+		{
+			name:    "forbidden 403",
+			desc:    "Access forbidden",
+			url:     ts.URL + "/metadata/forbidden.json",
+			data:    nil,
+			wantErr: &metadata.ErrDownloadHTTP{StatusCode: http.StatusForbidden},
+		},
+		{
+			name:      "data too long header",
+			desc:      "Reported Content-Length header is longer than maxLength",
+			url:       ts.URL + "/metadata/oversized.json",
+			maxLength: 1,
+			data:      nil,
+			wantErr:   &metadata.ErrDownloadLengthMismatch{},
+		},
+		{
+			name:      "data too long stream",
+			desc:      "Streamed data is longer than maxLength",
+			url:       ts.URL + "/metadata/streaming-too-large.json",
 			maxLength: 1,
 			data:      nil,
 			wantErr:   &metadata.ErrDownloadLengthMismatch{},
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			// this will only be printed if run in verbose mode or if test fails
 			t.Logf("Desc: %s", tt.desc)
-			// run the function under test
 			fetcher := NewDefaultFetcher()
 			fetcher.SetHTTPUserAgent("Metadata_Unit_Test/1.0")
 			data, err := fetcher.DownloadFile(tt.url, tt.maxLength, 0)
-			// special case if we expect no error
 			if tt.wantErr == nil {
 				assert.NoErrorf(t, err, "expected no error but got %v", err)
+				assert.Equal(t, tt.data, data, "fetched data did not match")
 				return
 			}
-			// compare the error and data with our expected error and data
 			assert.Equal(t, tt.data, data, "fetched data did not match")
 			assert.IsTypef(t, tt.wantErr, err, "expected %v but got %v", tt.wantErr, err)
+			if httpErr, ok := err.(*metadata.ErrDownloadHTTP); ok {
+				expectedHttpErr := tt.wantErr.(*metadata.ErrDownloadHTTP)
+				assert.Equal(t, expectedHttpErr.StatusCode, httpErr.StatusCode)
+			}
 		})
 	}
 }
@@ -181,8 +228,59 @@ func TestDownloadFile_Retry(t *testing.T) {
 }
 
 func TestDownloadFile_NoHTTPClientSet(t *testing.T) {
-	requireNetwork(t)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write(sampleRootData)
+	}))
+	defer ts.Close()
+
 	fetcher := DefaultFetcher{}
-	_, err := fetcher.DownloadFile("https://jku.github.io/tuf-demo/metadata/1.root.json", 512000, 0)
+	data, err := fetcher.DownloadFile(ts.URL+"/metadata/1.root.json", 512000, 0)
 	assert.NoError(t, err)
+	assert.Equal(t, sampleRootData, data)
+}
+
+type dummyRoundTripper struct{}
+
+func (d *dummyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewReader(sampleRootData)),
+	}, nil
+}
+
+func TestDefaultFetcher_Configuration(t *testing.T) {
+	mockClient := &MockHTTPClient{SucceedOnTryN: 1}
+	f1 := NewDefaultFetcher()
+	f2 := f1.NewFetcherWithHTTPClient(mockClient)
+	assert.Equal(t, mockClient, f2.client)
+
+	rt := &dummyRoundTripper{}
+	f3 := f1.NewFetcherWithRoundTripper(rt)
+	hc, ok := f3.client.(*http.Client)
+	assert.True(t, ok)
+	assert.Equal(t, rt, hc.Transport)
+
+	f4 := NewDefaultFetcher()
+	f4.SetHTTPClient(mockClient)
+	assert.Equal(t, mockClient, f4.client)
+
+	// SetTransport error when client is not *http.Client
+	err := f4.SetTransport(rt)
+	assert.Error(t, err)
+
+	f5 := NewDefaultFetcher()
+	err = f5.SetTransport(rt)
+	assert.NoError(t, err)
+
+	f5.SetRetry(10*time.Millisecond, 2)
+	assert.Len(t, f5.retryOptions, 2)
+}
+
+func TestDownloadFile_LiveNetwork(t *testing.T) {
+	requireNetwork(t)
+	fetcher := NewDefaultFetcher()
+	data, err := fetcher.DownloadFile("https://jku.github.io/tuf-demo/metadata/1.root.json", 512000, 0)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, data)
 }
