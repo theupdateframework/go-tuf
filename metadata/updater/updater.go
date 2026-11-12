@@ -420,7 +420,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 		return role, nil
 	}
 	// try to read local targets
-	data, err := update.loadLocalMetadata(filepath.Join(update.cfg.LocalMetadataDir, roleName))
+	data, err := os.ReadFile(update.localMetadataPath(roleName))
 	if err != nil {
 		// this means there's no existing local target file so we should proceed downloading it without the need to UpdateDelegatedTargets
 		log.Info("Local role does not exist", "role", roleName)
@@ -586,6 +586,15 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 	return nil, fmt.Errorf("target %s not found", targetFilePath)
 }
 
+// localMetadataPath returns the on-disk path of the cached metadata for
+// roleName. The role name is URL-path-escaped before it is used as a path
+// component, so a delegated role name cannot escape LocalMetadataDir. This is
+// the same encoding persistMetadata writes with and downloadMetadata requests
+// with, so reads and writes always agree on the file name.
+func (update *Updater) localMetadataPath(roleName string) string {
+	return filepath.Join(update.cfg.LocalMetadataDir, fmt.Sprintf("%s.json", url.PathEscape(roleName)))
+}
+
 // persistMetadata writes metadata to disk atomically to avoid data loss
 func (update *Updater) persistMetadata(roleName string, data []byte) error {
 	log := metadata.GetLogger()
@@ -594,7 +603,7 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 		return nil
 	}
 	// caching enabled, proceed with persisting the metadata locally
-	fileName := filepath.Join(update.cfg.LocalMetadataDir, fmt.Sprintf("%s.json", url.PathEscape(roleName)))
+	fileName := update.localMetadataPath(roleName)
 	// create a temporary file
 	file, err := os.CreateTemp(update.cfg.LocalMetadataDir, "tuf_tmp")
 	if err != nil {
