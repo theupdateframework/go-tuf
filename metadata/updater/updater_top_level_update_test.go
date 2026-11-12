@@ -40,19 +40,44 @@ func TestMain(m *testing.M) {
 	simulator.PastDateTime = time.Now().UTC().Truncate(24 * time.Hour).Add(-5 * 24 * time.Hour)
 
 	if err != nil {
-		simulator.RepositoryCleanup(simulator.MetadataDir)
+		if simulator.LocalDir != "" {
+			simulator.RepositoryCleanup(simulator.LocalDir)
+		}
 		slog.Error("Failed to load TrustedRootMetadata", "err", err)
 		os.Exit(1)
 	}
 
-	defer simulator.RepositoryCleanup(simulator.MetadataDir)
-	m.Run()
+	exitCode := m.Run()
+	if simulator.LocalDir != "" {
+		simulator.RepositoryCleanup(simulator.LocalDir)
+	}
+	os.Exit(exitCode)
 }
 
-func loadOrResetTrustedRootMetadata() error {
-	// TODO: This should be a t.Helper() function
-	var err error
+// initTestEnv initializes an isolated test environment for the given test
+// and registers automatic cleanup with t.Cleanup.
+func initTestEnv(t *testing.T) {
+	t.Helper()
+	err := loadOrResetTrustedRootMetadata(t)
+	assert.NoError(t, err)
+}
 
+func loadOrResetTrustedRootMetadata(tb ...testing.TB) error {
+	if len(tb) > 0 && tb[0] != nil {
+		tb[0].Helper()
+		tb[0].Cleanup(func() {
+			if simulator.LocalDir != "" {
+				simulator.RepositoryCleanup(simulator.LocalDir)
+				simulator.LocalDir = ""
+				simulator.MetadataDir = ""
+			}
+		})
+	}
+	if simulator.LocalDir != "" {
+		simulator.RepositoryCleanup(simulator.LocalDir)
+	}
+
+	var err error
 	simulator.Sim, simulator.MetadataDir, testutils.TargetsDir, err = simulator.InitMetadataDir()
 	if err != nil {
 		slog.Error("Failed to initialize metadata dir", "err", err)
