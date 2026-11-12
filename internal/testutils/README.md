@@ -88,9 +88,10 @@ helpers.FuzzMetadataOperations(f, func(data []byte) error { ... })
 ### Updater utilities (`updater.go`)
 
 ```go
-helpers.ContainsTargetWithPrefix(targets []string, prefix string) bool
-helpers.AssertTargetDownloaded(t, targetDir, targetName string)
-helpers.AssertTargetNotDownloaded(t, targetDir, targetName string)
+helpers.CheckError(t, tc helpers.UpdaterTestCase, err error)
+helpers.AssertFilesExist(t, metadataDir string, roles []string)
+helpers.AssertFilesExact(t, metadataDir string, roles []string)
+helpers.RunTrustedMetadataTests(t, tests []helpers.TrustedMetadataTestCase)
 ```
 
 ## simulator package
