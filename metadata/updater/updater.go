@@ -414,9 +414,10 @@ func (update *Updater) loadSnapshot() error {
 // loadTargets load local (and if needed remote) metadata for roleName
 func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metadata[metadata.TargetsType], error) {
 	log := metadata.GetLogger()
-	// avoid loading "roleName" more than once during "GetTargetInfo"
+	// Skip only when this parent already verified the role. Another parent
+	// has to verify the same bytes with its own keys.
 	role, ok := update.trusted.Targets[roleName]
-	if ok {
+	if ok && update.trusted.HasVerifiedDelegation(roleName, parentName) {
 		return role, nil
 	}
 	// try to read local targets

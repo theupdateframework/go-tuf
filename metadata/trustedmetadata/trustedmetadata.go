@@ -29,12 +29,21 @@ import (
 // Thread Safety: TrustedMetadata is NOT safe for concurrent use. If multiple
 // goroutines need to access a TrustedMetadata instance concurrently, external
 // synchronization is required (e.g., a sync.Mutex).
+type verifiedDelegation struct {
+	delegator string
+	role      string
+}
+
 type TrustedMetadata struct {
 	Root      *metadata.Metadata[metadata.RootType]
 	Snapshot  *metadata.Metadata[metadata.SnapshotType]
 	Timestamp *metadata.Metadata[metadata.TimestampType]
 	Targets   map[string]*metadata.Metadata[metadata.TargetsType]
 	RefTime   time.Time
+	// verifiedDelegations records each (delegator, role) pair that has
+	// passed signature checks. A role name alone is not enough: another
+	// parent has to verify the same role with its own keys.
+	verifiedDelegations map[verifiedDelegation]struct{}
 }
 
 // New creates a new TrustedMetadata instance which ensures that the
@@ -43,8 +52,9 @@ type TrustedMetadata struct {
 // with the caller making decisions on what is updated
 func New(rootData []byte) (*TrustedMetadata, error) {
 	res := &TrustedMetadata{
-		Targets: map[string]*metadata.Metadata[metadata.TargetsType]{},
-		RefTime: time.Now().UTC(),
+		Targets:             map[string]*metadata.Metadata[metadata.TargetsType]{},
+		RefTime:             time.Now().UTC(),
+		verifiedDelegations: map[verifiedDelegation]struct{}{},
 	}
 	// load and validate the local root metadata
 	// valid initial trusted root metadata is required
@@ -339,8 +349,21 @@ func (trusted *TrustedMetadata) UpdateDelegatedTargets(targetsData []byte, roleN
 		return nil, &metadata.ErrExpiredMetadata{Msg: fmt.Sprintf("new %s is expired", roleName)}
 	}
 	trusted.Targets[roleName] = newDelegate
+	if trusted.verifiedDelegations == nil {
+		trusted.verifiedDelegations = map[verifiedDelegation]struct{}{}
+	}
+	trusted.verifiedDelegations[verifiedDelegation{delegator: delegatorName, role: roleName}] = struct{}{}
 	log.Info("Updated role", "role", roleName, "version", trusted.Targets[roleName].Signed.Version)
 	return trusted.Targets[roleName], nil
+}
+
+// HasVerifiedDelegation reports whether roleName was verified against delegatorName.
+func (trusted *TrustedMetadata) HasVerifiedDelegation(roleName, delegatorName string) bool {
+	if trusted.verifiedDelegations == nil {
+		return false
+	}
+	_, ok := trusted.verifiedDelegations[verifiedDelegation{delegator: delegatorName, role: roleName}]
+	return ok
 }
 
 // loadTrustedRoot verifies and loads "data" as trusted root metadata.
