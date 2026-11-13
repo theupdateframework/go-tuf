@@ -211,6 +211,16 @@ and updates parent references to match. For example, changing targets to version
 choose new versions or extend expired fixtures automatically. Add new delegated
 roles to their parent's `delegations` and to snapshot's `meta` before regenerating.
 
+The checked-in fixtures expire on 2030-01-01 (`role1`, `role2`) and 2030-08-15
+(top-level roles). Verification checks expiry against the current time, so after
+those dates `make check-fixtures` and the tests in `internal/testutils/fixtures`
+fail until the `expires` values are extended and the fixtures regenerated.
+
+A regeneration that changes anything rewrites every metadata file, not only the
+stale one: the tool re-serialises and re-signs the whole chain, and RSA-PSS
+signatures are salted. The first such run also moves delegated roles to the
+deterministic keys described below.
+
 Top-level roles use the existing RSA-PSS test keys in `keystore/`. Delegated roles
 are re-signed with public, deterministic **test-only** Ed25519 keys derived from
 the role name; the generator updates their parents' key declarations as well.
