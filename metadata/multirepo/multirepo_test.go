@@ -460,6 +460,10 @@ func TestEnsurePathsExistTable(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
+			if !cfg.DisableLocalCache {
+				assert.DirExists(t, cfg.LocalMetadataDir)
+				assert.DirExists(t, cfg.LocalTargetsDir)
+			}
 		})
 	}
 }
@@ -486,7 +490,7 @@ func TestNewFailureCases(t *testing.T) {
 		// The root bytes pass NewConfig (which only checks "is the key
 		// present") but fail when updater.New tries to parse them.
 		_, err = New(cfg)
-		assert.Error(t, err)
+		assert.ErrorContains(t, err, "failed to create Updater instance")
 	})
 
 	t.Run("empty trusted roots after NewConfig", func(t *testing.T) {
