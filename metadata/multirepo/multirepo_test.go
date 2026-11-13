@@ -107,10 +107,10 @@ func TestNewConfigErrorWrapping(t *testing.T) {
 	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
 
 	tests := []struct {
-		name         string
-		repoMap      []byte
-		roots        map[string][]byte
-		shouldWrap   []error
+		name          string
+		repoMap       []byte
+		roots         map[string][]byte
+		shouldWrap    []error
 		shouldNotWrap []error
 	}{
 		{

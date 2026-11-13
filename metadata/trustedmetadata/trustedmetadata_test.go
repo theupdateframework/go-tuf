@@ -348,6 +348,7 @@ func TestUpdateFlowTable(t *testing.T) {
 //   - threshold bumped without enough sigs
 //   - same version as trusted
 //   - invalid JSON (empty / unsigned-bump / wrong type)
+//
 // Plus the cross-cutting "intermediate root can expire, final root cannot"
 // flow.
 func TestUpdateRootTable(t *testing.T) {
@@ -807,11 +808,11 @@ func TestUpdateSnapshotTable(t *testing.T) {
 // preloads canonical timestamp + snapshot (customisable via preload).
 func TestUpdateTargetsTable(t *testing.T) {
 	tests := []struct {
-		name          string
-		preload       func(t *testing.T, ts *TrustedMetadata)
-		targetsBytes  func(t *testing.T) []byte
-		errIs         error
-		errContains   string
+		name         string
+		preload      func(t *testing.T, ts *TrustedMetadata)
+		targetsBytes func(t *testing.T) []byte
+		errIs        error
+		errContains  string
 	}{
 		{
 			name: "empty input is invalid JSON",
