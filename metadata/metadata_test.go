@@ -28,6 +28,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -300,6 +301,46 @@ func TestIsDelegatedPathInvalidPattern(t *testing.T) {
 	ok, err := role.IsDelegatedPath("targets/anything")
 	assert.False(t, ok)
 	assert.ErrorIs(t, err, path.ErrBadPattern)
+}
+
+func TestDelegatedRoleRejectsPathsWithPathHashPrefixes(t *testing.T) {
+	// A delegated role selects targets by path or by path hash prefix, never
+	// both. Such a role must be rejected on parse rather than accepted with
+	// "paths" silently taking precedence.
+	const role = `{"name":"r","keyids":[],"threshold":1,"terminating":false,%s}`
+	const targets = `{"signatures":[],"signed":{"_type":"targets","spec_version":"1.0.31","version":1,` +
+		`"expires":"2030-01-01T00:00:00Z","targets":{},"delegations":{"keys":{},"roles":[%s]}}}`
+
+	tests := []struct {
+		name    string
+		fields  string
+		wantErr bool
+	}{
+		{name: "paths only", fields: `"paths":["a/*"]`},
+		{name: "path hash prefixes only", fields: `"path_hash_prefixes":["ab"]`},
+		{name: "paths with null path hash prefixes", fields: `"paths":["a/*"],"path_hash_prefixes":null`},
+		{name: "both", fields: `"paths":["a/*"],"path_hash_prefixes":["ab"]`, wantErr: true},
+		{name: "both empty", fields: `"paths":[],"path_hash_prefixes":[]`, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roleJSON := fmt.Sprintf(role, tt.fields)
+
+			var parsed DelegatedRole
+			roleErr := json.Unmarshal([]byte(roleJSON), &parsed)
+			// The same role inside targets metadata, as a client receives it.
+			_, targetsErr := Targets().FromBytes(fmt.Appendf(nil, targets, roleJSON))
+
+			for _, err := range []error{roleErr, targetsErr} {
+				if !tt.wantErr {
+					assert.NoError(t, err)
+					continue
+				}
+				assert.ErrorIs(t, err, &ErrValue{})
+				assert.ErrorContains(t, err, `not allowed to have both "paths" and "path_hash_prefixes" present`)
+			}
+		})
+	}
 }
 
 func TestClearSignatures(t *testing.T) {
