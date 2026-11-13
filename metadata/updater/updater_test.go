@@ -490,21 +490,22 @@ func TestVersionRollbackTable(t *testing.T) {
 		name       string
 		role       string
 		wantErrMsg string
-		// wantCached is the version of role that must remain in the local
-		// cache after the rollback attempt is rejected.
-		wantCached int64
+		// wantCached lists the cached versions after the first refresh. Both
+		// rollbacks are detected while loading the new timestamp, so neither
+		// the timestamp nor the snapshot in the cache may change afterwards.
+		wantCached map[string]int64
 	}{
 		{
 			name:       "timestamp version rollback fails",
 			role:       metadata.TIMESTAMP,
 			wantErrMsg: "new timestamp version 2 must be >= 3",
-			wantCached: 3,
+			wantCached: map[string]int64{metadata.TIMESTAMP: 3, metadata.SNAPSHOT: 2},
 		},
 		{
 			name:       "snapshot version rollback fails",
 			role:       metadata.SNAPSHOT,
 			wantErrMsg: "new snapshot version 2 must be >= 3",
-			wantCached: 3,
+			wantCached: map[string]int64{metadata.TIMESTAMP: 2, metadata.SNAPSHOT: 3},
 		},
 	}
 
@@ -521,7 +522,9 @@ func TestVersionRollbackTable(t *testing.T) {
 			// First refresh succeeds
 			_, err := createAndRefresh(t, repo)
 			assert.NoError(t, err)
-			repo.AssertVersionEquals(tc.role, tc.wantCached)
+			for role, version := range tc.wantCached {
+				repo.AssertVersionEquals(role, version)
+			}
 
 			// Now try to rollback: the remote version of tc.role becomes 2.
 			repo.SetVersion(tc.role, 1)
@@ -533,8 +536,10 @@ func TestVersionRollbackTable(t *testing.T) {
 			assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{})
 			assert.ErrorContains(t, err, tc.wantErrMsg)
 
-			// The rolled-back metadata must not replace the cached version.
-			repo.AssertVersionEquals(tc.role, tc.wantCached)
+			// The rejected metadata must not replace what is cached.
+			for role, version := range tc.wantCached {
+				repo.AssertVersionEquals(role, version)
+			}
 		})
 	}
 }
