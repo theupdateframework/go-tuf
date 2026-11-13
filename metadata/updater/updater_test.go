@@ -20,7 +20,6 @@ package updater
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -30,18 +29,6 @@ import (
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"github.com/theupdateframework/go-tuf/v2/metadata/config"
 )
-
-// skipIfWindows guards the subtests that download a target through the
-// simulator. Its target routing splits the requested path on
-// filepath.Separator, which is "\" on Windows, while TUF target paths
-// always use "/", so those downloads do not work there. Subtests that only
-// fetch metadata or read local files do not need the skip.
-func skipIfWindows(t *testing.T) {
-	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("simulator target downloads do not work on windows; see skipIfWindows in metadata/updater/updater_test.go")
-	}
-}
 
 // createAndRefresh creates an updater for the test repository and runs Refresh
 func createAndRefresh(t *testing.T, repo *simulator.TestRepository) (*Updater, error) {
@@ -1301,10 +1288,6 @@ func TestDownloadTargetTable(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if !tc.wantErr {
-				// Only the cases that fetch the target need the skip.
-				skipIfWindows(t)
-			}
 			repo := simulator.NewTestRepository(t)
 			defer repo.Cleanup()
 			// Disable consistent-snapshot to dodge the simulator's
@@ -1368,7 +1351,6 @@ func TestFindCachedTargetTable(t *testing.T) {
 	targetContent := []byte("cached payload")
 
 	t.Run("returns cached path and bytes after a download", func(t *testing.T) {
-		skipIfWindows(t)
 		repo := simulator.NewTestRepository(t)
 		defer repo.Cleanup()
 		repo.Simulator.MDRoot.Signed.ConsistentSnapshot = false
