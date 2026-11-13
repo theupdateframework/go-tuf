@@ -74,9 +74,15 @@ func TestDownLoadFile(t *testing.T) {
 			wantErr:   nil,
 		},
 		{
-			name:    "invalid url",
-			desc:    "URL does not resolve",
-			makeURL: func(*httptest.Server) string { return "http://127.0.0.1:1/" },
+			name: "unreachable server",
+			desc: "Connection is refused",
+			makeURL: func(*httptest.Server) string {
+				// A server that has been shut down refuses connections,
+				// without relying on any fixed port being closed.
+				closed := httptest.NewServer(http.NotFoundHandler())
+				closed.Close()
+				return closed.URL + "/"
+			},
 			data:    nil,
 			wantErr: &url.Error{},
 		},
@@ -218,9 +224,13 @@ func TestDownloadFile_Retry(t *testing.T) {
 // back to http.DefaultClient" branch in DownloadFile.
 func TestDownloadFile_NoHTTPClientSet(t *testing.T) {
 	server := newRootServer(t)
-	fetcher := DefaultFetcher{}
-	_, err := fetcher.DownloadFile(server.URL+"/1.root.json", 512000, 0)
+	// A zero-value fetcher has no retry limit either; cap it so a failing
+	// request fails the test instead of retrying until the test times out.
+	fetcher := DefaultFetcher{retryOptions: []backoff.RetryOption{backoff.WithMaxTries(1)}}
+	data, err := fetcher.DownloadFile(server.URL+"/1.root.json", 512000, 0)
 	assert.NoError(t, err)
+	assert.Equal(t, sampleRootData, data)
+	assert.Same(t, http.DefaultClient, fetcher.client)
 }
 
 // TestNewFetcherWithHTTPClient verifies that the constructor returns a
@@ -320,44 +330,88 @@ func TestSetTransportTable(t *testing.T) {
 	}
 }
 
-// TestSetRetry verifies that SetRetry installs constant-interval retry
-// options on the fetcher.
+// mockURL is never dialled: the tests below serve it from a MockHTTPClient.
+const mockURL = "http://go-tuf.invalid/1.root.json"
+
+// TestSetRetry verifies that SetRetry controls how many times a download
+// is attempted.
 func TestSetRetry(t *testing.T) {
 	tests := []struct {
-		name     string
-		interval time.Duration
-		count    uint
+		name      string
+		interval  time.Duration
+		count     uint
+		client    *MockHTTPClient
+		wantTries int
+		wantErr   bool
 	}{
-		{name: "non-zero interval and count", interval: 100 * time.Millisecond, count: 3},
-		{name: "zero interval and count", interval: 0, count: 0},
+		{
+			name:      "non-zero count stops after that many tries",
+			interval:  time.Millisecond,
+			count:     3,
+			client:    &MockHTTPClient{AlwaysFail: true},
+			wantTries: 3,
+			wantErr:   true,
+		},
+		{
+			name:      "zero count does not cap the tries",
+			interval:  0,
+			count:     0,
+			client:    &MockHTTPClient{SucceedOnTryN: 4},
+			wantTries: 4,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := NewDefaultFetcher()
+			f.SetHTTPClient(tt.client)
 			f.SetRetry(tt.interval, tt.count)
-			// SetRetry replaces retryOptions with [constantBackOff, maxTries].
+			// SetRetry installs a constant backoff and a try limit.
 			assert.Len(t, f.retryOptions, 2)
+
+			_, err := f.DownloadFile(mockURL, 512000, 0)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantTries, tt.client.TryCount)
 		})
 	}
 }
 
 // TestSetRetryOptions verifies that SetRetryOptions replaces the entire
-// retryOptions slice with whatever the caller passes.
+// retryOptions slice with whatever the caller passes, and that the new
+// options govern the next download.
 func TestSetRetryOptions(t *testing.T) {
 	tests := []struct {
 		name     string
 		opts     []backoff.RetryOption
 		expected int
+		// client, when set, serves a download to observe the options.
+		client    *MockHTTPClient
+		wantTries int
+		wantErr   bool
 	}{
 		{name: "nil clears retry options", opts: nil, expected: 0},
-		{name: "one option installs one", opts: []backoff.RetryOption{backoff.WithMaxTries(5)}, expected: 1},
 		{
-			name: "multiple options install all of them",
+			// The default fetcher tries once; replacing its options with a
+			// backoff alone lifts that limit.
+			name:      "one option replaces the default single try",
+			opts:      []backoff.RetryOption{backoff.WithBackOff(backoff.NewConstantBackOff(0))},
+			expected:  1,
+			client:    &MockHTTPClient{SucceedOnTryN: 4},
+			wantTries: 4,
+		},
+		{
+			name: "multiple options are all installed",
 			opts: []backoff.RetryOption{
 				backoff.WithMaxTries(5),
 				backoff.WithBackOff(backoff.NewConstantBackOff(0)),
 			},
-			expected: 2,
+			expected:  2,
+			client:    &MockHTTPClient{AlwaysFail: true},
+			wantTries: 5,
+			wantErr:   true,
 		},
 	}
 	for _, tt := range tests {
@@ -365,6 +419,18 @@ func TestSetRetryOptions(t *testing.T) {
 			f := NewDefaultFetcher()
 			f.SetRetryOptions(tt.opts...)
 			assert.Len(t, f.retryOptions, tt.expected)
+			if tt.client == nil {
+				return
+			}
+
+			f.SetHTTPClient(tt.client)
+			_, err := f.DownloadFile(mockURL, 512000, 0)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantTries, tt.client.TryCount)
 		})
 	}
 }
