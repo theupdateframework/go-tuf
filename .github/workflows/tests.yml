@@ -42,6 +42,11 @@ jobs:
           cache: true
 
       - name: Run tests
+        # PowerShell, the default shell on Windows runners, splits arguments
+        # such as -coverpkg=./metadata/... at the first dot. That silently
+        # limited the Windows run to the ./metadata/... packages and dropped
+        # the -coverpkg setting.
+        shell: bash
         env:
           GO_TUF_NETWORK_TESTS: "1"
         run: go test -race -covermode=atomic -coverpkg=./metadata/... -coverprofile=coverage.out ./...
