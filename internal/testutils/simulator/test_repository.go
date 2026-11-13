@@ -163,6 +163,12 @@ func (r *TestRepository) GetUpdaterConfig() (*config.UpdaterConfig, error) {
 	cfg.Fetcher = r.Simulator
 	cfg.LocalMetadataDir = r.MetadataDir
 	cfg.LocalTargetsDir = r.TargetsDir
+	// Route target downloads to the simulator. It handles URLs under
+	// TargetsDir; the default derived by config.New (<metadata URL>/targets)
+	// is not a path it recognises. With consistent snapshots the simulator
+	// cannot resolve hash-prefixed target names that contain a dot, so tests
+	// downloading such targets turn consistent snapshots off.
+	cfg.RemoteTargetsURL = r.TargetsDir
 	return cfg, nil
 }
 
@@ -197,6 +203,9 @@ func (r *TestRepository) SetExpiresAt(role string, expires time.Time) {
 		r.Simulator.MDSnapshot.Signed.Expires = expires
 	case metadata.TIMESTAMP:
 		r.Simulator.MDTimestamp.Signed.Expires = expires
+	default:
+		r.t.Helper()
+		r.t.Fatalf("SetExpiresAt: unsupported role %q", role)
 	}
 }
 
@@ -211,6 +220,9 @@ func (r *TestRepository) SetVersion(role string, version int64) {
 		r.Simulator.MDSnapshot.Signed.Version = version
 	case metadata.TIMESTAMP:
 		r.Simulator.MDTimestamp.Signed.Version = version
+	default:
+		r.t.Helper()
+		r.t.Fatalf("SetVersion: unsupported role %q", role)
 	}
 }
 
@@ -226,6 +238,8 @@ func (r *TestRepository) GetVersion(role string) int64 {
 	case metadata.TIMESTAMP:
 		return r.Simulator.MDTimestamp.Signed.Version
 	}
+	r.t.Helper()
+	r.t.Fatalf("GetVersion: unsupported role %q", role)
 	return 0
 }
 
@@ -241,6 +255,9 @@ func (r *TestRepository) BumpVersion(role string) {
 		r.Simulator.MDSnapshot.Signed.Version++
 	case metadata.TIMESTAMP:
 		r.Simulator.MDTimestamp.Signed.Version++
+	default:
+		r.t.Helper()
+		r.t.Fatalf("BumpVersion: unsupported role %q", role)
 	}
 }
 
@@ -395,6 +412,8 @@ func (r *TestRepository) AssertVersionEquals(role string, expectedVersion int64)
 		if md.Signed.Version != expectedVersion {
 			r.t.Errorf("expected %s version %d, got %d", role, expectedVersion, md.Signed.Version)
 		}
+	default:
+		r.t.Fatalf("AssertVersionEquals: unsupported role %q", role)
 	}
 }
 

@@ -203,6 +203,8 @@ func (b *SimulatorBuilder) Build(t *testing.T) *RepositorySimulator {
 			sim.MDSnapshot.Signed.Expires = pastTime
 		case metadata.TIMESTAMP:
 			sim.MDTimestamp.Signed.Expires = pastTime
+		default:
+			t.Fatalf("WithExpiredRole: unsupported role %q", role)
 		}
 	}
 
@@ -217,6 +219,8 @@ func (b *SimulatorBuilder) Build(t *testing.T) *RepositorySimulator {
 			sim.MDSnapshot.Signed.Version = version
 		case metadata.TIMESTAMP:
 			sim.MDTimestamp.Signed.Version = version
+		default:
+			t.Fatalf("WithVersion: unsupported role %q", role)
 		}
 	}
 

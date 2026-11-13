@@ -267,11 +267,15 @@ func (rs *RepositorySimulator) PublishRoot() {
 	slog.Info("Published root", "version", rs.MDRoot.Signed.Version)
 }
 
+// lastIndex splits str at the last occurrence of delimiter. It returns the
+// part before the delimiter, the delimiter, and the part after it. A string
+// without the delimiter is returned whole as the last part.
 func lastIndex(str string, delimiter string) (string, string, string) {
-	// TODO: check if contained and lengths
-	spl := strings.Split(str, delimiter)
-	res := strings.SplitAfterN(str, delimiter, len(spl)-1)
-	return res[0], delimiter, res[1]
+	i := strings.LastIndex(str, delimiter)
+	if i < 0 {
+		return "", "", str
+	}
+	return str[:i], delimiter, str[i+len(delimiter):]
 }
 
 func partition(s string, delimiter string) (string, string) {

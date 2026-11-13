@@ -18,6 +18,8 @@
 package simulator_test
 
 import (
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -97,5 +99,37 @@ func TestCacheAssertionsDoNotMutateRepository(t *testing.T) {
 		repo.BumpVersion(role)
 		repo.AssertVersionEquals(role, cachedVersion)
 		require.Equal(t, cachedVersion+1, repo.GetVersion(role), "asserting %s must not change remote metadata", role)
+	}
+}
+
+// TestDefaultConfigDownloadsTargets checks that the config GetUpdaterConfig
+// returns can download a target from the simulator at any directory depth.
+func TestDefaultConfigDownloadsTargets(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the simulator's target routing uses the OS path separator")
+	}
+	for _, targetPath := range []string{"file.txt", "dir/file.txt", "a/b/file.txt", "a/b/c/file.txt"} {
+		t.Run(targetPath, func(t *testing.T) {
+			repo := simulator.NewTestRepository(t)
+			// With consistent snapshots the simulator cannot resolve
+			// hash-prefixed target names that contain a dot.
+			repo.Simulator.MDRoot.Signed.ConsistentSnapshot = false
+			repo.BumpVersion(metadata.ROOT)
+			content := []byte("content of " + targetPath)
+			repo.AddTarget(metadata.TARGETS, content, targetPath)
+			repo.UpdateSnapshot()
+
+			cfg, err := repo.GetUpdaterConfig()
+			require.NoError(t, err)
+			up, err := updater.New(cfg)
+			require.NoError(t, err)
+			require.NoError(t, up.Refresh())
+			info, err := up.GetTargetInfo(targetPath)
+			require.NoError(t, err)
+
+			_, data, err := up.DownloadTarget(info, filepath.Join(t.TempDir(), "out"), "")
+			require.NoError(t, err)
+			require.Equal(t, content, data)
+		})
 	}
 }
