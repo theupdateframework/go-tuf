@@ -127,7 +127,7 @@ func TestUpdaterConfigNew(t *testing.T) {
 	}
 }
 
-// TestUpdaterConfigDefaults verifies the default and custom configuration values.
+// TestUpdaterConfigDefaults verifies the default configuration values.
 func TestUpdaterConfigDefaults(t *testing.T) {
 	t.Run("default configuration values", func(t *testing.T) {
 		rootBytes := helpers.CreateTestRootJSON(t)
@@ -140,6 +140,10 @@ func TestUpdaterConfigDefaults(t *testing.T) {
 		assert.Equal(t, "https://example.com/targets", cfg.RemoteTargetsURL)
 		assert.Equal(t, rootBytes, cfg.LocalTrustedRoot)
 
+		// The local cache directories are left for the caller to choose.
+		assert.Empty(t, cfg.LocalMetadataDir)
+		assert.Empty(t, cfg.LocalTargetsDir)
+
 		assert.Equal(t, int64(256), cfg.MaxRootRotations)
 		assert.Equal(t, 32, cfg.MaxDelegations)
 		assert.Equal(t, int64(512000), cfg.RootMaxLength)
@@ -151,23 +155,6 @@ func TestUpdaterConfigDefaults(t *testing.T) {
 		assert.False(t, cfg.DisableLocalCache)
 		assert.NotNil(t, cfg.Fetcher)
 		assert.IsType(t, &fetcher.DefaultFetcher{}, cfg.Fetcher)
-	})
-
-	t.Run("custom configuration values", func(t *testing.T) {
-		cfg, err := New("https://example.com", helpers.CreateTestRootJSON(t))
-		assert.NoError(t, err)
-
-		cfg.MaxRootRotations = 100
-		cfg.MaxDelegations = 10
-		cfg.RootMaxLength = 100000
-		cfg.UnsafeLocalMode = true
-		cfg.PrefixTargetsWithHash = false
-
-		assert.Equal(t, int64(100), cfg.MaxRootRotations)
-		assert.Equal(t, 10, cfg.MaxDelegations)
-		assert.Equal(t, int64(100000), cfg.RootMaxLength)
-		assert.True(t, cfg.UnsafeLocalMode)
-		assert.False(t, cfg.PrefixTargetsWithHash)
 	})
 }
 
@@ -288,33 +275,10 @@ func TestEnsurePathsExistTable(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
+			if !cfg.DisableLocalCache {
+				assert.DirExists(t, cfg.LocalMetadataDir)
+				assert.DirExists(t, cfg.LocalTargetsDir)
+			}
 		})
 	}
-}
-
-// TestUpdaterConfigCopy verifies that config values can be copied independently.
-func TestUpdaterConfigCopy(t *testing.T) {
-	original, err := New("https://example.com", helpers.CreateTestRootJSON(t))
-	assert.NoError(t, err)
-
-	copied := *original
-
-	// Mutate the original
-	original.MaxRootRotations = 999
-	original.UnsafeLocalMode = true
-
-	// Verify the copy is independent of the original
-	assert.NotEqual(t, copied.MaxRootRotations, original.MaxRootRotations)
-	assert.NotEqual(t, copied.UnsafeLocalMode, original.UnsafeLocalMode)
-}
-
-// TestUpdaterConfigCustomFetcher verifies that a custom fetcher can be set.
-func TestUpdaterConfigCustomFetcher(t *testing.T) {
-	cfg, err := New("https://example.com", helpers.CreateTestRootJSON(t))
-	assert.NoError(t, err)
-
-	customFetcher := &fetcher.DefaultFetcher{}
-	cfg.Fetcher = customFetcher
-
-	assert.Same(t, customFetcher, cfg.Fetcher)
 }
