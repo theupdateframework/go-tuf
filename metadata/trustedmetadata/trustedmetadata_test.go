@@ -221,12 +221,18 @@ func updateAllBesidesTargets(trustedSet *TrustedMetadata, timestampBytes []byte,
 	return nil
 }
 
+// fixtureRefTime is the reference time used for expiry checks. It is fixed
+// so these tests do not depend on the wall clock: the static fixtures expire
+// in 2030, and the expired cases below set Expires to 1970.
+var fixtureRefTime = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
 // newTrustedSetT is a small require-style helper: construct a fresh
 // TrustedMetadata from the canonical root fixture or fail the test.
 func newTrustedSetT(t *testing.T) *TrustedMetadata {
 	t.Helper()
 	ts, err := New(allRoles[metadata.ROOT])
 	require.NoError(t, err)
+	ts.RefTime = fixtureRefTime
 	return ts
 }
 
