@@ -19,12 +19,9 @@ package metadata
 
 import (
 	"bytes"
-	"crypto"
 	"crypto/hmac"
-	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/sha512"
-	"crypto/x509"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -40,7 +37,6 @@ import (
 	"time"
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
-	"github.com/sigstore/sigstore/pkg/signature"
 )
 
 // Root return new metadata instance of type Root
@@ -204,50 +200,6 @@ func (meta *Metadata[T]) ToFile(name string, pretty bool) error {
 	return os.WriteFile(name, data, 0644)
 }
 
-// Sign create signature over Signed and assign it to Signatures
-func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
-	// encode the Signed part to canonical JSON so signatures are consistent
-	payload, err := cjson.EncodeCanonical(meta.Signed)
-	if err != nil {
-		return nil, err
-	}
-	// get the signer's PublicKey
-	publ, err := signer.PublicKey()
-	if err != nil {
-		return nil, err
-	}
-	// convert to TUF Key type to get keyID
-	key, err := KeyFromPublicKey(publ)
-	if err != nil {
-		return nil, err
-	}
-	keyID, err := key.ID()
-	if err != nil {
-		return nil, err
-	}
-
-	payloadToSign, err := preparePayload(key, payload)
-	if err != nil {
-		return nil, err
-	}
-
-	// sign the Signed part
-	sb, err := signer.SignMessage(bytes.NewReader(payloadToSign))
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", &ErrUnsignedMetadata{Msg: "problem signing metadata"}, err)
-	}
-	// build signature
-	sig := &Signature{
-		KeyID:     keyID,
-		Signature: sb,
-	}
-	// update the Signatures part
-	meta.Signatures = append(meta.Signatures, *sig)
-	// return the new signature
-	log.Info("Signed metadata with key", "ID", keyID)
-	return sig, nil
-}
-
 // preparePayload returns the payload to sign or verify, applying protocol
 // pre-hashing and domain separation if required by the key type (e.g. TAP 21 for ML-DSA).
 func preparePayload(key *Key, payload []byte) ([]byte, error) {
@@ -263,11 +215,30 @@ func preparePayload(key *Key, payload []byte) ([]byte, error) {
 	return append(prefix, h[:]...), nil
 }
 
-// VerifyDelegate verifies that delegatedMetadata is signed with the required
-// threshold of keys for the delegated role delegatedRole
+// Verifier verifies signatures and supplies the canonical public-key encoding
+// used for threshold deduplication. The encoding must identify the underlying
+// public key independently of its key ID, scheme alias, signature or payload.
+// Use canonical SubjectPublicKeyInfo when the algorithm has that encoding.
+type Verifier interface {
+	PublicKeyBytes() []byte
+	VerifySignature(signature, payload []byte) error
+}
+
+// VerifyDelegate verifies the required signature threshold using the default verifier.
 func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata any) error {
+	return meta.VerifyDelegateWithVerifier(delegatedRole, delegatedMetadata, nil)
+}
+
+// VerifyDelegateWithVerifier uses an optional per-key verifier constructor.
+// Nil selects NewVerifier. Callers can wrap it to restrict algorithms or supply
+// another implementation without changing TUF's state machine or thresholds.
+func (meta *Metadata[T]) VerifyDelegateWithVerifier(delegatedRole string, delegatedMetadata any, newVerifier func(*Key) (Verifier, error)) error {
+	if newVerifier == nil {
+		newVerifier = NewVerifier
+	}
+
 	i := any(meta)
-	// keyed by SHA-256 of the PKIX-marshaled public key bytes, not by keyID,
+	// keyed by SHA-256 of the canonical public-key encoding, not by keyID,
 	// so two *Key records that resolve to the same underlying public key
 	// (e.g. registered under both "ecdsa" and "ecdsa-sha2-nistp256") count
 	// as a single threshold contribution.
@@ -370,57 +341,22 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			continue
 		}
 
-		// convert to a PublicKey type
-		publicKey, err := key.ToPublicKey()
+		verifier, err := newVerifier(key)
 		if err != nil {
 			return err
 		}
-
-		pubBytes, err := x509.MarshalPKIXPublicKey(publicKey)
-		if err != nil {
-			return err
+		if verifier == nil {
+			return &ErrValue{Msg: "verifier returned no public key"}
 		}
-		pubFingerprint := sha256.Sum256(pubBytes)
+		publicKeyBytes := verifier.PublicKeyBytes()
+		if len(publicKeyBytes) == 0 {
+			return &ErrValue{Msg: "verifier returned no public key"}
+		}
+		pubFingerprint := sha256.Sum256(publicKeyBytes)
 		fingerprint := hex.EncodeToString(pubFingerprint[:])
-		// use corresponding hash function for key type
-		hash := crypto.Hash(0)
-		if key.Type != KeyTypeEd25519 && key.Type != KeyTypeMLDSA {
-			switch key.Scheme {
-			case KeySchemeECDSA_SHA2_P256:
-				hash = crypto.SHA256
-			case KeySchemeECDSA_SHA2_P384:
-				hash = crypto.SHA384
-			default:
-				hash = crypto.SHA256
-			}
-		}
-		// load a verifier based on that key
-		// handle RSA PSS scheme separately as the LoadVerifier function doesn't identify it correctly
-		// Note we should support RSA PSS, not RSA PKCS1v15 (which is what LoadVerifier would return)
-		// Reference: https://theupdateframework.github.io/specification/latest/#file-formats-keys
-		var verifier signature.Verifier
-		if key.Type == KeyTypeRSASSA_PSS_SHA256 {
-			// Load a verifier for rsa
-			publicKeyRSAPSS, ok := publicKey.(*rsa.PublicKey)
-			if !ok {
-				return &ErrType{Msg: "failed to convert public key to RSA PSS key"}
-			}
-			verifier, err = signature.LoadRSAPSSVerifier(publicKeyRSAPSS, hash, &rsa.PSSOptions{Hash: crypto.SHA256})
-		} else {
-			// Load a verifier for ed25519, ecdsa, and ml-dsa
-			verifier, err = signature.LoadVerifier(publicKey, hash)
-		}
-		if err != nil {
-			return err
-		}
-
-		payloadToVerify, err := preparePayload(key, payload)
-		if err != nil {
-			return err
-		}
 
 		// verify if the signature for that payload corresponds to the given key
-		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payloadToVerify)); err != nil {
+		if err := verifier.VerifySignature(sign.Signature, payload); err != nil {
 			// failed to verify the metadata with that key ID
 			log.Info("Failed to verify role with key ID", "role", delegatedRole, "ID", keyID)
 		} else {
