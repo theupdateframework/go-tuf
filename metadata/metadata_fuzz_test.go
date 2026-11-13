@@ -18,16 +18,22 @@
 package metadata
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils/helpers"
 )
 
+// The seed corpora and fuzz bodies below build metadata with fixedExpire
+// rather than the constructors' default of time.Now(), so a given input
+// always produces the same bytes.
+
 // FuzzRootFromBytes tests Root metadata parsing with random input
 func FuzzRootFromBytes(f *testing.F) {
 	// Add seed corpus
-	root := Root()
+	root := Root(fixedExpire)
 	validData, _ := root.ToBytes(false)
 	f.Add(validData)
 
@@ -61,7 +67,7 @@ func FuzzRootFromBytes(f *testing.F) {
 // FuzzTargetsFromBytes tests Targets metadata parsing with random input
 func FuzzTargetsFromBytes(f *testing.F) {
 	// Add seed corpus
-	targets := Targets()
+	targets := Targets(fixedExpire)
 	validData, _ := targets.ToBytes(false)
 	f.Add(validData)
 
@@ -90,7 +96,7 @@ func FuzzTargetsFromBytes(f *testing.F) {
 
 // FuzzSnapshotFromBytes tests Snapshot metadata parsing with random input
 func FuzzSnapshotFromBytes(f *testing.F) {
-	snapshot := Snapshot()
+	snapshot := Snapshot(fixedExpire)
 	validData, _ := snapshot.ToBytes(false)
 	f.Add(validData)
 
@@ -119,7 +125,7 @@ func FuzzSnapshotFromBytes(f *testing.F) {
 
 // FuzzTimestampFromBytes tests Timestamp metadata parsing with random input
 func FuzzTimestampFromBytes(f *testing.F) {
-	timestamp := Timestamp()
+	timestamp := Timestamp(fixedExpire)
 	validData, _ := timestamp.ToBytes(false)
 	f.Add(validData)
 
@@ -146,7 +152,8 @@ func FuzzTimestampFromBytes(f *testing.F) {
 	})
 }
 
-// FuzzMetadataToBytes tests metadata serialization
+// FuzzMetadataToBytes tests metadata serialization: every role must
+// serialise for any version, and the version must survive a re-parse.
 func FuzzMetadataToBytes(f *testing.F) {
 	// Add some variations
 	f.Add(int64(1), true) // version, pretty
@@ -161,75 +168,57 @@ func FuzzMetadataToBytes(f *testing.F) {
 			}
 		}()
 
-		// Test each metadata type
-		testCases := []func(){
-			func() {
-				root := Root()
-				root.Signed.Version = version
-				_, _ = root.ToBytes(pretty)
-			},
-			func() {
-				targets := Targets()
-				targets.Signed.Version = version
-				_, _ = targets.ToBytes(pretty)
-			},
-			func() {
-				snapshot := Snapshot()
-				snapshot.Signed.Version = version
-				_, _ = snapshot.ToBytes(pretty)
-			},
-			func() {
-				timestamp := Timestamp()
-				timestamp.Signed.Version = version
-				_, _ = timestamp.ToBytes(pretty)
-			},
+		root := Root(fixedExpire)
+		root.Signed.Version = version
+		data, err := root.ToBytes(pretty)
+		if err != nil {
+			t.Fatalf("root ToBytes failed: %v", err)
+		}
+		if parsed, err := Root().FromBytes(data); err != nil {
+			t.Errorf("root did not re-parse: %v", err)
+		} else if parsed.Signed.Version != version {
+			t.Errorf("root version changed: want %d, got %d", version, parsed.Signed.Version)
 		}
 
-		for _, testFunc := range testCases {
-			testFunc()
+		targets := Targets(fixedExpire)
+		targets.Signed.Version = version
+		data, err = targets.ToBytes(pretty)
+		if err != nil {
+			t.Fatalf("targets ToBytes failed: %v", err)
+		}
+		if parsed, err := Targets().FromBytes(data); err != nil {
+			t.Errorf("targets did not re-parse: %v", err)
+		} else if parsed.Signed.Version != version {
+			t.Errorf("targets version changed: want %d, got %d", version, parsed.Signed.Version)
+		}
+
+		snapshot := Snapshot(fixedExpire)
+		snapshot.Signed.Version = version
+		data, err = snapshot.ToBytes(pretty)
+		if err != nil {
+			t.Fatalf("snapshot ToBytes failed: %v", err)
+		}
+		if parsed, err := Snapshot().FromBytes(data); err != nil {
+			t.Errorf("snapshot did not re-parse: %v", err)
+		} else if parsed.Signed.Version != version {
+			t.Errorf("snapshot version changed: want %d, got %d", version, parsed.Signed.Version)
+		}
+
+		timestamp := Timestamp(fixedExpire)
+		timestamp.Signed.Version = version
+		data, err = timestamp.ToBytes(pretty)
+		if err != nil {
+			t.Fatalf("timestamp ToBytes failed: %v", err)
+		}
+		if parsed, err := Timestamp().FromBytes(data); err != nil {
+			t.Errorf("timestamp did not re-parse: %v", err)
+		} else if parsed.Signed.Version != version {
+			t.Errorf("timestamp version changed: want %d, got %d", version, parsed.Signed.Version)
 		}
 	})
 }
 
-// FuzzJSONMarshaling tests JSON marshaling of metadata structures
-func FuzzJSONMarshaling(f *testing.F) {
-	generator := helpers.NewFuzzDataGenerator(0, 0)
-
-	// Add valid JSON samples
-	f.Add([]byte(`{"test": "value"}`))
-	f.Add([]byte(`{}`))
-	f.Add([]byte(`[]`))
-	f.Add(helpers.BuildRootJSON())
-
-	// Add some random data
-	for i := 0; i < 5; i++ {
-		f.Add(generator.GenerateRandomJSON())
-		f.Add(generator.GenerateCorruptedJSON())
-	}
-
-	f.Fuzz(func(t *testing.T, data []byte) {
-		defer func() {
-			if r := recover(); r != nil {
-				t.Errorf("JSON marshaling panicked with input %q: %v", string(data), r)
-			}
-		}()
-
-		var v interface{}
-		err := json.Unmarshal(data, &v)
-		if err != nil {
-			// Invalid JSON is expected, not an error
-			return
-		}
-
-		// If we can unmarshal, we should be able to marshal back
-		_, err = json.Marshal(v)
-		if err != nil {
-			t.Errorf("failed to marshal back after unmarshal: %v", err)
-		}
-	})
-}
-
-// FuzzHexBytes tests HexBytes marshaling/unmarshaling
+// FuzzHexBytes tests that HexBytes survives a JSON round trip unchanged.
 func FuzzHexBytes(f *testing.F) {
 	// Add seed data
 	f.Add([]byte(""))
@@ -249,29 +238,27 @@ func FuzzHexBytes(f *testing.F) {
 			}
 		}()
 
-		hexBytes := HexBytes(data)
-
-		// Test JSON marshaling
-		jsonData, err := json.Marshal(hexBytes)
+		// Any byte slice has a hex encoding, so neither direction may fail.
+		jsonData, err := json.Marshal(HexBytes(data))
 		if err != nil {
-			return // Some data might not be marshalable
+			t.Fatalf("HexBytes marshal failed for %v: %v", data, err)
 		}
 
-		// Test JSON unmarshaling
 		var unmarshaled HexBytes
-		err = json.Unmarshal(jsonData, &unmarshaled)
-		if err != nil {
-			return // Some JSON might not be unmarshalable
+		if err = json.Unmarshal(jsonData, &unmarshaled); err != nil {
+			t.Fatalf("HexBytes unmarshal failed for %s: %v", jsonData, err)
 		}
 
-		// If both operations succeeded, the data should be the same
-		if len(data) > 0 && string(hexBytes) != string(unmarshaled) {
-			t.Errorf("HexBytes roundtrip failed: original %v, got %v", hexBytes, unmarshaled)
+		if !bytes.Equal(data, unmarshaled) {
+			t.Errorf("HexBytes roundtrip failed: original %v, got %v", data, unmarshaled)
 		}
 	})
 }
 
-// FuzzMetadataFieldsValidation tests validation of metadata fields
+// FuzzMetadataFieldsValidation tests the type check in FromBytes. The payload
+// carries every collection a role requires, so the only thing deciding
+// whether a role accepts it is the fuzzed _type: the version and
+// spec_version are not validated on parse.
 func FuzzMetadataFieldsValidation(f *testing.F) {
 	generator := helpers.NewFuzzDataGenerator(0, 0)
 
@@ -308,6 +295,12 @@ func FuzzMetadataFieldsValidation(f *testing.F) {
 				"version":      version,
 				"spec_version": specVersion,
 				"expires":      "2030-01-01T00:00:00Z",
+				"keys":         map[string]interface{}{},
+				"roles":        map[string]interface{}{},
+				"meta": map[string]interface{}{
+					"snapshot.json": map[string]interface{}{"version": 1},
+				},
+				"targets": map[string]interface{}{},
 			},
 			"signatures": []interface{}{},
 		}
@@ -317,15 +310,29 @@ func FuzzMetadataFieldsValidation(f *testing.F) {
 			return
 		}
 
-		// Test parsing with each metadata type
-		_, _ = Root().FromBytes(jsonData)
-		_, _ = Targets().FromBytes(jsonData)
-		_, _ = Snapshot().FromBytes(jsonData)
-		_, _ = Timestamp().FromBytes(jsonData)
+		// Each role must accept the payload exactly when _type names it.
+		check := func(role string, err error) {
+			t.Helper()
+			if metadataType == role && err != nil {
+				t.Errorf("%s rejected a payload of its own type: %v", role, err)
+			}
+			if metadataType != role && err == nil {
+				t.Errorf("%s accepted a payload of type %q", role, metadataType)
+			}
+		}
+		_, err = Root().FromBytes(jsonData)
+		check(ROOT, err)
+		_, err = Targets().FromBytes(jsonData)
+		check(TARGETS, err)
+		_, err = Snapshot().FromBytes(jsonData)
+		check(SNAPSHOT, err)
+		_, err = Timestamp().FromBytes(jsonData)
+		check(TIMESTAMP, err)
 	})
 }
 
-// FuzzSignatureOperations tests signature-related operations
+// FuzzSignatureOperations tests that a Signature survives a JSON round trip
+// and can be attached to metadata that still serialises.
 func FuzzSignatureOperations(f *testing.F) {
 	generator := helpers.NewFuzzDataGenerator(0, 0)
 
@@ -355,25 +362,31 @@ func FuzzSignatureOperations(f *testing.F) {
 			Signature: HexBytes(sigData),
 		}
 
-		// Test JSON marshaling
 		jsonData, err := json.Marshal(sig)
 		if err != nil {
-			return
+			t.Fatalf("Signature marshal failed: %v", err)
 		}
 
-		// Test JSON unmarshaling
 		var unmarshaled Signature
-		err = json.Unmarshal(jsonData, &unmarshaled)
-		if err != nil {
-			return
+		if err = json.Unmarshal(jsonData, &unmarshaled); err != nil {
+			t.Fatalf("Signature unmarshal failed for %s: %v", jsonData, err)
 		}
 
-		// Test adding to metadata
-		root := Root()
-		root.Signatures = append(root.Signatures, sig)
+		if !bytes.Equal(sigData, unmarshaled.Signature) {
+			t.Errorf("signature bytes changed: want %x, got %x", sigData, unmarshaled.Signature)
+		}
+		// encoding/json replaces invalid UTF-8, so only valid key IDs are
+		// expected to come back unchanged.
+		if utf8.ValidString(keyID) && unmarshaled.KeyID != keyID {
+			t.Errorf("key ID changed: want %q, got %q", keyID, unmarshaled.KeyID)
+		}
 
-		// Test serialization
-		_, _ = root.ToBytes(false)
+		// Metadata carrying the signature must still serialise.
+		root := Root(fixedExpire)
+		root.Signatures = append(root.Signatures, sig)
+		if _, err = root.ToBytes(false); err != nil {
+			t.Errorf("ToBytes failed with the signature attached: %v", err)
+		}
 	})
 }
 
@@ -408,13 +421,6 @@ func FuzzCompleteMetadataStructure(f *testing.F) {
 
 		for _, parseFunc := range metadataTypes {
 			parseFunc()
-		}
-
-		// Test if it's valid JSON at all
-		var v interface{}
-		if err := json.Unmarshal(data, &v); err == nil {
-			// If it's valid JSON, test re-marshaling
-			_, _ = json.Marshal(v)
 		}
 	})
 }
