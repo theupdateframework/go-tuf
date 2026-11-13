@@ -1446,7 +1446,12 @@ func TestFindCachedTargetTable(t *testing.T) {
 		info, err := up.GetTargetInfo(targetPath)
 		assert.NoError(t, err)
 
-		gotPath, gotData, err := up.FindCachedTarget(info, "")
+		// A valid copy of the target exists at the path, so only the
+		// disabled cache can explain an empty result.
+		dst := filepath.Join(t.TempDir(), "cached")
+		assert.NoError(t, os.WriteFile(dst, targetContent, 0644))
+
+		gotPath, gotData, err := up.FindCachedTarget(info, dst)
 		assert.NoError(t, err)
 		assert.Empty(t, gotPath)
 		assert.Empty(t, gotData)
