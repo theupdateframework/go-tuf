@@ -16,9 +16,7 @@ internal/testutils/
 ├── rsapss/                          # RSA-PSS signing utilities
 ├── signer/                          # generic signing test utilities
 └── simulator/
-    ├── config.go
     ├── repository_simulator.go      # HTTP-free TUF repository simulator
-    ├── repository_simulator_setup.go
     ├── util.go
     ├── builder.go                   # SimulatorBuilder fluent API
     └── test_repository.go           # TestRepository — isolated test state
