@@ -18,9 +18,13 @@
 package config
 
 import (
+	"errors"
+	"io"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -306,6 +310,45 @@ func newCfgWithFetcher(t *testing.T, f fetcher.Fetcher) *UpdaterConfig {
 	return cfg
 }
 
+// stubRoundTripper is an in-memory transport: it fails the first failFirst
+// requests and answers the rest with 200 "ok". The setter tests download
+// through it to observe which client and retry policy the fetcher uses.
+type stubRoundTripper struct {
+	failFirst int
+	calls     int
+}
+
+// failAlways makes a stubRoundTripper fail every request.
+const failAlways = math.MaxInt
+
+func (s *stubRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	s.calls++
+	if s.calls <= s.failFirst {
+		return nil, errors.New("stub transport failure")
+	}
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{},
+		Body:       io.NopCloser(strings.NewReader("ok")),
+		Request:    req,
+	}, nil
+}
+
+// useStubTransport gives a default fetcher a private http.Client backed by
+// rt, leaving the shared http.DefaultClient untouched. Other fetcher types
+// are left as they are.
+func useStubTransport(f fetcher.Fetcher, rt http.RoundTripper) {
+	if df, ok := f.(*fetcher.DefaultFetcher); ok {
+		df.SetHTTPClient(&http.Client{Transport: rt})
+	}
+}
+
+// download fetches through the config's fetcher. The host is never dialled:
+// every request is answered by a stubRoundTripper.
+func download(cfg *UpdaterConfig) ([]byte, error) {
+	return cfg.Fetcher.DownloadFile("http://go-tuf.invalid/root.json", 16, 0)
+}
+
 // TestSetDefaultFetcherHTTPClientTable covers cfg.SetDefaultFetcherHTTPClient.
 // The method only does anything if cfg.Fetcher is the default fetcher.
 func TestSetDefaultFetcherHTTPClientTable(t *testing.T) {
@@ -329,24 +372,24 @@ func TestSetDefaultFetcherHTTPClientTable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := newCfgWithFetcher(t, tt.fetcher)
-			err := cfg.SetDefaultFetcherHTTPClient(&http.Client{Timeout: 5 * time.Second})
+			rt := &stubRoundTripper{}
+			err := cfg.SetDefaultFetcherHTTPClient(&http.Client{Transport: rt})
 			if tt.expectError {
 				assert.ErrorContains(t, err, tt.errorMsg)
 				return
 			}
 			assert.NoError(t, err)
-			// On success the config's fetcher must still be the same
-			// DefaultFetcher instance (the method reassigns it inline).
-			assert.Same(t, tt.fetcher, cfg.Fetcher)
+			// Downloads must now go through the supplied client.
+			data, err := download(cfg)
+			assert.NoError(t, err)
+			assert.Equal(t, "ok", string(data))
+			assert.Equal(t, 1, rt.calls)
 		})
 	}
 }
 
 // TestSetDefaultFetcherTransportTable covers cfg.SetDefaultFetcherTransport.
 func TestSetDefaultFetcherTransportTable(t *testing.T) {
-	originalTransport := http.DefaultClient.Transport
-	t.Cleanup(func() { http.DefaultClient.Transport = originalTransport })
-
 	tests := []struct {
 		name        string
 		fetcher     fetcher.Fetcher
@@ -367,13 +410,20 @@ func TestSetDefaultFetcherTransportTable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := newCfgWithFetcher(t, tt.fetcher)
-			err := cfg.SetDefaultFetcherTransport(http.DefaultTransport)
+			// Start from a transport that fails, so a successful download
+			// proves the RoundTripper passed to the setter replaced it.
+			useStubTransport(tt.fetcher, &stubRoundTripper{failFirst: failAlways})
+			rt := &stubRoundTripper{}
+			err := cfg.SetDefaultFetcherTransport(rt)
 			if tt.expectError {
 				assert.ErrorContains(t, err, tt.errorMsg)
 				return
 			}
 			assert.NoError(t, err)
-			assert.Same(t, tt.fetcher, cfg.Fetcher)
+			data, err := download(cfg)
+			assert.NoError(t, err)
+			assert.Equal(t, "ok", string(data))
+			assert.Equal(t, 1, rt.calls)
 		})
 	}
 }
@@ -388,18 +438,28 @@ func TestSetDefaultFetcherRetryTable(t *testing.T) {
 		count       uint
 		expectError bool
 		errorMsg    string
+		// failFirst is how many leading requests the transport fails.
+		failFirst int
+		// wantCalls is how many requests the download must make.
+		wantCalls       int
+		wantDownloadErr bool
 	}{
 		{
-			name:     "default fetcher accepts retry settings",
-			fetcher:  fetcher.NewDefaultFetcher(),
-			interval: 100 * time.Millisecond,
-			count:    3,
+			name:            "default fetcher stops after the configured count",
+			fetcher:         fetcher.NewDefaultFetcher(),
+			interval:        time.Millisecond,
+			count:           3,
+			failFirst:       failAlways,
+			wantCalls:       3,
+			wantDownloadErr: true,
 		},
 		{
-			name:     "zero retry count is accepted",
-			fetcher:  fetcher.NewDefaultFetcher(),
-			interval: 0,
-			count:    0,
+			name:      "zero retry count does not cap retries",
+			fetcher:   fetcher.NewDefaultFetcher(),
+			interval:  0,
+			count:     0,
+			failFirst: 2,
+			wantCalls: 3,
 		},
 		{
 			name:        "non-default fetcher is rejected",
@@ -413,13 +473,21 @@ func TestSetDefaultFetcherRetryTable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := newCfgWithFetcher(t, tt.fetcher)
+			rt := &stubRoundTripper{failFirst: tt.failFirst}
+			useStubTransport(tt.fetcher, rt)
 			err := cfg.SetDefaultFetcherRetry(tt.interval, tt.count)
 			if tt.expectError {
 				assert.ErrorContains(t, err, tt.errorMsg)
 				return
 			}
 			assert.NoError(t, err)
-			assert.Same(t, tt.fetcher, cfg.Fetcher)
+			_, err = download(cfg)
+			if tt.wantDownloadErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantCalls, rt.calls)
 		})
 	}
 }
@@ -433,16 +501,32 @@ func TestSetRetryOptionsTable(t *testing.T) {
 		opts        []backoff.RetryOption
 		expectError bool
 		errorMsg    string
+		// failFirst is how many leading requests the transport fails.
+		failFirst int
+		// wantCalls is how many requests the download must make.
+		wantCalls       int
+		wantDownloadErr bool
 	}{
 		{
-			name:    "default fetcher accepts no options",
-			fetcher: fetcher.NewDefaultFetcher(),
-			opts:    nil,
+			// Passing no options drops the default fetcher's single-try
+			// limit, so one failure is retried (after backoff's default
+			// initial interval of roughly half a second).
+			name:      "no options removes the default single-try limit",
+			fetcher:   fetcher.NewDefaultFetcher(),
+			opts:      nil,
+			failFirst: 1,
+			wantCalls: 2,
 		},
 		{
-			name:    "default fetcher accepts max-tries option",
+			name:    "default fetcher stops after the max-tries option",
 			fetcher: fetcher.NewDefaultFetcher(),
-			opts:    []backoff.RetryOption{backoff.WithMaxTries(5)},
+			opts: []backoff.RetryOption{
+				backoff.WithMaxTries(5),
+				backoff.WithBackOff(backoff.NewConstantBackOff(time.Millisecond)),
+			},
+			failFirst:       failAlways,
+			wantCalls:       5,
+			wantDownloadErr: true,
 		},
 		{
 			name:        "non-default fetcher is rejected",
@@ -455,13 +539,21 @@ func TestSetRetryOptionsTable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := newCfgWithFetcher(t, tt.fetcher)
+			rt := &stubRoundTripper{failFirst: tt.failFirst}
+			useStubTransport(tt.fetcher, rt)
 			err := cfg.SetRetryOptions(tt.opts...)
 			if tt.expectError {
 				assert.ErrorContains(t, err, tt.errorMsg)
 				return
 			}
 			assert.NoError(t, err)
-			assert.Same(t, tt.fetcher, cfg.Fetcher)
+			_, err = download(cfg)
+			if tt.wantDownloadErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantCalls, rt.calls)
 		})
 	}
 }
