@@ -19,7 +19,6 @@ package simulator_test
 
 import (
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -105,9 +104,6 @@ func TestCacheAssertionsDoNotMutateRepository(t *testing.T) {
 // TestDefaultConfigDownloadsTargets checks that the config GetUpdaterConfig
 // returns can download a target from the simulator at any directory depth.
 func TestDefaultConfigDownloadsTargets(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the simulator's target routing uses the OS path separator")
-	}
 	for _, targetPath := range []string{"file.txt", "dir/file.txt", "a/b/file.txt", "a/b/c/file.txt"} {
 		t.Run(targetPath, func(t *testing.T) {
 			repo := simulator.NewTestRepository(t)

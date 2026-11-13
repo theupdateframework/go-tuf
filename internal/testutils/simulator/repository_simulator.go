@@ -337,15 +337,17 @@ func (rs *RepositorySimulator) fetch(urlPath string) ([]byte, error) {
 		}
 		return rs.FetchMetadata(role, &version)
 	} else if hasPrefix(path, "/targets/") {
-		targetPath := path[len("/targets/"):]
-		dirParts, sep, prefixedFilename := lastIndex(targetPath, string(filepath.Separator))
+		// Target paths in TUF metadata and URLs are always "/"-separated,
+		// whatever the host OS, so they are resolved without filepath.
+		targetPath := filepath.ToSlash(path[len("/targets/"):])
+		dirParts, sep, prefixedFilename := lastIndex(targetPath, "/")
 		var filename string
 		prefix := ""
 		filename = prefixedFilename
 		if rs.MDRoot.Signed.ConsistentSnapshot && rs.PrefixTargetsWithHash {
 			prefix, filename = partition(prefixedFilename, ".")
 		}
-		targetPath = filepath.Join(dirParts, sep, filename)
+		targetPath = dirParts + sep + filename
 		target, err := rs.FetchTarget(targetPath, prefix)
 		if err != nil {
 			slog.Error("Failed to fetch target", "err", err)
