@@ -72,20 +72,27 @@ test-bench:
 # conformance section
 #####################
 
-# Build the tuf-conformance client-under-test binary.
+# Build the tuf-conformance client-under-test binary. It goes next to its
+# expected-failures list (.github/scripts/tuf-conformance-client.xfails),
+# because the suite looks that file up beside the entrypoint.
+CONFORMANCE_CLIENT := .github/scripts/tuf-conformance-client
 .PHONY: build-conformance-client
 build-conformance-client:
 	@echo "Building tuf-conformance-client"
-	@go build -o tuf-conformance-client ./cmd/tuf-conformance-client
+	@go build -o $(CONFORMANCE_CLIENT) ./cmd/tuf-conformance-client
 
-# Run the tuf-conformance test suite against this implementation.
-# Requires tuf-conformance to be installed:
-#   pip install tuf-conformance
-# or clone https://github.com/theupdateframework/tuf-conformance and run:
-#   make dev
+# Run the tuf-conformance test suite against this implementation, the same
+# way the Conformance workflow does. The suite is not published on PyPI:
+#   git clone https://github.com/theupdateframework/tuf-conformance
+#   pip install -e tuf-conformance        (needs Python >= 3.10)
+# It also needs the `faketime` tool on PATH. Then:
+#   make conformance TUF_CONFORMANCE_DIR=/path/to/tuf-conformance
+TUF_CONFORMANCE_DIR ?=
 .PHONY: conformance
 conformance: build-conformance-client
-	pytest tuf_conformance --entrypoint ./tuf-conformance-client
+	@test -d "$(TUF_CONFORMANCE_DIR)/tuf_conformance" || { \
+		echo "TUF_CONFORMANCE_DIR must point at a tuf-conformance checkout"; exit 1; }
+	pytest "$(TUF_CONFORMANCE_DIR)/tuf_conformance" --entrypoint $(CONFORMANCE_CLIENT)
 
 #####################
 # lint section
