@@ -54,6 +54,9 @@ func TestMetadataCreation(t *testing.T) {
 		name         string
 		createFunc   func() any
 		expectedType string
+		// fixed marks the cases built with fixedExpire, whose expiry must be
+		// stored unchanged.
+		fixed bool
 	}{
 		{
 			name:         "Root creation with default expiry",
@@ -64,6 +67,7 @@ func TestMetadataCreation(t *testing.T) {
 			name:         "Root creation with fixed expiry",
 			createFunc:   func() any { return Root(fixedExpire) },
 			expectedType: ROOT,
+			fixed:        true,
 		},
 		{
 			name:         "Targets creation with default expiry",
@@ -74,6 +78,7 @@ func TestMetadataCreation(t *testing.T) {
 			name:         "Targets creation with fixed expiry",
 			createFunc:   func() any { return Targets(fixedExpire) },
 			expectedType: TARGETS,
+			fixed:        true,
 		},
 		{
 			name:         "Snapshot creation with default expiry",
@@ -84,6 +89,7 @@ func TestMetadataCreation(t *testing.T) {
 			name:         "Snapshot creation with fixed expiry",
 			createFunc:   func() any { return Snapshot(fixedExpire) },
 			expectedType: SNAPSHOT,
+			fixed:        true,
 		},
 		{
 			name:         "Timestamp creation with default expiry",
@@ -94,6 +100,7 @@ func TestMetadataCreation(t *testing.T) {
 			name:         "Timestamp creation with fixed expiry",
 			createFunc:   func() any { return Timestamp(fixedExpire) },
 			expectedType: TIMESTAMP,
+			fixed:        true,
 		},
 	}
 
@@ -102,6 +109,7 @@ func TestMetadataCreation(t *testing.T) {
 			result := tt.createFunc()
 			assert.NotNil(t, result)
 
+			var expires time.Time
 			switch meta := result.(type) {
 			case *Metadata[RootType]:
 				assert.Equal(t, tt.expectedType, meta.Signed.Type)
@@ -109,21 +117,28 @@ func TestMetadataCreation(t *testing.T) {
 				assert.Equal(t, int64(1), meta.Signed.Version)
 				assert.NotNil(t, meta.Signed.Keys)
 				assert.NotNil(t, meta.Signed.Roles)
+				expires = meta.Signed.Expires
 			case *Metadata[TargetsType]:
 				assert.Equal(t, tt.expectedType, meta.Signed.Type)
 				assert.Equal(t, SPECIFICATION_VERSION, meta.Signed.SpecVersion)
 				assert.Equal(t, int64(1), meta.Signed.Version)
 				assert.NotNil(t, meta.Signed.Targets)
+				expires = meta.Signed.Expires
 			case *Metadata[SnapshotType]:
 				assert.Equal(t, tt.expectedType, meta.Signed.Type)
 				assert.Equal(t, SPECIFICATION_VERSION, meta.Signed.SpecVersion)
 				assert.Equal(t, int64(1), meta.Signed.Version)
 				assert.NotNil(t, meta.Signed.Meta)
+				expires = meta.Signed.Expires
 			case *Metadata[TimestampType]:
 				assert.Equal(t, tt.expectedType, meta.Signed.Type)
 				assert.Equal(t, SPECIFICATION_VERSION, meta.Signed.SpecVersion)
 				assert.Equal(t, int64(1), meta.Signed.Version)
 				assert.NotNil(t, meta.Signed.Meta)
+				expires = meta.Signed.Expires
+			}
+			if tt.fixed {
+				assert.Equal(t, fixedExpire, expires)
 			}
 		})
 	}
@@ -300,7 +315,6 @@ func TestMetadataToBytes(t *testing.T) {
 		name     string
 		metadata any
 		pretty   bool
-		wantErr  bool
 	}{
 		{name: "Root to bytes compact", metadata: Root(expiry), pretty: false},
 		{name: "Root to bytes pretty", metadata: Root(expiry), pretty: true},
@@ -326,10 +340,6 @@ func TestMetadataToBytes(t *testing.T) {
 				data, err = meta.ToBytes(tt.pretty)
 			}
 
-			if tt.wantErr {
-				assert.Error(t, err)
-				return
-			}
 			assert.NoError(t, err)
 			assert.NotEmpty(t, data)
 
@@ -352,7 +362,6 @@ func TestMetadataToFile(t *testing.T) {
 		metadata any
 		filename string
 		pretty   bool
-		wantErr  bool
 	}{
 		{name: "Root to file pretty", metadata: Root(expiry), filename: "root.json", pretty: true},
 		{name: "Targets to file compact", metadata: Targets(expiry), filename: "targets.json", pretty: false},
@@ -375,10 +384,6 @@ func TestMetadataToFile(t *testing.T) {
 				err = meta.ToFile(path, tt.pretty)
 			}
 
-			if tt.wantErr {
-				assert.Error(t, err)
-				return
-			}
 			assert.NoError(t, err)
 
 			// Verify the file contains valid JSON.
@@ -412,74 +417,51 @@ func TestMetadataRoundTrip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			path := filepath.Join(testDir, tt.filename)
 
+			// The expiry differs from the constructors' default, so the
+			// serialised forms only match if FromFile loaded what ToFile
+			// wrote.
+			var want, got []byte
+			var err error
 			switch meta := tt.metadata.(type) {
 			case *Metadata[RootType]:
 				assert.NoError(t, meta.ToFile(path, false))
-				loaded, err := Root().FromFile(path)
+				loaded, loadErr := Root().FromFile(path)
+				assert.NoError(t, loadErr)
+				assert.True(t, meta.Signed.Expires.Equal(loaded.Signed.Expires))
+				want, err = meta.ToBytes(false)
 				assert.NoError(t, err)
-				assert.Equal(t, meta.Signed.Type, loaded.Signed.Type)
-				assert.Equal(t, meta.Signed.Version, loaded.Signed.Version)
-				assert.Equal(t, meta.Signed.SpecVersion, loaded.Signed.SpecVersion)
+				got, err = loaded.ToBytes(false)
 
 			case *Metadata[TargetsType]:
 				assert.NoError(t, meta.ToFile(path, false))
-				loaded, err := Targets().FromFile(path)
+				loaded, loadErr := Targets().FromFile(path)
+				assert.NoError(t, loadErr)
+				assert.True(t, meta.Signed.Expires.Equal(loaded.Signed.Expires))
+				want, err = meta.ToBytes(false)
 				assert.NoError(t, err)
-				assert.Equal(t, meta.Signed.Type, loaded.Signed.Type)
-				assert.Equal(t, meta.Signed.Version, loaded.Signed.Version)
-				assert.Equal(t, meta.Signed.SpecVersion, loaded.Signed.SpecVersion)
+				got, err = loaded.ToBytes(false)
 
 			case *Metadata[SnapshotType]:
 				assert.NoError(t, meta.ToFile(path, false))
-				loaded, err := Snapshot().FromFile(path)
+				loaded, loadErr := Snapshot().FromFile(path)
+				assert.NoError(t, loadErr)
+				assert.True(t, meta.Signed.Expires.Equal(loaded.Signed.Expires))
+				want, err = meta.ToBytes(false)
 				assert.NoError(t, err)
-				assert.Equal(t, meta.Signed.Type, loaded.Signed.Type)
-				assert.Equal(t, meta.Signed.Version, loaded.Signed.Version)
-				assert.Equal(t, meta.Signed.SpecVersion, loaded.Signed.SpecVersion)
+				got, err = loaded.ToBytes(false)
 
 			case *Metadata[TimestampType]:
 				assert.NoError(t, meta.ToFile(path, false))
-				loaded, err := Timestamp().FromFile(path)
+				loaded, loadErr := Timestamp().FromFile(path)
+				assert.NoError(t, loadErr)
+				assert.True(t, meta.Signed.Expires.Equal(loaded.Signed.Expires))
+				want, err = meta.ToBytes(false)
 				assert.NoError(t, err)
-				assert.Equal(t, meta.Signed.Type, loaded.Signed.Type)
-				assert.Equal(t, meta.Signed.Version, loaded.Signed.Version)
-				assert.Equal(t, meta.Signed.SpecVersion, loaded.Signed.SpecVersion)
+				got, err = loaded.ToBytes(false)
 			}
-		})
-	}
-}
-
-func TestMetadataVersioning(t *testing.T) {
-	expiry := time.Now().UTC().Add(24 * time.Hour)
-
-	tests := []struct {
-		name       string
-		metadata   any
-		newVersion int64
-	}{
-		{name: "Increment Root version", metadata: Root(expiry), newVersion: 2},
-		{name: "Set high version number", metadata: Targets(expiry), newVersion: 1_000_000},
-		// Version 0 is below the valid minimum but the library permits setting it
-		// directly; enforcement happens at validation/update time.
-		{name: "Zero version (below minimum)", metadata: Snapshot(expiry), newVersion: 0},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			switch meta := tt.metadata.(type) {
-			case *Metadata[RootType]:
-				meta.Signed.Version = tt.newVersion
-				assert.Equal(t, tt.newVersion, meta.Signed.Version)
-			case *Metadata[TargetsType]:
-				meta.Signed.Version = tt.newVersion
-				assert.Equal(t, tt.newVersion, meta.Signed.Version)
-			case *Metadata[SnapshotType]:
-				meta.Signed.Version = tt.newVersion
-				assert.Equal(t, tt.newVersion, meta.Signed.Version)
-			case *Metadata[TimestampType]:
-				meta.Signed.Version = tt.newVersion
-				assert.Equal(t, tt.newVersion, meta.Signed.Version)
-			}
+			assert.NoError(t, err)
+			assert.NotEmpty(t, want)
+			assert.Equal(t, string(want), string(got))
 		})
 	}
 }
@@ -492,25 +474,32 @@ func TestMetadataExpiration(t *testing.T) {
 	tests := []struct {
 		name      string
 		metadata  any
-		expires   time.Time
 		isExpired bool
 	}{
-		{name: "Root not expired", metadata: Root(future), expires: future, isExpired: false},
-		{name: "Root expired", metadata: Root(past), expires: past, isExpired: true},
-		{name: "Targets not expired", metadata: Targets(future), expires: future, isExpired: false},
-		{name: "Targets expired", metadata: Targets(past), expires: past, isExpired: true},
+		{name: "Root not expired", metadata: Root(future), isExpired: false},
+		{name: "Root expired", metadata: Root(past), isExpired: true},
+		{name: "Targets not expired", metadata: Targets(future), isExpired: false},
+		{name: "Targets expired", metadata: Targets(past), isExpired: true},
+		{name: "Snapshot not expired", metadata: Snapshot(future), isExpired: false},
+		{name: "Snapshot expired", metadata: Snapshot(past), isExpired: true},
+		{name: "Timestamp not expired", metadata: Timestamp(future), isExpired: false},
+		{name: "Timestamp expired", metadata: Timestamp(past), isExpired: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var expired bool
 			switch meta := tt.metadata.(type) {
 			case *Metadata[RootType]:
-				assert.Equal(t, tt.expires.Truncate(time.Second), meta.Signed.Expires.Truncate(time.Second))
-				assert.Equal(t, tt.isExpired, meta.Signed.Expires.Before(now))
+				expired = meta.Signed.IsExpired(now)
 			case *Metadata[TargetsType]:
-				assert.Equal(t, tt.expires.Truncate(time.Second), meta.Signed.Expires.Truncate(time.Second))
-				assert.Equal(t, tt.isExpired, meta.Signed.Expires.Before(now))
+				expired = meta.Signed.IsExpired(now)
+			case *Metadata[SnapshotType]:
+				expired = meta.Signed.IsExpired(now)
+			case *Metadata[TimestampType]:
+				expired = meta.Signed.IsExpired(now)
 			}
+			assert.Equal(t, tt.isExpired, expired)
 		})
 	}
 }
