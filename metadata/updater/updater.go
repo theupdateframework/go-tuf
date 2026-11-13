@@ -588,6 +588,9 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 
 // persistMetadata writes metadata to disk atomically to avoid data loss
 func (update *Updater) persistMetadata(roleName string, data []byte) error {
+	if update.cfg.MetadataStore != nil {
+		return update.cfg.MetadataStore.Persist(roleName, data)
+	}
 	log := metadata.GetLogger()
 	// do not persist the metadata if we have disabled local caching
 	if update.cfg.DisableLocalCache {
@@ -699,6 +702,9 @@ func selectTargetHashAlgorithm(hashes metadata.Hashes) string {
 
 // loadLocalMetadata reads a local <roleName>.json file and returns its bytes
 func (update *Updater) loadLocalMetadata(roleName string) ([]byte, error) {
+	if update.cfg.MetadataStore != nil {
+		return update.cfg.MetadataStore.Load(filepath.Base(roleName))
+	}
 	return os.ReadFile(fmt.Sprintf("%s.json", roleName))
 }
 
