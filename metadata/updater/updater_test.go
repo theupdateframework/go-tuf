@@ -31,15 +31,15 @@ import (
 	"github.com/theupdateframework/go-tuf/v2/metadata/config"
 )
 
-// skipIfWindows guards the target-download tables -- the simulator's URL
-// routing for target files uses filepath.Separator, which is "\" on
-// Windows; that combined with hardcoded "/targets/" prefix checks makes
-// the routing unreachable from these tests. The underlying code under
-// test still gets coverage from Linux and macOS runners.
+// skipIfWindows guards the subtests that download a target through the
+// simulator. Its target routing splits the requested path on
+// filepath.Separator, which is "\" on Windows, while TUF target paths
+// always use "/", so those downloads do not work there. Subtests that only
+// fetch metadata or read local files do not need the skip.
 func skipIfWindows(t *testing.T) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
-		t.Skip("simulator target URL routing is broken on windows; see metadata/updater/updater_test.go")
+		t.Skip("simulator target downloads do not work on windows; see skipIfWindows in metadata/updater/updater_test.go")
 	}
 }
 
@@ -1222,7 +1222,6 @@ func TestDelegatesConsistentSnapshotTable(t *testing.T) {
 // the implicit Refresh that GetTargetInfo triggers when targets isn't
 // trusted yet.
 func TestGetTargetInfoTable(t *testing.T) {
-	skipIfWindows(t)
 	const targetPath = "hello.txt"
 	targetContent := []byte("hello, table-driven world")
 
@@ -1275,18 +1274,15 @@ func TestGetTargetInfoTable(t *testing.T) {
 // happy path with the configured base URL, happy path with an explicit
 // targetBaseURL argument, and the rejection when neither is set.
 func TestDownloadTargetTable(t *testing.T) {
-	skipIfWindows(t)
-	// The simulator's URL routing for targets has multiple bugs that
-	// compound under consistent-snapshot mode -- a flat target path
-	// panics lastIndex, and a nested one collides with the hash-prefix
-	// parser. Use a doubly-nested layout and switch consistent_snapshot
+	// With consistent snapshots the simulator cannot resolve hash-prefixed
+	// target names that contain a dot, so consistent_snapshot is switched
 	// off below.
 	const targetPath = "a/b/doc.txt"
 	targetContent := []byte("doc body")
 
 	tests := []struct {
 		name        string
-		useExplicit bool // pass cfg.RemoteTargetsURL as the explicit baseURL arg
+		useExplicit bool // pass the served URL as the explicit baseURL arg only
 		clearCfgURL bool // wipe cfg.RemoteTargetsURL before the call
 		wantErr     bool
 		wantErrMsg  string
@@ -1305,6 +1301,10 @@ func TestDownloadTargetTable(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			if !tc.wantErr {
+				// Only the cases that fetch the target need the skip.
+				skipIfWindows(t)
+			}
 			repo := simulator.NewTestRepository(t)
 			defer repo.Cleanup()
 			// Disable consistent-snapshot to dodge the simulator's
@@ -1316,14 +1316,21 @@ func TestDownloadTargetTable(t *testing.T) {
 
 			cfg, err := repo.GetUpdaterConfig()
 			assert.NoError(t, err)
-			// The simulator's URL routing keys off the LocalDir layout
-			// (/metadata/* vs /targets/*); TestRepository's default
-			// RemoteTargetsURL (MetadataDir + "/targets") doesn't match
-			// either branch, so we point it at the actual TargetsDir.
-			cfg.RemoteTargetsURL = repo.TargetsDir
-			savedURL := cfg.RemoteTargetsURL
-			if tc.clearCfgURL {
+			// GetUpdaterConfig points RemoteTargetsURL at the directory
+			// the simulator serves targets from.
+			servedURL := cfg.RemoteTargetsURL
+			assert.Equal(t, repo.TargetsDir, servedURL)
+
+			var baseURL string
+			switch {
+			case tc.clearCfgURL:
 				cfg.RemoteTargetsURL = ""
+			case tc.useExplicit:
+				// Point the config at a URL the simulator does not serve
+				// targets from, so the download can only succeed through
+				// the argument.
+				cfg.RemoteTargetsURL = repo.MetadataDir
+				baseURL = servedURL
 			}
 			up, err := New(cfg)
 			assert.NoError(t, err)
@@ -1332,14 +1339,6 @@ func TestDownloadTargetTable(t *testing.T) {
 			info, err := up.GetTargetInfo(targetPath)
 			assert.NoError(t, err)
 			assert.NotNil(t, info)
-
-			// When the case wants to exercise the "explicit baseURL"
-			// branch, pass the saved cfg URL so the download still
-			// resolves through the simulator. Otherwise pass empty.
-			var baseURL string
-			if tc.useExplicit {
-				baseURL = savedURL
-			}
 
 			targetDir := t.TempDir()
 			dst := filepath.Join(targetDir, "downloaded")
@@ -1364,13 +1363,12 @@ func TestDownloadTargetTable(t *testing.T) {
 // DownloadTarget call, after a hash-mismatching local file, and when the
 // local file is missing entirely.
 func TestFindCachedTargetTable(t *testing.T) {
-	skipIfWindows(t)
-	// As in TestDownloadTargetTable, use a doubly-nested path so the
-	// simulator's URL parser doesn't trip on shallow names.
+	// A nested target path, as in TestDownloadTargetTable.
 	const targetPath = "a/b/cached.txt"
 	targetContent := []byte("cached payload")
 
 	t.Run("returns cached path and bytes after a download", func(t *testing.T) {
+		skipIfWindows(t)
 		repo := simulator.NewTestRepository(t)
 		defer repo.Cleanup()
 		repo.Simulator.MDRoot.Signed.ConsistentSnapshot = false
@@ -1378,12 +1376,8 @@ func TestFindCachedTargetTable(t *testing.T) {
 		repo.AddTarget(metadata.TARGETS, targetContent, targetPath)
 		repo.UpdateSnapshot()
 
-		cfg, err := repo.GetUpdaterConfig()
+		up, err := createAndRefresh(t, repo)
 		assert.NoError(t, err)
-		cfg.RemoteTargetsURL = repo.TargetsDir
-		up, err := New(cfg)
-		assert.NoError(t, err)
-		assert.NoError(t, up.Refresh())
 		info, err := up.GetTargetInfo(targetPath)
 		assert.NoError(t, err)
 
