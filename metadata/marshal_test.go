@@ -19,320 +19,182 @@ package metadata
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/theupdateframework/go-tuf/v2/internal/testutils/helpers"
+	"github.com/stretchr/testify/require"
 )
+
+// assertMarshalRoundTrip checks both directions of a type's JSON encoding.
+// Marshalling input must produce wantJSON, which catches fields dropped on
+// the way out. Unmarshalling that into a new value of the same type and
+// marshalling again must reproduce the same bytes, which catches fields
+// dropped on the way back in.
+func assertMarshalRoundTrip(t *testing.T, input any, wantJSON string) {
+	t.Helper()
+
+	encoded, err := json.Marshal(input)
+	require.NoError(t, err)
+	assert.JSONEq(t, wantJSON, string(encoded))
+
+	decoded := reflect.New(reflect.TypeOf(input))
+	require.NoError(t, json.Unmarshal(encoded, decoded.Interface()))
+
+	reencoded, err := json.Marshal(decoded.Elem().Interface())
+	require.NoError(t, err)
+	assert.Equal(t, string(encoded), string(reencoded))
+}
 
 func TestMarshalUnmarshalJSON(t *testing.T) {
 	fixedTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	tests := []struct {
-		name    string
-		input   any
-		wantErr bool
+		name     string
+		input    any
+		wantJSON string
 	}{
 		{
-			name:    "RootType Marshal/Unmarshal",
-			input:   RootType{Type: "root", SpecVersion: "1.0", ConsistentSnapshot: true, Version: 1, Expires: fixedTime, Keys: map[string]*Key{}, Roles: map[string]*Role{}},
-			wantErr: false,
+			name:     "RootType Marshal/Unmarshal",
+			input:    RootType{Type: "root", SpecVersion: "1.0", ConsistentSnapshot: true, Version: 1, Expires: fixedTime, Keys: map[string]*Key{}, Roles: map[string]*Role{}},
+			wantJSON: `{"_type":"root","spec_version":"1.0","consistent_snapshot":true,"version":1,"expires":"2024-01-01T00:00:00Z","keys":{},"roles":{}}`,
 		},
 		{
-			name:    "SnapshotType Marshal/Unmarshal",
-			input:   SnapshotType{Type: "snapshot", SpecVersion: "1.0", Version: 1, Expires: fixedTime, Meta: map[string]*MetaFiles{}},
-			wantErr: false,
+			name:     "SnapshotType Marshal/Unmarshal",
+			input:    SnapshotType{Type: "snapshot", SpecVersion: "1.0", Version: 1, Expires: fixedTime, Meta: map[string]*MetaFiles{}},
+			wantJSON: `{"_type":"snapshot","spec_version":"1.0","version":1,"expires":"2024-01-01T00:00:00Z","meta":{}}`,
 		},
 		{
-			name:    "TimestampType Marshal/Unmarshal",
-			input:   TimestampType{Type: "timestamp", SpecVersion: "1.0", Version: 1, Expires: fixedTime, Meta: map[string]*MetaFiles{"snapshot.json": MetaFile(1)}},
-			wantErr: false,
+			name:     "TimestampType Marshal/Unmarshal",
+			input:    TimestampType{Type: "timestamp", SpecVersion: "1.0", Version: 1, Expires: fixedTime, Meta: map[string]*MetaFiles{"snapshot.json": MetaFile(1)}},
+			wantJSON: `{"_type":"timestamp","spec_version":"1.0","version":1,"expires":"2024-01-01T00:00:00Z","meta":{"snapshot.json":{"version":1}}}`,
 		},
 		{
-			name:    "TargetsType Marshal/Unmarshal",
-			input:   TargetsType{Type: "targets", SpecVersion: "1.0", Version: 1, Expires: fixedTime, Targets: map[string]*TargetFiles{}},
-			wantErr: false,
+			name:     "TargetsType Marshal/Unmarshal",
+			input:    TargetsType{Type: "targets", SpecVersion: "1.0", Version: 1, Expires: fixedTime, Targets: map[string]*TargetFiles{}},
+			wantJSON: `{"_type":"targets","spec_version":"1.0","version":1,"expires":"2024-01-01T00:00:00Z","targets":{}}`,
 		},
 		{
-			name:    "MetaFiles Marshal/Unmarshal",
-			input:   MetaFiles{Length: 123, Hashes: Hashes{"sha256": HexBytes("abc123")}, Version: 1},
-			wantErr: false,
+			name:     "MetaFiles Marshal/Unmarshal",
+			input:    MetaFiles{Length: 123, Hashes: Hashes{"sha256": HexBytes("abc123")}, Version: 1},
+			wantJSON: `{"length":123,"hashes":{"sha256":"616263313233"},"version":1}`,
 		},
 		{
-			name:    "TargetFiles Marshal/Unmarshal",
-			input:   TargetFiles{Length: 123, Hashes: Hashes{"sha256": HexBytes("abc123")}},
-			wantErr: false,
+			name:     "TargetFiles Marshal/Unmarshal",
+			input:    TargetFiles{Length: 123, Hashes: Hashes{"sha256": HexBytes("abc123")}},
+			wantJSON: `{"length":123,"hashes":{"sha256":"616263313233"}}`,
 		},
 		{
-			name:    "Key Marshal/Unmarshal",
-			input:   Key{Type: "ed25519", Scheme: "scheme", Value: KeyVal{PublicKey: "publicKey"}},
-			wantErr: false,
+			name:     "Key Marshal/Unmarshal",
+			input:    Key{Type: "ed25519", Scheme: "scheme", Value: KeyVal{PublicKey: "publicKey"}},
+			wantJSON: `{"keytype":"ed25519","scheme":"scheme","keyval":{"public":"publicKey"}}`,
 		},
 		{
-			name:    "Signature Marshal/Unmarshal",
-			input:   Signature{KeyID: "keyid", Signature: HexBytes("signature")},
-			wantErr: false,
+			name:     "Signature Marshal/Unmarshal",
+			input:    Signature{KeyID: "keyid", Signature: HexBytes("signature")},
+			wantJSON: `{"keyid":"keyid","sig":"7369676e6174757265"}`,
 		},
 		{
-			name:    "Delegations Marshal/Unmarshal",
-			input:   Delegations{Keys: map[string]*Key{"keyid": {Type: "ed25519", Scheme: "scheme", Value: KeyVal{PublicKey: "publicKey"}}}},
-			wantErr: false,
+			name:     "Delegations Marshal/Unmarshal",
+			input:    Delegations{Keys: map[string]*Key{"keyid": {Type: "ed25519", Scheme: "scheme", Value: KeyVal{PublicKey: "publicKey"}}}},
+			wantJSON: `{"keys":{"keyid":{"keytype":"ed25519","scheme":"scheme","keyval":{"public":"publicKey"}}}}`,
 		},
 		{
-			name:    "DelegatedRole Marshal/Unmarshal",
-			input:   DelegatedRole{Name: "role", KeyIDs: []string{"keyid"}, Threshold: 1, Terminating: true},
-			wantErr: false,
+			name:     "DelegatedRole Marshal/Unmarshal",
+			input:    DelegatedRole{Name: "role", KeyIDs: []string{"keyid"}, Threshold: 1, Terminating: true},
+			wantJSON: `{"name":"role","keyids":["keyid"],"threshold":1,"terminating":true}`,
 		},
 		{
-			name:    "SuccinctRoles Marshal/Unmarshal",
-			input:   SuccinctRoles{KeyIDs: []string{"keyid"}, Threshold: 1, BitLength: 8, NamePrefix: "prefix"},
-			wantErr: false,
+			name:     "SuccinctRoles Marshal/Unmarshal",
+			input:    SuccinctRoles{KeyIDs: []string{"keyid"}, Threshold: 1, BitLength: 8, NamePrefix: "prefix"},
+			wantJSON: `{"keyids":["keyid"],"threshold":1,"bit_length":8,"name_prefix":"prefix"}`,
 		},
 		{
-			name:    "HexBytes Marshal/Unmarshal",
-			input:   HexBytes("abc123"),
-			wantErr: false,
+			name:     "HexBytes Marshal/Unmarshal",
+			input:    HexBytes("abc123"),
+			wantJSON: `"616263313233"`,
 		},
 		{
-			name:    "Empty HexBytes Marshal/Unmarshal",
-			input:   HexBytes(""),
-			wantErr: false,
+			name:     "Empty HexBytes Marshal/Unmarshal",
+			input:    HexBytes(""),
+			wantJSON: `""`,
 		},
 		{
-			name:    "Role Marshal/Unmarshal",
-			input:   Role{KeyIDs: []string{"key1", "key2"}, Threshold: 2},
-			wantErr: false,
+			name:     "Role Marshal/Unmarshal",
+			input:    Role{KeyIDs: []string{"key1", "key2"}, Threshold: 2},
+			wantJSON: `{"keyids":["key1","key2"],"threshold":2}`,
 		},
 		{
-			name:    "KeyVal Marshal/Unmarshal",
-			input:   KeyVal{PublicKey: "public-key-bytes"},
-			wantErr: false,
+			name:     "KeyVal Marshal/Unmarshal",
+			input:    KeyVal{PublicKey: "public-key-bytes"},
+			wantJSON: `{"public":"public-key-bytes"}`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Marshal the input
-			data, err := json.Marshal(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Marshal() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if tt.wantErr {
-				return // Skip unmarshal test if marshal was expected to fail
-			}
-
-			// Unmarshal back to same type
-			switch v := tt.input.(type) {
-			case RootType:
-				var result RootType
-				err = json.Unmarshal(data, &result)
-				if err != nil {
-					t.Errorf("Unmarshal() error = %v", err)
-					return
-				}
-				assert.Equal(t, result.Type, v.Type)
-				assert.Equal(t, result.Version, v.Version)
-				assert.Equal(t, result.SpecVersion, v.SpecVersion)
-
-			case SnapshotType:
-				var result SnapshotType
-				err = json.Unmarshal(data, &result)
-				if err != nil {
-					t.Errorf("Unmarshal() error = %v", err)
-					return
-				}
-				assert.Equal(t, result.Type, v.Type)
-				assert.Equal(t, result.Version, v.Version)
-
-			case TimestampType:
-				var result TimestampType
-				err = json.Unmarshal(data, &result)
-				if err != nil {
-					t.Errorf("Unmarshal() error = %v", err)
-					return
-				}
-				assert.Equal(t, result.Type, v.Type)
-				assert.Equal(t, result.Version, v.Version)
-
-			case TargetsType:
-				var result TargetsType
-				err = json.Unmarshal(data, &result)
-				if err != nil {
-					t.Errorf("Unmarshal() error = %v", err)
-					return
-				}
-				assert.Equal(t, result.Type, v.Type)
-				assert.Equal(t, result.Version, v.Version)
-
-			case MetaFiles:
-				var result MetaFiles
-				err = json.Unmarshal(data, &result)
-				if err != nil {
-					t.Errorf("Unmarshal() error = %v", err)
-					return
-				}
-				assert.Equal(t, result.Length, v.Length)
-				assert.Equal(t, result.Version, v.Version)
-
-			case TargetFiles:
-				var result TargetFiles
-				err = json.Unmarshal(data, &result)
-				if err != nil {
-					t.Errorf("Unmarshal() error = %v", err)
-					return
-				}
-				assert.Equal(t, result.Length, v.Length)
-
-			case Key:
-				var result Key
-				err = json.Unmarshal(data, &result)
-				if err != nil {
-					t.Errorf("Unmarshal() error = %v", err)
-					return
-				}
-				assert.Equal(t, result.Type, v.Type)
-				assert.Equal(t, result.Scheme, v.Scheme)
-
-			case Signature:
-				var result Signature
-				err = json.Unmarshal(data, &result)
-				if err != nil {
-					t.Errorf("Unmarshal() error = %v", err)
-					return
-				}
-				assert.Equal(t, result.KeyID, v.KeyID)
-				assert.Equal(t, string(result.Signature), string(v.Signature))
-
-			case Delegations:
-				var result Delegations
-				err = json.Unmarshal(data, &result)
-				if err != nil {
-					t.Errorf("Unmarshal() error = %v", err)
-					return
-				}
-				assert.Equal(t, len(result.Keys), len(v.Keys))
-
-			case DelegatedRole:
-				var result DelegatedRole
-				err = json.Unmarshal(data, &result)
-				if err != nil {
-					t.Errorf("Unmarshal() error = %v", err)
-					return
-				}
-				assert.Equal(t, result.Name, v.Name)
-				assert.Equal(t, result.Threshold, v.Threshold)
-				assert.Equal(t, result.Terminating, v.Terminating)
-
-			case SuccinctRoles:
-				var result SuccinctRoles
-				err = json.Unmarshal(data, &result)
-				if err != nil {
-					t.Errorf("Unmarshal() error = %v", err)
-					return
-				}
-				assert.Equal(t, result.Threshold, v.Threshold)
-				assert.Equal(t, result.BitLength, v.BitLength)
-				assert.Equal(t, result.NamePrefix, v.NamePrefix)
-
-			case HexBytes:
-				var result HexBytes
-				err = json.Unmarshal(data, &result)
-				if err != nil {
-					t.Errorf("Unmarshal() error = %v", err)
-					return
-				}
-				assert.Equal(t, string(result), string(v))
-
-			case Role:
-				var result Role
-				err = json.Unmarshal(data, &result)
-				if err != nil {
-					t.Errorf("Unmarshal() error = %v", err)
-					return
-				}
-				assert.Equal(t, result.Threshold, v.Threshold)
-				assert.ElementsMatch(t, result.KeyIDs, v.KeyIDs)
-
-			case KeyVal:
-				var result KeyVal
-				err = json.Unmarshal(data, &result)
-				if err != nil {
-					t.Errorf("Unmarshal() error = %v", err)
-					return
-				}
-				assert.Equal(t, string(result.PublicKey), string(v.PublicKey))
-
-			default:
-				t.Errorf("Unknown type for roundtrip test: %T", tt.input)
-			}
-
-			assert.NoError(t, err)
+			assertMarshalRoundTrip(t, tt.input, tt.wantJSON)
 		})
 	}
 }
 
 func TestMarshalEdgeCases(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   any
-		wantErr bool
+		name     string
+		input    any
+		wantJSON string
 	}{
 		{
-			name:    "Nil map in Delegations",
-			input:   Delegations{Keys: nil},
-			wantErr: false,
+			name:     "Empty KeyIDs slice",
+			input:    Role{KeyIDs: []string{}, Threshold: 1},
+			wantJSON: `{"keyids":[],"threshold":1}`,
 		},
 		{
-			name:    "Empty KeyIDs slice",
-			input:   Role{KeyIDs: []string{}, Threshold: 1},
-			wantErr: false,
+			name:     "Zero threshold",
+			input:    Role{KeyIDs: []string{"key1"}, Threshold: 0},
+			wantJSON: `{"keyids":["key1"],"threshold":0}`,
 		},
 		{
-			name:    "Zero threshold",
-			input:   Role{KeyIDs: []string{"key1"}, Threshold: 0},
-			wantErr: false,
+			// JSON marshaling allows a negative threshold; validation
+			// happens elsewhere.
+			name:     "Negative threshold",
+			input:    SuccinctRoles{KeyIDs: []string{"key1"}, Threshold: -1, BitLength: 8, NamePrefix: "prefix"},
+			wantJSON: `{"keyids":["key1"],"threshold":-1,"bit_length":8,"name_prefix":"prefix"}`,
 		},
 		{
-			name:    "Negative threshold",
-			input:   SuccinctRoles{KeyIDs: []string{"key1"}, Threshold: -1, BitLength: 8, NamePrefix: "prefix"},
-			wantErr: false, // JSON marshaling allows negative threshold; validation happens elsewhere
+			name:     "Very large numbers",
+			input:    MetaFiles{Length: 9223372036854775807, Version: 9223372036854775807}, // max int64
+			wantJSON: `{"length":9223372036854775807,"version":9223372036854775807}`,
 		},
 		{
-			name:    "Very large numbers",
-			input:   MetaFiles{Length: 9223372036854775807, Version: 9223372036854775807}, // max int64
-			wantErr: false,
+			name:     "Unicode in strings",
+			input:    DelegatedRole{Name: "роль-тест-🔑", KeyIDs: []string{"🔑-keyid"}, Threshold: 1},
+			wantJSON: `{"name":"роль-тест-🔑","keyids":["🔑-keyid"],"threshold":1,"terminating":false}`,
 		},
 		{
-			name:    "Unicode in strings",
-			input:   DelegatedRole{Name: "роль-тест-🔑", KeyIDs: []string{"🔑-keyid"}, Threshold: 1},
-			wantErr: false,
-		},
-		{
-			name:    "Empty strings",
-			input:   Key{Type: "", Scheme: "", Value: KeyVal{PublicKey: ""}},
-			wantErr: false,
+			name:     "Empty strings",
+			input:    Key{Type: "", Scheme: "", Value: KeyVal{PublicKey: ""}},
+			wantJSON: `{"keytype":"","scheme":"","keyval":{"public":""}}`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data, err := json.Marshal(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Marshal() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if !tt.wantErr {
-				// Verify it produces valid JSON
-				var result interface{}
-				err = json.Unmarshal(data, &result)
-				helpers.AssertNoError(t, err)
-			}
+			assertMarshalRoundTrip(t, tt.input, tt.wantJSON)
 		})
 	}
+
+	// A nil keys map serialises as null, which the decoder refuses, so this
+	// value cannot round-trip.
+	t.Run("Nil map in Delegations", func(t *testing.T) {
+		encoded, err := json.Marshal(Delegations{Keys: nil})
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"keys":null}`, string(encoded))
+
+		var decoded Delegations
+		assert.ErrorContains(t, json.Unmarshal(encoded, &decoded), "delegation keys must not be null")
+	})
 }
 
 func TestUnmarshalErrorCases(t *testing.T) {
@@ -417,9 +279,9 @@ func TestComplexStructuresMarshaling(t *testing.T) {
 	fixedTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	tests := []struct {
-		name    string
-		input   any
-		wantErr bool
+		name     string
+		input    any
+		wantJSON string
 	}{
 		{
 			name: "Complete RootType with all fields",
@@ -452,7 +314,21 @@ func TestComplexStructuresMarshaling(t *testing.T) {
 				},
 				ConsistentSnapshot: true,
 			},
-			wantErr: false,
+			wantJSON: `{
+				"_type": "root",
+				"spec_version": "1.0.31",
+				"version": 1,
+				"expires": "2024-01-01T00:00:00Z",
+				"consistent_snapshot": true,
+				"keys": {
+					"key1": {"keytype": "ed25519", "scheme": "ed25519", "keyval": {"public": "publickey1"}},
+					"key2": {"keytype": "rsa", "scheme": "rsa-pss-sha256", "keyval": {"public": "publickey2"}}
+				},
+				"roles": {
+					"root": {"keyids": ["key1"], "threshold": 1},
+					"targets": {"keyids": ["key2"], "threshold": 1}
+				}
+			}`,
 		},
 		{
 			name: "TargetsType with complex targets and delegations",
@@ -489,7 +365,32 @@ func TestComplexStructuresMarshaling(t *testing.T) {
 					},
 				},
 			},
-			wantErr: false,
+			wantJSON: `{
+				"_type": "targets",
+				"spec_version": "1.0.31",
+				"version": 2,
+				"expires": "2024-01-01T00:00:00Z",
+				"targets": {
+					"file1.txt": {
+						"length": 1024,
+						"hashes": {"sha256": "616263313233", "sha512": "646566343536"}
+					}
+				},
+				"delegations": {
+					"keys": {
+						"delegate-key": {"keytype": "ed25519", "scheme": "ed25519", "keyval": {"public": "delegate-public-key"}}
+					},
+					"roles": [
+						{
+							"name": "delegate-role",
+							"keyids": ["delegate-key"],
+							"threshold": 1,
+							"terminating": false,
+							"paths": ["path/*"]
+						}
+					]
+				}
+			}`,
 		},
 		{
 			name: "Nested structure with empty collections",
@@ -504,39 +405,20 @@ func TestComplexStructuresMarshaling(t *testing.T) {
 					Roles: []DelegatedRole{},
 				},
 			},
-			wantErr: false,
+			wantJSON: `{
+				"_type": "targets",
+				"spec_version": "1.0.31",
+				"version": 1,
+				"expires": "2024-01-01T00:00:00Z",
+				"targets": {},
+				"delegations": {"keys": {}, "roles": []}
+			}`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Test marshaling
-			data, err := json.Marshal(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Marshal() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if tt.wantErr {
-				return
-			}
-
-			// Verify valid JSON
-			var jsonData interface{}
-			err = json.Unmarshal(data, &jsonData)
-			helpers.AssertNoError(t, err)
-
-			// Test unmarshaling back
-			switch tt.input.(type) {
-			case RootType:
-				var result RootType
-				err = json.Unmarshal(data, &result)
-				helpers.AssertNoError(t, err)
-			case TargetsType:
-				var result TargetsType
-				err = json.Unmarshal(data, &result)
-				helpers.AssertNoError(t, err)
-			}
+			assertMarshalRoundTrip(t, tt.input, tt.wantJSON)
 		})
 	}
 }
