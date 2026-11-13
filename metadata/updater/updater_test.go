@@ -708,6 +708,7 @@ func TestUpdaterConstructorTable(t *testing.T) {
 				t.Helper()
 				ts := up.GetTrustedMetadataSet()
 				assert.Equal(t, metadata.ROOT, ts.Root.Signed.Type)
+				assert.Equal(t, metadata.SPECIFICATION_VERSION, ts.Root.Signed.SpecVersion)
 				assert.Equal(t, int64(1), ts.Root.Signed.Version)
 				assert.True(t, ts.Root.Signed.ConsistentSnapshot)
 				assert.Nil(t, ts.Snapshot)
@@ -716,13 +717,15 @@ func TestUpdaterConstructorTable(t *testing.T) {
 			},
 		},
 		{
-			name: "missing trusted root and remote URL fails construction",
+			// The remote URL stays set, so only the empty root can cause
+			// the failure.
+			name: "missing trusted root fails construction",
 			buildCfg: func(t *testing.T, repo *simulator.TestRepository) *config.UpdaterConfig {
 				t.Helper()
 				cfg, err := repo.GetUpdaterConfig()
 				assert.NoError(t, err)
 				cfg.LocalTrustedRoot = []byte{}
-				cfg.RemoteMetadataURL = ""
+				assert.NotEmpty(t, cfg.RemoteMetadataURL)
 				return cfg
 			},
 			wantErr:    true,
