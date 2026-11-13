@@ -231,9 +231,6 @@ editing static fixtures altogether.
 # All tests
 make test
 
-# Include the opt-in external fetcher tests on branches that still have them
-GO_TUF_NETWORK_TESTS=1 make test
-
 # Specific packages
 go test ./metadata/...
 go test ./metadata/updater/...
