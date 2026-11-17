@@ -223,6 +223,27 @@ func TestFromBytesRejectsNullMapValues(t *testing.T) {
 	}
 }
 
+func TestFromBytesMatchesFieldNamesExactly(t *testing.T) {
+	// A name that differs from a known field only by case is an unrecognized field.
+	const signed = `{"_type":"root","version":1,"Version":"x","keys":{},` +
+		`"roles":{"root":{"keyids":["a"],"threshold":1,"KeyIDs":["b"]}}}`
+	const other = `{"_type":"root","version":2,"keys":{},"roles":{}}`
+	const longS = "\u017f"
+	input := `{"signed":` + signed + `,"signatures":[],"Signed":` + other +
+		`,"` + longS + `ignatures":[{"keyid":"k","sig":"00"}]}`
+
+	root, err := Root().FromBytes([]byte(input))
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), root.Signed.Version)
+	assert.Empty(t, root.Signatures)
+	assert.Equal(t, []string{"a"}, root.Signed.Roles[ROOT].KeyIDs)
+
+	assert.Contains(t, root.UnrecognizedFields, "Signed")
+	assert.Contains(t, root.UnrecognizedFields, longS+"ignatures")
+	assert.Equal(t, "x", root.Signed.UnrecognizedFields["Version"])
+	assert.Contains(t, root.Signed.Roles[ROOT].UnrecognizedFields, "KeyIDs")
+}
+
 func TestGenericRead(t *testing.T) {
 	// Assert that it chokes correctly on an unknown metadata type
 	badMetadata := "{\"signed\": {\"_type\": \"bad-metadata\"}}"
