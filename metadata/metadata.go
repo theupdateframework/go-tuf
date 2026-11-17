@@ -561,21 +561,27 @@ func (meta *Metadata[T]) ClearSignatures() {
 }
 
 // IsDelegatedPath determines whether the given "targetFilepath" is in one of
-// the paths that "DelegatedRole" is trusted to provide
+// the paths that "DelegatedRole" is trusted to provide. An invalid path
+// pattern is reported as an error only if no other pattern matches.
 func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) {
 	if len(role.Paths) > 0 {
 		// standard delegations
+		var firstErr error
 		for _, pathPattern := range role.Paths {
 			//  A delegated role path may be an explicit path or glob
 			//  pattern (Unix shell-style wildcards).
 			matched, err := isTargetInPathPattern(targetFilepath, pathPattern)
 			if err != nil {
-				return false, err
+				if firstErr == nil {
+					firstErr = err
+				}
+				continue
 			}
 			if matched {
 				return true, nil
 			}
 		}
+		return false, firstErr
 	} else if len(role.PathHashPrefixes) > 0 {
 		// hash bin delegations - calculate the hash of the filepath to determine in which bin to find the target.
 		targetFilepathHash := sha256.Sum256([]byte(targetFilepath))
