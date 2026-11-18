@@ -54,9 +54,20 @@ func delegate(parent, role string, paths ...string) map[string]*signature.Signer
 	return added
 }
 
-// setupSharedRole resets the repository to one where "shared" is delegated
-// by "parent-a" for "a/*" and by "parent-b" for "b/*", each trusting its own
-// key. It returns the signers of those two keys.
+// setupSharedRole resets the repository to one where two parents delegate to
+// the same role, each for its own paths and each listing its own key for it:
+//
+//	targets -- a/* --> parent-a -- a/* --> shared (key listed by parent-a: signersA)
+//	targets -- b/* --> parent-b -- b/* --> shared (key listed by parent-b: signersB)
+//
+// "shared" is a single metadata file. A target under "a/" is only reached
+// through "parent-a" and a target under "b/" only through "parent-b", so
+// "shared" is accepted for a path only if it is signed with the key listed by
+// the parent that path is reached through.
+//
+// It returns the signers of the two keys. Both are registered for "shared",
+// which is therefore signed with both keys unless a test narrows
+// simulator.Sim.Signers["shared"] to one of them.
 func setupSharedRole(t *testing.T) (signersA, signersB map[string]*signature.Signer) {
 	t.Helper()
 	require.NoError(t, loadOrResetTrustedRootMetadata())
@@ -81,12 +92,15 @@ func refreshedUpdater(t *testing.T) *Updater {
 }
 
 func TestSharedRoleVerifiedByEachDelegator(t *testing.T) {
-	// "shared" meets the keys and threshold of both delegators
+	// "shared" is signed with the keys of both parents, so it is valid
+	// through either of them
 	setupSharedRole(t)
 	simulator.Sim.AddTarget("shared", []byte("a"), "a/file")
 	simulator.Sim.AddTarget("shared", []byte("b"), "b/file")
 	updater := refreshedUpdater(t)
 
+	// "a/file" is reached through "parent-a" and "b/file" through
+	// "parent-b": each parent verifies "shared" with its own key
 	for _, targetPath := range []string{"a/file", "b/file", "a/file"} {
 		info, err := updater.GetTargetInfo(targetPath)
 		assert.NoError(t, err)
@@ -104,50 +118,60 @@ func TestSharedRoleVerifiedByEachDelegator(t *testing.T) {
 }
 
 func TestCachedRoleNotVerifiedByOtherDelegator(t *testing.T) {
-	// "shared" only meets the keys of "parent-a"
+	// "shared" is signed with the key of "parent-a" only
 	signersA, _ := setupSharedRole(t)
 	simulator.Sim.Signers["shared"] = signersA
 	simulator.Sim.AddTarget("shared", []byte("a"), "a/file")
 	simulator.Sim.AddTarget("shared", []byte("b"), "b/file")
 	updater := refreshedUpdater(t)
 
+	// "a/file" is reached through "parent-a", whose key signed "shared"
 	info, err := updater.GetTargetInfo("a/file")
 	assert.NoError(t, err)
 	assert.NotNil(t, info)
 
-	// the copy cached for "parent-a" is not reused for "parent-b"
+	// "b/file" is reached through "parent-b", whose key did not sign
+	// "shared": the copy cached for "parent-a" is not reused for "parent-b"
 	info, err = updater.GetTargetInfo("b/file")
 	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{})
 	assert.Nil(t, info)
 }
 
 func TestCachedRoleReplacedThroughOtherDelegator(t *testing.T) {
-	// "shared" first only meets the keys of "parent-b"
+	// "shared" is first signed with the key of "parent-b" only
 	signersA, signersB := setupSharedRole(t)
 	simulator.Sim.Signers["shared"] = signersB
 	simulator.Sim.AddTarget("shared", []byte("a"), "a/file")
 	simulator.Sim.AddTarget("shared", []byte("b"), "b/file")
 	updater := refreshedUpdater(t)
 
+	// "b/file" is reached through "parent-b", whose key signed "shared"
 	info, err := updater.GetTargetInfo("b/file")
 	assert.NoError(t, err)
 	assert.NotNil(t, info)
 
-	// the repository then serves a copy that only meets the keys of
-	// "parent-a", which replaces the cached one
+	// the repository then serves a copy signed with the key of "parent-a"
+	// only. "a/file" is reached through "parent-a": the cached copy is not
+	// signed with its key, so the new copy is loaded and replaces it
 	simulator.Sim.Signers["shared"] = signersA
 	info, err = updater.GetTargetInfo("a/file")
 	assert.NoError(t, err)
 	assert.NotNil(t, info)
 
-	// the earlier verification by "parent-b" does not cover the new copy
+	// "b/file" is reached through "parent-b" again: it verified the earlier
+	// copy, but its key did not sign the one that replaced it
 	info, err = updater.GetTargetInfo("b/file")
 	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{})
 	assert.Nil(t, info)
 }
 
 func TestCachedRoleNotVerifiedByReplacedDelegator(t *testing.T) {
-	// "shared" first only meets the keys of "parent-a" and delegates to "leaf"
+	// "shared" is first signed with the key of "parent-a" only. It delegates
+	// all paths to "leaf", which holds the targets and is signed with the
+	// key that "shared" lists for it:
+	//
+	//	parent-a -- a/* --> shared -- */* --> leaf
+	//	parent-b -- b/* --> shared -- */* --> leaf
 	signersA, signersB := setupSharedRole(t)
 	simulator.Sim.Signers["shared"] = signersA
 	delegate("shared", "leaf", "*/*")
@@ -155,12 +179,15 @@ func TestCachedRoleNotVerifiedByReplacedDelegator(t *testing.T) {
 	simulator.Sim.AddTarget("leaf", []byte("b"), "b/file")
 	updater := refreshedUpdater(t)
 
+	// "a/file" is reached through "parent-a", whose key signed "shared",
+	// and then through "shared", whose listed key signed "leaf"
 	info, err := updater.GetTargetInfo("a/file")
 	assert.NoError(t, err)
 	assert.NotNil(t, info)
 
-	// the repository then serves a copy of "shared" that only meets the keys
-	// of "parent-b" and trusts another key for "leaf"
+	// the repository then serves a copy of "shared" signed with the key of
+	// "parent-b" only, which lists another key for "leaf". "leaf" itself is
+	// unchanged
 	publicKey, _, _ := simulator.CreateKey()
 	key, err := metadata.KeyFromPublicKey(*publicKey)
 	require.NoError(t, err)
@@ -171,7 +198,9 @@ func TestCachedRoleNotVerifiedByReplacedDelegator(t *testing.T) {
 	delegations.Roles[0].KeyIDs = []string{keyID}
 	simulator.Sim.Signers["shared"] = signersB
 
-	// "leaf" was verified by the previous copy of "shared", not by this one
+	// "b/file" is reached through "parent-b", which accepts the new copy of
+	// "shared". The cached "leaf" was verified by the previous copy and is
+	// not signed with the key that the new copy lists
 	info, err = updater.GetTargetInfo("b/file")
 	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{})
 	assert.Nil(t, info)
