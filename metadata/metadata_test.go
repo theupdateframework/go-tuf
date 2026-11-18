@@ -767,6 +767,31 @@ func TestIsDelegatedPathInvalidPattern(t *testing.T) {
 	assert.ErrorIs(t, err, path.ErrBadPattern)
 }
 
+func TestGetRolesForTargetInvalidPattern(t *testing.T) {
+	// An invalid pattern must not hide a role whose other patterns match.
+	delegations := &Delegations{
+		Roles: []DelegatedRole{
+			{Name: "first", Paths: []string{"foo/[bad", "foo/*"}, Terminating: true},
+			{Name: "second", Paths: []string{"*/*"}},
+		},
+	}
+	expected := []RoleResult{
+		{Name: "first", Terminating: true},
+		{Name: "second", Terminating: false},
+	}
+	assert.Equal(t, expected, delegations.GetRolesForTarget("foo/x"))
+
+	ok, err := delegations.Roles[0].IsDelegatedPath("foo/x")
+	assert.True(t, ok)
+	assert.NoError(t, err)
+
+	// Without a matching pattern the error is still reported, regardless of order.
+	role := &DelegatedRole{Paths: []string{"foo/[bad", "foo/y"}}
+	ok, err = role.IsDelegatedPath("foo/x")
+	assert.False(t, ok)
+	assert.ErrorIs(t, err, path.ErrBadPattern)
+}
+
 func TestClearSignatures(t *testing.T) {
 	meta := Root()
 	// verify signatures is empty
@@ -2700,4 +2725,25 @@ func TestFromBytesRejectsNullMapValues(t *testing.T) {
 			assert.EqualError(t, testCase.parse([]byte(testCase.input)), testCase.expectedErr)
 		})
 	}
+}
+
+func TestFromBytesMatchesFieldNamesExactly(t *testing.T) {
+	// A name that differs from a known field only by case is an unrecognized field.
+	const signed = `{"_type":"root","version":1,"Version":"x","keys":{},` +
+		`"roles":{"root":{"keyids":["a"],"threshold":1,"KeyIDs":["b"]}}}`
+	const other = `{"_type":"root","version":2,"keys":{},"roles":{}}`
+	const longS = "\u017f"
+	input := `{"signed":` + signed + `,"signatures":[],"Signed":` + other +
+		`,"` + longS + `ignatures":[{"keyid":"k","sig":"00"}]}`
+
+	root, err := Root().FromBytes([]byte(input))
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), root.Signed.Version)
+	assert.Empty(t, root.Signatures)
+	assert.Equal(t, []string{"a"}, root.Signed.Roles[ROOT].KeyIDs)
+
+	assert.Contains(t, root.UnrecognizedFields, "Signed")
+	assert.Contains(t, root.UnrecognizedFields, longS+"ignatures")
+	assert.Equal(t, "x", root.Signed.UnrecognizedFields["Version"])
+	assert.Contains(t, root.Signed.Roles[ROOT].UnrecognizedFields, "KeyIDs")
 }
