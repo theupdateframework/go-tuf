@@ -1061,3 +1061,21 @@ func TestVerifyDelegateDuplicatePublicKeyMLDSA(t *testing.T) {
 
 	assertDuplicatePublicKeyCountsOnce(t, keyA, keyB, targets, sigBytes)
 }
+
+func TestFromBytesRejectsDuplicateSignatureKeyIDs(t *testing.T) {
+	var envelope struct {
+		Signatures []Signature     `json:"signatures"`
+		Signed     json.RawMessage `json:"signed"`
+	}
+	if !assert.NoError(t, json.Unmarshal(testRootBytes, &envelope)) {
+		return
+	}
+	envelope.Signatures = append(envelope.Signatures, envelope.Signatures[0])
+	data, err := json.Marshal(envelope)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	_, err = Root().FromBytes(data)
+	assert.ErrorContains(t, err, "multiple signatures found for key ID")
+}
