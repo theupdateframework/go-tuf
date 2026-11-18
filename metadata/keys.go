@@ -31,7 +31,6 @@ import (
 	"strings"
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
-	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
 const (
@@ -53,7 +52,7 @@ const (
 func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 	switch k.Type {
 	case KeyTypeRSASSA_PSS_SHA256:
-		publicKey, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(k.Value.PublicKey))
+		publicKey, err := unmarshalPEMToPublicKey([]byte(k.Value.PublicKey))
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +66,7 @@ func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 		}
 		return rsaKey, nil
 	case KeyTypeECDSA_SHA2_P256, KeyTypeECDSA_SHA2_P256_COMPAT: // handle "ecdsa" too as python-tuf/sslib keys are using it for keytype instead of https://theupdateframework.github.io/specification/latest/index.html#keytype-ecdsa-sha2-nistp256
-		publicKey, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(k.Value.PublicKey))
+		publicKey, err := unmarshalPEMToPublicKey([]byte(k.Value.PublicKey))
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +95,7 @@ func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 		}
 		return ed25519Key, nil
 	case KeyTypeMLDSA:
-		publicKey, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(k.Value.PublicKey))
+		publicKey, err := unmarshalPEMToPublicKey([]byte(k.Value.PublicKey))
 		if err != nil {
 			return nil, err
 		}
@@ -132,7 +131,7 @@ func KeyFromPublicKey(k crypto.PublicKey) (*Key, error) {
 	case *rsa.PublicKey:
 		key.Type = KeyTypeRSASSA_PSS_SHA256
 		key.Scheme = KeySchemeRSASSA_PSS_SHA256
-		pemKey, err := cryptoutils.MarshalPublicKeyToPEM(k)
+		pemKey, err := marshalPublicKeyToPEM(k)
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +139,7 @@ func KeyFromPublicKey(k crypto.PublicKey) (*Key, error) {
 	case *ecdsa.PublicKey:
 		key.Type = KeyTypeECDSA_SHA2_P256
 		key.Scheme = KeySchemeECDSA_SHA2_P256
-		pemKey, err := cryptoutils.MarshalPublicKeyToPEM(k)
+		pemKey, err := marshalPublicKeyToPEM(k)
 		if err != nil {
 			return nil, err
 		}
@@ -150,7 +149,7 @@ func KeyFromPublicKey(k crypto.PublicKey) (*Key, error) {
 		key.Scheme = KeySchemeEd25519
 		key.Value.PublicKey = hex.EncodeToString(k)
 	case *mldsa.PublicKey:
-		params, err := cryptoutils.ValidateMLDSAPublicKey(k)
+		params, err := validateMLDSAPublicKey(k)
 		if err != nil {
 			return nil, err
 		}
@@ -165,7 +164,7 @@ func KeyFromPublicKey(k crypto.PublicKey) (*Key, error) {
 		default:
 			return nil, fmt.Errorf("unsupported mldsa parameters")
 		}
-		pemKey, err := cryptoutils.MarshalPublicKeyToPEM(k)
+		pemKey, err := marshalPublicKeyToPEM(k)
 		if err != nil {
 			return nil, err
 		}

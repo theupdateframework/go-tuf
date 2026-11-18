@@ -81,7 +81,7 @@ func New(config *config.UpdaterConfig) (*Updater, error) {
 		return nil, fmt.Errorf("no initial trusted root metadata or remote URL provided")
 	}
 	// create a new trusted metadata instance using the trusted root.json
-	trustedMetadataSet, err := trustedmetadata.New(config.LocalTrustedRoot)
+	trustedMetadataSet, err := trustedmetadata.NewWithVerifier(config.LocalTrustedRoot, config.NewVerifier)
 	if err != nil {
 		return nil, err
 	}
