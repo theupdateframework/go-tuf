@@ -343,6 +343,31 @@ func TestDelegatedRoleRejectsPathsWithPathHashPrefixes(t *testing.T) {
 	}
 }
 
+func TestGetRolesForTargetInvalidPattern(t *testing.T) {
+	// An invalid pattern must not hide a role whose other patterns match.
+	delegations := &Delegations{
+		Roles: []DelegatedRole{
+			{Name: "first", Paths: []string{"foo/[bad", "foo/*"}, Terminating: true},
+			{Name: "second", Paths: []string{"*/*"}},
+		},
+	}
+	expected := []RoleResult{
+		{Name: "first", Terminating: true},
+		{Name: "second", Terminating: false},
+	}
+	assert.Equal(t, expected, delegations.GetRolesForTarget("foo/x"))
+
+	ok, err := delegations.Roles[0].IsDelegatedPath("foo/x")
+	assert.True(t, ok)
+	assert.NoError(t, err)
+
+	// Without a matching pattern the error is still reported, regardless of order.
+	role := &DelegatedRole{Paths: []string{"foo/[bad", "foo/y"}}
+	ok, err = role.IsDelegatedPath("foo/x")
+	assert.False(t, ok)
+	assert.ErrorIs(t, err, path.ErrBadPattern)
+}
+
 func TestClearSignatures(t *testing.T) {
 	meta := Root()
 	// verify signatures is empty

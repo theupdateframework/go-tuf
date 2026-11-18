@@ -23,10 +23,44 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
+	"strings"
 )
 
 // The following marshal/unmarshal methods override the default behavior for for each TUF type
 // in order to support unrecognized fields
+
+// unmarshalExact works like json.Unmarshal for a pointer to a struct, but
+// matches JSON names to fields exactly. encoding/json also accepts a name that
+// differs from a field's name only by case; such a member is an unrecognized
+// field, so it is left out when decoding into v.
+func unmarshalExact(data []byte, v any) error {
+	var members map[string]json.RawMessage
+	if err := json.Unmarshal(data, &members); err != nil {
+		return json.Unmarshal(data, v)
+	}
+	t := reflect.TypeOf(v).Elem()
+	dropped := false
+	for i := range t.NumField() {
+		field, _, _ := strings.Cut(t.Field(i).Tag.Get("json"), ",")
+		if field == "-" {
+			continue
+		}
+		for name := range members {
+			if name != field && strings.EqualFold(name, field) {
+				delete(members, name)
+				dropped = true
+			}
+		}
+	}
+	if dropped {
+		var err error
+		if data, err = json.Marshal(members); err != nil {
+			return err
+		}
+	}
+	return json.Unmarshal(data, v)
+}
 
 func (signed RootType) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
@@ -46,7 +80,7 @@ func (signed RootType) MarshalJSON() ([]byte, error) {
 func (signed *RootType) UnmarshalJSON(data []byte) error {
 	type Alias RootType
 	var s Alias
-	if err := json.Unmarshal(data, &s); err != nil {
+	if err := unmarshalExact(data, &s); err != nil {
 		return err
 	}
 	if err := rejectNilMapValues("keys", s.Keys); err != nil {
@@ -88,7 +122,7 @@ func (signed SnapshotType) MarshalJSON() ([]byte, error) {
 func (signed *SnapshotType) UnmarshalJSON(data []byte) error {
 	type Alias SnapshotType
 	var s Alias
-	if err := json.Unmarshal(data, &s); err != nil {
+	if err := unmarshalExact(data, &s); err != nil {
 		return err
 	}
 	if err := rejectNilMapValues("meta", s.Meta); err != nil {
@@ -125,7 +159,7 @@ func (signed TimestampType) MarshalJSON() ([]byte, error) {
 func (signed *TimestampType) UnmarshalJSON(data []byte) error {
 	type Alias TimestampType
 	var s Alias
-	if err := json.Unmarshal(data, &s); err != nil {
+	if err := unmarshalExact(data, &s); err != nil {
 		return err
 	}
 	if err := rejectNilMapValues("meta", s.Meta); err != nil {
@@ -168,7 +202,7 @@ func (signed TargetsType) MarshalJSON() ([]byte, error) {
 func (signed *TargetsType) UnmarshalJSON(data []byte) error {
 	type Alias TargetsType
 	var s Alias
-	if err := json.Unmarshal(data, &s); err != nil {
+	if err := unmarshalExact(data, &s); err != nil {
 		return err
 	}
 	if err := rejectNilMapValues("targets", s.Targets); err != nil {
@@ -214,7 +248,7 @@ func (signed MetaFiles) MarshalJSON() ([]byte, error) {
 func (signed *MetaFiles) UnmarshalJSON(data []byte) error {
 	type Alias MetaFiles
 	var s Alias
-	if err := json.Unmarshal(data, &s); err != nil {
+	if err := unmarshalExact(data, &s); err != nil {
 		return err
 	}
 	*signed = MetaFiles(s)
@@ -246,7 +280,7 @@ func (signed TargetFiles) MarshalJSON() ([]byte, error) {
 func (signed *TargetFiles) UnmarshalJSON(data []byte) error {
 	type Alias TargetFiles
 	var s Alias
-	if err := json.Unmarshal(data, &s); err != nil {
+	if err := unmarshalExact(data, &s); err != nil {
 		return err
 	}
 	// Per TUF spec, hashes are mandatory for target files
@@ -280,7 +314,7 @@ func (key Key) MarshalJSON() ([]byte, error) {
 func (key *Key) UnmarshalJSON(data []byte) error {
 	type Alias Key
 	var a Alias
-	if err := json.Unmarshal(data, &a); err != nil {
+	if err := unmarshalExact(data, &a); err != nil {
 		return err
 	}
 	// nolint
@@ -319,7 +353,7 @@ func (meta *Metadata[T]) UnmarshalJSON(data []byte) error {
 			Signed     RootType    `json:"signed"`
 			Signatures []Signature `json:"signatures"`
 		}{}
-		if err := json.Unmarshal(data, &dict); err != nil {
+		if err := unmarshalExact(data, &dict); err != nil {
 			return err
 		}
 		var i any = dict.Signed
@@ -330,7 +364,7 @@ func (meta *Metadata[T]) UnmarshalJSON(data []byte) error {
 			Signed     SnapshotType `json:"signed"`
 			Signatures []Signature  `json:"signatures"`
 		}{}
-		if err := json.Unmarshal(data, &dict); err != nil {
+		if err := unmarshalExact(data, &dict); err != nil {
 			return err
 		}
 		var i any = dict.Signed
@@ -341,7 +375,7 @@ func (meta *Metadata[T]) UnmarshalJSON(data []byte) error {
 			Signed     TimestampType `json:"signed"`
 			Signatures []Signature   `json:"signatures"`
 		}{}
-		if err := json.Unmarshal(data, &dict); err != nil {
+		if err := unmarshalExact(data, &dict); err != nil {
 			return err
 		}
 		var i any = dict.Signed
@@ -352,7 +386,7 @@ func (meta *Metadata[T]) UnmarshalJSON(data []byte) error {
 			Signed     TargetsType `json:"signed"`
 			Signatures []Signature `json:"signatures"`
 		}{}
-		if err := json.Unmarshal(data, &dict); err != nil {
+		if err := unmarshalExact(data, &dict); err != nil {
 			return err
 		}
 		var i any = dict.Signed
@@ -380,7 +414,7 @@ func (s Signature) MarshalJSON() ([]byte, error) {
 func (s *Signature) UnmarshalJSON(data []byte) error {
 	type Alias Signature
 	var a Alias
-	if err := json.Unmarshal(data, &a); err != nil {
+	if err := unmarshalExact(data, &a); err != nil {
 		return err
 	}
 	*s = Signature(a)
@@ -407,7 +441,7 @@ func (kv KeyVal) MarshalJSON() ([]byte, error) {
 func (kv *KeyVal) UnmarshalJSON(data []byte) error {
 	type Alias KeyVal
 	var a Alias
-	if err := json.Unmarshal(data, &a); err != nil {
+	if err := unmarshalExact(data, &a); err != nil {
 		return err
 	}
 	*kv = KeyVal(a)
@@ -434,7 +468,7 @@ func (role Role) MarshalJSON() ([]byte, error) {
 func (role *Role) UnmarshalJSON(data []byte) error {
 	type Alias Role
 	var a Alias
-	if err := json.Unmarshal(data, &a); err != nil {
+	if err := unmarshalExact(data, &a); err != nil {
 		return err
 	}
 	*role = Role(a)
@@ -467,7 +501,7 @@ func (d Delegations) MarshalJSON() ([]byte, error) {
 func (d *Delegations) UnmarshalJSON(data []byte) error {
 	type Alias Delegations
 	var a Alias
-	if err := json.Unmarshal(data, &a); err != nil {
+	if err := unmarshalExact(data, &a); err != nil {
 		return err
 	}
 	if err := rejectNilMapValues("delegation keys", a.Keys); err != nil {
@@ -522,7 +556,7 @@ func (role DelegatedRole) MarshalJSON() ([]byte, error) {
 func (role *DelegatedRole) UnmarshalJSON(data []byte) error {
 	type Alias DelegatedRole
 	var a Alias
-	if err := json.Unmarshal(data, &a); err != nil {
+	if err := unmarshalExact(data, &a); err != nil {
 		return err
 	}
 	// make sure we have only one of the two (per spec)
@@ -560,7 +594,7 @@ func (role SuccinctRoles) MarshalJSON() ([]byte, error) {
 func (role *SuccinctRoles) UnmarshalJSON(data []byte) error {
 	type Alias SuccinctRoles
 	var a Alias
-	if err := json.Unmarshal(data, &a); err != nil {
+	if err := unmarshalExact(data, &a); err != nil {
 		return err
 	}
 	*role = SuccinctRoles(a)
