@@ -23,11 +23,13 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils"
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils/simulator"
@@ -1079,4 +1081,110 @@ func TestTimestampEqVersionsCheck(t *testing.T) {
 	timestamp, err := metadata.Timestamp().FromFile(simulator.MetadataDir + "/timestamp.json")
 	assert.NoError(t, err)
 	assert.Equal(t, initialTimestampMetadataVer, timestamp.Signed.Meta["snapshot.json"].Version)
+}
+
+// regressionFetcher injects deterministic HTTP failures without making network requests.
+type regressionFetcher struct {
+	base interface {
+		DownloadFile(string, int64, time.Duration) ([]byte, error)
+	}
+	path string
+}
+
+func (f regressionFetcher) DownloadFile(path string, maxLength int64, timeout time.Duration) ([]byte, error) {
+	if strings.HasSuffix(path, f.path) {
+		return nil, &metadata.ErrDownloadHTTP{StatusCode: 500, URL: path}
+	}
+	return f.base.DownloadFile(path, maxLength, timeout)
+}
+
+func assertMetadataNotPersisted(t *testing.T, role string) {
+	t.Helper()
+	_, err := os.ReadFile(filepath.Join(simulator.MetadataDir, role+".json"))
+	assert.ErrorIs(t, err, os.ErrNotExist)
+}
+
+func TestRefreshRejectsExpiredRemoteTimestampWithoutPersistingIt(t *testing.T) {
+	require.NoError(t, loadOrResetTrustedRootMetadata())
+	simulator.Sim.MDTimestamp.Signed.Expires = simulator.PastDateTime
+	updaterConfig, err := loadUpdaterConfig()
+	require.NoError(t, err)
+
+	_, err = runRefresh(updaterConfig, time.Now())
+	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "timestamp.json is expired"})
+	assertMetadataNotPersisted(t, metadata.TIMESTAMP)
+}
+
+func TestRefreshRejectsExpiredRemoteSnapshotWithoutPersistingIt(t *testing.T) {
+	require.NoError(t, loadOrResetTrustedRootMetadata())
+	simulator.Sim.MDSnapshot.Signed.Expires = simulator.PastDateTime
+	updaterConfig, err := loadUpdaterConfig()
+	require.NoError(t, err)
+
+	_, err = runRefresh(updaterConfig, time.Now())
+	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "snapshot.json is expired"})
+	assertMetadataNotPersisted(t, metadata.SNAPSHOT)
+}
+
+func TestRefreshRejectsRemoteSnapshotVersionMismatchWithoutPersistingIt(t *testing.T) {
+	require.NoError(t, loadOrResetTrustedRootMetadata())
+	simulator.Sim.MDSnapshot.Signed.Version = 2
+	updaterConfig, err := loadUpdaterConfig()
+	require.NoError(t, err)
+
+	_, err = runRefresh(updaterConfig, time.Now())
+	assert.ErrorIs(t, err, &metadata.ErrBadVersionNumber{Msg: "expected 1, got 2"})
+	assertMetadataNotPersisted(t, metadata.SNAPSHOT)
+}
+
+func TestRefreshAbortsWhenRootRotationReturnsHTTP500(t *testing.T) {
+	require.NoError(t, loadOrResetTrustedRootMetadata())
+	simulator.Sim.MDRoot.Signed.Version++
+	simulator.Sim.PublishRoot()
+	updaterConfig, err := loadUpdaterConfig()
+	require.NoError(t, err)
+	updaterConfig.Fetcher = regressionFetcher{base: simulator.Sim, path: "2.root.json"}
+
+	_, err = runRefresh(updaterConfig, time.Now())
+	var downloadErr *metadata.ErrDownloadHTTP
+	assert.ErrorAs(t, err, &downloadErr)
+	if assert.NotNil(t, downloadErr) {
+		assert.Equal(t, 500, downloadErr.StatusCode)
+	}
+	assertVersionEquals(t, metadata.ROOT, 1)
+}
+
+func TestRefreshReturnsTimestampDownloadHTTP500WithValidCache(t *testing.T) {
+	require.NoError(t, loadOrResetTrustedRootMetadata())
+	updaterConfig, err := loadUpdaterConfig()
+	require.NoError(t, err)
+	_, err = runRefresh(updaterConfig, time.Now())
+	require.NoError(t, err)
+	updaterConfig.Fetcher = regressionFetcher{base: simulator.Sim, path: "timestamp.json"}
+
+	_, err = runRefresh(updaterConfig, time.Now())
+	var downloadErr *metadata.ErrDownloadHTTP
+	assert.ErrorAs(t, err, &downloadErr)
+	if assert.NotNil(t, downloadErr) {
+		assert.Equal(t, 500, downloadErr.StatusCode)
+	}
+}
+
+func TestRefreshReturnsSnapshotDownloadHTTP500WithValidCache(t *testing.T) {
+
+	require.NoError(t, loadOrResetTrustedRootMetadata())
+	updaterConfig, err := loadUpdaterConfig()
+	require.NoError(t, err)
+	_, err = runRefresh(updaterConfig, time.Now())
+	require.NoError(t, err)
+	simulator.Sim.MDSnapshot.Signed.Version++
+	simulator.Sim.UpdateSnapshot()
+	updaterConfig.Fetcher = regressionFetcher{base: simulator.Sim, path: "snapshot.json"}
+
+	_, err = runRefresh(updaterConfig, time.Now())
+	var downloadErr *metadata.ErrDownloadHTTP
+	assert.ErrorAs(t, err, &downloadErr)
+	if assert.NotNil(t, downloadErr) {
+		assert.Equal(t, 500, downloadErr.StatusCode)
+	}
 }

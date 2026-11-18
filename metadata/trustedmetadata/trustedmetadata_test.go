@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils"
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils/rsapss"
+	"github.com/theupdateframework/go-tuf/v2/internal/testutils/simulator"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
@@ -703,4 +704,29 @@ func TestUpdateTargetsExpiredMewTarget(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = trustedSet.UpdateTargets(targets)
 	assert.ErrorIs(t, err, &metadata.ErrExpiredMetadata{Msg: "new targets is expired"})
+}
+
+func TestUpdateRootRequiresOldRootThreshold(t *testing.T) {
+	trusted, err := New(allRoles[metadata.ROOT])
+	require.NoError(t, err)
+
+	newRoot, err := metadata.Root().FromBytes(allRoles[metadata.ROOT])
+	require.NoError(t, err)
+	publicKey, _, signer := simulator.CreateKey()
+	key, err := metadata.KeyFromPublicKey(*publicKey)
+	require.NoError(t, err)
+	keyID, err := key.ID()
+	require.NoError(t, err)
+	require.NoError(t, newRoot.Signed.AddKey(key, metadata.ROOT))
+	newRoot.Signed.Roles[metadata.ROOT].KeyIDs = []string{keyID}
+	newRoot.Signed.Roles[metadata.ROOT].Threshold = 1
+	newRoot.Signed.Version++
+	newRoot.ClearSignatures()
+	_, err = newRoot.Sign(*signer)
+	require.NoError(t, err)
+	rootBytes, err := newRoot.ToBytes(true)
+	require.NoError(t, err)
+
+	_, err = trusted.UpdateRoot(rootBytes)
+	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 0, want 1"})
 }
