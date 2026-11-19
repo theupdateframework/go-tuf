@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils/simulator"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
@@ -89,18 +90,17 @@ func TestDownloadTargetHashPrefixIsDeterministic(t *testing.T) {
 	// A target listing more than one hash must always resolve to the same
 	// hash-prefixed URL (ref. https://github.com/theupdateframework/go-tuf/issues/746)
 
-	err := loadOrResetTrustedRootMetadata()
-	assert.NoError(t, err)
-	simulator.Sim.MDRoot.Signed.ConsistentSnapshot = true
-	simulator.Sim.MDRoot.Signed.Version += 1
-	simulator.Sim.PublishRoot()
+	repo := simulator.NewTestRepository(t)
+	repo.Simulator.MDRoot.Signed.ConsistentSnapshot = true
+	repo.BumpVersion(metadata.ROOT)
 
-	updaterConfig, err := loadUpdaterConfig()
-	assert.NoError(t, err)
+	updaterConfig, err := repo.GetUpdaterConfig()
+	require.NoError(t, err)
 	updaterConfig.DisableLocalCache = true
 	updaterConfig.PrefixTargetsWithHash = true
-	updater, err := runRefresh(updaterConfig, time.Now())
-	assert.NoError(t, err)
+	updater, err := New(updaterConfig)
+	require.NoError(t, err)
+	require.NoError(t, updater.Refresh())
 
 	content := []byte("target content")
 	sha256Hash := sha256.Sum256(content)
