@@ -130,6 +130,23 @@ func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 // The scheme of an ECDSA key follows its curve: P-256 keys get
 // "ecdsa-sha2-nistp256" and P-384 keys get "ecdsa-sha2-nistp384".
 // ECDSA keys on any other curve are rejected.
+//
+// Earlier releases gave every ECDSA key the "ecdsa-sha2-nistp256" scheme.
+// Metadata they wrote still verifies, but a key that is not on P-256 needs
+// care when it is used again:
+//
+//   - The scheme is part of the key ID, so a P-384 key now has a different
+//     key ID, and Sign writes only the new one. To keep signing with the
+//     key, add the Key returned here to the delegating role and remove the
+//     old entry. Its signatures must use SHA-384.
+//   - P-224 and P-521 keys can no longer be used with Sign. Replace them
+//     with a supported key in the delegating role.
+//   - A new root version must also verify against the root before it, which
+//     lists the key under its old key ID and scheme. If the key is needed
+//     to reach that root's threshold, Sign cannot produce the signature:
+//     sign the canonical JSON of Signed with the key and SHA-256, and
+//     append the result to Signatures under the old key ID. Clients that
+//     trust the earlier root cannot verify the new root without it.
 func KeyFromPublicKey(k crypto.PublicKey) (*Key, error) {
 	key := &Key{}
 	switch k := k.(type) {
