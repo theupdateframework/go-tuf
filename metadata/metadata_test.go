@@ -756,6 +756,65 @@ func TestVerifyDelegateDuplicateKeyTypeECDSA(t *testing.T) {
 	assertDuplicatePublicKeyCountsOnce(t, keyA, keyB, targets, sigBytes)
 }
 
+// Regression: KeyFromPublicKey labelled every ECDSA key "ecdsa-sha2-nistp256".
+// The scheme selects the verification digest and is part of the key ID, so a
+// P-384 key could not be signed with through Sign and verified.
+func TestECDSASchemeFollowsCurve(t *testing.T) {
+	for _, tc := range []struct {
+		curve  elliptic.Curve
+		hash   crypto.Hash
+		scheme string
+	}{
+		{elliptic.P256(), crypto.SHA256, KeySchemeECDSA_SHA2_P256},
+		{elliptic.P384(), crypto.SHA384, KeySchemeECDSA_SHA2_P384},
+	} {
+		t.Run(tc.curve.Params().Name, func(t *testing.T) {
+			privKey, err := ecdsa.GenerateKey(tc.curve, rand.Reader)
+			assert.NoError(t, err)
+
+			key, err := KeyFromPublicKey(&privKey.PublicKey)
+			assert.NoError(t, err)
+			assert.Equal(t, KeyTypeECDSA_SHA2_P256, key.Type)
+			assert.Equal(t, tc.scheme, key.Scheme)
+			keyID, err := key.ID()
+			assert.NoError(t, err)
+
+			root := Root(fixedExpire)
+			assert.NoError(t, root.Signed.AddKey(key, ROOT))
+
+			signer, err := signature.LoadECDSASigner(privKey, tc.hash)
+			assert.NoError(t, err)
+			sig, err := root.Sign(signer)
+			assert.NoError(t, err)
+			assert.Equal(t, keyID, sig.KeyID)
+
+			assert.NoError(t, root.VerifyDelegate(ROOT, root))
+		})
+	}
+}
+
+func TestECDSAUnsupportedCurveRejected(t *testing.T) {
+	for _, curve := range []elliptic.Curve{elliptic.P224(), elliptic.P521()} {
+		t.Run(curve.Params().Name, func(t *testing.T) {
+			privKey, err := ecdsa.GenerateKey(curve, rand.Reader)
+			assert.NoError(t, err)
+
+			_, err = KeyFromPublicKey(&privKey.PublicKey)
+			assert.EqualError(t, err, "unsupported ecdsa curve "+curve.Params().Name+": only P-256 and P-384 are supported")
+
+			signer, err := signature.LoadECDSASigner(privKey, crypto.SHA256)
+			assert.NoError(t, err)
+			root := Root(fixedExpire)
+			_, err = root.Sign(signer)
+			assert.ErrorContains(t, err, "unsupported ecdsa curve")
+			assert.Empty(t, root.Signatures)
+		})
+	}
+
+	_, err := KeyFromPublicKey(&ecdsa.PublicKey{})
+	assert.EqualError(t, err, "unsupported ecdsa public key: no curve set")
+}
+
 // Regression: even without an alternate keytype, duplicate Ed25519 key records
 // that resolve to the same public key must count as a single threshold
 // contribution.
