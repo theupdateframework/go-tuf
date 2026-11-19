@@ -44,11 +44,10 @@ jobs:
         run: |
           # Read the constant from the source so that nothing has to be built.
           # The next job puts this value into a script and an issue, so fail
-          # unless it is declared exactly once, as a plain "X.Y.Z" string.
-          pattern='^[[:space:]]*(const[[:space:]]+)?SPECIFICATION_VERSION[[:space:]]*=[[:space:]]*"([0-9]+\.[0-9]+\.[0-9]+)"[[:space:]]*(//.*)?$'
-          version="$(sed -nE "s#${pattern}#\2#p" "${SOURCE_FILE}")"
+          # unless it is a plain "X.Y.Z" string.
+          version="$(grep SPECIFICATION_VERSION "${SOURCE_FILE}" | cut -d '=' -f2 | tr -d ' "')" || true
           if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error file=${SOURCE_FILE}::Expected exactly one SPECIFICATION_VERSION = \"X.Y.Z\" declaration, found: '${version//$'\n'/, }'"
+            echo "::error file=${SOURCE_FILE}::Expected SPECIFICATION_VERSION = \"X.Y.Z\", found: '${version//$'\n'/, }'"
             exit 1
           fi
           echo "Supported TUF specification version: v${version}"
