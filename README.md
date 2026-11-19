@@ -5,6 +5,10 @@
 This is a Go implementation of [The Update Framework (TUF)](http://theupdateframework.com/),
 a framework for securing software update systems.
 
+## Deprecation notice
+
+**The legacy go-tuf module (`github.com/theupdateframework/go-tuf`) is deprecated in favour of [go-tuf/v2](https://github.com/theupdateframework/go-tuf) (`github.com/theupdateframework/go-tuf/v2`).** New projects should use go-tuf/v2, and existing users are encouraged to migrate to it.
+
 ## API instability
 
 **Note**: go-tuf's API is in flux and backwards compatibility with version 0.7.0 and earlier will _**not**_ be maintained.

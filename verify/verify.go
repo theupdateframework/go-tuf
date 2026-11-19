@@ -1,3 +1,8 @@
+// Package verify implements the verification of signatures, thresholds,
+// versions and expiration of TUF metadata.
+//
+// Deprecated: The legacy go-tuf module is deprecated in favour of
+// github.com/theupdateframework/go-tuf/v2.
 package verify
 
 import (

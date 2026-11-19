@@ -1,3 +1,4 @@
+// Deprecated: Use github.com/theupdateframework/go-tuf/v2 instead.
 module github.com/theupdateframework/go-tuf
 
 go 1.20
