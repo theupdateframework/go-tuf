@@ -67,11 +67,25 @@ import (
 type Updater struct {
 	trusted *trustedmetadata.TrustedMetadata
 	cfg     *config.UpdaterConfig
+	// verified records, for a (role, parent) pair, the trusted copies of
+	// both for which the role passed verification by the parent
+	verified map[roleParentTuple]roleParentCopies
 }
 
 type roleParentTuple struct {
 	Role   string
 	Parent string
+}
+
+// delegator is the trusted metadata of a role that delegates to other roles
+type delegator interface {
+	VerifyDelegate(delegatedRole string, delegatedMetadata any) error
+}
+
+// roleParentCopies holds the trusted copies of a role and of its parent
+type roleParentCopies struct {
+	role   *metadata.Metadata[metadata.TargetsType]
+	parent delegator
 }
 
 // New creates a new Updater instance and loads trusted root metadata
@@ -87,8 +101,9 @@ func New(config *config.UpdaterConfig) (*Updater, error) {
 	}
 	// create an updater instance
 	updater := &Updater{
-		cfg:     config,
-		trusted: trustedMetadataSet, // save trusted metadata set
+		cfg:      config,
+		trusted:  trustedMetadataSet, // save trusted metadata set
+		verified: map[roleParentTuple]roleParentCopies{},
 	}
 	// ensure paths exist, doesn't do anything if caching is disabled
 	err = updater.cfg.EnsurePathsExist()
@@ -411,11 +426,56 @@ func (update *Updater) loadSnapshot() error {
 	return nil
 }
 
+// trustedCopies returns the trusted copies of roleName and of its parent
+// parentName, if both are loaded
+func (update *Updater) trustedCopies(roleName, parentName string) (roleParentCopies, bool) {
+	role, ok := update.trusted.Targets[roleName]
+	if !ok {
+		return roleParentCopies{}, false
+	}
+	if parentName == metadata.ROOT {
+		return roleParentCopies{role: role, parent: update.trusted.Root}, true
+	}
+	parent, ok := update.trusted.Targets[parentName]
+	if !ok {
+		return roleParentCopies{}, false
+	}
+	return roleParentCopies{role: role, parent: parent}, true
+}
+
+// markVerified records that the trusted copy of roleName passed
+// verification by the trusted copy of parentName
+func (update *Updater) markVerified(roleName, parentName string) {
+	if current, ok := update.trustedCopies(roleName, parentName); ok {
+		update.verified[roleParentTuple{Role: roleName, Parent: parentName}] = current
+	}
+}
+
+// cachedTargets returns the trusted copy of roleName if it is verified by
+// the trusted copy of parentName. A copy that parentName has not verified
+// yet, such as one loaded through another parent, is verified first.
+func (update *Updater) cachedTargets(roleName, parentName string) (*metadata.Metadata[metadata.TargetsType], bool) {
+	current, ok := update.trustedCopies(roleName, parentName)
+	if !ok {
+		return nil, false
+	}
+	pair := roleParentTuple{Role: roleName, Parent: parentName}
+	// a replaced role or parent does not match the recorded copies
+	if update.verified[pair] != current {
+		if err := current.parent.VerifyDelegate(roleName, current.role); err != nil {
+			return nil, false
+		}
+		update.verified[pair] = current
+	}
+	return current.role, true
+}
+
 // loadTargets load local (and if needed remote) metadata for roleName
 func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metadata[metadata.TargetsType], error) {
 	log := metadata.GetLogger()
-	// avoid loading "roleName" more than once during "GetTargetInfo"
-	role, ok := update.trusted.Targets[roleName]
+	// avoid loading "roleName" more than once during "GetTargetInfo", as
+	// long as the trusted copy is verified by "parentName"
+	role, ok := update.cachedTargets(roleName, parentName)
 	if ok {
 		return role, nil
 	}
@@ -439,6 +499,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 		} else {
 			// this means targets verification/loading succeeded
 			log.Info("Local role is valid: not downloading new one", "role", roleName)
+			update.markVerified(roleName, parentName)
 			return delegatedTargets, nil
 		}
 	}
@@ -472,6 +533,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 	if err != nil {
 		return nil, err
 	}
+	update.markVerified(roleName, parentName)
 	// persist the new target metadata
 	err = update.persistMetadata(roleName, data)
 	if err != nil {

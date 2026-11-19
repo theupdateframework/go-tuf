@@ -1,0 +1,49 @@
+#
+# Copyright 2026 The Update Framework Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License
+#
+# SPDX-License-Identifier: Apache-2.0
+on:
+  push:
+    branches:
+      - "master"
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 6 * * 3'
+
+permissions:
+  contents: read
+
+name: Conformance
+jobs:
+  tuf-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup - Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - name: Build conformance client
+        run: go build -o .github/scripts/tuf-conformance-client ./cmd/tuf-conformance-client
+
+      - name: Run test suite
+        uses: theupdateframework/tuf-conformance@1bc18916ee35f753b6eb8ee19dabb98449ca7326 # v2.5.0
+        with:
+          entrypoint: ".github/scripts/tuf-conformance-client"

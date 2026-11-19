@@ -71,6 +71,62 @@ To try it - run `make example-tuf-client-cli`
 
 To try it - run `make example-multirepo`
 
+* [external signer](metadata/example_external_signer_test.go) and [key file](metadata/example_key_from_file_test.go) examples which demonstrate how to sign metadata with a key go-tuf has no access to and with keys loaded from PEM files (see [Signing and keys](#signing-and-keys)).
+
+To try it - run `go test -v -run ExampleMetadata_Sign ./metadata/`
+
+## Signing and keys
+
+----------------------------
+
+go-tuf does not store or manage private keys. `Metadata.Sign` takes a
+[`signature.Signer`](https://pkg.go.dev/github.com/sigstore/sigstore/pkg/signature#Signer)
+from [sigstore](https://github.com/sigstore/sigstore), which is an interface:
+
+```go
+type Signer interface {
+	PublicKey(opts ...PublicKeyOption) (crypto.PublicKey, error)
+	SignMessage(message io.Reader, opts ...SignOption) ([]byte, error)
+}
+```
+
+Any implementation works, so the private key can be kept wherever it suits you:
+
+* **In memory or in a file** - `signature.LoadSigner` turns a `crypto.PrivateKey` into a signer, see [Loading keys from files](#loading-keys-from-files).
+* **In a cloud KMS or HashiCorp Vault** - the [sigstore KMS signers](https://github.com/sigstore/sigstore/tree/main/pkg/signature/kms) (AWS, Azure, GCP, HashiCorp Vault) implement the interface. They are separate Go modules which go-tuf does not depend on, so import the one you need and pass what `kms.Get` returns to `Sign`. The key has to be of a type and signing algorithm listed below.
+* **In an HSM (PKCS#11), a YubiKey, a TPM or anywhere else** - implement the two methods yourself. The [external signer example](metadata/example_external_signer_test.go) does so for any `crypto.Signer`, which is what the client libraries for such devices usually provide.
+
+What a custom signer has to comply with:
+
+* `Sign` derives the TUF key (type, scheme and key ID) from the signer's public key through `metadata.KeyFromPublicKey`, so `PublicKey` has to return an `*rsa.PublicKey`, `*ecdsa.PublicKey`, `ed25519.PublicKey` or `*mldsa.PublicKey`. Use the same function to get the key to add to the delegating role. The key ID is always computed from the key.
+* `SignMessage` gets the exact bytes to sign and has to return a signature of the kind go-tuf verifies for that key type:
+
+| Public key | TUF key scheme | Expected signature |
+| ---------- | -------------- | ------------------ |
+| Ed25519    | `ed25519` | Ed25519 over the message |
+| ECDSA      | `ecdsa-sha2-nistp256` for a P-256 key, `ecdsa-sha2-nistp384` for a P-384 key (other curves are rejected) | ASN.1 DER encoded ECDSA over the SHA-256 digest of the message for a P-256 key, the SHA-384 digest for a P-384 key |
+| RSA        | `rsassa-pss-sha256` | RSASSA-PSS with SHA-256 (not PKCS #1 v1.5) |
+| ML-DSA     | `ml-dsa-44/1`, `ml-dsa-65/1` or `ml-dsa-87/1` | ML-DSA with an empty context over the message |
+
+### Loading keys from files
+
+There is no go-tuf specific key file format. Read the file and decode it with sigstore's
+[`cryptoutils`](https://pkg.go.dev/github.com/sigstore/sigstore/pkg/cryptoutils) package,
+as shown in the [key file example](metadata/example_key_from_file_test.go):
+
+| From | To | Function |
+| ---- | -- | -------- |
+| PEM private key (PKCS #8, PKCS #1, SEC 1, optionally encrypted) | `crypto.PrivateKey` | `cryptoutils.UnmarshalPEMToPrivateKey` |
+| PEM public key | `crypto.PublicKey` | `cryptoutils.UnmarshalPEMToPublicKey` |
+| `crypto.PrivateKey` | `signature.Signer` | `signature.LoadSigner` (`signature.LoadRSAPSSSigner` for RSA) |
+| `crypto.PublicKey` | TUF `metadata.Key` | `metadata.KeyFromPublicKey` |
+| TUF `metadata.Key` | `crypto.PublicKey` | `Key.ToPublicKey` |
+| `crypto.PrivateKey` / `crypto.PublicKey` | PEM | `cryptoutils.MarshalPrivateKeyToPEM` / `cryptoutils.MarshalPublicKeyToPEM` |
+
+`signature.LoadSignerFromPEMFile` combines the first and the third step. Note that for an RSA key both it and
+`signature.LoadSigner` return a PKCS #1 v1.5 signer whose signatures go-tuf does not accept, so load RSA keys with
+`signature.LoadRSAPSSSigner(key, crypto.SHA256, &rsa.PSSOptions{Hash: crypto.SHA256})`.
+
 ## Package details
 
 ----------------------------

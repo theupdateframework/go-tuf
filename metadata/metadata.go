@@ -204,7 +204,17 @@ func (meta *Metadata[T]) ToFile(name string, pretty bool) error {
 	return os.WriteFile(name, data, 0644)
 }
 
-// Sign create signature over Signed and assign it to Signatures
+// Sign creates a signature over Signed and stores it in Signatures. It
+// replaces any existing signature from the same key, as a key ID must be
+// unique in Signatures. The new signature is verified against the key derived
+// from the signer's public key, and if it does not verify an error is returned
+// and Signatures is left unchanged.
+//
+// Any signature.Signer implementation can be used, so the private key does not
+// have to be available to go-tuf: it can be held in memory, in a KMS, an HSM
+// or a hardware token. The TUF key and its ID are derived from the signer's
+// public key through KeyFromPublicKey, so the signer has to return a public
+// key type supported by it and a signature matching the resulting key scheme.
 func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	// encode the Signed part to canonical JSON so signatures are consistent
 	payload, err := cjson.EncodeCanonical(meta.Signed)
@@ -236,16 +246,95 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", &ErrUnsignedMetadata{Msg: "problem signing metadata"}, err)
 	}
+	// make sure the signature verifies for the key derived above, i.e. the
+	// signer uses the algorithm that the key type and scheme declare
+	publicKey, err := key.ToPublicKey()
+	if err != nil {
+		return nil, err
+	}
+	verified, err := verifySignature(key, publicKey, payload, sb)
+	if err != nil {
+		return nil, err
+	}
+	if !verified {
+		return nil, &ErrUnsignedMetadata{Msg: fmt.Sprintf(
+			"signature created with key ID %s does not verify for keytype %s and scheme %s",
+			keyID, key.Type, key.Scheme)}
+	}
 	// build signature
 	sig := &Signature{
 		KeyID:     keyID,
 		Signature: sb,
 	}
-	// update the Signatures part
-	meta.Signatures = append(meta.Signatures, *sig)
+	// update the Signatures part, replacing any signature from the same key
+	// at its position
+	signatures := make([]Signature, 0, len(meta.Signatures)+1)
+	stored := false
+	for _, existing := range meta.Signatures {
+		if existing.KeyID != keyID {
+			signatures = append(signatures, existing)
+		} else if !stored {
+			signatures = append(signatures, *sig)
+			stored = true
+		}
+	}
+	if !stored {
+		signatures = append(signatures, *sig)
+	}
+	meta.Signatures = signatures
 	// return the new signature
 	log.Info("Signed metadata with key", "ID", keyID)
 	return sig, nil
+}
+
+// verifySignature reports whether sig is a signature by key over payload, the
+// canonical JSON of the signed part. publicKey is the result of
+// key.ToPublicKey(). It returns false and no error if the signature does not
+// verify, and an error if the key cannot be used for verification.
+func verifySignature(key *Key, publicKey crypto.PublicKey, payload, sig []byte) (bool, error) {
+	// use corresponding hash function for key type
+	hashFunc := crypto.Hash(0)
+	if key.Type != KeyTypeEd25519 && key.Type != KeyTypeMLDSA {
+		switch key.Scheme {
+		case KeySchemeECDSA_SHA2_P256:
+			hashFunc = crypto.SHA256
+		case KeySchemeECDSA_SHA2_P384:
+			hashFunc = crypto.SHA384
+		default:
+			hashFunc = crypto.SHA256
+		}
+	}
+	// load a verifier based on that key
+	// handle RSA PSS scheme separately as the LoadVerifier function doesn't identify it correctly
+	// Note we should support RSA PSS, not RSA PKCS1v15 (which is what LoadVerifier would return)
+	// Reference: https://theupdateframework.github.io/specification/latest/#file-formats-keys
+	var verifier signature.Verifier
+	var err error
+	if key.Type == KeyTypeRSASSA_PSS_SHA256 {
+		// Load a verifier for rsa
+		publicKeyRSAPSS, ok := publicKey.(*rsa.PublicKey)
+		if !ok {
+			return false, &ErrType{Msg: "failed to convert public key to RSA PSS key"}
+		}
+		verifier, err = signature.LoadRSAPSSVerifier(publicKeyRSAPSS, hashFunc, &rsa.PSSOptions{Hash: crypto.SHA256})
+	} else {
+		// Load a verifier for ed25519, ecdsa, and ml-dsa
+		verifier, err = signature.LoadVerifier(publicKey, hashFunc)
+	}
+	if err != nil {
+		return false, err
+	}
+
+	payloadToVerify, err := preparePayload(key, payload)
+	if err != nil {
+		return false, err
+	}
+
+	// verify if the signature for that payload corresponds to the given key
+	if err := verifier.VerifySignature(bytes.NewReader(sig), bytes.NewReader(payloadToVerify)); err != nil {
+		return false, nil
+	}
+	return true, nil
 }
 
 // preparePayload returns the payload to sign or verify, applying protocol
@@ -382,45 +471,13 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 		}
 		pubFingerprint := sha256.Sum256(pubBytes)
 		fingerprint := hex.EncodeToString(pubFingerprint[:])
-		// use corresponding hash function for key type
-		hash := crypto.Hash(0)
-		if key.Type != KeyTypeEd25519 && key.Type != KeyTypeMLDSA {
-			switch key.Scheme {
-			case KeySchemeECDSA_SHA2_P256:
-				hash = crypto.SHA256
-			case KeySchemeECDSA_SHA2_P384:
-				hash = crypto.SHA384
-			default:
-				hash = crypto.SHA256
-			}
-		}
-		// load a verifier based on that key
-		// handle RSA PSS scheme separately as the LoadVerifier function doesn't identify it correctly
-		// Note we should support RSA PSS, not RSA PKCS1v15 (which is what LoadVerifier would return)
-		// Reference: https://theupdateframework.github.io/specification/latest/#file-formats-keys
-		var verifier signature.Verifier
-		if key.Type == KeyTypeRSASSA_PSS_SHA256 {
-			// Load a verifier for rsa
-			publicKeyRSAPSS, ok := publicKey.(*rsa.PublicKey)
-			if !ok {
-				return &ErrType{Msg: "failed to convert public key to RSA PSS key"}
-			}
-			verifier, err = signature.LoadRSAPSSVerifier(publicKeyRSAPSS, hash, &rsa.PSSOptions{Hash: crypto.SHA256})
-		} else {
-			// Load a verifier for ed25519, ecdsa, and ml-dsa
-			verifier, err = signature.LoadVerifier(publicKey, hash)
-		}
-		if err != nil {
-			return err
-		}
-
-		payloadToVerify, err := preparePayload(key, payload)
-		if err != nil {
-			return err
-		}
 
 		// verify if the signature for that payload corresponds to the given key
-		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payloadToVerify)); err != nil {
+		verified, err := verifySignature(key, publicKey, payload, sign.Signature)
+		if err != nil {
+			return err
+		}
+		if !verified {
 			// failed to verify the metadata with that key ID
 			log.Info("Failed to verify role with key ID", "role", delegatedRole, "ID", keyID)
 		} else {
@@ -561,21 +618,27 @@ func (meta *Metadata[T]) ClearSignatures() {
 }
 
 // IsDelegatedPath determines whether the given "targetFilepath" is in one of
-// the paths that "DelegatedRole" is trusted to provide
+// the paths that "DelegatedRole" is trusted to provide. An invalid path
+// pattern is reported as an error only if no other pattern matches.
 func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) {
 	if len(role.Paths) > 0 {
 		// standard delegations
+		var firstErr error
 		for _, pathPattern := range role.Paths {
 			//  A delegated role path may be an explicit path or glob
 			//  pattern (Unix shell-style wildcards).
 			matched, err := isTargetInPathPattern(targetFilepath, pathPattern)
 			if err != nil {
-				return false, err
+				if firstErr == nil {
+					firstErr = err
+				}
+				continue
 			}
 			if matched {
 				return true, nil
 			}
 		}
+		return false, firstErr
 	} else if len(role.PathHashPrefixes) > 0 {
 		// hash bin delegations - calculate the hash of the filepath to determine in which bin to find the target.
 		targetFilepathHash := sha256.Sum256([]byte(targetFilepath))
