@@ -18,6 +18,7 @@
 package metadata_test
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/ecdh"
 	"crypto/ecdsa"
@@ -26,6 +27,7 @@ import (
 	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"io"
 	"testing"
 	"time"
@@ -114,11 +116,28 @@ func TestSignWithExternalSigner(t *testing.T) {
 		})
 	}
 
-	// TUF uses RSASSA-PSS, so a signer producing PKCS #1 v1.5 signatures
-	// gets to sign, but what it returns does not verify
+	// go-tuf does not accept PKCS #1 v1.5 signatures for RSA keys, so a
+	// signer producing them never yields metadata that verifies, whether it
+	// is Sign or VerifyDelegate that turns the signature down
 	t.Run("rsa-pkcs1v15", func(t *testing.T) {
 		signer := &cryptoSigner{key: opaqueKey{key: rsaKey}, opts: crypto.SHA256}
-		root, targets := signTargetsWith(t, signer)
+
+		// the signer itself works and produces PKCS #1 v1.5 signatures
+		message := []byte("message")
+		sig, err := signer.SignMessage(bytes.NewReader(message))
+		require.NoError(t, err)
+		digest := sha256.Sum256(message)
+		require.NoError(t, rsa.VerifyPKCS1v15(&rsaKey.PublicKey, crypto.SHA256, digest[:], sig))
+
+		key, err := metadata.KeyFromPublicKey(rsaKey.Public())
+		require.NoError(t, err)
+		expires := time.Now().AddDate(0, 0, 7).UTC()
+		root := metadata.Root(expires)
+		require.NoError(t, root.Signed.AddKey(key, metadata.TARGETS))
+
+		targets := metadata.Targets(expires)
+		// Sign may or may not return an error here
+		_, _ = targets.Sign(signer)
 		assert.ErrorIs(t, root.VerifyDelegate(metadata.TARGETS, targets), &metadata.ErrUnsignedMetadata{})
 	})
 
