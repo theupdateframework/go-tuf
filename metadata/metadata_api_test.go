@@ -582,13 +582,17 @@ func TestSignVerify(t *testing.T) {
 	snapshotPublicKey, err := snapshotKey.ToPublicKey()
 	assert.NoError(t, err)
 	snapshotHash := crypto.SHA256
-	snapshotVerifier, err := signature.LoadVerifier(snapshotPublicKey, snapshotHash)
+	snapshotVerifier, err := signature.LoadRSAPSSVerifier(
+		snapshotPublicKey.(*rsa.PublicKey),
+		snapshotHash,
+		&rsa.PSSOptions{Hash: snapshotHash},
+	)
 	assert.NoError(t, err)
 	err = snapshotVerifier.VerifySignature(bytes.NewReader(sig), bytes.NewReader(data))
 	assert.ErrorContains(t, err, "crypto/rsa: verification error")
 
 	// Append a new signature with the unrelated key and assert that ...
-	signer, err := signature.LoadSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "snapshot_key"), crypto.SHA256, cryptoutils.SkipPassword)
+	signer, err := rsapss.LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "snapshot_key"))
 	assert.NoError(t, err)
 	snapshotSig, err := targets.Sign(signer)
 	assert.NoError(t, err)
@@ -603,7 +607,7 @@ func TestSignVerify(t *testing.T) {
 	assert.Equal(t, snapshotSig.KeyID, snapshotKeyID)
 
 	// Clear all signatures and add a new signature with the unrelated key and assert that ...
-	signer, err = signature.LoadSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "timestamp_key"), crypto.SHA256, cryptoutils.SkipPassword)
+	signer, err = rsapss.LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "timestamp_key"))
 	assert.NoError(t, err)
 	targets.ClearSignatures()
 	assert.Equal(t, 0, len(targets.Signatures))
@@ -616,7 +620,11 @@ func TestSignVerify(t *testing.T) {
 	timestampPublicKey, err := timestampKey.ToPublicKey()
 	assert.NoError(t, err)
 	timestampHash := crypto.SHA256
-	timestampVerifier, err := signature.LoadVerifier(timestampPublicKey, timestampHash)
+	timestampVerifier, err := signature.LoadRSAPSSVerifier(
+		timestampPublicKey.(*rsa.PublicKey),
+		timestampHash,
+		&rsa.PSSOptions{Hash: timestampHash},
+	)
 	assert.NoError(t, err)
 
 	err = timestampVerifier.VerifySignature(bytes.NewReader(timestampSig.Signature), bytes.NewReader(data))

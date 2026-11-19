@@ -346,6 +346,98 @@ func TestClearSignatures(t *testing.T) {
 	assert.Equal(t, []Signature{}, meta.Signatures)
 }
 
+func TestSignReplacesSignatureFromSameKey(t *testing.T) {
+	root := Root(fixedExpire)
+	root.Signed.Roles[ROOT].Threshold = 2
+	signers := []signature.Signer{}
+	for range 2 {
+		_, private, err := ed25519.GenerateKey(nil)
+		assert.NoError(t, err)
+		key, err := KeyFromPublicKey(private.Public())
+		assert.NoError(t, err)
+		assert.NoError(t, root.Signed.AddKey(key, ROOT))
+		signer, err := signature.LoadSigner(private, crypto.Hash(0))
+		assert.NoError(t, err)
+		signers = append(signers, signer)
+	}
+
+	oldSigA, err := root.Sign(signers[0])
+	assert.NoError(t, err)
+	oldSigB, err := root.Sign(signers[1])
+	assert.NoError(t, err)
+
+	// signing again after a change replaces the signature at its position
+	root.Signed.Version++
+	sigA, err := root.Sign(signers[0])
+	assert.NoError(t, err)
+	assert.NotEqual(t, oldSigA.Signature, sigA.Signature)
+	assert.Equal(t, []Signature{*sigA, *oldSigB}, root.Signatures)
+	sigB, err := root.Sign(signers[1])
+	assert.NoError(t, err)
+	assert.Equal(t, []Signature{*sigA, *sigB}, root.Signatures)
+	assert.NoError(t, root.VerifyDelegate(ROOT, root))
+
+	// the signed metadata can be loaded again
+	data, err := root.ToBytes(false)
+	assert.NoError(t, err)
+	_, err = Root().FromBytes(data)
+	assert.NoError(t, err)
+
+	// duplicates that are already present are dropped as well, otherwise a
+	// stale one could be picked over the new signature
+	root.Signed.Version++
+	root.Signatures = append(root.Signatures, *sigA)
+	newSigA, err := root.Sign(signers[0])
+	assert.NoError(t, err)
+	newSigB, err := root.Sign(signers[1])
+	assert.NoError(t, err)
+	assert.Equal(t, []Signature{*newSigA, *newSigB}, root.Signatures)
+	assert.NoError(t, root.VerifyDelegate(ROOT, root))
+}
+
+func TestSignRejectsSignatureThatDoesNotVerify(t *testing.T) {
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	assert.NoError(t, err)
+	ecdsaKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.NoError(t, err)
+
+	rsaPSS, err := signature.LoadRSAPSSSigner(rsaKey, crypto.SHA256, &rsa.PSSOptions{Hash: crypto.SHA256})
+	assert.NoError(t, err)
+	// LoadSigner returns a PKCS #1 v1.5 signer for RSA keys, while the key
+	// is published with the rsassa-pss-sha256 scheme
+	rsaPKCS1v15, err := signature.LoadSigner(rsaKey, crypto.SHA256)
+	assert.NoError(t, err)
+	ecdsaSHA256, err := signature.LoadSigner(ecdsaKey, crypto.SHA256)
+	assert.NoError(t, err)
+	// the key is published with the ecdsa-sha2-nistp256 scheme, i.e. SHA-256
+	ecdsaSHA384, err := signature.LoadSigner(ecdsaKey, crypto.SHA384)
+	assert.NoError(t, err)
+
+	for name, tc := range map[string]struct {
+		signer   signature.Signer
+		verifies bool
+	}{
+		"rsa pss":      {rsaPSS, true},
+		"rsa pkcs1v15": {rsaPKCS1v15, false},
+		"ecdsa sha256": {ecdsaSHA256, true},
+		"ecdsa sha384": {ecdsaSHA384, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := Root(fixedExpire)
+			sig, err := root.Sign(tc.signer)
+			if tc.verifies {
+				assert.NoError(t, err)
+				assert.Equal(t, []Signature{*sig}, root.Signatures)
+				return
+			}
+			assert.ErrorIs(t, err, &ErrUnsignedMetadata{})
+			assert.ErrorContains(t, err, "does not verify")
+			assert.Nil(t, sig)
+			assert.Empty(t, root.Signatures)
+		})
+	}
+}
+
 func TestIsExpiredRoot(t *testing.T) {
 	// without setting expiration
 	meta := Root()
