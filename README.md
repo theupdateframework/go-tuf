@@ -104,7 +104,7 @@ What a custom signer has to comply with:
 | Public key | TUF key scheme | Expected signature |
 | ---------- | -------------- | ------------------ |
 | Ed25519    | `ed25519` | Ed25519 over the message |
-| ECDSA      | `ecdsa-sha2-nistp256` (whatever the curve, so use a P-256 key) | ASN.1 DER encoded ECDSA over the SHA-256 digest of the message |
+| ECDSA      | `ecdsa-sha2-nistp256` for a P-256 key, `ecdsa-sha2-nistp384` for a P-384 key (other curves are rejected) | ASN.1 DER encoded ECDSA over the SHA-256 digest of the message for a P-256 key, the SHA-384 digest for a P-384 key |
 | RSA        | `rsassa-pss-sha256` | RSASSA-PSS with SHA-256 (not PKCS #1 v1.5) |
 | ML-DSA     | `ml-dsa-44/1`, `ml-dsa-65/1` or `ml-dsa-87/1` | ML-DSA with an empty context over the message |
 
