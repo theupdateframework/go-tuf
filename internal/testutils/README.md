@@ -10,8 +10,7 @@ internal/testutils/
 ├── setup.go                         # legacy setup helpers (compatibility)
 ├── helpers/
 │   ├── helpers.go                   # core test helper functions
-│   ├── fuzz.go                      # fuzz data generation utilities
-│   └── updater.go                   # updater-specific test helpers
+│   └── fuzz.go                      # fuzz data generation utilities
 ├── fixtures/                        # verified static fixture regeneration
 ├── rsapss/                          # RSA-PSS signing utilities
 ├── signer/                          # generic signing test utilities
@@ -81,15 +80,6 @@ gen.CreateFuzzTestMetadata(metadataType string) []byte
 
 // Register standard seeds and run f.Fuzz:
 helpers.FuzzMetadataOperations(f, func(data []byte) error { ... })
-```
-
-### Updater utilities (`updater.go`)
-
-```go
-helpers.CheckError(t, tc helpers.UpdaterTestCase, err error)
-helpers.AssertFilesExist(t, metadataDir string, roles []string)
-helpers.AssertFilesExact(t, metadataDir string, roles []string)
-helpers.RunTrustedMetadataTests(t, tests []helpers.TrustedMetadataTestCase)
 ```
 
 ## simulator package
@@ -240,9 +230,6 @@ editing static fixtures altogether.
 ```bash
 # All tests
 make test
-
-# Include the opt-in external fetcher tests on branches that still have them
-GO_TUF_NETWORK_TESTS=1 make test
 
 # Specific packages
 go test ./metadata/...
