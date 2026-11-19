@@ -41,7 +41,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var testRootBytes = []byte("{\"signatures\":[{\"keyid\":\"roothash\",\"sig\":\"1307990e6ba5ca145eb35e99182a9bec46531bc54ddf656a602c780fa0240dee\"}],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{\"roothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubrootval\"},\"scheme\":\"ed25519\"},\"snapshothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubsval\"},\"scheme\":\"ed25519\"},\"targetshash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtrval\"},\"scheme\":\"ed25519\"},\"timestamphash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtmval\"},\"scheme\":\"ed25519\"}},\"roles\":{\"root\":{\"keyids\":[\"roothash\"],\"threshold\":1},\"snapshot\":{\"keyids\":[\"snapshothash\"],\"threshold\":1},\"targets\":{\"keyids\":[\"targetshash\"],\"threshold\":1},\"timestamp\":{\"keyids\":[\"timestamphash\"],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"version\":1}}")
+var testRootBytes = []byte("{\"signatures\":[{\"keyid\":\"roothash\",\"sig\":\"1307990e6ba5ca145eb35e99182a9bec46531bc54ddf656a602c780fa0240dee\"}],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{\"roothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubrootval\"},\"scheme\":\"ed25519\"},\"snapshothash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubsval\"},\"scheme\":\"ed25519\"},\"targetshash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtrval\"},\"scheme\":\"ed25519\"},\"timestamphash\":{\"keytype\":\"ed25519\",\"keyval\":{\"public\":\"pubtmval\"},\"scheme\":\"ed25519\"}},\"roles\":{\"root\":{\"keyids\":[\"roothash\"],\"threshold\":1},\"snapshot\":{\"keyids\":[\"snapshothash\"],\"threshold\":1},\"targets\":{\"keyids\":[\"targetshash\"],\"threshold\":1},\"timestamp\":{\"keyids\":[\"timestamphash\"],\"threshold\":1}},\"spec_version\":\"" + SPECIFICATION_VERSION + "\",\"version\":1}}")
 
 const TEST_REPOSITORY_DATA = "../internal/testutils/repository_data/repository/metadata"
 
@@ -549,25 +549,25 @@ func TestUnrecognizedFieldRolesSigned(t *testing.T) {
 	root.Signed.UnrecognizedFields = testUnrecognizedField
 	rootJSON, err := root.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1}}"), rootJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"spec_version\":\""+SPECIFICATION_VERSION+"\",\"test\":\"true\",\"version\":1}}"), rootJSON)
 
 	targets := Targets(fixedExpire)
 	targets.Signed.UnrecognizedFields = testUnrecognizedField
 	targetsJSON, err := targets.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"targets\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"spec_version\":\"1.0.31\",\"targets\":{},\"test\":\"true\",\"version\":1}}"), targetsJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"targets\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"spec_version\":\""+SPECIFICATION_VERSION+"\",\"targets\":{},\"test\":\"true\",\"version\":1}}"), targetsJSON)
 
 	snapshot := Snapshot(fixedExpire)
 	snapshot.Signed.UnrecognizedFields = testUnrecognizedField
 	snapshotJSON, err := snapshot.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"snapshot\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"targets.json\":{\"version\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1}}"), snapshotJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"snapshot\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"targets.json\":{\"version\":1}},\"spec_version\":\""+SPECIFICATION_VERSION+"\",\"test\":\"true\",\"version\":1}}"), snapshotJSON)
 
 	timestamp := Timestamp(fixedExpire)
 	timestamp.Signed.UnrecognizedFields = testUnrecognizedField
 	timestampJSON, err := timestamp.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"timestamp\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"snapshot.json\":{\"version\":1}},\"spec_version\":\"1.0.31\",\"test\":\"true\",\"version\":1}}"), timestampJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"timestamp\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"meta\":{\"snapshot.json\":{\"version\":1}},\"spec_version\":\""+SPECIFICATION_VERSION+"\",\"test\":\"true\",\"version\":1}}"), timestampJSON)
 }
 func TestUnrecognizedFieldGenericMetadata(t *testing.T) {
 	// fixed expire
@@ -581,7 +581,7 @@ func TestUnrecognizedFieldGenericMetadata(t *testing.T) {
 	root.UnrecognizedFields = testUnrecognizedField
 	rootJSON, err := root.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"spec_version\":\"1.0.31\",\"version\":1},\"test\":\"true\"}"), rootJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"root\",\"consistent_snapshot\":true,\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"keys\":{},\"roles\":{\"root\":{\"keyids\":[],\"threshold\":1},\"snapshot\":{\"keyids\":[],\"threshold\":1},\"targets\":{\"keyids\":[],\"threshold\":1},\"timestamp\":{\"keyids\":[],\"threshold\":1}},\"spec_version\":\""+SPECIFICATION_VERSION+"\",\"version\":1},\"test\":\"true\"}"), rootJSON)
 }
 func TestTargetFilesCustomField(t *testing.T) {
 	// custom JSON to test
@@ -599,7 +599,7 @@ func TestTargetFilesCustomField(t *testing.T) {
 	targets.Signed.Targets["testTarget"] = targetFile
 	targetsJSON, err := targets.ToBytes(false)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"targets\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"spec_version\":\"1.0.31\",\"targets\":{\"testTarget\":{\"custom\":{\"test\":true},\"hashes\":{},\"length\":0}},\"version\":1}}"), targetsJSON)
+	assert.Equal(t, []byte("{\"signatures\":[],\"signed\":{\"_type\":\"targets\",\"expires\":\"2030-08-15T14:30:45.0000001Z\",\"spec_version\":\""+SPECIFICATION_VERSION+"\",\"targets\":{\"testTarget\":{\"custom\":{\"test\":true},\"hashes\":{},\"length\":0}},\"version\":1}}"), targetsJSON)
 }
 
 func TestFromBytes(t *testing.T) {
@@ -720,7 +720,8 @@ func TestFromFile(t *testing.T) {
 	assert.Contains(t, root.Signed.Keys, root.Signed.Roles[TIMESTAMP].KeyIDs[0])
 	assert.Equal(t, "0a5842e65e9c8c428354f40708435de6793ac379a275effe40d6358be2de835c", root.Signed.Roles[TIMESTAMP].KeyIDs[0])
 
-	assert.Equal(t, SPECIFICATION_VERSION, root.Signed.SpecVersion)
+	// spec_version comes from the signed fixture, not from SPECIFICATION_VERSION
+	assert.Equal(t, "1.0.31", root.Signed.SpecVersion)
 	assert.Contains(t, root.Signed.UnrecognizedFields, "test")
 	assert.Equal(t, "true", root.Signed.UnrecognizedFields["test"])
 
