@@ -40,7 +40,7 @@ import (
 type cryptoSigner struct {
 	key crypto.Signer
 	// opts selects what go-tuf verifies for the key type:
-	//   - ECDSA:   crypto.SHA256
+	//   - ECDSA:   crypto.SHA256 for a P-256 key, crypto.SHA384 for a P-384 key
 	//   - RSA:     &rsa.PSSOptions{Hash: crypto.SHA256, SaltLength: rsa.PSSSaltLengthEqualsHash}
 	//   - Ed25519: crypto.Hash(0)
 	//   - ML-DSA:  crypto.Hash(0)
