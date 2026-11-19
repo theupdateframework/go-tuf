@@ -247,7 +247,11 @@ func (client *MultiRepoClient) Refresh() error {
 	return errors.Join(errs...)
 }
 
-// GetTopLevelTargets returns the top-level target files for all repositories
+// GetTopLevelTargets returns the top-level target files for all repositories.
+//
+// A repository whose top-level targets metadata is not loaded, for example
+// because it failed to refresh, has no targets to list. The targets listed by
+// the other repositories are still returned if they satisfy their mapping.
 func (client *MultiRepoClient) GetTopLevelTargets() (map[string]*metadata.TargetFiles, error) {
 	// collection of all target files for all clients
 	result := map[string]*metadata.TargetFiles{}

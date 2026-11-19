@@ -764,9 +764,17 @@ func (update *Updater) loadLocalMetadata(roleName string) ([]byte, error) {
 	return os.ReadFile(fmt.Sprintf("%s.json", roleName))
 }
 
-// GetTopLevelTargets returns the top-level target files
+// GetTopLevelTargets returns the top-level target files.
+//
+// It returns an empty map if the top-level targets metadata is not loaded,
+// which is the case until Refresh() or GetTargetInfo() has succeeded. It
+// does not load any metadata itself.
 func (update *Updater) GetTopLevelTargets() map[string]*metadata.TargetFiles {
-	return update.trusted.Targets[metadata.TARGETS].Signed.Targets
+	targets := update.trusted.Targets[metadata.TARGETS]
+	if targets == nil {
+		return map[string]*metadata.TargetFiles{}
+	}
+	return targets.Signed.Targets
 }
 
 // GetTrustedMetadataSet returns the trusted metadata set
