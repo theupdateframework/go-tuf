@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils/rsapss"
@@ -85,10 +86,10 @@ func readRepository(dir string) (*repository, error) {
 		return nil, err
 	}
 	for filename := range r.snapshot.Signed.Meta {
-		if filepath.Ext(filename) != ".json" {
+		role, found := strings.CutSuffix(filename, ".json")
+		if !found {
 			return nil, fmt.Errorf("unexpected snapshot entry %q", filename)
 		}
-		role := filename[:len(filename)-len(".json")]
 		data, err = read(role)
 		if err != nil {
 			return nil, err
