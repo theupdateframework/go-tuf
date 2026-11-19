@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
 )
@@ -796,6 +797,141 @@ func TestVerifyDelegateDuplicateKeyTypeECDSA(t *testing.T) {
 	assert.NoError(t, err)
 
 	assertDuplicatePublicKeyCountsOnce(t, keyA, keyB, targets, sigBytes)
+}
+
+// Regression: KeyFromPublicKey labelled every ECDSA key "ecdsa-sha2-nistp256".
+// The scheme selects the verification digest and is part of the key ID, so a
+// P-384 key could not be signed with through Sign and verified.
+func TestECDSASchemeFollowsCurve(t *testing.T) {
+	for _, tc := range []struct {
+		curve  elliptic.Curve
+		hash   crypto.Hash
+		scheme string
+	}{
+		{elliptic.P256(), crypto.SHA256, KeySchemeECDSA_SHA2_P256},
+		{elliptic.P384(), crypto.SHA384, KeySchemeECDSA_SHA2_P384},
+	} {
+		t.Run(tc.curve.Params().Name, func(t *testing.T) {
+			privKey, err := ecdsa.GenerateKey(tc.curve, rand.Reader)
+			assert.NoError(t, err)
+
+			key, err := KeyFromPublicKey(&privKey.PublicKey)
+			assert.NoError(t, err)
+			assert.Equal(t, KeyTypeECDSA_SHA2_P256, key.Type)
+			assert.Equal(t, tc.scheme, key.Scheme)
+			keyID, err := key.ID()
+			assert.NoError(t, err)
+
+			root := Root(fixedExpire)
+			assert.NoError(t, root.Signed.AddKey(key, ROOT))
+
+			signer, err := signature.LoadECDSASigner(privKey, tc.hash)
+			assert.NoError(t, err)
+			sig, err := root.Sign(signer)
+			assert.NoError(t, err)
+			assert.Equal(t, keyID, sig.KeyID)
+
+			assert.NoError(t, root.VerifyDelegate(ROOT, root))
+		})
+	}
+}
+
+func TestECDSAUnsupportedCurveRejected(t *testing.T) {
+	for _, curve := range []elliptic.Curve{elliptic.P224(), elliptic.P521()} {
+		t.Run(curve.Params().Name, func(t *testing.T) {
+			privKey, err := ecdsa.GenerateKey(curve, rand.Reader)
+			assert.NoError(t, err)
+
+			_, err = KeyFromPublicKey(&privKey.PublicKey)
+			assert.EqualError(t, err, "unsupported ecdsa curve "+curve.Params().Name+": only P-256 and P-384 are supported")
+
+			signer, err := signature.LoadECDSASigner(privKey, crypto.SHA256)
+			assert.NoError(t, err)
+			root := Root(fixedExpire)
+			_, err = root.Sign(signer)
+			assert.ErrorContains(t, err, "unsupported ecdsa curve")
+			assert.Empty(t, root.Signatures)
+		})
+	}
+
+	_, err := KeyFromPublicKey(&ecdsa.PublicKey{})
+	assert.EqualError(t, err, "unsupported ecdsa public key: no curve set")
+}
+
+// Migration: a root written before the scheme followed the curve lists a key
+// that is not on P-256 under the "ecdsa-sha2-nistp256" scheme and the key ID
+// that goes with it. Sign no longer writes that key ID, so the next root needs
+// a signature built by hand for the old root, next to the one Sign writes for
+// the new root.
+func TestECDSALegacyRootKeyMigration(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		legacyCurve elliptic.Curve
+		nextCurve   elliptic.Curve // nil keeps the legacy key
+		nextHash    crypto.Hash
+	}{
+		{"P-384 key kept under its new key ID", elliptic.P384(), nil, crypto.SHA384},
+		{"P-521 key replaced by a P-256 key", elliptic.P521(), elliptic.P256(), crypto.SHA256},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			legacyPriv, err := ecdsa.GenerateKey(tc.legacyCurve, rand.Reader)
+			assert.NoError(t, err)
+			legacyPEM, err := cryptoutils.MarshalPublicKeyToPEM(&legacyPriv.PublicKey)
+			assert.NoError(t, err)
+			legacyKey := &Key{
+				Type:   KeyTypeECDSA_SHA2_P256,
+				Scheme: KeySchemeECDSA_SHA2_P256,
+				Value:  KeyVal{PublicKey: string(legacyPEM)},
+			}
+			legacyID, err := legacyKey.ID()
+			assert.NoError(t, err)
+
+			oldRoot := Root(fixedExpire)
+			assert.NoError(t, oldRoot.Signed.AddKey(legacyKey, ROOT))
+
+			nextPriv := legacyPriv
+			if tc.nextCurve != nil {
+				nextPriv, err = ecdsa.GenerateKey(tc.nextCurve, rand.Reader)
+				assert.NoError(t, err)
+			}
+			nextKey, err := KeyFromPublicKey(&nextPriv.PublicKey)
+			assert.NoError(t, err)
+			nextID, err := nextKey.ID()
+			assert.NoError(t, err)
+			assert.NotEqual(t, legacyID, nextID)
+
+			nextRoot := Root(fixedExpire)
+			nextRoot.Signed.Version = 2
+			assert.NoError(t, nextRoot.Signed.AddKey(nextKey, ROOT))
+
+			nextSigner, err := signature.LoadECDSASigner(nextPriv, tc.nextHash)
+			assert.NoError(t, err)
+			nextSig, err := nextRoot.Sign(nextSigner)
+			assert.NoError(t, err)
+			assert.Equal(t, nextID, nextSig.KeyID)
+
+			// the old root verifies the legacy key with SHA-256 under its old key ID
+			payload, err := cjson.EncodeCanonical(nextRoot.Signed)
+			assert.NoError(t, err)
+			legacySigner, err := signature.LoadECDSASigner(legacyPriv, crypto.SHA256)
+			assert.NoError(t, err)
+			legacySigBytes, err := legacySigner.SignMessage(bytes.NewReader(payload))
+			assert.NoError(t, err)
+			legacySig := Signature{KeyID: legacyID, Signature: legacySigBytes}
+
+			nextRoot.Signatures = []Signature{*nextSig, legacySig}
+			assert.NoError(t, oldRoot.VerifyDelegate(ROOT, nextRoot))
+			assert.NoError(t, nextRoot.VerifyDelegate(ROOT, nextRoot))
+
+			nextRoot.Signatures = []Signature{*nextSig}
+			assert.ErrorIs(t, oldRoot.VerifyDelegate(ROOT, nextRoot), &ErrUnsignedMetadata{})
+			assert.NoError(t, nextRoot.VerifyDelegate(ROOT, nextRoot))
+
+			nextRoot.Signatures = []Signature{legacySig}
+			assert.NoError(t, oldRoot.VerifyDelegate(ROOT, nextRoot))
+			assert.ErrorIs(t, nextRoot.VerifyDelegate(ROOT, nextRoot), &ErrUnsignedMetadata{})
+		})
+	}
 }
 
 // Regression: even without an alternate keytype, duplicate Ed25519 key records
