@@ -209,6 +209,12 @@ func (meta *Metadata[T]) ToFile(name string, pretty bool) error {
 // unique in Signatures. The new signature is verified against the key derived
 // from the signer's public key, and if it does not verify an error is returned
 // and Signatures is left unchanged.
+//
+// Any signature.Signer implementation can be used, so the private key does not
+// have to be available to go-tuf: it can be held in memory, in a KMS, an HSM
+// or a hardware token. The TUF key and its ID are derived from the signer's
+// public key through KeyFromPublicKey, so the signer has to return a public
+// key type supported by it and a signature matching the resulting key scheme.
 func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	// encode the Signed part to canonical JSON so signatures are consistent
 	payload, err := cjson.EncodeCanonical(meta.Signed)
