@@ -23,16 +23,25 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils/simulator"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
 // serveSimulator serves a simulated TUF repository over HTTP and returns the
-// metadata URL to use for it.
-func serveSimulator(t *testing.T) (string, []byte) {
+// metadata URL to use for it. The repository lists the given top-level
+// targets, with content that depends only on the target name.
+func serveSimulator(t *testing.T, targets ...string) (string, []byte) {
 	t.Helper()
 	sim := simulator.NewRepository()
+	for _, name := range targets {
+		sim.AddTarget(metadata.TARGETS, []byte("content of "+name), name)
+	}
+	if len(targets) > 0 {
+		sim.UpdateSnapshot()
+	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		data, err := sim.DownloadFile(r.URL.Path, math.MaxInt64, 0)
 		if err != nil {
@@ -106,5 +115,75 @@ func TestRefreshContinuesPastFailingRepository(t *testing.T) {
 				t.Fatalf("iteration %d: repository %q was not refreshed because another repository failed", i, name)
 			}
 		}
+	}
+}
+
+// TestGetTopLevelTargetsAfterFailedRefresh checks that the targets of the
+// repositories that were refreshed can still be listed when another
+// repository failed to refresh, and that listing them does not contact the
+// repository that failed.
+func TestGetTopLevelTargetsAfterFailedRefresh(t *testing.T) {
+	const targetPath = "file.txt"
+	goodA, rootA := serveSimulator(t, targetPath)
+	goodB, rootB := serveSimulator(t, targetPath)
+
+	// a server that fails every request
+	var brokenRequests atomic.Int32
+	broken := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		brokenRequests.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(broken.Close)
+	// the broken repository is given a valid root so that only Refresh fails
+	_, rootBroken := serveSimulator(t)
+
+	mapJSON := fmt.Sprintf(`{
+		"repositories": {
+			"good-a": [%q],
+			"good-b": [%q],
+			"broken": [%q]
+		},
+		"mapping": [
+			{
+				"paths": ["*"],
+				"repositories": ["good-a", "good-b", "broken"],
+				"threshold": 2,
+				"terminating": true
+			}
+		]
+	}`, goodA, goodB, broken.URL+"/metadata")
+
+	cfg, err := NewConfig([]byte(mapJSON), map[string][]byte{
+		"good-a": rootA,
+		"good-b": rootB,
+		"broken": rootBroken,
+	})
+	if err != nil {
+		t.Fatalf("NewConfig() failed: %v", err)
+	}
+	cfg.LocalMetadataDir = t.TempDir()
+	cfg.LocalTargetsDir = t.TempDir()
+
+	client, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New() failed: %v", err)
+	}
+	if err := client.Refresh(); err == nil {
+		t.Fatal("Refresh() should report the repository that failed to refresh")
+	}
+	requestsAfterRefresh := brokenRequests.Load()
+	if requestsAfterRefresh == 0 {
+		t.Fatal("Refresh() should have contacted the failing repository")
+	}
+
+	targets, err := client.GetTopLevelTargets()
+	if err != nil {
+		t.Fatalf("GetTopLevelTargets() failed: %v", err)
+	}
+	if len(targets) != 1 || targets[targetPath] == nil {
+		t.Errorf("GetTopLevelTargets() should return only %q, got: %v", targetPath, targets)
+	}
+	if got := brokenRequests.Load(); got != requestsAfterRefresh {
+		t.Errorf("GetTopLevelTargets() sent %d requests to the repository that failed to refresh", got-requestsAfterRefresh)
 	}
 }
