@@ -2943,7 +2943,7 @@ func TestFromBytesRejectsNullMapValues(t *testing.T) {
 	}{
 		{
 			name:  "root key",
-			input: `{"signed":{"_type":"root","keys":{"keyid":null},"roles":{}}}`,
+			input: `{"signed":{"_type":"root","spec_version":"1.0.31","version":1,"keys":{"keyid":null},"roles":{}}}`,
 			parse: func(data []byte) error {
 				_, err := Root().FromBytes(data)
 				return err
@@ -2952,7 +2952,7 @@ func TestFromBytesRejectsNullMapValues(t *testing.T) {
 		},
 		{
 			name:  "root keys map",
-			input: `{"signed":{"_type":"root","keys":null,"roles":{}}}`,
+			input: `{"signed":{"_type":"root","spec_version":"1.0.31","version":1,"keys":null,"roles":{}}}`,
 			parse: func(data []byte) error {
 				_, err := Root().FromBytes(data)
 				return err
@@ -2961,7 +2961,7 @@ func TestFromBytesRejectsNullMapValues(t *testing.T) {
 		},
 		{
 			name:  "root role",
-			input: `{"signed":{"_type":"root","keys":{},"roles":{"root":null}}}`,
+			input: `{"signed":{"_type":"root","spec_version":"1.0.31","version":1,"keys":{},"roles":{"root":null}}}`,
 			parse: func(data []byte) error {
 				_, err := Root().FromBytes(data)
 				return err
@@ -2970,7 +2970,7 @@ func TestFromBytesRejectsNullMapValues(t *testing.T) {
 		},
 		{
 			name:  "snapshot meta",
-			input: `{"signed":{"_type":"snapshot","meta":{"targets.json":null}}}`,
+			input: `{"signed":{"_type":"snapshot","spec_version":"1.0.31","version":1,"meta":{"targets.json":null}}}`,
 			parse: func(data []byte) error {
 				_, err := Snapshot().FromBytes(data)
 				return err
@@ -2979,7 +2979,7 @@ func TestFromBytesRejectsNullMapValues(t *testing.T) {
 		},
 		{
 			name:  "timestamp meta",
-			input: `{"signed":{"_type":"timestamp","meta":{"snapshot.json":null}}}`,
+			input: `{"signed":{"_type":"timestamp","spec_version":"1.0.31","version":1,"meta":{"snapshot.json":null}}}`,
 			parse: func(data []byte) error {
 				_, err := Timestamp().FromBytes(data)
 				return err
@@ -2988,7 +2988,7 @@ func TestFromBytesRejectsNullMapValues(t *testing.T) {
 		},
 		{
 			name:  "timestamp missing snapshot meta",
-			input: `{"signed":{"_type":"timestamp","meta":{}}}`,
+			input: `{"signed":{"_type":"timestamp","spec_version":"1.0.31","version":1,"meta":{}}}`,
 			parse: func(data []byte) error {
 				_, err := Timestamp().FromBytes(data)
 				return err
@@ -2997,7 +2997,7 @@ func TestFromBytesRejectsNullMapValues(t *testing.T) {
 		},
 		{
 			name:  "target file",
-			input: `{"signed":{"_type":"targets","targets":{"file.txt":null}}}`,
+			input: `{"signed":{"_type":"targets","spec_version":"1.0.31","version":1,"targets":{"file.txt":null}}}`,
 			parse: func(data []byte) error {
 				_, err := Targets().FromBytes(data)
 				return err
@@ -3006,7 +3006,7 @@ func TestFromBytesRejectsNullMapValues(t *testing.T) {
 		},
 		{
 			name:  "targets map",
-			input: `{"signed":{"_type":"targets","targets":null}}`,
+			input: `{"signed":{"_type":"targets","spec_version":"1.0.31","version":1,"targets":null}}`,
 			parse: func(data []byte) error {
 				_, err := Targets().FromBytes(data)
 				return err
@@ -3015,7 +3015,7 @@ func TestFromBytesRejectsNullMapValues(t *testing.T) {
 		},
 		{
 			name:  "delegation key",
-			input: `{"signed":{"_type":"targets","targets":{},"delegations":{"keys":{"keyid":null}}}}`,
+			input: `{"signed":{"_type":"targets","spec_version":"1.0.31","version":1,"targets":{},"delegations":{"keys":{"keyid":null}}}}`,
 			parse: func(data []byte) error {
 				_, err := Targets().FromBytes(data)
 				return err
@@ -3033,8 +3033,10 @@ func TestFromBytesRejectsNullMapValues(t *testing.T) {
 
 func TestFromBytesMatchesFieldNamesExactly(t *testing.T) {
 	// A name that differs from a known field only by case is an unrecognized field.
-	const signed = `{"_type":"root","version":1,"Version":"x","keys":{},` +
-		`"roles":{"root":{"keyids":["a"],"threshold":1,"KeyIDs":["b"]}}}`
+	const role = `{"keyids":[],"threshold":1}`
+	const signed = `{"_type":"root","spec_version":"1.0.31","version":1,"Version":"x","keys":{},` +
+		`"roles":{"root":{"keyids":["a"],"threshold":1,"KeyIDs":["b"]},` +
+		`"snapshot":` + role + `,"targets":` + role + `,"timestamp":` + role + `}}`
 	const other = `{"_type":"root","version":2,"keys":{},"roles":{}}`
 	const longS = "\u017f"
 	input := `{"signed":` + signed + `,"signatures":[],"Signed":` + other +
@@ -3050,4 +3052,221 @@ func TestFromBytesMatchesFieldNamesExactly(t *testing.T) {
 	assert.Contains(t, root.UnrecognizedFields, longS+"ignatures")
 	assert.Equal(t, "x", root.Signed.UnrecognizedFields["Version"])
 	assert.Contains(t, root.Signed.Roles[ROOT].UnrecognizedFields, "KeyIDs")
+}
+
+// reparseTopLevel writes one metadata file of each top-level type with the
+// given spec_version and version, and returns the error from reading each one
+// back, keyed by type.
+func reparseTopLevel(t *testing.T, specVersion string, version int64) map[string]error {
+	t.Helper()
+	root, snapshot, timestamp, targets := Root(), Snapshot(), Timestamp(), Targets()
+	root.Signed.SpecVersion, root.Signed.Version = specVersion, version
+	snapshot.Signed.SpecVersion, snapshot.Signed.Version = specVersion, version
+	timestamp.Signed.SpecVersion, timestamp.Signed.Version = specVersion, version
+	targets.Signed.SpecVersion, targets.Signed.Version = specVersion, version
+
+	errs := map[string]error{}
+	data, err := root.ToBytes(false)
+	assert.NoError(t, err)
+	_, errs[ROOT] = Root().FromBytes(data)
+	data, err = snapshot.ToBytes(false)
+	assert.NoError(t, err)
+	_, errs[SNAPSHOT] = Snapshot().FromBytes(data)
+	data, err = timestamp.ToBytes(false)
+	assert.NoError(t, err)
+	_, errs[TIMESTAMP] = Timestamp().FromBytes(data)
+	data, err = targets.ToBytes(false)
+	assert.NoError(t, err)
+	_, errs[TARGETS] = Targets().FromBytes(data)
+	return errs
+}
+
+func TestFromBytesChecksSpecVersion(t *testing.T) {
+	// Only the major version is compared. Both MAJOR.MINOR.PATCH and the
+	// legacy MAJOR.MINOR are accepted: Sigstore's production root declares
+	// "1.0".
+	const failedToParse = "failed to parse spec_version"
+	const unsupported = "unsupported spec_version"
+
+	tests := []struct {
+		specVersion string
+		wantErr     string
+	}{
+		{specVersion: SPECIFICATION_VERSION},
+		{specVersion: "1.0.31"},
+		{specVersion: "1.0"},
+		{specVersion: "1.0.0"},
+		{specVersion: "1.99.999"},
+		{specVersion: "1.00.031"},
+
+		{specVersion: "2.0.0", wantErr: unsupported},
+		{specVersion: "2.0", wantErr: unsupported},
+		{specVersion: "0.9.0", wantErr: unsupported},
+		{specVersion: "10.0.0", wantErr: unsupported},
+		{specVersion: "01.0.0", wantErr: unsupported},
+
+		{specVersion: "", wantErr: failedToParse},
+		{specVersion: "banana", wantErr: failedToParse},
+		{specVersion: "1", wantErr: failedToParse},
+		{specVersion: "1.0.0.0", wantErr: failedToParse},
+		{specVersion: "1.", wantErr: failedToParse},
+		{specVersion: ".0", wantErr: failedToParse},
+		{specVersion: "1..0", wantErr: failedToParse},
+		{specVersion: "1.0.", wantErr: failedToParse},
+		{specVersion: "1.x", wantErr: failedToParse},
+		{specVersion: "1.0.0-rc1", wantErr: failedToParse},
+		{specVersion: "1.0.0+build", wantErr: failedToParse},
+		{specVersion: "v1.0.0", wantErr: failedToParse},
+		{specVersion: "+1.0.0", wantErr: failedToParse},
+		{specVersion: "1.-0", wantErr: failedToParse},
+		{specVersion: " 1.0.0", wantErr: failedToParse},
+		{specVersion: "1.0.0\n", wantErr: failedToParse},
+		{specVersion: "1,0", wantErr: failedToParse},
+		// Digits outside ASCII are not accepted.
+		{specVersion: "1.\u0660", wantErr: failedToParse},
+		{specVersion: "\uff11.0", wantErr: failedToParse},
+	}
+	for _, tt := range tests {
+		t.Run(strconv.Quote(tt.specVersion), func(t *testing.T) {
+			for role, err := range reparseTopLevel(t, tt.specVersion, 1) {
+				if tt.wantErr == "" {
+					assert.NoError(t, err, role)
+					continue
+				}
+				assert.ErrorIs(t, err, &ErrValue{}, role)
+				assert.ErrorContains(t, err, tt.wantErr, role)
+			}
+		})
+	}
+
+	t.Run("missing", func(t *testing.T) {
+		_, err := Targets().FromBytes([]byte(`{"signatures":[],"signed":{"_type":"targets",` +
+			`"version":1,"expires":"2030-01-01T00:00:00Z","targets":{}}}`))
+		assert.ErrorContains(t, err, failedToParse)
+	})
+}
+
+func TestFromBytesChecksVersion(t *testing.T) {
+	// The version of a metadata file is an integer greater than 0.
+	tests := []struct {
+		version int64
+		wantErr bool
+	}{
+		{version: 1},
+		{version: 2},
+		{version: 9223372036854775807},
+		{version: 0, wantErr: true},
+		{version: -1, wantErr: true},
+		{version: -9223372036854775808, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(strconv.FormatInt(tt.version, 10), func(t *testing.T) {
+			for role, err := range reparseTopLevel(t, SPECIFICATION_VERSION, tt.version) {
+				if !tt.wantErr {
+					assert.NoError(t, err, role)
+					continue
+				}
+				assert.ErrorIs(t, err, &ErrValue{}, role)
+				assert.ErrorContains(t, err, fmt.Sprintf("version must be > 0, got %d", tt.version), role)
+			}
+		})
+	}
+
+	t.Run("missing", func(t *testing.T) {
+		_, err := Targets().FromBytes([]byte(`{"signatures":[],"signed":{"_type":"targets",` +
+			`"spec_version":"1.0.31","expires":"2030-01-01T00:00:00Z","targets":{}}}`))
+		assert.ErrorContains(t, err, "version must be > 0, got 0")
+	})
+}
+
+func TestRootFromBytesRequiresTopLevelRoles(t *testing.T) {
+	// A root must specify the root, snapshot, timestamp and targets roles.
+	// It may specify others, such as the optional mirrors role.
+	reparse := func(edit func(roles map[string]*Role)) error {
+		root := Root()
+		edit(root.Signed.Roles)
+		data, err := root.ToBytes(false)
+		assert.NoError(t, err)
+		_, err = Root().FromBytes(data)
+		return err
+	}
+
+	assert.NoError(t, reparse(func(map[string]*Role) {}))
+	assert.NoError(t, reparse(func(roles map[string]*Role) {
+		roles["mirrors"] = &Role{KeyIDs: []string{}, Threshold: 1}
+	}))
+
+	for _, name := range TOP_LEVEL_ROLE_NAMES {
+		wantErr := fmt.Sprintf("roles is missing required top-level role %q", name)
+
+		t.Run("missing "+name, func(t *testing.T) {
+			err := reparse(func(roles map[string]*Role) { delete(roles, name) })
+			assert.ErrorIs(t, err, &ErrValue{})
+			assert.ErrorContains(t, err, wantErr)
+		})
+		// Role names are case-sensitive, so this is another role.
+		t.Run("renamed "+name, func(t *testing.T) {
+			err := reparse(func(roles map[string]*Role) {
+				roles[strings.ToUpper(name)] = roles[name]
+				delete(roles, name)
+			})
+			assert.ErrorContains(t, err, wantErr)
+		})
+	}
+
+	t.Run("no roles", func(t *testing.T) {
+		assert.ErrorIs(t, reparse(func(roles map[string]*Role) { clear(roles) }), &ErrValue{})
+	})
+}
+
+func TestDelegationsRejectDuplicateRoleNames(t *testing.T) {
+	// The name of a delegated role must be unique in its delegations object.
+	tests := []struct {
+		name    string
+		roles   []string
+		wantErr string
+	}{
+		{name: "no roles", roles: []string{}},
+		{name: "unique", roles: []string{"a", "b", "c"}},
+		// Names are compared exactly.
+		{name: "differ by case", roles: []string{"dup", "Dup"}},
+		{name: "differ by whitespace", roles: []string{"dup", "dup "}},
+		{name: "adjacent", roles: []string{"dup", "dup"}, wantErr: `duplicate delegated role name "dup"`},
+		{name: "not adjacent", roles: []string{"dup", "a", "b", "dup"}, wantErr: `duplicate delegated role name "dup"`},
+		{name: "empty names", roles: []string{"", ""}, wantErr: `duplicate delegated role name ""`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			delegations := &Delegations{Keys: map[string]*Key{}, Roles: []DelegatedRole{}}
+			for i, name := range tt.roles {
+				// The roles differ in everything but their name.
+				delegations.Roles = append(delegations.Roles, DelegatedRole{
+					Name:      name,
+					KeyIDs:    []string{},
+					Threshold: i + 1,
+					Paths:     []string{fmt.Sprintf("%d/*", i)},
+				})
+			}
+			targets := Targets()
+			targets.Signed.Delegations = delegations
+
+			delegationsJSON, err := json.Marshal(delegations)
+			assert.NoError(t, err)
+			var parsed Delegations
+			delegationsErr := json.Unmarshal(delegationsJSON, &parsed)
+			// The same delegations inside targets metadata, as a client receives them.
+			data, err := targets.ToBytes(false)
+			assert.NoError(t, err)
+			_, targetsErr := Targets().FromBytes(data)
+
+			for _, err := range []error{delegationsErr, targetsErr} {
+				if tt.wantErr == "" {
+					assert.NoError(t, err)
+					continue
+				}
+				assert.ErrorIs(t, err, &ErrValue{})
+				assert.ErrorContains(t, err, tt.wantErr)
+			}
+		})
+	}
 }

@@ -20,6 +20,7 @@ package metadata
 import (
 	"bytes"
 	"encoding/json"
+	"regexp"
 	"testing"
 	"unicode/utf8"
 
@@ -153,7 +154,8 @@ func FuzzTimestampFromBytes(f *testing.F) {
 }
 
 // FuzzMetadataToBytes tests metadata serialization: every role must
-// serialise for any version, and the version must survive a re-parse.
+// serialise for any version, but a re-parse accepts, and preserves, only a
+// version greater than 0.
 func FuzzMetadataToBytes(f *testing.F) {
 	// Add some variations
 	f.Add(int64(1), true) // version, pretty
@@ -174,9 +176,9 @@ func FuzzMetadataToBytes(f *testing.F) {
 		if err != nil {
 			t.Fatalf("root ToBytes failed: %v", err)
 		}
-		if parsed, err := Root().FromBytes(data); err != nil {
-			t.Errorf("root did not re-parse: %v", err)
-		} else if parsed.Signed.Version != version {
+		if parsed, err := Root().FromBytes(data); (err == nil) != (version > 0) {
+			t.Errorf("root re-parse of version %d returned: %v", version, err)
+		} else if err == nil && parsed.Signed.Version != version {
 			t.Errorf("root version changed: want %d, got %d", version, parsed.Signed.Version)
 		}
 
@@ -186,9 +188,9 @@ func FuzzMetadataToBytes(f *testing.F) {
 		if err != nil {
 			t.Fatalf("targets ToBytes failed: %v", err)
 		}
-		if parsed, err := Targets().FromBytes(data); err != nil {
-			t.Errorf("targets did not re-parse: %v", err)
-		} else if parsed.Signed.Version != version {
+		if parsed, err := Targets().FromBytes(data); (err == nil) != (version > 0) {
+			t.Errorf("targets re-parse of version %d returned: %v", version, err)
+		} else if err == nil && parsed.Signed.Version != version {
 			t.Errorf("targets version changed: want %d, got %d", version, parsed.Signed.Version)
 		}
 
@@ -198,9 +200,9 @@ func FuzzMetadataToBytes(f *testing.F) {
 		if err != nil {
 			t.Fatalf("snapshot ToBytes failed: %v", err)
 		}
-		if parsed, err := Snapshot().FromBytes(data); err != nil {
-			t.Errorf("snapshot did not re-parse: %v", err)
-		} else if parsed.Signed.Version != version {
+		if parsed, err := Snapshot().FromBytes(data); (err == nil) != (version > 0) {
+			t.Errorf("snapshot re-parse of version %d returned: %v", version, err)
+		} else if err == nil && parsed.Signed.Version != version {
 			t.Errorf("snapshot version changed: want %d, got %d", version, parsed.Signed.Version)
 		}
 
@@ -210,9 +212,9 @@ func FuzzMetadataToBytes(f *testing.F) {
 		if err != nil {
 			t.Fatalf("timestamp ToBytes failed: %v", err)
 		}
-		if parsed, err := Timestamp().FromBytes(data); err != nil {
-			t.Errorf("timestamp did not re-parse: %v", err)
-		} else if parsed.Signed.Version != version {
+		if parsed, err := Timestamp().FromBytes(data); (err == nil) != (version > 0) {
+			t.Errorf("timestamp re-parse of version %d returned: %v", version, err)
+		} else if err == nil && parsed.Signed.Version != version {
 			t.Errorf("timestamp version changed: want %d, got %d", version, parsed.Signed.Version)
 		}
 	})
@@ -255,18 +257,22 @@ func FuzzHexBytes(f *testing.F) {
 	})
 }
 
-// FuzzMetadataFieldsValidation tests the type check in FromBytes. The payload
-// carries every collection a role requires, so the only thing deciding
-// whether a role accepts it is the fuzzed _type: the version and
-// spec_version are not validated on parse.
+// FuzzMetadataFieldsValidation tests the type, version and spec_version
+// checks in FromBytes. The payload carries every collection a role requires,
+// so the only things deciding whether a role accepts it are the fuzzed
+// fields: _type must name the role, version must be greater than 0 and
+// spec_version must be a supported version.
 func FuzzMetadataFieldsValidation(f *testing.F) {
 	generator := helpers.NewFuzzDataGenerator(0, 0)
+	supportedSpecVersion := regexp.MustCompile(`^1\.[0-9]+(\.[0-9]+)?$`)
 
 	// Add seed test cases
 	f.Add("root", int64(1), "1.0.31")
 	f.Add("targets", int64(999), "1.0.0")
 	f.Add("snapshot", int64(0), "")
 	f.Add("timestamp", int64(-1), "invalid")
+	f.Add("timestamp", int64(1), "1.0")
+	f.Add("snapshot", int64(1), "2.0.0")
 
 	// Add random cases
 	for i := 0; i < 5; i++ {
@@ -289,6 +295,7 @@ func FuzzMetadataFieldsValidation(f *testing.F) {
 		// so the payload stays reproducible for a given input across
 		// runs. Local variable is named `payload` rather than `metadata`
 		// to avoid shadowing the enclosing package name.
+		role := map[string]interface{}{"keyids": []interface{}{}, "threshold": 1}
 		payload := map[string]interface{}{
 			"signed": map[string]interface{}{
 				"_type":        metadataType,
@@ -296,7 +303,9 @@ func FuzzMetadataFieldsValidation(f *testing.F) {
 				"spec_version": specVersion,
 				"expires":      "2030-01-01T00:00:00Z",
 				"keys":         map[string]interface{}{},
-				"roles":        map[string]interface{}{},
+				"roles": map[string]interface{}{
+					ROOT: role, SNAPSHOT: role, TARGETS: role, TIMESTAMP: role,
+				},
 				"meta": map[string]interface{}{
 					"snapshot.json": map[string]interface{}{"version": 1},
 				},
@@ -310,11 +319,16 @@ func FuzzMetadataFieldsValidation(f *testing.F) {
 			return
 		}
 
-		// Each role must accept the payload exactly when _type names it.
+		// Each role must accept the payload exactly when _type names it and
+		// the version and spec_version are valid.
+		validFields := version > 0 && supportedSpecVersion.MatchString(specVersion)
 		check := func(role string, err error) {
 			t.Helper()
-			if metadataType == role && err != nil {
-				t.Errorf("%s rejected a payload of its own type: %v", role, err)
+			if metadataType == role && validFields && err != nil {
+				t.Errorf("%s rejected a valid payload of its own type: %v", role, err)
+			}
+			if metadataType == role && !validFields && err == nil {
+				t.Errorf("%s accepted version %d, spec_version %q", role, version, specVersion)
 			}
 			if metadataType != role && err == nil {
 				t.Errorf("%s accepted a payload of type %q", role, metadataType)
