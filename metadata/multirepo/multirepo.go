@@ -248,22 +248,34 @@ func (client *MultiRepoClient) Refresh() error {
 }
 
 // GetTopLevelTargets returns the top-level target files for all repositories.
+// Each of them is looked up with the TAP 4 search algorithm, and an error is
+// returned if any of them does not satisfy its mapping.
 //
-// A repository whose top-level targets metadata is not loaded, for example
-// because it failed to refresh, has no targets to list. The targets listed by
-// the other repositories are still returned if they satisfy their mapping.
+// Only the repositories whose top-level targets metadata is loaded take part.
+// A repository that is not refreshed, for example because its refresh failed,
+// lists no targets, does not count towards a threshold and is not contacted.
 func (client *MultiRepoClient) GetTopLevelTargets() (map[string]*metadata.TargetFiles, error) {
 	// collection of all target files for all clients
 	result := map[string]*metadata.TargetFiles{}
+
+	// repositories whose top-level targets metadata is not loaded. They are
+	// determined once, so that the result does not depend on a repository
+	// becoming available while the targets are being collected
+	notLoaded := map[string]bool{}
+	for repoName, tufClient := range client.TUFClients {
+		if tufClient.GetTrustedMetadataSet().Targets[metadata.TARGETS] == nil {
+			notLoaded[repoName] = true
+		}
+	}
 
 	// loop through each repository
 	for _, tufClient := range client.TUFClients {
 		// loop through the top level targets for each repository
 		for targetName := range tufClient.GetTopLevelTargets() {
 			// see if this target should be kept, this goes through the TAP4 search algorithm
-			targetInfo, _, err := client.GetTargetInfo(targetName)
+			targetInfo, _, err := client.searchTargetInfo(targetName, notLoaded)
 			if err != nil {
-				// we skip saving this target since there's no way/policy do download it with this map.json file
+				// there's no way/policy to download this target with this map.json file
 				// possible causes like not enough repositories for that threshold, target info mismatch, etc.
 				return nil, err
 			}
@@ -290,6 +302,12 @@ func (client *MultiRepoClient) GetTopLevelTargets() (map[string]*metadata.Target
 // for targetPath and a list of repositories that serve the matching target.
 // It implements the TAP 4 search algorithm.
 func (client *MultiRepoClient) GetTargetInfo(targetPath string) (*metadata.TargetFiles, []string, error) {
+	return client.searchTargetInfo(targetPath, nil)
+}
+
+// searchTargetInfo implements GetTargetInfo. The repositories in skip are not
+// asked for the target, as if they did not list it.
+func (client *MultiRepoClient) searchTargetInfo(targetPath string, skip map[string]bool) (*metadata.TargetFiles, []string, error) {
 	terminated := false
 	// loop through each mapping
 	for _, eachMap := range client.Config.RepoMap.Mapping {
@@ -306,6 +324,9 @@ func (client *MultiRepoClient) GetTargetInfo(targetPath string) (*metadata.Targe
 					// and see if we can find a consensus among them to cover the threshold for that mapping
 					var matchedTargetGroups []targetMatch
 					for _, repoName := range eachMap.Repositories {
+						if skip[repoName] {
+							continue
+						}
 						// get target info from that repository
 						newTargetInfo, err := client.TUFClients[repoName].GetTargetInfo(targetPath)
 						if err != nil {

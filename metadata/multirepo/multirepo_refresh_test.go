@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils/simulator"
@@ -119,14 +120,17 @@ func TestRefreshContinuesPastFailingRepository(t *testing.T) {
 
 // TestGetTopLevelTargetsAfterFailedRefresh checks that the targets of the
 // repositories that were refreshed can still be listed when another
-// repository failed to refresh.
+// repository failed to refresh, and that listing them does not contact the
+// repository that failed.
 func TestGetTopLevelTargetsAfterFailedRefresh(t *testing.T) {
 	const targetPath = "file.txt"
 	goodA, rootA := serveSimulator(t, targetPath)
 	goodB, rootB := serveSimulator(t, targetPath)
 
 	// a server that fails every request
+	var brokenRequests atomic.Int32
 	broken := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		brokenRequests.Add(1)
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	t.Cleanup(broken.Close)
@@ -167,6 +171,10 @@ func TestGetTopLevelTargetsAfterFailedRefresh(t *testing.T) {
 	if err := client.Refresh(); err == nil {
 		t.Fatal("Refresh() should report the repository that failed to refresh")
 	}
+	requestsAfterRefresh := brokenRequests.Load()
+	if requestsAfterRefresh == 0 {
+		t.Fatal("Refresh() should have contacted the failing repository")
+	}
 
 	targets, err := client.GetTopLevelTargets()
 	if err != nil {
@@ -174,5 +182,8 @@ func TestGetTopLevelTargetsAfterFailedRefresh(t *testing.T) {
 	}
 	if len(targets) != 1 || targets[targetPath] == nil {
 		t.Errorf("GetTopLevelTargets() should return only %q, got: %v", targetPath, targets)
+	}
+	if got := brokenRequests.Load(); got != requestsAfterRefresh {
+		t.Errorf("GetTopLevelTargets() sent %d requests to the repository that failed to refresh", got-requestsAfterRefresh)
 	}
 }
