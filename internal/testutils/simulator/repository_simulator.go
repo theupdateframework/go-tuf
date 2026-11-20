@@ -279,27 +279,11 @@ func lastIndex(str string, delimiter string) (string, string, string) {
 }
 
 func partition(s string, delimiter string) (string, string) {
-	splitted := strings.Split(s, delimiter)
-	version := ""
-	role := ""
-	switch len(splitted) {
-	case 1:
-		role = splitted[0]
-	case 2:
-		version = splitted[0]
-		role = splitted[1]
-	case 3:
-		version = splitted[0]
-		if splitted[1] == "" && splitted[2] == "" {
-			role = "."
-		}
-	case 4:
-		version = splitted[0]
-		if splitted[1] == "" && splitted[2] == "" && splitted[3] == "" {
-			role = ".."
-		}
+	before, after, found := strings.Cut(s, delimiter)
+	if !found {
+		return "", before
 	}
-	return version, role
+	return before, after
 }
 
 func (rs *RepositorySimulator) DownloadFile(urlPath string, maxLength int64, _ time.Duration) ([]byte, error) {
@@ -366,7 +350,7 @@ func (rs *RepositorySimulator) FetchTarget(targetPath string, targetHash string)
 		return nil, fmt.Errorf("no target %s", targetPath)
 	}
 
-	if targetHash != "" && !contains(repoTarget.TargetFile.Hashes, []byte(targetHash)) {
+	if targetHash != "" && !contains(repoTarget.TargetFile.Hashes, targetHash) {
 		return nil, fmt.Errorf("hash mismatch for %s", targetPath)
 	}
 
@@ -374,9 +358,9 @@ func (rs *RepositorySimulator) FetchTarget(targetPath string, targetHash string)
 	return repoTarget.Data, nil
 }
 
-func contains(hashes map[string]metadata.HexBytes, targetHash []byte) bool {
+func contains(hashes map[string]metadata.HexBytes, targetHash string) bool {
 	for _, value := range hashes {
-		if bytes.Equal(value, targetHash) {
+		if strings.EqualFold(value.String(), targetHash) || bytes.Equal(value, []byte(targetHash)) {
 			return true
 		}
 	}
