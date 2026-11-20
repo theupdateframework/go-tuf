@@ -177,7 +177,7 @@ and can be used to implement various TUF clients with relatively little effort.
 
 ## History - legacy go-tuf vs go-tuf/v2
 
-The [legacy go-tuf (v0.7.0)](https://github.com/theupdateframework/go-tuf/tree/v0.7.0) codebase was difficult to maintain and prone to errors due to its initial design decisions. Now it is considered deprecated in favour of go-tuf v2 (originaly from [rdimitrov/go-tuf-metadata](https://github.com/rdimitrov/go-tuf-metadata)) which started from the idea of providing a Go implementation of TUF that is heavily influenced by the design decisions made in [python-tuf](https://github.com/theupdateframework/python-tuf).
+The [legacy go-tuf (v0.7.0)](https://github.com/theupdateframework/go-tuf/tree/v0.7.0) codebase was difficult to maintain and prone to errors due to its initial design decisions. Now it is considered deprecated in favour of go-tuf v2 (originally from [rdimitrov/go-tuf-metadata](https://github.com/rdimitrov/go-tuf-metadata)) which started from the idea of providing a Go implementation of TUF that is heavily influenced by the design decisions made in [python-tuf](https://github.com/theupdateframework/python-tuf).
 
 ## Contact
 
