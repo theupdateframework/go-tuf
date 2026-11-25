@@ -454,3 +454,25 @@ func TestDownloadFileContext_CancelAbortsABlockedRequest(t *testing.T) {
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.Less(t, time.Since(start), 5*time.Second, "DownloadFileContext outlived its context")
 }
+
+// countingClient records how often the fetcher calls it.
+type countingClient struct{ calls int }
+
+func (c *countingClient) Do(*http.Request) (*http.Response, error) {
+	c.calls++
+	return nil, fmt.Errorf("countingClient: unexpected call")
+}
+
+// A custom httpClient is never called with an already-cancelled context: backoff.Retry
+// would otherwise run the operation once before it looks at ctx.
+func TestDownloadFileContext_CancelledContextNeverCallsTheClient(t *testing.T) {
+	hc := &countingClient{}
+	f := NewDefaultFetcher().NewFetcherWithHTTPClient(hc)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err := f.DownloadFileContext(ctx, "https://example.com/1.root.json", 1024)
+
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Zero(t, hc.calls, "the http client was called with a cancelled context")
+}

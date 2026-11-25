@@ -82,6 +82,11 @@ func (d *DefaultFetcher) DownloadFileContext(ctx context.Context, urlPath string
 	if err != nil {
 		return nil, err
 	}
+	// backoff.Retry runs the operation once before it looks at ctx, so a custom
+	// httpClient would otherwise still be called with an already-cancelled context.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	// Use in case of multiple sessions.
 	if d.httpUserAgent != "" {
 		req.Header.Set("User-Agent", d.httpUserAgent)

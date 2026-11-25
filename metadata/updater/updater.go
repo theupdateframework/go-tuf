@@ -142,7 +142,15 @@ func (update *Updater) Refresh() error {
 
 // RefreshContext is Refresh with a context: cancelling ctx aborts the refresh, including
 // an in-flight download when the Fetcher implements fetcher.ContextFetcher (DefaultFetcher does).
+// A nil or already-done ctx returns an error before any work, in local mode too.
+//
+// The trusted metadata only moves forward, so a refresh that fails or is cancelled
+// part-way (for example after timestamp and snapshot are loaded) may leave the Updater
+// unable to refresh again; construct a new Updater to retry. Refresh behaves the same.
 func (update *Updater) RefreshContext(ctx context.Context) error {
+	if err := checkContext(ctx); err != nil {
+		return err
+	}
 	if update.cfg.UnsafeLocalMode {
 		return update.unsafeLocalRefresh()
 	}
@@ -226,8 +234,14 @@ func (update *Updater) GetTargetInfo(targetPath string) (*metadata.TargetFiles, 
 	return update.GetTargetInfoContext(context.Background(), targetPath)
 }
 
-// GetTargetInfoContext is GetTargetInfo with a context (see RefreshContext).
+// GetTargetInfoContext is GetTargetInfo with a context (see RefreshContext). A nil or
+// already-done ctx returns an error, even when the answer would come from cached metadata.
+// If it runs the implicit refresh and that refresh fails or is cancelled part-way, the
+// Updater may be unable to refresh again; construct a new Updater to retry.
 func (update *Updater) GetTargetInfoContext(ctx context.Context, targetPath string) (*metadata.TargetFiles, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
 	// do a Refresh() in case there's no trusted targets.json yet
 	if update.trusted.Targets[metadata.TARGETS] == nil {
 		err := update.RefreshContext(ctx)
@@ -243,8 +257,12 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 	return update.DownloadTargetContext(context.Background(), targetFile, filePath, targetBaseURL)
 }
 
-// DownloadTargetContext is DownloadTarget with a context (see RefreshContext).
+// DownloadTargetContext is DownloadTarget with a context (see RefreshContext). A nil or
+// already-done ctx returns an error before any work.
 func (update *Updater) DownloadTargetContext(ctx context.Context, targetFile *metadata.TargetFiles, filePath, targetBaseURL string) (string, []byte, error) {
+	if err := checkContext(ctx); err != nil {
+		return "", nil, err
+	}
 	log := metadata.GetLogger()
 
 	var err error
@@ -739,13 +757,22 @@ func (update *Updater) downloadMetadata(ctx context.Context, roleName string, le
 // fetcher.ContextFetcher gets ctx, so cancelling it aborts the download; any other
 // Fetcher is called as before and ctx only takes effect between downloads.
 func (update *Updater) download(ctx context.Context, urlPath string, maxLength int64) ([]byte, error) {
-	if err := ctx.Err(); err != nil {
+	if err := checkContext(ctx); err != nil {
 		return nil, err
 	}
 	if cf, ok := update.cfg.Fetcher.(fetcher.ContextFetcher); ok {
 		return cf.DownloadFileContext(ctx, urlPath, maxLength)
 	}
 	return update.cfg.Fetcher.DownloadFile(urlPath, maxLength, 0)
+}
+
+// checkContext rejects a nil ctx with an error rather than a panic, as
+// http.NewRequestWithContext does, and otherwise returns ctx.Err().
+func checkContext(ctx context.Context) error {
+	if ctx == nil {
+		return &metadata.ErrValue{Msg: "nil context"}
+	}
+	return ctx.Err()
 }
 
 // generateTargetFilePath generates path from TargetFiles
