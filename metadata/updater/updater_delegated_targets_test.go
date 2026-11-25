@@ -258,8 +258,9 @@ func TestSharedRoleVisitedThroughEachDelegationPath(t *testing.T) {
 			wantErrMsg: "target dir/missing not found",
 		},
 		{
-			// "shared" is valid through "parent-a" but is visited again
-			// through "parent-b", whose key did not sign it
+			// "shared" is valid through "parent-a" but as it's not found
+			// it's visited again through "parent-b", whose key did not
+			// sign it, so `ErrUnsignedMetadata{}` is returned
 			name:      "signed with the key of the first parent only",
 			signedByA: true,
 			wantErr:   &metadata.ErrUnsignedMetadata{},
