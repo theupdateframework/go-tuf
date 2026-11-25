@@ -1464,3 +1464,100 @@ func TestGetTopLevelTargets(t *testing.T) {
 	assert.Len(t, targets, 1)
 	assert.Contains(t, targets, targetPath)
 }
+
+// TestRefreshRecoversFromInvalidCachedMetadata verifies that cached local
+// timestamp, snapshot, top-level targets, and delegated targets files that fail
+// deserialization or parse-time validation (ErrValue / JSON syntax) are
+// replaced from the remote repository rather than wedging updates.
+func TestRefreshRecoversFromInvalidCachedMetadata(t *testing.T) {
+	const delegatedRole = "role1"
+	const targetPath = "delegated/file.txt"
+
+	corruptions := map[string]func(roleType string) []byte{
+		"truncated JSON": func(string) []byte {
+			return []byte(`{"signatures":[],"signed":{`)
+		},
+		"wrong _type": func(string) []byte {
+			return []byte(`{"signatures":[],"signed":{"_type":"not-a-role"}}`)
+		},
+		"invalid spec_version": func(roleType string) []byte {
+			return []byte(`{"signatures":[],"signed":{"_type":"` + roleType + `","spec_version":"1.0.0.0","version":1,"expires":"2030-01-01T00:00:00Z","meta":{"snapshot.json":{"version":1}},"targets":{}}}`)
+		},
+		"zero version": func(roleType string) []byte {
+			return []byte(`{"signatures":[],"signed":{"_type":"` + roleType + `","spec_version":"1.0.31","version":0,"expires":"2030-01-01T00:00:00Z","meta":{"snapshot.json":{"version":1}},"targets":{}}}`)
+		},
+	}
+
+	targetsOnlyCorruptions := map[string][]byte{
+		"duplicate delegated role names":    []byte(`{"signatures":[],"signed":{"_type":"targets","spec_version":"1.0.31","version":1,"expires":"2030-01-01T00:00:00Z","targets":{},"delegations":{"keys":{},"roles":[{"name":"dup","keyids":[],"threshold":1},{"name":"dup","keyids":[],"threshold":1}]}}}`),
+		"both paths and path_hash_prefixes": []byte(`{"signatures":[],"signed":{"_type":"targets","spec_version":"1.0.31","version":1,"expires":"2030-01-01T00:00:00Z","targets":{},"delegations":{"keys":{},"roles":[{"name":"r","keyids":[],"threshold":1,"paths":["a/*"],"path_hash_prefixes":["ab"]}]}}}`),
+	}
+
+	newDelegatedRepo := func(t *testing.T) *simulator.TestRepository {
+		t.Helper()
+		repo := simulator.NewTestRepository(t)
+		// Keep optional snapshot metafile length/hashes unset so cached targets
+		// reach FromBytes directly rather than failing VerifyLengthHashes first.
+		repo.DisableComputeHashesAndLength()
+		delegate(repo, metadata.TARGETS, delegatedRole, "delegated/*")
+		repo.AddTarget(delegatedRole, []byte("payload"), targetPath)
+		repo.UpdateSnapshot()
+		return repo
+	}
+
+	for _, role := range []string{metadata.TIMESTAMP, metadata.SNAPSHOT, metadata.TARGETS, delegatedRole} {
+		roleType := role
+		if role == delegatedRole {
+			roleType = metadata.TARGETS
+		}
+		cases := map[string][]byte{}
+		for name, fn := range corruptions {
+			cases[name] = fn(roleType)
+		}
+		if roleType == metadata.TARGETS {
+			for name, payload := range targetsOnlyCorruptions {
+				cases[name] = payload
+			}
+		}
+
+		for name, badBytes := range cases {
+			t.Run(role+"/"+name, func(t *testing.T) {
+				repo := newDelegatedRepo(t)
+				defer repo.Cleanup()
+
+				up, err := createAndRefresh(t, repo)
+				assert.NoError(t, err)
+				_, err = up.GetTargetInfo(targetPath)
+				assert.NoError(t, err)
+
+				cachedPath := filepath.Join(repo.MetadataDir, role+".json")
+				validBytes, err := os.ReadFile(cachedPath)
+				assert.NoError(t, err)
+				assert.NoError(t, os.WriteFile(cachedPath, badBytes, 0644))
+
+				up2, err := createAndRefresh(t, repo)
+				assert.NoError(t, err)
+				info, err := up2.GetTargetInfo(targetPath)
+				assert.NoError(t, err)
+				assert.NotNil(t, info)
+
+				repairedBytes, err := os.ReadFile(cachedPath)
+				assert.NoError(t, err)
+				assert.Equal(t, validBytes, repairedBytes)
+			})
+		}
+	}
+
+	t.Run("invalid remote metadata still fails", func(t *testing.T) {
+		repo := simulator.NewTestRepository(t)
+		defer repo.Cleanup()
+
+		repo.Simulator.MDTargets.Signed.SpecVersion = "1.0.0.0"
+		repo.UpdateSnapshot()
+
+		_, err := createAndRefresh(t, repo)
+		assert.ErrorIs(t, err, &metadata.ErrDeserialization{})
+		assert.ErrorIs(t, err, &metadata.ErrRepository{})
+		assert.ErrorIs(t, err, &metadata.ErrValue{})
+	})
+}

@@ -81,7 +81,7 @@ func checkSignedCommon(specVersion string, version int64) error {
 // versions are not compared, since they do not change the metadata format
 // incompatibly.
 func checkSpecVersion(specVersion string) error {
-	parts := strings.Split(specVersion, ".")
+	parts := strings.SplitN(specVersion, ".", 4)
 	if len(parts) != 2 && len(parts) != 3 {
 		return &ErrValue{Msg: fmt.Sprintf("failed to parse spec_version %q", specVersion)}
 	}
