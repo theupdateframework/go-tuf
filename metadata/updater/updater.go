@@ -564,7 +564,7 @@ func (update *Updater) loadRoot() error {
 				// 404 means current root is newest available, so we can stop the loop and move forward
 				break
 			}
-			// some other error ocurred
+			// some other error occurred
 			return err
 		} else {
 			// downloading root metadata succeeded, so let's try to verify and load it
