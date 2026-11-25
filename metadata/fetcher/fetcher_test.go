@@ -19,6 +19,7 @@ package fetcher
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -433,4 +434,23 @@ func TestSetRetryOptions(t *testing.T) {
 			assert.Equal(t, tt.wantTries, tt.client.TryCount)
 		})
 	}
+}
+
+// DownloadFileContext aborts a request the server never answers once its context
+// expires, and does not retry past it (#835).
+func TestDownloadFileContext_CancelAbortsABlockedRequest(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	t.Cleanup(srv.Close)
+	f := NewDefaultFetcher()
+	f.SetRetryOptions(backoff.WithMaxTries(5), backoff.WithBackOff(backoff.NewConstantBackOff(10*time.Millisecond)))
+
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, err := f.DownloadFileContext(ctx, srv.URL+"/1.root.json", 1024)
+
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Less(t, time.Since(start), 5*time.Second, "DownloadFileContext outlived its context")
 }
