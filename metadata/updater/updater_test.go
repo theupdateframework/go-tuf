@@ -1439,3 +1439,28 @@ func TestFindCachedTargetTable(t *testing.T) {
 		assert.Empty(t, gotData)
 	})
 }
+
+// TestGetTopLevelTargets: before the top-level targets metadata is loaded
+// there are no targets to return, and asking for them must neither panic nor
+// start a refresh.
+func TestGetTopLevelTargets(t *testing.T) {
+	const targetPath = "hello.txt"
+
+	repo := simulator.NewTestRepository(t)
+	repo.AddTarget(metadata.TARGETS, []byte("hello"), targetPath)
+	repo.UpdateSnapshot()
+
+	cfg, err := repo.GetUpdaterConfig()
+	assert.NoError(t, err)
+	up, err := New(cfg)
+	assert.NoError(t, err)
+
+	fetched := len(repo.Simulator.FetchTracker.Metadata)
+	assert.Empty(t, up.GetTopLevelTargets())
+	assert.Len(t, repo.Simulator.FetchTracker.Metadata, fetched)
+
+	assert.NoError(t, up.Refresh())
+	targets := up.GetTopLevelTargets()
+	assert.Len(t, targets, 1)
+	assert.Contains(t, targets, targetPath)
+}
