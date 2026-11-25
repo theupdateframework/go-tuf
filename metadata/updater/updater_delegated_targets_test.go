@@ -91,6 +91,23 @@ func refreshedUpdater(t *testing.T, repo *simulator.TestRepository) *Updater {
 	return updater
 }
 
+// refreshedUpdaterWithMaxDelegations publishes the repository and returns
+// an updater for it that visits at most maxDelegations delegated roles, or
+// the default number of them if maxDelegations is 0.
+func refreshedUpdaterWithMaxDelegations(t *testing.T, repo *simulator.TestRepository, maxDelegations int) *Updater {
+	t.Helper()
+	repo.UpdateSnapshot()
+	cfg, err := repo.GetUpdaterConfig()
+	require.NoError(t, err)
+	if maxDelegations != 0 {
+		cfg.MaxDelegations = maxDelegations
+	}
+	updater, err := New(cfg)
+	require.NoError(t, err)
+	require.NoError(t, updater.Refresh())
+	return updater
+}
+
 func TestSharedRoleVerifiedByEachDelegator(t *testing.T) {
 	// "shared" is signed with the keys of both parents, so it is valid
 	// through either of them
@@ -204,4 +221,150 @@ func TestCachedRoleNotVerifiedByReplacedDelegator(t *testing.T) {
 	info, err = updater.GetTargetInfo("b/file")
 	assert.ErrorIs(t, err, &metadata.ErrUnsignedMetadata{})
 	assert.Nil(t, info)
+}
+
+// setupDiamond creates a repository where two parents delegate all paths
+// to the same role, each listing its own key for it:
+//
+//	targets -- */* --> parent-a -- */* --> shared (key listed by parent-a: signersA)
+//	targets -- */* --> parent-b -- */* --> shared (key listed by parent-b: signersB)
+//
+// A search for a target that no role lists walks into "shared" twice:
+// first through "parent-a" and then through "parent-b".
+func setupDiamond(t *testing.T) (repo *simulator.TestRepository, signersA, signersB map[string]*signature.Signer) {
+	t.Helper()
+	repo = simulator.NewTestRepository(t)
+
+	delegate(repo, metadata.TARGETS, "parent-a", "*/*")
+	delegate(repo, metadata.TARGETS, "parent-b", "*/*")
+	signersA = delegate(repo, "parent-a", "shared", "*/*")
+	signersB = delegate(repo, "parent-b", "shared", "*/*")
+	return repo, signersA, signersB
+}
+
+func TestSharedRoleVisitedThroughEachDelegationPath(t *testing.T) {
+	tests := []struct {
+		name string
+		// whether "shared" is signed with the key listed by each parent
+		signedByA, signedByB bool
+		maxDelegations       int
+		wantErr              error
+		wantErrMsg           string
+	}{
+		{
+			name:       "signed with the keys of both parents",
+			signedByA:  true,
+			signedByB:  true,
+			wantErrMsg: "target dir/missing not found",
+		},
+		{
+			// "shared" is valid through "parent-a" but as it's not found
+			// it's visited again through "parent-b", whose key did not
+			// sign it, so `ErrUnsignedMetadata{}` is returned
+			name:      "signed with the key of the first parent only",
+			signedByA: true,
+			wantErr:   &metadata.ErrUnsignedMetadata{},
+		},
+		{
+			name:      "signed with the key of the second parent only",
+			signedByB: true,
+			wantErr:   &metadata.ErrUnsignedMetadata{},
+		},
+		{
+			// targets, parent-a, shared and parent-b are visited: visiting
+			// "shared" again through "parent-b" would exceed the limit
+			name:           "visiting the role again exceeds the maximum number of delegations",
+			signedByA:      true,
+			maxDelegations: 3,
+			wantErrMsg:     "target dir/missing not found",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, signersA, signersB := setupDiamond(t)
+			signers := map[string]*signature.Signer{}
+			if tc.signedByA {
+				maps.Copy(signers, signersA)
+			}
+			if tc.signedByB {
+				maps.Copy(signers, signersB)
+			}
+			repo.Simulator.Signers["shared"] = signers
+			updater := refreshedUpdaterWithMaxDelegations(t, repo, tc.maxDelegations)
+
+			info, err := updater.GetTargetInfo("dir/missing")
+			if tc.wantErr != nil {
+				assert.ErrorIs(t, err, tc.wantErr)
+			} else {
+				assert.ErrorContains(t, err, tc.wantErrMsg)
+			}
+			assert.Nil(t, info)
+		})
+	}
+}
+
+func TestDelegationCyclesSkipped(t *testing.T) {
+	// "parent-a" and "parent-b" delegate to themselves and to each other,
+	// and "parent-c" lists the target:
+	//
+	//	targets -- */* --> parent-a -- */* --> parent-a, parent-b
+	//	        -- */* --> parent-b -- */* --> parent-b, parent-a
+	//	        -- */* --> parent-c
+	//
+	// A role is skipped only if it is already on the delegation path used
+	// to reach it, so the search visits targets, parent-a, parent-b
+	// (through parent-a), parent-b and parent-a (through parent-b), and
+	// then finds the target in parent-c, the sixth role it visits
+	tests := []struct {
+		name           string
+		maxDelegations int
+		wantFound      bool
+	}{
+		{
+			name:      "default maximum number of delegations",
+			wantFound: true,
+		},
+		{
+			name:           "parent-c is the last role allowed",
+			maxDelegations: 5,
+			wantFound:      true,
+		},
+		{
+			// roles visited again through another delegation path count
+			// toward the maximum number of delegations
+			name:           "parent-c exceeds the maximum number of delegations",
+			maxDelegations: 4,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := simulator.NewTestRepository(t)
+			delegate(repo, metadata.TARGETS, "parent-a", "*/*")
+			delegate(repo, metadata.TARGETS, "parent-b", "*/*")
+			delegate(repo, metadata.TARGETS, "parent-c", "*/*")
+			delegate(repo, "parent-a", "parent-a", "*/*")
+			delegate(repo, "parent-a", "parent-b", "*/*")
+			delegate(repo, "parent-b", "parent-b", "*/*")
+			delegate(repo, "parent-b", "parent-a", "*/*")
+			repo.AddTarget("parent-c", []byte("c"), "dir/file")
+			updater := refreshedUpdaterWithMaxDelegations(t, repo, tc.maxDelegations)
+
+			info, err := updater.GetTargetInfo("dir/file")
+			if tc.wantFound {
+				assert.NoError(t, err)
+				assert.NotNil(t, info)
+			} else {
+				assert.ErrorContains(t, err, "target dir/file not found")
+				assert.Nil(t, info)
+			}
+
+			// each role is loaded once, however many times it is visited
+			fetched := map[string]int{}
+			for _, md := range repo.Simulator.FetchTracker.Metadata {
+				fetched[md.Name]++
+			}
+			assert.Equal(t, 1, fetched["parent-a"])
+			assert.Equal(t, 1, fetched["parent-b"])
+		})
+	}
 }
