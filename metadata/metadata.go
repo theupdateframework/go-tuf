@@ -1001,15 +1001,15 @@ func fromBytes[T Roles](data []byte) (*Metadata[T], error) {
 	meta := &Metadata[T]{}
 	// verify that the type we used to create the object is the same as the type of the metadata file
 	if err := checkType[T](data); err != nil {
-		return nil, err
+		return nil, &ErrDeserialization{Err: err}
 	}
 	// if all is okay, unmarshal meta to the desired Metadata[T] type
 	if err := json.Unmarshal(data, meta); err != nil {
-		return nil, err
+		return nil, &ErrDeserialization{Err: err}
 	}
 	// Make sure signature key IDs are unique
 	if err := checkUniqueSignatures(*meta); err != nil {
-		return nil, err
+		return nil, &ErrDeserialization{Err: err}
 	}
 	return meta, nil
 }

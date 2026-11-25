@@ -33,6 +33,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -3144,6 +3145,103 @@ func TestFromBytesChecksSpecVersion(t *testing.T) {
 			`"version":1,"expires":"2030-01-01T00:00:00Z","targets":{}}}`))
 		assert.ErrorContains(t, err, failedToParse)
 	})
+
+	t.Run("many dots bounded allocation", func(t *testing.T) {
+		manyDots := strings.Repeat(".", 1<<20)
+		var before, after runtime.MemStats
+		runtime.ReadMemStats(&before)
+		err := checkSpecVersion(manyDots)
+		runtime.ReadMemStats(&after)
+
+		assert.ErrorIs(t, err, &ErrValue{})
+		// Unbounded strings.Split on 1 MiB of dots allocates ~16 MiB for the
+		// []string slice alone (~19 MiB total including error formatting).
+		assert.Less(t, after.TotalAlloc-before.TotalAlloc, uint64(8<<20))
+	})
+}
+
+func TestFromBytesReturnsErrDeserialization(t *testing.T) {
+	assert.Equal(t, "deserialization error", (&ErrDeserialization{}).Error())
+
+	tests := []struct {
+		name      string
+		parse     func() error
+		wantValue bool
+	}{
+		{
+			name: "invalid JSON",
+			parse: func() error {
+				_, err := Timestamp().FromBytes([]byte("{truncated"))
+				return err
+			},
+		},
+		{
+			name: "wrong _type",
+			parse: func() error {
+				_, err := Timestamp().FromBytes([]byte(`{"signatures":[],"signed":{"_type":"snapshot"}}`))
+				return err
+			},
+			wantValue: true,
+		},
+		{
+			name: "invalid spec_version",
+			parse: func() error {
+				_, err := Snapshot().FromBytes([]byte(`{"signatures":[],"signed":{"_type":"snapshot",` +
+					`"spec_version":"1.0.0.0","version":1,"expires":"2030-01-01T00:00:00Z","meta":{}}}`))
+				return err
+			},
+			wantValue: true,
+		},
+		{
+			name: "non-positive version",
+			parse: func() error {
+				_, err := Targets().FromBytes([]byte(`{"signatures":[],"signed":{"_type":"targets",` +
+					`"spec_version":"1.0.31","version":0,"expires":"2030-01-01T00:00:00Z","targets":{}}}`))
+				return err
+			},
+			wantValue: true,
+		},
+		{
+			name: "duplicate delegated role name",
+			parse: func() error {
+				_, err := Targets().FromBytes([]byte(`{"signatures":[],"signed":{"_type":"targets",` +
+					`"spec_version":"1.0.31","version":1,"expires":"2030-01-01T00:00:00Z","targets":{},` +
+					`"delegations":{"keys":{},"roles":[{"name":"r","keyids":[],"threshold":1},{"name":"r","keyids":[],"threshold":1}]}}}`))
+				return err
+			},
+			wantValue: true,
+		},
+		{
+			name: "duplicate signature key ID",
+			parse: func() error {
+				_, err := Targets().FromBytes([]byte(`{"signatures":[{"keyid":"k","sig":"00"},{"keyid":"k","sig":"00"}],` +
+					`"signed":{"_type":"targets","spec_version":"1.0.31","version":1,"expires":"2030-01-01T00:00:00Z","targets":{}}}`))
+				return err
+			},
+			wantValue: true,
+		},
+		{
+			name: "null map entry",
+			parse: func() error {
+				_, err := Targets().FromBytes([]byte(`{"signatures":[],"signed":{"_type":"targets",` +
+					`"spec_version":"1.0.31","version":1,"expires":"2030-01-01T00:00:00Z","targets":{"a":null}}}`))
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.parse()
+			assert.ErrorIs(t, err, &ErrDeserialization{})
+			assert.ErrorIs(t, err, &ErrRepository{})
+			if tt.wantValue {
+				assert.ErrorIs(t, err, &ErrValue{})
+			} else {
+				assert.NotErrorIs(t, err, &ErrValue{})
+			}
+		})
+	}
 }
 
 func TestFromBytesChecksVersion(t *testing.T) {
