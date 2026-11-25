@@ -57,8 +57,8 @@ func TestMarshalUnmarshalJSON(t *testing.T) {
 	}{
 		{
 			name:     "RootType Marshal/Unmarshal",
-			input:    RootType{Type: "root", SpecVersion: "1.0", ConsistentSnapshot: true, Version: 1, Expires: fixedTime, Keys: map[string]*Key{}, Roles: map[string]*Role{}},
-			wantJSON: `{"_type":"root","spec_version":"1.0","consistent_snapshot":true,"version":1,"expires":"2024-01-01T00:00:00Z","keys":{},"roles":{}}`,
+			input:    RootType{Type: "root", SpecVersion: "1.0", ConsistentSnapshot: true, Version: 1, Expires: fixedTime, Keys: map[string]*Key{}, Roles: Root().Signed.Roles},
+			wantJSON: `{"_type":"root","spec_version":"1.0","consistent_snapshot":true,"version":1,"expires":"2024-01-01T00:00:00Z","keys":{},"roles":{"root":{"keyids":[],"threshold":1},"snapshot":{"keyids":[],"threshold":1},"targets":{"keyids":[],"threshold":1},"timestamp":{"keyids":[],"threshold":1}}}`,
 		},
 		{
 			name:     "SnapshotType Marshal/Unmarshal",
@@ -311,6 +311,14 @@ func TestComplexStructuresMarshaling(t *testing.T) {
 						KeyIDs:    []string{"key2"},
 						Threshold: 1,
 					},
+					"snapshot": {
+						KeyIDs:    []string{"key2"},
+						Threshold: 1,
+					},
+					"timestamp": {
+						KeyIDs:    []string{"key2"},
+						Threshold: 1,
+					},
 				},
 				ConsistentSnapshot: true,
 			},
@@ -326,7 +334,9 @@ func TestComplexStructuresMarshaling(t *testing.T) {
 				},
 				"roles": {
 					"root": {"keyids": ["key1"], "threshold": 1},
-					"targets": {"keyids": ["key2"], "threshold": 1}
+					"targets": {"keyids": ["key2"], "threshold": 1},
+					"snapshot": {"keyids": ["key2"], "threshold": 1},
+					"timestamp": {"keyids": ["key2"], "threshold": 1}
 				}
 			}`,
 		},
