@@ -23,7 +23,6 @@ import (
 	"log/slog"
 	"net/url"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/sigstore/sigstore/pkg/signature"
@@ -52,19 +51,16 @@ func createKey() (*ed25519.PublicKey, *ed25519.PrivateKey, *signature.Signer) {
 // If it doesn't, it parses the path as a URL and trims the prefix from the URL's path.
 // The function returns the trimmed path or an error if the path cannot be parsed as a URL.
 func trimPrefix(path string, prefix string) (string, error) {
-	var toTrim string
-	if match, _ := regexp.MatchString(`^[a-zA-Z]:\\`, path); match {
-		toTrim = path
-	} else {
-		parsedURL, err := url.Parse(path)
-		if err != nil {
-			return "", err
-		}
-
-		toTrim = parsedURL.Path
+	if prefix != "" && strings.HasPrefix(path, prefix) {
+		return url.PathUnescape(strings.TrimPrefix(path, prefix))
 	}
 
-	return strings.TrimPrefix(toTrim, prefix), nil
+	parsedURL, err := url.Parse(path)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimPrefix(parsedURL.Path, prefix), nil
 }
 
 func hasPrefix(path, prefix string) bool {
