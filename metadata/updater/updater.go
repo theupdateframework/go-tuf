@@ -187,8 +187,7 @@ func (update *Updater) onlineRefresh(ctx context.Context) error {
 func (update *Updater) unsafeLocalRefresh() error {
 	// Root is already loaded
 	// load timestamp
-	var p = filepath.Join(update.cfg.LocalMetadataDir, metadata.TIMESTAMP)
-	data, err := update.loadLocalMetadata(p)
+	data, err := update.loadLocalMetadata(metadata.TIMESTAMP)
 	if err != nil {
 		return err
 	}
@@ -198,8 +197,7 @@ func (update *Updater) unsafeLocalRefresh() error {
 	}
 
 	// load snapshot
-	p = filepath.Join(update.cfg.LocalMetadataDir, metadata.SNAPSHOT)
-	data, err = update.loadLocalMetadata(p)
+	data, err = update.loadLocalMetadata(metadata.SNAPSHOT)
 	if err != nil {
 		return err
 	}
@@ -209,8 +207,7 @@ func (update *Updater) unsafeLocalRefresh() error {
 	}
 
 	// targets
-	p = filepath.Join(update.cfg.LocalMetadataDir, metadata.TARGETS)
-	data, err = update.loadLocalMetadata(p)
+	data, err = update.loadLocalMetadata(metadata.TARGETS)
 	if err != nil {
 		return err
 	}
@@ -354,7 +351,7 @@ func (update *Updater) FindCachedTarget(targetFile *metadata.TargetFiles, filePa
 func (update *Updater) loadTimestamp(ctx context.Context) error {
 	log := metadata.GetLogger()
 	// try to read local timestamp
-	data, err := update.loadLocalMetadata(filepath.Join(update.cfg.LocalMetadataDir, metadata.TIMESTAMP))
+	data, err := update.loadLocalMetadata(metadata.TIMESTAMP)
 	if err != nil {
 		// this means there's no existing local timestamp so we should proceed downloading it without the need to UpdateTimestamp
 		log.Info("Local timestamp does not exist")
@@ -402,7 +399,7 @@ func (update *Updater) loadTimestamp(ctx context.Context) error {
 func (update *Updater) loadSnapshot(ctx context.Context) error {
 	log := metadata.GetLogger()
 	// try to read local snapshot
-	data, err := update.loadLocalMetadata(filepath.Join(update.cfg.LocalMetadataDir, metadata.SNAPSHOT))
+	data, err := update.loadLocalMetadata(metadata.SNAPSHOT)
 	if err != nil {
 		// this means there's no existing local snapshot so we should proceed downloading it without the need to UpdateSnapshot
 		log.Info("Local snapshot does not exist")
@@ -516,7 +513,7 @@ func (update *Updater) loadTargets(ctx context.Context, roleName, parentName str
 		return role, nil
 	}
 	// try to read local targets
-	data, err := os.ReadFile(update.localMetadataPath(roleName))
+	data, err := update.loadLocalMetadata(roleName)
 	if err != nil {
 		// this means there's no existing local target file so we should proceed downloading it without the need to UpdateDelegatedTargets
 		log.Info("Local role does not exist", "role", roleName)
@@ -846,9 +843,9 @@ func selectTargetHashAlgorithm(hashes metadata.Hashes) string {
 	return slices.Min(slices.Collect(maps.Keys(hashes)))
 }
 
-// loadLocalMetadata reads a local <roleName>.json file and returns its bytes
+// loadLocalMetadata reads the cached metadata file for roleName
 func (update *Updater) loadLocalMetadata(roleName string) ([]byte, error) {
-	return os.ReadFile(fmt.Sprintf("%s.json", roleName))
+	return os.ReadFile(update.localMetadataPath(roleName))
 }
 
 // GetTopLevelTargets returns the top-level target files.

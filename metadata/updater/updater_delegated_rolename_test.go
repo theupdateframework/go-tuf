@@ -18,10 +18,13 @@
 package updater
 
 import (
+	"net/url"
+	"path/filepath"
 	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils/simulator"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
@@ -30,45 +33,57 @@ import (
 // A delegated role name must not change where its cached metadata is read
 // from on disk. persistMetadata, downloadMetadata and generateTargetFilePath
 // all url.PathEscape the role name before using it as a path component, so a
-// name is confined to LocalMetadataDir. loadTargets joined the raw name, so a
-// name containing a path-traversal sequence resolved the local read outside
-// LocalMetadataDir and never matched the escaped name used on write.
+// name is confined to LocalMetadataDir. loadTargets previously joined the raw
+// name, so a name containing a path-traversal sequence or characters rewritten
+// by url.PathEscape either resolved outside LocalMetadataDir or missed the
+// escaped file written on persist.
 func TestDelegatedRoleNameLocalReadStaysInMetadataDir(t *testing.T) {
-	err := loadOrResetTrustedRootMetadata()
-	assert.NoError(t, err)
-	simulator.Sim.MDRoot.Signed.ConsistentSnapshot = false
-	simulator.Sim.MDRoot.Signed.Version += 1
-	simulator.Sim.PublishRoot()
+	const targetPath = "target.txt"
 
-	delegatedRole := metadata.DelegatedRole{
-		Name:        "..",
-		KeyIDs:      []string{},
-		Threshold:   1,
-		Terminating: false,
-		Paths:       []string{"*"},
+	cases := []struct {
+		name string
+		role string
+	}{
+		{name: "dotdot", role: ".."},
+		{name: "dot", role: "."},
+		{name: "slash", role: "a/b"},
+		{name: "space", role: "role with space"},
+		{name: "percent", role: "100%"},
 	}
-	target := metadata.Targets(simulator.Sim.SafeExpiry)
-	simulator.Sim.AddDelegation("targets", delegatedRole, target.Signed)
-	simulator.Sim.UpdateSnapshot()
 
-	// First client fetches the delegated metadata and caches it locally.
-	cfg, err := loadUpdaterConfig()
-	assert.NoError(t, err)
-	up1 := initUpdater(cfg)
-	assert.NoError(t, up1.Refresh())
-	_, _ = up1.GetTargetInfo("anything")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := simulator.NewTestRepository(t)
+			defer repo.Cleanup()
 
-	// A fresh client should read that cached metadata back instead of
-	// refetching it from the remote.
-	simulator.Sim.FetchTracker.Metadata = []simulator.FTMetadata{}
-	cfg2, err := loadUpdaterConfig()
-	assert.NoError(t, err)
-	up2 := initUpdater(cfg2)
-	assert.NoError(t, up2.Refresh())
-	_, _ = up2.GetTargetInfo("anything")
+			delegate(repo, metadata.TARGETS, tc.role, "*")
+			repo.AddTarget(tc.role, []byte("hello"), targetPath)
+			repo.UpdateSnapshot()
 
-	refetched := slices.ContainsFunc(simulator.Sim.FetchTracker.Metadata, func(m simulator.FTMetadata) bool {
-		return m.Name == ".."
-	})
-	assert.False(t, refetched, "delegated role '..' should be read from the local cache, not refetched from outside LocalMetadataDir")
+			// First client fetches the delegated metadata and caches it locally.
+			up1, err := createAndRefresh(t, repo)
+			require.NoError(t, err)
+			info, err := up1.GetTargetInfo(targetPath)
+			require.NoError(t, err)
+			require.NotNil(t, info)
+
+			expectedFile := filepath.Join(repo.MetadataDir, url.PathEscape(tc.role)+".json")
+			assert.Equal(t, repo.MetadataDir, filepath.Dir(expectedFile))
+			assert.FileExists(t, expectedFile)
+
+			// A fresh client reads that cached metadata back instead of
+			// refetching it from the remote repository.
+			repo.Simulator.FetchTracker.Metadata = []simulator.FTMetadata{}
+			up2, err := createAndRefresh(t, repo)
+			require.NoError(t, err)
+			info, err = up2.GetTargetInfo(targetPath)
+			require.NoError(t, err)
+			require.NotNil(t, info)
+
+			refetched := slices.ContainsFunc(repo.Simulator.FetchTracker.Metadata, func(m simulator.FTMetadata) bool {
+				return m.Name == tc.role
+			})
+			assert.False(t, refetched, "delegated role %q should be read from the local cache, not refetched", tc.role)
+		})
+	}
 }
