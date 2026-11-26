@@ -29,7 +29,7 @@ type Roles interface {
 
 // Define version of the TUF specification
 const (
-	SPECIFICATION_VERSION = "1.0.31"
+	SPECIFICATION_VERSION = "1.0.37"
 )
 
 // Define top level role names

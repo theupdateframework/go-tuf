@@ -146,6 +146,33 @@ func (e *ErrLengthOrHashMismatch) Is(target error) bool {
 	return false
 }
 
+// ErrDeserialization - An error occurred while deserializing a TUF Metadata file
+type ErrDeserialization struct {
+	Err error
+}
+
+func (e *ErrDeserialization) Error() string {
+	if e.Err == nil {
+		return "deserialization error"
+	}
+	return e.Err.Error()
+}
+
+func (e *ErrDeserialization) Unwrap() error {
+	return e.Err
+}
+
+// ErrDeserialization is a subset of ErrRepository
+func (e *ErrDeserialization) Is(target error) bool {
+	if _, ok := target.(*ErrDeserialization); ok {
+		return true
+	}
+	if _, ok := target.(*ErrRepository); ok {
+		return true
+	}
+	return false
+}
+
 // Download errors
 
 // ErrDownload - An error occurred while attempting to download a file

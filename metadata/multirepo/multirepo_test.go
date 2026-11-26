@@ -19,14 +19,140 @@ package multirepo
 
 import (
 	"errors"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils/simulator"
-	"github.com/theupdateframework/go-tuf/v2/metadata/config"
 	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
+
+func TestNewConfig(t *testing.T) {
+	validMapJSON := []byte(`{
+		"repositories": {
+			"test-repo": ["https://example.com/repo"]
+		},
+		"mapping": []
+	}`)
+
+	tests := []struct {
+		name    string
+		desc    string
+		repoMap []byte
+		roots   map[string][]byte
+		wantErr bool
+	}{
+		{
+			name:    "empty map file returns error",
+			desc:    "Creating config with empty map file should fail",
+			repoMap: []byte(""),
+			roots:   map[string][]byte{},
+			wantErr: true,
+		},
+		{
+			name:    "empty roots returns error",
+			desc:    "Creating config with empty roots should fail",
+			repoMap: validMapJSON,
+			roots:   map[string][]byte{},
+			wantErr: true,
+		},
+		{
+			name:    "valid config succeeds",
+			desc:    "Creating config with valid map and roots should succeed",
+			repoMap: validMapJSON,
+			roots:   map[string][]byte{"test-repo": []byte(`{"signatures":[],"signed":{}}`)},
+			wantErr: false,
+		},
+		{
+			name:    "missing root for repo returns error",
+			desc:    "Creating config with missing root metadata for a repository should fail",
+			repoMap: validMapJSON,
+			roots:   map[string][]byte{"other-repo": []byte(`{"signatures":[],"signed":{}}`)},
+			wantErr: true,
+		},
+		{
+			name:    "invalid JSON map file returns error",
+			desc:    "Creating config with invalid JSON should fail",
+			repoMap: []byte(`{invalid json}`),
+			roots:   map[string][]byte{"test-repo": []byte(`{"signatures":[],"signed":{}}`)},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Logf("Desc: %s", tt.desc)
+
+			cfg, err := NewConfig(tt.repoMap, tt.roots)
+
+			if tt.wantErr {
+				assert.Error(t, err, "expected error but got none")
+				return
+			}
+
+			assert.NoError(t, err, "expected no error but got %v", err)
+			assert.NotNil(t, cfg, "expected config to be non-nil")
+		})
+	}
+}
+
+// TestNewConfigErrorWrapping asserts that NewConfig's input-validation
+// error wraps only the sentinel matching the actually-missing input, so
+// callers can use errors.Is to discriminate.
+func TestNewConfigErrorWrapping(t *testing.T) {
+	validMapJSON := []byte(`{
+		"repositories": {
+			"test-repo": ["https://example.com/repo"]
+		},
+		"mapping": []
+	}`)
+	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
+
+	tests := []struct {
+		name          string
+		repoMap       []byte
+		roots         map[string][]byte
+		shouldWrap    []error
+		shouldNotWrap []error
+	}{
+		{
+			name:          "only map file missing",
+			repoMap:       nil,
+			roots:         map[string][]byte{"test-repo": rootBytes},
+			shouldWrap:    []error{ErrNoMapFile},
+			shouldNotWrap: []error{ErrNoTrustedRoots},
+		},
+		{
+			name:          "only trusted roots missing",
+			repoMap:       validMapJSON,
+			roots:         map[string][]byte{},
+			shouldWrap:    []error{ErrNoTrustedRoots},
+			shouldNotWrap: []error{ErrNoMapFile},
+		},
+		{
+			name:       "both missing",
+			repoMap:    nil,
+			roots:      map[string][]byte{},
+			shouldWrap: []error{ErrNoMapFile, ErrNoTrustedRoots},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewConfig(tt.repoMap, tt.roots)
+			assert.Error(t, err)
+			for _, target := range tt.shouldWrap {
+				assert.ErrorIs(t, err, target, "error should wrap %v", target)
+			}
+			for _, target := range tt.shouldNotWrap {
+				assert.NotErrorIs(t, err, target, "error must not wrap %v", target)
+			}
+		})
+	}
+}
 
 func TestValidateRepoName(t *testing.T) {
 	tests := []struct {
@@ -257,6 +383,135 @@ func TestNewRejectsNilConfig(t *testing.T) {
 	}
 }
 
+// TestEnsurePathsExistTable exercises MultiRepoConfig.EnsurePathsExist
+// directly: it's the one method that has no dependence on the
+// per-repository updater plumbing, so we can hit every branch with a
+// plain config struct.
+func TestEnsurePathsExistTable(t *testing.T) {
+	tests := []struct {
+		name        string
+		buildCfg    func(t *testing.T) *MultiRepoConfig
+		expectError bool
+		errorIs     error
+	}{
+		{
+			name: "creates metadata and targets directories",
+			buildCfg: func(t *testing.T) *MultiRepoConfig {
+				t.Helper()
+				tmp := t.TempDir()
+				return &MultiRepoConfig{
+					LocalMetadataDir: filepath.Join(tmp, "metadata"),
+					LocalTargetsDir:  filepath.Join(tmp, "targets"),
+				}
+			},
+		},
+		{
+			name: "no-op when local cache is disabled",
+			buildCfg: func(t *testing.T) *MultiRepoConfig {
+				t.Helper()
+				return &MultiRepoConfig{
+					DisableLocalCache: true,
+					LocalMetadataDir:  "", // would otherwise fail
+					LocalTargetsDir:   "",
+				}
+			},
+		},
+		{
+			name: "already-existing directories succeed",
+			buildCfg: func(t *testing.T) *MultiRepoConfig {
+				t.Helper()
+				tmp := t.TempDir()
+				md := filepath.Join(tmp, "metadata")
+				td := filepath.Join(tmp, "targets")
+				assert.NoError(t, os.MkdirAll(md, 0700))
+				assert.NoError(t, os.MkdirAll(td, 0700))
+				return &MultiRepoConfig{LocalMetadataDir: md, LocalTargetsDir: td}
+			},
+		},
+		{
+			name: "fails when paths are empty and cache is enabled",
+			buildCfg: func(t *testing.T) *MultiRepoConfig {
+				t.Helper()
+				return &MultiRepoConfig{LocalMetadataDir: "", LocalTargetsDir: ""}
+			},
+			expectError: true,
+			errorIs:     os.ErrNotExist,
+		},
+		{
+			name: "fails when a path collides with an existing file",
+			buildCfg: func(t *testing.T) *MultiRepoConfig {
+				t.Helper()
+				tmp := t.TempDir()
+				file := filepath.Join(tmp, "blocking_file")
+				assert.NoError(t, os.WriteFile(file, []byte("x"), 0600))
+				return &MultiRepoConfig{
+					LocalMetadataDir: file,
+					LocalTargetsDir:  filepath.Join(tmp, "targets"),
+				}
+			},
+			expectError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := tt.buildCfg(t)
+			err := cfg.EnsurePathsExist()
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorIs != nil {
+					assert.ErrorIs(t, err, tt.errorIs)
+				}
+				return
+			}
+			assert.NoError(t, err)
+			if !cfg.DisableLocalCache {
+				assert.DirExists(t, cfg.LocalMetadataDir)
+				assert.DirExists(t, cfg.LocalTargetsDir)
+			}
+		})
+	}
+}
+
+// TestNewFailureCases covers the New() construction error paths that
+// fire before any per-repository updater is created. The happy path
+// requires a working network of TUF repositories and is out of scope
+// for this unit-level test.
+func TestNewFailureCases(t *testing.T) {
+	validMapJSON := []byte(`{
+		"repositories": {
+			"test-repo": ["https://example.com/repo"]
+		},
+		"mapping": []
+	}`)
+	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
+
+	t.Run("invalid root bytes fail updater construction", func(t *testing.T) {
+		cfg, err := NewConfig(validMapJSON, map[string][]byte{"test-repo": rootBytes})
+		assert.NoError(t, err)
+		cfg.LocalMetadataDir = t.TempDir()
+		cfg.LocalTargetsDir = t.TempDir()
+
+		// The root bytes pass NewConfig (which only checks "is the key
+		// present") but fail when updater.New tries to parse them.
+		_, err = New(cfg)
+		assert.ErrorContains(t, err, "failed to create Updater instance")
+	})
+
+	t.Run("empty trusted roots after NewConfig", func(t *testing.T) {
+		cfg, err := NewConfig(validMapJSON, map[string][]byte{"test-repo": rootBytes})
+		assert.NoError(t, err)
+		cfg.LocalMetadataDir = t.TempDir()
+		cfg.LocalTargetsDir = t.TempDir()
+		// Sabotage the trusted-roots map after config construction so
+		// initTUFClients hits the "trusted root missing" branch.
+		cfg.TrustedRoots = map[string][]byte{}
+
+		_, err = New(cfg)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get trusted root metadata from config")
+	})
+}
+
 // newBareMultiRepoClient constructs a MultiRepoClient with the given repo map
 // mapping and no initialized repository clients. GetTargetInfo walks the
 // mappings before it consults TUFClients, so a terminating mapping lets us
@@ -303,31 +558,17 @@ func TestGetTargetInfoInvalidPattern(t *testing.T) {
 // contains a literal backslash resolved differently on Windows than on
 // POSIX systems, breaking the TAP 4 mapping consensus (see #747).
 func TestGetTargetInfoMatchIsOSIndependent(t *testing.T) {
-	// Set up one fully offline simulated repository serving a single target.
-	sim, metadataDir, targetsDir, err := simulator.InitMetadataDir()
-	if err != nil {
-		t.Fatalf("InitMetadataDir() failed: %v", err)
-	}
-	defer simulator.RepositoryCleanup(simulator.LocalDir)
+	repo := simulator.NewTestRepository(t)
+	defer repo.Cleanup()
 	content := []byte("target content")
-	sim.AddTarget("targets", content, "sigstore-tuf-root/root.json")
-	sim.AddTarget("targets", content, `a/\`)
+	repo.AddTarget("targets", content, "sigstore-tuf-root/root.json")
+	repo.AddTarget("targets", content, `a/\`)
+	repo.UpdateSnapshot()
 
-	rootBytes, err := simulator.GetRootBytes(metadataDir)
-	if err != nil {
-		t.Fatalf("GetRootBytes() failed: %v", err)
-	}
-	cfg, err := config.New(metadataDir, rootBytes)
-	if err != nil {
-		t.Fatalf("config.New() failed: %v", err)
-	}
-	cfg.Fetcher = sim
-	cfg.LocalMetadataDir = metadataDir
-	cfg.LocalTargetsDir = targetsDir
+	cfg, err := repo.GetUpdaterConfig()
+	require.NoError(t, err)
 	repoUpdater, err := updater.New(cfg)
-	if err != nil {
-		t.Fatalf("updater.New() failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	tests := []struct {
 		name    string
@@ -358,6 +599,12 @@ func TestGetTargetInfoMatchIsOSIndependent(t *testing.T) {
 			pattern: "sigstore-tuf-root/*",
 			target:  "sigstore-tuf-root/root.json",
 			want:    true,
+		},
+		{
+			name:    "single-segment wildcard does not cross slash separator",
+			pattern: "*",
+			target:  "sigstore-tuf-root/root.json",
+			want:    false,
 		},
 		{
 			name:    "control unrelated pattern does not match",
