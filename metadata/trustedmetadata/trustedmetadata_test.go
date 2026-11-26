@@ -421,6 +421,30 @@ func TestUpdateRootTable(t *testing.T) {
 			},
 			errIs: &metadata.ErrValue{Msg: "expected metadata type root, got - snapshot"},
 		},
+		{
+			// The new root satisfies its own threshold, so only the check
+			// against the trusted root can reject it.
+			name: "new root signed only by keys the trusted root does not accept",
+			rootBytes: func(t *testing.T) []byte {
+				t.Helper()
+				root, err := metadata.Root().FromBytes(allRoles[metadata.ROOT])
+				require.NoError(t, err)
+				root.Signed.Version += 1
+				root.Signed.Roles[metadata.ROOT].KeyIDs = root.Signed.Roles[metadata.TIMESTAMP].KeyIDs
+				signer, err := rsapss.LoadRSAPSSSignerFromPEMFile(filepath.Join(testutils.KeystoreDir, "timestamp_key"))
+				require.NoError(t, err)
+				root.ClearSignatures()
+				_, err = root.Sign(signer)
+				require.NoError(t, err)
+				// Both checks report the same error, so pin that this root is
+				// valid on its own.
+				require.NoError(t, root.VerifyDelegate(metadata.ROOT, root))
+				b, err := root.ToBytes(true)
+				require.NoError(t, err)
+				return b
+			},
+			errIs: &metadata.ErrUnsignedMetadata{Msg: "Verifying root failed, not enough signatures, got 0, want 1"},
+		},
 	}
 
 	for _, tt := range tests {

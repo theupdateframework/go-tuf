@@ -18,16 +18,20 @@
 package updater
 
 import (
+	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils/simulator"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"github.com/theupdateframework/go-tuf/v2/metadata/config"
+	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
 
 // createAndRefresh creates an updater for the test repository and runs Refresh
@@ -206,7 +210,8 @@ func TestTimestampUpdatesTable(t *testing.T) {
 			wantErrType: &metadata.ErrExpiredMetadata{},
 			wantErrMsg:  "timestamp.json is expired",
 			assert: func(t *testing.T, repo *simulator.TestRepository) {
-				repo.AssertFilesExist([]string{metadata.ROOT})
+				// the rejected timestamp must not be cached
+				repo.AssertFilesExact([]string{metadata.ROOT})
 			},
 		},
 	}
@@ -273,7 +278,8 @@ func TestSnapshotUpdatesTable(t *testing.T) {
 			wantErrType: &metadata.ErrExpiredMetadata{},
 			wantErrMsg:  "snapshot.json is expired",
 			assert: func(t *testing.T, repo *simulator.TestRepository) {
-				repo.AssertFilesExist([]string{metadata.ROOT})
+				// the rejected snapshot must not be cached
+				repo.AssertFilesExact([]string{metadata.ROOT, metadata.TIMESTAMP})
 			},
 		},
 		{
@@ -286,7 +292,8 @@ func TestSnapshotUpdatesTable(t *testing.T) {
 			wantErrType: &metadata.ErrBadVersionNumber{},
 			wantErrMsg:  "expected 1, got 2",
 			assert: func(t *testing.T, repo *simulator.TestRepository) {
-				repo.AssertFilesExist([]string{metadata.ROOT, metadata.TIMESTAMP})
+				// the rejected snapshot must not be cached
+				repo.AssertFilesExact([]string{metadata.ROOT, metadata.TIMESTAMP})
 			},
 		},
 	}
@@ -1560,4 +1567,85 @@ func TestRefreshRecoversFromInvalidCachedMetadata(t *testing.T) {
 		assert.ErrorIs(t, err, &metadata.ErrRepository{})
 		assert.ErrorIs(t, err, &metadata.ErrValue{})
 	})
+}
+
+// serverErrorFetcher returns the error a fetcher reports for HTTP 500 for URLs
+// ending in suffix, and passes every other request to the wrapped fetcher.
+type serverErrorFetcher struct {
+	fetcher.Fetcher
+	suffix string
+}
+
+func (f serverErrorFetcher) DownloadFile(urlPath string, maxLength int64, timeout time.Duration) ([]byte, error) {
+	if strings.HasSuffix(urlPath, f.suffix) {
+		return nil, &metadata.ErrDownloadHTTP{StatusCode: http.StatusInternalServerError, URL: urlPath}
+	}
+	return f.Fetcher.DownloadFile(urlPath, maxLength, timeout)
+}
+
+// TestRefreshServerErrorTable checks that a server error fails the refresh:
+// only a 404 ends root rotation, and cached metadata does not hide a failed
+// download.
+func TestRefreshServerErrorTable(t *testing.T) {
+	tests := []struct {
+		name string
+		// publish changes the repository after the first, successful refresh.
+		publish func(repo *simulator.TestRepository)
+		suffix  string
+		// kept is the cached role the failed download must leave as it was.
+		kept string
+	}{
+		{
+			name: "next root version",
+			publish: func(repo *simulator.TestRepository) {
+				repo.BumpVersion(metadata.ROOT)
+			},
+			suffix: "2.root.json",
+			kept:   metadata.ROOT,
+		},
+		{
+			name:   "timestamp with a valid cached copy",
+			suffix: "timestamp.json",
+			kept:   metadata.TIMESTAMP,
+		},
+		{
+			name: "new snapshot with an older cached copy",
+			publish: func(repo *simulator.TestRepository) {
+				repo.UpdateSnapshot()
+			},
+			suffix: "snapshot.json",
+			kept:   metadata.SNAPSHOT,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := simulator.NewTestRepository(t)
+			defer repo.Cleanup()
+
+			_, err := createAndRefresh(t, repo)
+			require.NoError(t, err)
+			cachedPath := filepath.Join(repo.MetadataDir, tc.kept+".json")
+			before, err := os.ReadFile(cachedPath)
+			require.NoError(t, err)
+			if tc.publish != nil {
+				tc.publish(repo)
+			}
+
+			cfg, err := repo.GetUpdaterConfig()
+			require.NoError(t, err)
+			cfg.Fetcher = serverErrorFetcher{Fetcher: cfg.Fetcher, suffix: tc.suffix}
+			up, err := New(cfg)
+			require.NoError(t, err)
+
+			err = up.Refresh()
+			var httpErr *metadata.ErrDownloadHTTP
+			require.ErrorAs(t, err, &httpErr)
+			assert.Equal(t, http.StatusInternalServerError, httpErr.StatusCode)
+			assert.True(t, strings.HasSuffix(httpErr.URL, tc.suffix), "failed URL: %s", httpErr.URL)
+			after, err := os.ReadFile(cachedPath)
+			require.NoError(t, err)
+			assert.Equal(t, before, after, "cached %s.json changed", tc.kept)
+		})
+	}
 }
