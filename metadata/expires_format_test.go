@@ -1,4 +1,4 @@
-// Copyright 2024 The Update Framework Authors
+// Copyright 2026 The Update Framework Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // expiresFromJSON pulls the raw "expires" string out of marshaled metadata so
@@ -35,7 +36,7 @@ func expiresFromJSON(t *testing.T, data []byte) string {
 			Expires string `json:"expires"`
 		} `json:"signed"`
 	}
-	assert.NoError(t, json.Unmarshal(data, &outer))
+	require.NoError(t, json.Unmarshal(data, &outer))
 	return outer.Signed.Expires
 }
 
@@ -47,28 +48,31 @@ func TestConstructorsTruncateExpiresToSeconds(t *testing.T) {
 	expires := time.Date(2030, 1, 1, 0, 0, 0, 100, time.UTC)
 	const want = "2030-01-01T00:00:00Z"
 
-	root, err := Root(expires).MarshalJSON()
-	assert.NoError(t, err)
+	// Passing a slice with "..." must not mutate the caller's slice element.
+	callerSlice := []time.Time{expires}
+	root, err := Root(callerSlice...).ToBytes(false)
+	require.NoError(t, err)
+	assert.Equal(t, expires, callerSlice[0])
 	assert.Equal(t, want, expiresFromJSON(t, root))
 
-	snapshot, err := Snapshot(expires).MarshalJSON()
-	assert.NoError(t, err)
+	snapshot, err := Snapshot(expires).ToBytes(false)
+	require.NoError(t, err)
 	assert.Equal(t, want, expiresFromJSON(t, snapshot))
 
-	targets, err := Targets(expires).MarshalJSON()
-	assert.NoError(t, err)
+	targets, err := Targets(expires).ToBytes(false)
+	require.NoError(t, err)
 	assert.Equal(t, want, expiresFromJSON(t, targets))
 
-	timestamp, err := Timestamp(expires).MarshalJSON()
-	assert.NoError(t, err)
+	timestamp, err := Timestamp(expires).ToBytes(false)
+	require.NoError(t, err)
 	assert.Equal(t, want, expiresFromJSON(t, timestamp))
 }
 
 // A non-UTC expiry is normalized to UTC as well as truncated.
 func TestConstructorsNormalizeExpiresToUTC(t *testing.T) {
 	zone := time.FixedZone("UTC+2", 2*60*60)
-	root, err := Root(time.Date(2030, 1, 1, 2, 0, 0, 500, zone)).MarshalJSON()
-	assert.NoError(t, err)
+	root, err := Root(time.Date(2030, 1, 1, 2, 0, 0, 500, zone)).ToBytes(false)
+	require.NoError(t, err)
 	assert.Equal(t, "2030-01-01T00:00:00Z", expiresFromJSON(t, root))
 }
 
@@ -80,13 +84,11 @@ func TestConstructorsNormalizeExpiresToUTC(t *testing.T) {
 func TestParsedExpiresRoundTripsUnchanged(t *testing.T) {
 	const original = "2030-08-15T14:30:45.0000001Z"
 
-	root := Root()
-	raw := []byte(`{"signatures":[],"signed":{"_type":"root","spec_version":"1.0.31","version":1,` +
-		`"expires":"` + original + `","consistent_snapshot":true,"keys":{},"roles":{}}}`)
-	assert.NoError(t, json.Unmarshal(raw, root))
+	root, err := Root().FromBytes(testRootBytes)
+	require.NoError(t, err)
 
-	out, err := root.MarshalJSON()
-	assert.NoError(t, err)
+	out, err := root.ToBytes(false)
+	require.NoError(t, err)
 	assert.Equal(t, original, expiresFromJSON(t, out),
 		"re-marshaling parsed metadata must not rewrite expires, or signatures over it break")
 }

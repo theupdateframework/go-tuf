@@ -25,7 +25,6 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -34,7 +33,7 @@ import (
 	"io"
 	"math"
 	"os"
-	"path/filepath"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -44,7 +43,8 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 )
 
-// truncateExpires returns t in UTC with sub-second precision removed.
+// resolveExpires returns the first entry of expires (or time.Now().UTC() when
+// omitted), normalized to UTC with sub-second precision removed.
 //
 // The TUF specification defines "expires" as an ISO 8601 / RFC 3339 timestamp
 // in UTC with second precision. encoding/json serializes a time.Time with
@@ -56,17 +56,17 @@ import (
 // were signed, so reformatting there would change those bytes and invalidate
 // signatures over any existing metadata whose expires carries sub-second
 // precision.
-func truncateExpires(t time.Time) time.Time {
+func resolveExpires(expires []time.Time) time.Time {
+	t := time.Now().UTC()
+	if len(expires) > 0 {
+		t = expires[0]
+	}
 	return t.UTC().Truncate(time.Second)
 }
 
 // Root return new metadata instance of type Root
 func Root(expires ...time.Time) *Metadata[RootType] {
-	// expire now if there's nothing set
-	if len(expires) == 0 {
-		expires = []time.Time{time.Now().UTC()}
-	}
-	expires[0] = truncateExpires(expires[0])
+	exp := resolveExpires(expires)
 	// populate Roles
 	roles := map[string]*Role{}
 	for _, r := range []string{ROOT, SNAPSHOT, TARGETS, TIMESTAMP} {
@@ -81,7 +81,7 @@ func Root(expires ...time.Time) *Metadata[RootType] {
 			Type:               ROOT,
 			SpecVersion:        SPECIFICATION_VERSION,
 			Version:            1,
-			Expires:            expires[0],
+			Expires:            exp,
 			Keys:               map[string]*Key{},
 			Roles:              roles,
 			ConsistentSnapshot: true,
@@ -92,18 +92,14 @@ func Root(expires ...time.Time) *Metadata[RootType] {
 
 // Snapshot return new metadata instance of type Snapshot
 func Snapshot(expires ...time.Time) *Metadata[SnapshotType] {
-	// expire now if there's nothing set
-	if len(expires) == 0 {
-		expires = []time.Time{time.Now().UTC()}
-	}
-	expires[0] = truncateExpires(expires[0])
+	exp := resolveExpires(expires)
 	log.Info("Created metadata", "type", SNAPSHOT)
 	return &Metadata[SnapshotType]{
 		Signed: SnapshotType{
 			Type:        SNAPSHOT,
 			SpecVersion: SPECIFICATION_VERSION,
 			Version:     1,
-			Expires:     expires[0],
+			Expires:     exp,
 			Meta: map[string]*MetaFiles{
 				"targets.json": {
 					Version: 1,
@@ -116,18 +112,14 @@ func Snapshot(expires ...time.Time) *Metadata[SnapshotType] {
 
 // Timestamp return new metadata instance of type Timestamp
 func Timestamp(expires ...time.Time) *Metadata[TimestampType] {
-	// expire now if there's nothing set
-	if len(expires) == 0 {
-		expires = []time.Time{time.Now().UTC()}
-	}
-	expires[0] = truncateExpires(expires[0])
+	exp := resolveExpires(expires)
 	log.Info("Created metadata", "type", TIMESTAMP)
 	return &Metadata[TimestampType]{
 		Signed: TimestampType{
 			Type:        TIMESTAMP,
 			SpecVersion: SPECIFICATION_VERSION,
 			Version:     1,
-			Expires:     expires[0],
+			Expires:     exp,
 			Meta: map[string]*MetaFiles{
 				"snapshot.json": {
 					Version: 1,
@@ -140,18 +132,14 @@ func Timestamp(expires ...time.Time) *Metadata[TimestampType] {
 
 // Targets return new metadata instance of type Targets
 func Targets(expires ...time.Time) *Metadata[TargetsType] {
-	// expire now if there's nothing set
-	if len(expires) == 0 {
-		expires = []time.Time{time.Now().UTC()}
-	}
-	expires[0] = truncateExpires(expires[0])
+	exp := resolveExpires(expires)
 	log.Info("Created metadata", "type", TARGETS)
 	return &Metadata[TargetsType]{
 		Signed: TargetsType{
 			Type:        TARGETS,
 			SpecVersion: SPECIFICATION_VERSION,
 			Version:     1,
-			Expires:     expires[0],
+			Expires:     exp,
 			Targets:     map[string]*TargetFiles{},
 		},
 		Signatures: []Signature{},
@@ -225,17 +213,22 @@ func (meta *Metadata[T]) ToFile(name string, pretty bool) error {
 	return os.WriteFile(name, data, 0644)
 }
 
-// Sign create signature over Signed and assign it to Signatures
+// Sign creates a signature over Signed and stores it in Signatures. It
+// replaces any existing signature from the same key, as a key ID must be
+// unique in Signatures. The new signature is verified against the key derived
+// from the signer's public key, and if it does not verify an error is returned
+// and Signatures is left unchanged.
+//
+// Any signature.Signer implementation can be used, so the private key does not
+// have to be available to go-tuf: it can be held in memory, in a KMS, an HSM
+// or a hardware token. The TUF key and its ID are derived from the signer's
+// public key through KeyFromPublicKey, so the signer has to return a public
+// key type supported by it and a signature matching the resulting key scheme.
 func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	// encode the Signed part to canonical JSON so signatures are consistent
 	payload, err := cjson.EncodeCanonical(meta.Signed)
 	if err != nil {
 		return nil, err
-	}
-	// sign the Signed part
-	sb, err := signer.SignMessage(bytes.NewReader(payload))
-	if err != nil {
-		return nil, &ErrUnsignedMetadata{Msg: "problem signing metadata"}
 	}
 	// get the signer's PublicKey
 	publ, err := signer.PublicKey()
@@ -251,16 +244,121 @@ func (meta *Metadata[T]) Sign(signer signature.Signer) (*Signature, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	payloadToSign, err := preparePayload(key, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	// sign the Signed part
+	sb, err := signer.SignMessage(bytes.NewReader(payloadToSign))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", &ErrUnsignedMetadata{Msg: "problem signing metadata"}, err)
+	}
+	// make sure the signature verifies for the key derived above, i.e. the
+	// signer uses the algorithm that the key type and scheme declare
+	publicKey, err := key.ToPublicKey()
+	if err != nil {
+		return nil, err
+	}
+	verified, err := verifySignature(key, publicKey, payload, sb)
+	if err != nil {
+		return nil, err
+	}
+	if !verified {
+		return nil, &ErrUnsignedMetadata{Msg: fmt.Sprintf(
+			"signature created with key ID %s does not verify for keytype %s and scheme %s",
+			keyID, key.Type, key.Scheme)}
+	}
 	// build signature
 	sig := &Signature{
 		KeyID:     keyID,
 		Signature: sb,
 	}
-	// update the Signatures part
-	meta.Signatures = append(meta.Signatures, *sig)
+	// update the Signatures part, replacing any signature from the same key
+	// at its position
+	signatures := make([]Signature, 0, len(meta.Signatures)+1)
+	stored := false
+	for _, existing := range meta.Signatures {
+		if existing.KeyID != keyID {
+			signatures = append(signatures, existing)
+		} else if !stored {
+			signatures = append(signatures, *sig)
+			stored = true
+		}
+	}
+	if !stored {
+		signatures = append(signatures, *sig)
+	}
+	meta.Signatures = signatures
 	// return the new signature
 	log.Info("Signed metadata with key", "ID", keyID)
 	return sig, nil
+}
+
+// verifySignature reports whether sig is a signature by key over payload, the
+// canonical JSON of the signed part. publicKey is the result of
+// key.ToPublicKey(). It returns false and no error if the signature does not
+// verify, and an error if the key cannot be used for verification.
+func verifySignature(key *Key, publicKey crypto.PublicKey, payload, sig []byte) (bool, error) {
+	// use corresponding hash function for key type
+	hashFunc := crypto.Hash(0)
+	if key.Type != KeyTypeEd25519 && key.Type != KeyTypeMLDSA {
+		switch key.Scheme {
+		case KeySchemeECDSA_SHA2_P256:
+			hashFunc = crypto.SHA256
+		case KeySchemeECDSA_SHA2_P384:
+			hashFunc = crypto.SHA384
+		default:
+			hashFunc = crypto.SHA256
+		}
+	}
+	// load a verifier based on that key
+	// handle RSA PSS scheme separately as the LoadVerifier function doesn't identify it correctly
+	// Note we should support RSA PSS, not RSA PKCS1v15 (which is what LoadVerifier would return)
+	// Reference: https://theupdateframework.github.io/specification/latest/#file-formats-keys
+	var verifier signature.Verifier
+	var err error
+	if key.Type == KeyTypeRSASSA_PSS_SHA256 {
+		// Load a verifier for rsa
+		publicKeyRSAPSS, ok := publicKey.(*rsa.PublicKey)
+		if !ok {
+			return false, &ErrType{Msg: "failed to convert public key to RSA PSS key"}
+		}
+		verifier, err = signature.LoadRSAPSSVerifier(publicKeyRSAPSS, hashFunc, &rsa.PSSOptions{Hash: crypto.SHA256})
+	} else {
+		// Load a verifier for ed25519, ecdsa, and ml-dsa
+		verifier, err = signature.LoadVerifier(publicKey, hashFunc)
+	}
+	if err != nil {
+		return false, err
+	}
+
+	payloadToVerify, err := preparePayload(key, payload)
+	if err != nil {
+		return false, err
+	}
+
+	// verify if the signature for that payload corresponds to the given key
+	if err := verifier.VerifySignature(bytes.NewReader(sig), bytes.NewReader(payloadToVerify)); err != nil {
+		return false, nil
+	}
+	return true, nil
+}
+
+// preparePayload returns the payload to sign or verify, applying protocol
+// pre-hashing and domain separation if required by the key type (e.g. TAP 21 for ML-DSA).
+func preparePayload(key *Key, payload []byte) ([]byte, error) {
+	if key.Type != KeyTypeMLDSA {
+		return payload, nil
+	}
+	version, err := extractMLDSAVersion(key.Scheme)
+	if err != nil {
+		return nil, err
+	}
+	h := sha512.Sum512(payload)
+	prefix := []byte{'t', 'u', 'f', version}
+	return append(prefix, h[:]...), nil
 }
 
 // VerifyDelegate verifies that delegatedMetadata is signed with the required
@@ -283,7 +381,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 	// Root delegator
 	case *Metadata[RootType]:
 		keys = i.Signed.Keys
-		if role, ok := (*i).Signed.Roles[delegatedRole]; ok {
+		if role, ok := (*i).Signed.Roles[delegatedRole]; ok && role != nil {
 			roleKeyIDs = role.KeyIDs
 			roleThreshold = role.Threshold
 		} else {
@@ -355,53 +453,11 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 	// loop through each role keyID
 	for _, keyID := range roleKeyIDs {
 		key, ok := keys[keyID]
-		if !ok {
+		if !ok || key == nil {
 			return &ErrValue{Msg: fmt.Sprintf("key with ID %s not found in %s keyids", keyID, delegatedRole)}
 		}
-		sign := Signature{}
-		publicKey, err := key.ToPublicKey()
-		if err != nil {
-			return err
-		}
-		pubBytes, err := x509.MarshalPKIXPublicKey(publicKey)
-		if err != nil {
-			return err
-		}
-		pubFingerprint := sha256.Sum256(pubBytes)
-		fingerprint := hex.EncodeToString(pubFingerprint[:])
-		// use corresponding hash function for key type
-		hash := crypto.Hash(0)
-		if key.Type != KeyTypeEd25519 {
-			switch key.Scheme {
-			case KeySchemeECDSA_SHA2_P256:
-				hash = crypto.SHA256
-			case KeySchemeECDSA_SHA2_P384:
-				hash = crypto.SHA384
-			default:
-				hash = crypto.SHA256
-			}
-		}
-		// load a verifier based on that key
-		// handle RSA PSS scheme separately as the LoadVerifier function doesn't identify it correctly
-		// Note we should support RSA PSS, not RSA PKCS1v15 (which is what LoadVerifier would return)
-		// Reference: https://theupdateframework.github.io/specification/latest/#file-formats-keys
-		var verifier signature.Verifier
-		if key.Type == KeyTypeRSASSA_PSS_SHA256 {
-			// Load a verifier for rsa
-			publicKeyRSAPSS, ok := publicKey.(*rsa.PublicKey)
-			if !ok {
-				return &ErrType{Msg: "failed to convert public key to RSA PSS key"}
-			}
-			verifier, err = signature.LoadRSAPSSVerifier(publicKeyRSAPSS, hash, &rsa.PSSOptions{Hash: crypto.SHA256})
-		} else {
-			// Load a verifier for ed25519 and ecdsa
-			verifier, err = signature.LoadVerifier(publicKey, hash)
-		}
-		if err != nil {
-			return err
-		}
-		// collect the signature for that key and build the payload we'll verify
-		// based on the Signed part of the delegated metadata
+
+		var sign Signature
 		for _, signature := range allSignatures {
 			if signature.KeyID == keyID {
 				sign = signature
@@ -411,8 +467,26 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			log.Info("Signature not found for key ID", "role", delegatedRole, "ID", keyID)
 			continue
 		}
+
+		// convert to a PublicKey type
+		publicKey, err := key.ToPublicKey()
+		if err != nil {
+			return err
+		}
+
+		pubBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+		if err != nil {
+			return err
+		}
+		pubFingerprint := sha256.Sum256(pubBytes)
+		fingerprint := hex.EncodeToString(pubFingerprint[:])
+
 		// verify if the signature for that payload corresponds to the given key
-		if err := verifier.VerifySignature(bytes.NewReader(sign.Signature), bytes.NewReader(payload)); err != nil {
+		verified, err := verifySignature(key, publicKey, payload, sign.Signature)
+		if err != nil {
+			return err
+		}
+		if !verified {
 			// failed to verify the metadata with that key ID
 			log.Info("Failed to verify role with key ID", "role", delegatedRole, "ID", keyID)
 		} else {
@@ -553,22 +627,32 @@ func (meta *Metadata[T]) ClearSignatures() {
 }
 
 // IsDelegatedPath determines whether the given "targetFilepath" is in one of
-// the paths that "DelegatedRole" is trusted to provide
+// the paths that "DelegatedRole" is trusted to provide. An invalid path
+// pattern is reported as an error only if no other pattern matches.
 func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) {
 	if len(role.Paths) > 0 {
 		// standard delegations
+		var firstErr error
 		for _, pathPattern := range role.Paths {
 			//  A delegated role path may be an explicit path or glob
 			//  pattern (Unix shell-style wildcards).
-			if isTargetInPathPattern(targetFilepath, pathPattern) {
+			matched, err := isTargetInPathPattern(targetFilepath, pathPattern)
+			if err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				continue
+			}
+			if matched {
 				return true, nil
 			}
 		}
+		return false, firstErr
 	} else if len(role.PathHashPrefixes) > 0 {
 		// hash bin delegations - calculate the hash of the filepath to determine in which bin to find the target.
 		targetFilepathHash := sha256.Sum256([]byte(targetFilepath))
 		for _, pathHashPrefix := range role.PathHashPrefixes {
-			if strings.HasPrefix(base64.URLEncoding.EncodeToString(targetFilepathHash[:]), pathHashPrefix) {
+			if strings.HasPrefix(hex.EncodeToString(targetFilepathHash[:]), pathHashPrefix) {
 				return true, nil
 			}
 		}
@@ -577,24 +661,32 @@ func (role *DelegatedRole) IsDelegatedPath(targetFilepath string) (bool, error) 
 }
 
 // Determine whether “targetpath“ matches the “pathpattern“.
-func isTargetInPathPattern(targetpath string, pathpattern string) bool {
+func isTargetInPathPattern(targetpath string, pathpattern string) (bool, error) {
 	// We need to make sure that targetpath and pathpattern are pointing to
 	// the same directory as fnmatch doesn't threat "/" as a special symbol.
 	targetParts := strings.Split(targetpath, "/")
 	patternParts := strings.Split(pathpattern, "/")
 	if len(targetParts) != len(patternParts) {
-		return false
+		return false, nil
 	}
 
 	// Every part in the pathpattern could include a glob pattern, that's why
-	// each of the target and pathpattern parts should match.
+	// each of the target and pathpattern parts should match. We use path.Match
+	// (not filepath.Match) so matching is independent of the host OS: TUF target
+	// paths are always "/"-separated and "\" is a glob escape, not a separator.
+	// A malformed pattern surfaces path.ErrBadPattern instead of being silently
+	// treated as a non-match.
 	for i := range targetParts {
-		if ok, _ := filepath.Match(patternParts[i], targetParts[i]); !ok {
-			return false
+		ok, err := path.Match(patternParts[i], targetParts[i])
+		if err != nil {
+			return false, err
+		}
+		if !ok {
+			return false, nil
 		}
 	}
 
-	return true
+	return true, nil
 }
 
 // GetRolesForTarget return the names and terminating status of all
@@ -698,8 +790,11 @@ func (role *SuccinctRoles) IsDelegatedRole(roleName string) bool {
 // role: Name of the role, for which "key" is added.
 func (signed *RootType) AddKey(key *Key, role string) error {
 	// verify role is present
-	if _, ok := signed.Roles[role]; !ok {
+	if signed.Roles[role] == nil {
 		return &ErrValue{Msg: fmt.Sprintf("role %s doesn't exist", role)}
+	}
+	if key == nil {
+		return &ErrValue{Msg: "key must not be nil"}
 	}
 	keyID, err := key.ID()
 	if err != nil {
@@ -719,7 +814,7 @@ func (signed *RootType) AddKey(key *Key, role string) error {
 // role: Name of the role, for which a signing key is removed.
 func (signed *RootType) RevokeKey(keyID, role string) error {
 	// verify role is present
-	if _, ok := signed.Roles[role]; !ok {
+	if signed.Roles[role] == nil {
 		return &ErrValue{Msg: fmt.Sprintf("role %s doesn't exist", role)}
 	}
 	// verify keyID is present for given role
@@ -737,7 +832,7 @@ func (signed *RootType) RevokeKey(keyID, role string) error {
 	signed.Roles[role].KeyIDs = filteredKeyIDs
 	// check if keyID is used by other roles too
 	for _, r := range signed.Roles {
-		if slices.Contains(r.KeyIDs, keyID) {
+		if r != nil && slices.Contains(r.KeyIDs, keyID) {
 			return nil
 		}
 	}
@@ -753,6 +848,12 @@ func (signed *RootType) RevokeKey(keyID, role string) error {
 func (signed *TargetsType) AddKey(key *Key, role string) error {
 	// check if Delegations are even present
 	if signed.Delegations == nil {
+		return &ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
+	}
+	if key == nil {
+		return &ErrValue{Msg: "key must not be nil"}
+	}
+	if signed.Delegations.Roles == nil && signed.Delegations.SuccinctRoles == nil {
 		return &ErrValue{Msg: fmt.Sprintf("delegated role %s doesn't exist", role)}
 	}
 	keyID, err := key.ID()
@@ -909,15 +1010,15 @@ func fromBytes[T Roles](data []byte) (*Metadata[T], error) {
 	meta := &Metadata[T]{}
 	// verify that the type we used to create the object is the same as the type of the metadata file
 	if err := checkType[T](data); err != nil {
-		return nil, err
+		return nil, &ErrDeserialization{Err: err}
 	}
 	// if all is okay, unmarshal meta to the desired Metadata[T] type
 	if err := json.Unmarshal(data, meta); err != nil {
-		return nil, err
+		return nil, &ErrDeserialization{Err: err}
 	}
 	// Make sure signature key IDs are unique
 	if err := checkUniqueSignatures(*meta); err != nil {
-		return nil, err
+		return nil, &ErrDeserialization{Err: err}
 	}
 	return meta, nil
 }

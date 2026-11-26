@@ -45,7 +45,16 @@ type Fetcher interface {
 	DownloadFile(urlPath string, maxLength int64, _ time.Duration) ([]byte, error)
 }
 
-// DefaultFetcher implements Fetcher
+// ContextFetcher is a Fetcher whose downloads can be cancelled. The updater uses
+// DownloadFileContext when the configured Fetcher implements it.
+type ContextFetcher interface {
+	Fetcher
+	// DownloadFileContext is DownloadFile bound to ctx: cancelling ctx aborts the
+	// request and any retries.
+	DownloadFileContext(ctx context.Context, urlPath string, maxLength int64) ([]byte, error)
+}
+
+// DefaultFetcher implements Fetcher and ContextFetcher
 type DefaultFetcher struct {
 	//  httpClient configuration
 	httpUserAgent string
@@ -58,11 +67,24 @@ func (d *DefaultFetcher) SetHTTPUserAgent(httpUserAgent string) {
 	d.httpUserAgent = httpUserAgent
 }
 
-// DownloadFile downloads a file from urlPath, errors out if it failed,
-// its length is larger than maxLength or the timeout is reached.
+// DownloadFile downloads a file from urlPath, errors out if it failed or
+// its length is larger than maxLength. The timeout argument is unused, and with
+// the default HTTP client the request is not bounded in time: use
+// DownloadFileContext to cancel it.
 func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, _ time.Duration) ([]byte, error) {
-	req, err := http.NewRequest("GET", urlPath, nil)
+	return d.DownloadFileContext(context.Background(), urlPath, maxLength)
+}
+
+// DownloadFileContext downloads a file from urlPath like DownloadFile, and aborts the
+// request and any retries when ctx is cancelled.
+func (d *DefaultFetcher) DownloadFileContext(ctx context.Context, urlPath string, maxLength int64) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlPath, nil)
 	if err != nil {
+		return nil, err
+	}
+	// backoff.Retry runs the operation once before it looks at ctx, so a custom
+	// httpClient would otherwise still be called with an already-cancelled context.
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	// Use in case of multiple sessions.
@@ -114,7 +136,7 @@ func (d *DefaultFetcher) DownloadFile(urlPath string, maxLength int64, _ time.Du
 
 		return data, nil
 	}
-	data, err := backoff.Retry(context.Background(), operation, d.retryOptions...)
+	data, err := backoff.Retry(ctx, operation, d.retryOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -140,10 +162,8 @@ func (f *DefaultFetcher) NewFetcherWithHTTPClient(hc httpClient) *DefaultFetcher
 // NewFetcherWithRoundTripper creates a new DefaultFetcher with a custom RoundTripper
 // The function will create a default http.Client and replace the transport with the provided RoundTripper implementation
 func (f *DefaultFetcher) NewFetcherWithRoundTripper(rt http.RoundTripper) *DefaultFetcher {
-	client := http.DefaultClient
-	client.Transport = rt
 	return &DefaultFetcher{
-		client: client,
+		client: &http.Client{Transport: rt},
 	}
 }
 
@@ -156,8 +176,11 @@ func (f *DefaultFetcher) SetTransport(rt http.RoundTripper) error {
 	if !ok {
 		return fmt.Errorf("fetcher is not type fetcher.DefaultFetcher")
 	}
-	hc.Transport = rt
-	f.client = hc
+	// The client may be http.DefaultClient, which is shared with the rest of
+	// the process, so copy it rather than setting the transport in place.
+	client := *hc
+	client.Transport = rt
+	f.client = &client
 	return nil
 }
 
