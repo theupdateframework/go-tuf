@@ -43,12 +43,30 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 )
 
+// resolveExpires returns the first entry of expires (or time.Now().UTC() when
+// omitted), normalized to UTC with sub-second precision removed.
+//
+// The TUF specification defines "expires" as an ISO 8601 / RFC 3339 timestamp
+// in UTC with second precision. encoding/json serializes a time.Time with
+// RFC3339Nano, so a value carrying nanoseconds would be written out as
+// "2030-01-01T00:00:00.0000001Z", which is not spec conformant.
+//
+// This is applied when metadata is constructed rather than during MarshalJSON.
+// Signature verification re-marshals parsed metadata to recover the bytes that
+// were signed, so reformatting there would change those bytes and invalidate
+// signatures over any existing metadata whose expires carries sub-second
+// precision.
+func resolveExpires(expires []time.Time) time.Time {
+	t := time.Now().UTC()
+	if len(expires) > 0 {
+		t = expires[0]
+	}
+	return t.UTC().Truncate(time.Second)
+}
+
 // Root return new metadata instance of type Root
 func Root(expires ...time.Time) *Metadata[RootType] {
-	// expire now if there's nothing set
-	if len(expires) == 0 {
-		expires = []time.Time{time.Now().UTC()}
-	}
+	exp := resolveExpires(expires)
 	// populate Roles
 	roles := map[string]*Role{}
 	for _, r := range []string{ROOT, SNAPSHOT, TARGETS, TIMESTAMP} {
@@ -63,7 +81,7 @@ func Root(expires ...time.Time) *Metadata[RootType] {
 			Type:               ROOT,
 			SpecVersion:        SPECIFICATION_VERSION,
 			Version:            1,
-			Expires:            expires[0],
+			Expires:            exp,
 			Keys:               map[string]*Key{},
 			Roles:              roles,
 			ConsistentSnapshot: true,
@@ -74,17 +92,14 @@ func Root(expires ...time.Time) *Metadata[RootType] {
 
 // Snapshot return new metadata instance of type Snapshot
 func Snapshot(expires ...time.Time) *Metadata[SnapshotType] {
-	// expire now if there's nothing set
-	if len(expires) == 0 {
-		expires = []time.Time{time.Now().UTC()}
-	}
+	exp := resolveExpires(expires)
 	log.Info("Created metadata", "type", SNAPSHOT)
 	return &Metadata[SnapshotType]{
 		Signed: SnapshotType{
 			Type:        SNAPSHOT,
 			SpecVersion: SPECIFICATION_VERSION,
 			Version:     1,
-			Expires:     expires[0],
+			Expires:     exp,
 			Meta: map[string]*MetaFiles{
 				"targets.json": {
 					Version: 1,
@@ -97,17 +112,14 @@ func Snapshot(expires ...time.Time) *Metadata[SnapshotType] {
 
 // Timestamp return new metadata instance of type Timestamp
 func Timestamp(expires ...time.Time) *Metadata[TimestampType] {
-	// expire now if there's nothing set
-	if len(expires) == 0 {
-		expires = []time.Time{time.Now().UTC()}
-	}
+	exp := resolveExpires(expires)
 	log.Info("Created metadata", "type", TIMESTAMP)
 	return &Metadata[TimestampType]{
 		Signed: TimestampType{
 			Type:        TIMESTAMP,
 			SpecVersion: SPECIFICATION_VERSION,
 			Version:     1,
-			Expires:     expires[0],
+			Expires:     exp,
 			Meta: map[string]*MetaFiles{
 				"snapshot.json": {
 					Version: 1,
@@ -120,17 +132,14 @@ func Timestamp(expires ...time.Time) *Metadata[TimestampType] {
 
 // Targets return new metadata instance of type Targets
 func Targets(expires ...time.Time) *Metadata[TargetsType] {
-	// expire now if there's nothing set
-	if len(expires) == 0 {
-		expires = []time.Time{time.Now().UTC()}
-	}
+	exp := resolveExpires(expires)
 	log.Info("Created metadata", "type", TARGETS)
 	return &Metadata[TargetsType]{
 		Signed: TargetsType{
 			Type:        TARGETS,
 			SpecVersion: SPECIFICATION_VERSION,
 			Version:     1,
-			Expires:     expires[0],
+			Expires:     exp,
 			Targets:     map[string]*TargetFiles{},
 		},
 		Signatures: []Signature{},
