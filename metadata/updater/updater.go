@@ -18,6 +18,7 @@
 package updater
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -34,6 +35,7 @@ import (
 
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"github.com/theupdateframework/go-tuf/v2/metadata/config"
+	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 	"github.com/theupdateframework/go-tuf/v2/metadata/trustedmetadata"
 )
 
@@ -135,28 +137,42 @@ func New(config *config.UpdaterConfig) (*Updater, error) {
 // the cached files on disk are used. If the cached data is not complete,
 // this call will fail.
 func (update *Updater) Refresh() error {
+	return update.RefreshContext(context.Background())
+}
+
+// RefreshContext is Refresh with a context: cancelling ctx aborts the refresh, including
+// an in-flight download when the Fetcher implements fetcher.ContextFetcher (DefaultFetcher does).
+// A nil or already-done ctx returns an error before any work, in local mode too.
+//
+// The trusted metadata only moves forward, so a refresh that fails or is cancelled
+// part-way (for example after timestamp and snapshot are loaded) may leave the Updater
+// unable to refresh again; construct a new Updater to retry. Refresh behaves the same.
+func (update *Updater) RefreshContext(ctx context.Context) error {
+	if err := checkContext(ctx); err != nil {
+		return err
+	}
 	if update.cfg.UnsafeLocalMode {
 		return update.unsafeLocalRefresh()
 	}
-	return update.onlineRefresh()
+	return update.onlineRefresh(ctx)
 }
 
 // onlineRefresh implements the TUF client workflow as described for
 // the Refresh function.
-func (update *Updater) onlineRefresh() error {
-	err := update.loadRoot()
+func (update *Updater) onlineRefresh(ctx context.Context) error {
+	err := update.loadRoot(ctx)
 	if err != nil {
 		return err
 	}
-	err = update.loadTimestamp()
+	err = update.loadTimestamp(ctx)
 	if err != nil {
 		return err
 	}
-	err = update.loadSnapshot()
+	err = update.loadSnapshot(ctx)
 	if err != nil {
 		return err
 	}
-	_, err = update.loadTargets(metadata.TARGETS, metadata.ROOT)
+	_, err = update.loadTargets(ctx, metadata.TARGETS, metadata.ROOT)
 	if err != nil {
 		return err
 	}
@@ -215,18 +231,38 @@ func (update *Updater) unsafeLocalRefresh() error {
 // As a side-effect this method downloads all the additional (delegated
 // targets) metadata it needs to return the target information.
 func (update *Updater) GetTargetInfo(targetPath string) (*metadata.TargetFiles, error) {
+	return update.GetTargetInfoContext(context.Background(), targetPath)
+}
+
+// GetTargetInfoContext is GetTargetInfo with a context (see RefreshContext). A nil or
+// already-done ctx returns an error, even when the answer would come from cached metadata.
+// If it runs the implicit refresh and that refresh fails or is cancelled part-way, the
+// Updater may be unable to refresh again; construct a new Updater to retry.
+func (update *Updater) GetTargetInfoContext(ctx context.Context, targetPath string) (*metadata.TargetFiles, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
 	// do a Refresh() in case there's no trusted targets.json yet
 	if update.trusted.Targets[metadata.TARGETS] == nil {
-		err := update.Refresh()
+		err := update.RefreshContext(ctx)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return update.preOrderDepthFirstWalk(targetPath)
+	return update.preOrderDepthFirstWalk(ctx, targetPath)
 }
 
 // DownloadTarget downloads the target file specified by targetFile
 func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath, targetBaseURL string) (string, []byte, error) {
+	return update.DownloadTargetContext(context.Background(), targetFile, filePath, targetBaseURL)
+}
+
+// DownloadTargetContext is DownloadTarget with a context (see RefreshContext). A nil or
+// already-done ctx returns an error before any work.
+func (update *Updater) DownloadTargetContext(ctx context.Context, targetFile *metadata.TargetFiles, filePath, targetBaseURL string) (string, []byte, error) {
+	if err := checkContext(ctx); err != nil {
+		return "", nil, err
+	}
 	log := metadata.GetLogger()
 
 	var err error
@@ -261,7 +297,7 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 		}
 	}
 	fullURL := fmt.Sprintf("%s%s", targetBaseURL, targetRemotePath)
-	data, err := update.cfg.Fetcher.DownloadFile(fullURL, targetFile.Length, 0)
+	data, err := update.download(ctx, fullURL, targetFile.Length)
 	if err != nil {
 		return "", nil, err
 	}
@@ -315,7 +351,7 @@ func (update *Updater) FindCachedTarget(targetFile *metadata.TargetFiles, filePa
 }
 
 // loadTimestamp load local and remote timestamp metadata
-func (update *Updater) loadTimestamp() error {
+func (update *Updater) loadTimestamp(ctx context.Context) error {
 	log := metadata.GetLogger()
 	// try to read local timestamp
 	data, err := update.loadLocalMetadata(filepath.Join(update.cfg.LocalMetadataDir, metadata.TIMESTAMP))
@@ -338,7 +374,7 @@ func (update *Updater) loadTimestamp() error {
 		// all okay, local timestamp exists and it is valid, nevertheless proceed with downloading from remote
 	}
 	// load from remote (whether local load succeeded or not)
-	data, err = update.downloadMetadata(metadata.TIMESTAMP, update.cfg.TimestampMaxLength, "")
+	data, err = update.downloadMetadata(ctx, metadata.TIMESTAMP, update.cfg.TimestampMaxLength, "")
 	if err != nil {
 		return err
 	}
@@ -363,7 +399,7 @@ func (update *Updater) loadTimestamp() error {
 }
 
 // loadSnapshot load local (and if needed remote) snapshot metadata
-func (update *Updater) loadSnapshot() error {
+func (update *Updater) loadSnapshot(ctx context.Context) error {
 	log := metadata.GetLogger()
 	// try to read local snapshot
 	data, err := update.loadLocalMetadata(filepath.Join(update.cfg.LocalMetadataDir, metadata.SNAPSHOT))
@@ -409,7 +445,7 @@ func (update *Updater) loadSnapshot() error {
 		version = strconv.FormatInt(snapshotMeta.Version, 10)
 	}
 	// download snapshot metadata
-	data, err = update.downloadMetadata(metadata.SNAPSHOT, length, version)
+	data, err = update.downloadMetadata(ctx, metadata.SNAPSHOT, length, version)
 	if err != nil {
 		return err
 	}
@@ -471,7 +507,7 @@ func (update *Updater) cachedTargets(roleName, parentName string) (*metadata.Met
 }
 
 // loadTargets load local (and if needed remote) metadata for roleName
-func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metadata[metadata.TargetsType], error) {
+func (update *Updater) loadTargets(ctx context.Context, roleName, parentName string) (*metadata.Metadata[metadata.TargetsType], error) {
 	log := metadata.GetLogger()
 	// avoid loading "roleName" more than once during "GetTargetInfo", as
 	// long as the trusted copy is verified by "parentName"
@@ -524,7 +560,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 		version = strconv.FormatInt(metaInfo.Version, 10)
 	}
 	// download targets metadata
-	data, err = update.downloadMetadata(roleName, length, version)
+	data, err = update.downloadMetadata(ctx, roleName, length, version)
 	if err != nil {
 		return nil, err
 	}
@@ -545,14 +581,14 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 // loadRoot load remote root metadata. Sequentially load and
 // persist on local disk every newer root metadata version
 // available on the remote
-func (update *Updater) loadRoot() error {
+func (update *Updater) loadRoot(ctx context.Context) error {
 	// calculate boundaries
 	lowerBound := update.trusted.Root.Signed.Version + 1
 	upperBound := lowerBound + update.cfg.MaxRootRotations
 
 	// loop until we find the latest available version of root (download -> verify -> load -> persist)
 	for nextVersion := lowerBound; nextVersion < upperBound; nextVersion++ {
-		data, err := update.downloadMetadata(metadata.ROOT, update.cfg.RootMaxLength, strconv.FormatInt(nextVersion, 10))
+		data, err := update.downloadMetadata(ctx, metadata.ROOT, update.cfg.RootMaxLength, strconv.FormatInt(nextVersion, 10))
 		if err != nil {
 			// downloading the root metadata failed for some reason
 			var tmpErr *metadata.ErrDownloadHTTP
@@ -595,7 +631,7 @@ type delegationToVisit struct {
 // preOrderDepthFirstWalk interrogates the tree of target delegations
 // in order of appearance (which implicitly order trustworthiness),
 // and returns the matching target found in the most trusted role.
-func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.TargetFiles, error) {
+func (update *Updater) preOrderDepthFirstWalk(ctx context.Context, targetFilePath string) (*metadata.TargetFiles, error) {
 	log := metadata.GetLogger()
 	// list of delegations to be interrogated. A (role, parent role) pair
 	// is needed to load and verify the delegated targets metadata, and the
@@ -621,7 +657,7 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 		}
 		// the metadata for delegation.Role must be downloaded/updated before
 		// its targets, delegations, and child roles can be inspected
-		targets, err := update.loadTargets(delegation.Role, delegation.Parent)
+		targets, err := update.loadTargets(ctx, delegation.Role, delegation.Parent)
 		if err != nil {
 			return nil, err
 		}
@@ -726,7 +762,7 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 }
 
 // downloadMetadata download a metadata file and return it as bytes
-func (update *Updater) downloadMetadata(roleName string, length int64, version string) ([]byte, error) {
+func (update *Updater) downloadMetadata(ctx context.Context, roleName string, length int64, version string) ([]byte, error) {
 	urlPath := ensureTrailingSlash(update.cfg.RemoteMetadataURL)
 	// build urlPath
 	if version == "" {
@@ -734,7 +770,29 @@ func (update *Updater) downloadMetadata(roleName string, length int64, version s
 	} else {
 		urlPath = fmt.Sprintf("%s%s.%s.json", urlPath, version, url.PathEscape(roleName))
 	}
-	return update.cfg.Fetcher.DownloadFile(urlPath, length, 0)
+	return update.download(ctx, urlPath, length)
+}
+
+// download fetches urlPath with the configured Fetcher. A Fetcher that also implements
+// fetcher.ContextFetcher gets ctx, so cancelling it aborts the download; any other
+// Fetcher is called as before and ctx only takes effect between downloads.
+func (update *Updater) download(ctx context.Context, urlPath string, maxLength int64) ([]byte, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	if cf, ok := update.cfg.Fetcher.(fetcher.ContextFetcher); ok {
+		return cf.DownloadFileContext(ctx, urlPath, maxLength)
+	}
+	return update.cfg.Fetcher.DownloadFile(urlPath, maxLength, 0)
+}
+
+// checkContext rejects a nil ctx with an error rather than a panic, as
+// http.NewRequestWithContext does, and otherwise returns ctx.Err().
+func checkContext(ctx context.Context) error {
+	if ctx == nil {
+		return &metadata.ErrValue{Msg: "nil context"}
+	}
+	return ctx.Err()
 }
 
 // generateTargetFilePath generates path from TargetFiles
