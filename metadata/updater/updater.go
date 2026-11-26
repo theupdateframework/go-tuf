@@ -618,27 +618,41 @@ func (update *Updater) loadRoot(ctx context.Context) error {
 	return nil
 }
 
+// delegationToVisit is a delegated role to interrogate during the
+// pre-order depth-first walk and the delegation path taken to reach it
+type delegationToVisit struct {
+	roleParentTuple
+	// path lists the roles walked through to reach Role, from the
+	// top-level targets role to Parent. It is empty for the top-level
+	// targets role
+	path []string
+}
+
 // preOrderDepthFirstWalk interrogates the tree of target delegations
 // in order of appearance (which implicitly order trustworthiness),
 // and returns the matching target found in the most trusted role.
 func (update *Updater) preOrderDepthFirstWalk(ctx context.Context, targetFilePath string) (*metadata.TargetFiles, error) {
 	log := metadata.GetLogger()
 	// list of delegations to be interrogated. A (role, parent role) pair
-	// is needed to load and verify the delegated targets metadata
-	delegationsToVisit := []roleParentTuple{{
-		Role:   metadata.TARGETS,
-		Parent: metadata.ROOT,
+	// is needed to load and verify the delegated targets metadata, and the
+	// delegation path taken to reach the role is needed to detect cycles
+	delegationsToVisit := []delegationToVisit{{
+		roleParentTuple: roleParentTuple{
+			Role:   metadata.TARGETS,
+			Parent: metadata.ROOT,
+		},
 	}}
-	visitedRoleNames := map[string]bool{}
+	visitedRoles := 0
 	// pre-order depth-first traversal of the graph of target delegations
-	for len(visitedRoleNames) <= update.cfg.MaxDelegations && len(delegationsToVisit) > 0 {
+	for visitedRoles <= update.cfg.MaxDelegations && len(delegationsToVisit) > 0 {
 		// pop the role name from the top of the stack
 		delegation := delegationsToVisit[len(delegationsToVisit)-1]
 		delegationsToVisit = delegationsToVisit[:len(delegationsToVisit)-1]
-		// skip any visited current role to prevent cycles
-		_, ok := visitedRoleNames[delegation.Role]
-		if ok {
-			log.Info("Skipping visited current role", "role", delegation.Role)
+		// skip a role already visited on the delegation path used to reach
+		// it to prevent cycles. A role reached through another delegation
+		// path is visited again and verified by the delegator on that path
+		if slices.Contains(delegation.path, delegation.Role) {
+			log.Info("Skipping role visited on the current delegation path", "role", delegation.Role)
 			continue
 		}
 		// the metadata for delegation.Role must be downloaded/updated before
@@ -652,19 +666,25 @@ func (update *Updater) preOrderDepthFirstWalk(ctx context.Context, targetFilePat
 			log.Info("Found target in current role", "role", delegation.Role)
 			return target, nil
 		}
-		// after pre-order check, add current role to set of visited roles
-		visitedRoleNames[delegation.Role] = true
+		// after pre-order check, count the current role as visited. A role
+		// visited again through another delegation path counts again
+		visitedRoles++
 		if targets.Signed.Delegations != nil {
-			var childRolesToVisit []roleParentTuple
+			var childRolesToVisit []delegationToVisit
 			// note that this may be a slow operation if there are many
 			// delegated roles
 			roles := targets.Signed.Delegations.GetRolesForTarget(targetFilePath)
+			// the delegation path taken to reach the child roles
+			childPath := slices.Concat(delegation.path, []string{delegation.Role})
 			for _, rolesForTarget := range roles {
 				log.Info("Adding child role", "role", rolesForTarget.Name)
-				childRolesToVisit = append(childRolesToVisit, roleParentTuple{Role: rolesForTarget.Name, Parent: delegation.Role})
+				childRolesToVisit = append(childRolesToVisit, delegationToVisit{
+					roleParentTuple: roleParentTuple{Role: rolesForTarget.Name, Parent: delegation.Role},
+					path:            childPath,
+				})
 				if rolesForTarget.Terminating {
 					log.Info("Not backtracking to other roles")
-					delegationsToVisit = []roleParentTuple{}
+					delegationsToVisit = []delegationToVisit{}
 					break
 				}
 			}
@@ -822,9 +842,17 @@ func (update *Updater) loadLocalMetadata(roleName string) ([]byte, error) {
 	return os.ReadFile(fmt.Sprintf("%s.json", roleName))
 }
 
-// GetTopLevelTargets returns the top-level target files
+// GetTopLevelTargets returns the top-level target files.
+//
+// It returns an empty map if the top-level targets metadata is not loaded,
+// which is the case until Refresh() or GetTargetInfo() has succeeded. It
+// does not load any metadata itself.
 func (update *Updater) GetTopLevelTargets() map[string]*metadata.TargetFiles {
-	return update.trusted.Targets[metadata.TARGETS].Signed.Targets
+	targets := update.trusted.Targets[metadata.TARGETS]
+	if targets == nil {
+		return map[string]*metadata.TargetFiles{}
+	}
+	return targets.Signed.Targets
 }
 
 // GetTrustedMetadataSet returns the trusted metadata set

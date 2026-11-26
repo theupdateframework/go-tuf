@@ -62,6 +62,41 @@ func unmarshalExact(data []byte, v any) error {
 	return json.Unmarshal(data, v)
 }
 
+// checkSignedCommon validates the spec_version and version fields that every
+// top-level metadata type carries.
+func checkSignedCommon(specVersion string, version int64) error {
+	if err := checkSpecVersion(specVersion); err != nil {
+		return err
+	}
+	if version < 1 {
+		return &ErrValue{Msg: fmt.Sprintf("version must be > 0, got %d", version)}
+	}
+	return nil
+}
+
+// checkSpecVersion verifies that specVersion is a version of the TUF
+// specification this package supports. It must be MAJOR.MINOR.PATCH, or the
+// legacy MAJOR.MINOR, with each part made of ASCII digits, and its major
+// version must be the one of SPECIFICATION_VERSION. The minor and patch
+// versions are not compared, since they do not change the metadata format
+// incompatibly.
+func checkSpecVersion(specVersion string) error {
+	parts := strings.SplitN(specVersion, ".", 4)
+	if len(parts) != 2 && len(parts) != 3 {
+		return &ErrValue{Msg: fmt.Sprintf("failed to parse spec_version %q", specVersion)}
+	}
+	for _, part := range parts {
+		if part == "" || strings.Trim(part, "0123456789") != "" {
+			return &ErrValue{Msg: fmt.Sprintf("failed to parse spec_version %q", specVersion)}
+		}
+	}
+	supportedMajor, _, _ := strings.Cut(SPECIFICATION_VERSION, ".")
+	if parts[0] != supportedMajor {
+		return &ErrValue{Msg: fmt.Sprintf("unsupported spec_version %q, expected major version %s", specVersion, supportedMajor)}
+	}
+	return nil
+}
+
 func (signed RootType) MarshalJSON() ([]byte, error) {
 	dict := map[string]any{}
 	if len(signed.UnrecognizedFields) != 0 {
@@ -83,11 +118,21 @@ func (signed *RootType) UnmarshalJSON(data []byte) error {
 	if err := unmarshalExact(data, &s); err != nil {
 		return err
 	}
+	if err := checkSignedCommon(s.SpecVersion, s.Version); err != nil {
+		return err
+	}
 	if err := rejectNilMapValues("keys", s.Keys); err != nil {
 		return err
 	}
 	if err := rejectNilMapValues("roles", s.Roles); err != nil {
 		return err
+	}
+	// Roles other than the top-level ones are allowed, e.g. the optional
+	// mirrors role.
+	for _, name := range TOP_LEVEL_ROLE_NAMES {
+		if s.Roles[name] == nil {
+			return &ErrValue{Msg: fmt.Sprintf("roles is missing required top-level role %q", name)}
+		}
 	}
 	*signed = RootType(s)
 
@@ -125,6 +170,9 @@ func (signed *SnapshotType) UnmarshalJSON(data []byte) error {
 	if err := unmarshalExact(data, &s); err != nil {
 		return err
 	}
+	if err := checkSignedCommon(s.SpecVersion, s.Version); err != nil {
+		return err
+	}
 	if err := rejectNilMapValues("meta", s.Meta); err != nil {
 		return err
 	}
@@ -160,6 +208,9 @@ func (signed *TimestampType) UnmarshalJSON(data []byte) error {
 	type Alias TimestampType
 	var s Alias
 	if err := unmarshalExact(data, &s); err != nil {
+		return err
+	}
+	if err := checkSignedCommon(s.SpecVersion, s.Version); err != nil {
 		return err
 	}
 	if err := rejectNilMapValues("meta", s.Meta); err != nil {
@@ -203,6 +254,9 @@ func (signed *TargetsType) UnmarshalJSON(data []byte) error {
 	type Alias TargetsType
 	var s Alias
 	if err := unmarshalExact(data, &s); err != nil {
+		return err
+	}
+	if err := checkSignedCommon(s.SpecVersion, s.Version); err != nil {
 		return err
 	}
 	if err := rejectNilMapValues("targets", s.Targets); err != nil {
@@ -506,6 +560,13 @@ func (d *Delegations) UnmarshalJSON(data []byte) error {
 	}
 	if err := rejectNilMapValues("delegation keys", a.Keys); err != nil {
 		return err
+	}
+	names := make(map[string]struct{}, len(a.Roles))
+	for _, role := range a.Roles {
+		if _, ok := names[role.Name]; ok {
+			return &ErrValue{Msg: fmt.Sprintf("duplicate delegated role name %q", role.Name)}
+		}
+		names[role.Name] = struct{}{}
 	}
 	*d = Delegations(a)
 
