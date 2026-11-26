@@ -29,7 +29,7 @@ type Roles interface {
 
 // Define version of the TUF specification
 const (
-	SPECIFICATION_VERSION = "1.0.31"
+	SPECIFICATION_VERSION = "1.0.37"
 )
 
 // Define top level role names
@@ -58,7 +58,9 @@ type Signature struct {
 	UnrecognizedFields map[string]any `json:"-"`
 }
 
-// RootType represents the Signed portion of a root metadata
+// RootType represents the Signed portion of a root metadata.
+// When setting Expires directly rather than via a constructor, normalize to
+// whole-second UTC (t.UTC().Truncate(time.Second)) per the TUF specification.
 type RootType struct {
 	Type               string           `json:"_type"`
 	SpecVersion        string           `json:"spec_version"`

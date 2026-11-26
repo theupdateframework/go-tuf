@@ -21,6 +21,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/mldsa"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -125,7 +126,27 @@ func (k *Key) ToPublicKey() (crypto.PublicKey, error) {
 	return nil, fmt.Errorf("unsupported public key type")
 }
 
-// KeyFromPublicKey generate metadata type Key from crypto.PublicKey
+// KeyFromPublicKey generate metadata type Key from crypto.PublicKey.
+// The scheme of an ECDSA key follows its curve: P-256 keys get
+// "ecdsa-sha2-nistp256" and P-384 keys get "ecdsa-sha2-nistp384".
+// ECDSA keys on any other curve are rejected.
+//
+// Earlier releases gave every ECDSA key the "ecdsa-sha2-nistp256" scheme.
+// Metadata they wrote still verifies, but a key that is not on P-256 needs
+// care when it is used again:
+//
+//   - The scheme is part of the key ID, so a P-384 key now has a different
+//     key ID, and Sign writes only the new one. To keep signing with the
+//     key, add the Key returned here to the delegating role and remove the
+//     old entry. Its signatures must use SHA-384.
+//   - P-224 and P-521 keys can no longer be used with Sign. Replace them
+//     with a supported key in the delegating role.
+//   - A new root version must also verify against the root before it, which
+//     lists the key under its old key ID and scheme. If the key is needed
+//     to reach that root's threshold, Sign cannot produce the signature:
+//     sign the canonical JSON of Signed with the key and SHA-256, and
+//     append the result to Signatures under the old key ID. Clients that
+//     trust the earlier root cannot verify the new root without it.
 func KeyFromPublicKey(k crypto.PublicKey) (*Key, error) {
 	key := &Key{}
 	switch k := k.(type) {
@@ -138,8 +159,12 @@ func KeyFromPublicKey(k crypto.PublicKey) (*Key, error) {
 		}
 		key.Value.PublicKey = string(pemKey)
 	case *ecdsa.PublicKey:
+		scheme, err := ecdsaSchemeForCurve(k.Curve)
+		if err != nil {
+			return nil, err
+		}
 		key.Type = KeyTypeECDSA_SHA2_P256
-		key.Scheme = KeySchemeECDSA_SHA2_P256
+		key.Scheme = scheme
 		pemKey, err := cryptoutils.MarshalPublicKeyToPEM(k)
 		if err != nil {
 			return nil, err
@@ -174,6 +199,22 @@ func KeyFromPublicKey(k crypto.PublicKey) (*Key, error) {
 		return nil, fmt.Errorf("unsupported public key type")
 	}
 	return key, nil
+}
+
+// ecdsaSchemeForCurve returns the TUF scheme for an ECDSA key on the given
+// curve. The scheme selects the digest used for verification, so it must
+// match the curve rather than default to P-256.
+func ecdsaSchemeForCurve(curve elliptic.Curve) (string, error) {
+	switch curve {
+	case elliptic.P256():
+		return KeySchemeECDSA_SHA2_P256, nil
+	case elliptic.P384():
+		return KeySchemeECDSA_SHA2_P384, nil
+	case nil:
+		return "", fmt.Errorf("unsupported ecdsa public key: no curve set")
+	default:
+		return "", fmt.Errorf("unsupported ecdsa curve %s: only P-256 and P-384 are supported", curve.Params().Name)
+	}
 }
 
 // ID returns the keyID value for the given Key, or an error if the key

@@ -170,7 +170,7 @@ func main() {
 
 // helperExpireIn returns time offset by years (for the sake of the example)
 func helperExpireIn(years int) time.Time {
-	return time.Now().AddDate(years, 0, 0).UTC()
+	return time.Now().AddDate(years, 0, 0).UTC().Truncate(time.Second)
 }
 
 // helperGetPathForTarget returns local and target paths for target

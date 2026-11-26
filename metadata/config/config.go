@@ -29,17 +29,29 @@ import (
 )
 
 // MetadataStore optionally replaces the default filesystem metadata cache.
-// Implementations must preserve accepted metadata across restarts, atomically
-// persist each document before returning, and return an error for missing roles.
-// They must not treat corruption or I/O failure as an empty trusted repository.
+//
+// Implementations must preserve accepted metadata across restarts, persist each
+// document atomically before returning, and return an error matching
+// fs.ErrNotExist (such as os.ErrNotExist) when a role has not been stored yet.
+// Any other error from Load is treated as a storage failure and aborts the
+// operation rather than treating the cache as empty.
+//
+// The role argument is the raw TUF role name (for example "root", "timestamp",
+// "snapshot", "targets", or an unescaped delegated role name which may contain
+// "/" or ".."). Implementations backed by file paths or hierarchical keys must
+// encode or escape role rather than joining it directly as a relative path.
 type MetadataStore interface {
 	Load(role string) ([]byte, error)
 	Persist(role string, data []byte) error
 }
 
 type UpdaterConfig struct {
-	// MetadataStore takes precedence over the filesystem cache. The caller owns
-	// synchronization and store lifetime. It is independent of target storage.
+	// MetadataStore takes precedence over the filesystem metadata cache when
+	// DisableLocalCache is false. On startup, Updater loads "root" from the
+	// store if present and only falls back to LocalTrustedRoot when Load("root")
+	// returns fs.ErrNotExist, preserving root rotations across restarts. The
+	// caller owns synchronization and store lifetime. Target storage remains
+	// controlled by LocalTargetsDir.
 	MetadataStore MetadataStore
 	// TUF configuration
 	MaxRootRotations   int64

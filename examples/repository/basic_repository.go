@@ -594,7 +594,7 @@ func main() {
 
 // helperExpireIn returns time offset by days
 func helperExpireIn(days int) time.Time {
-	return time.Now().AddDate(0, 0, days).UTC()
+	return time.Now().AddDate(0, 0, days).UTC().Truncate(time.Second)
 }
 
 // helperGetPathForTarget returns local and target paths for target
