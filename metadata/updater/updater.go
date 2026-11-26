@@ -283,14 +283,12 @@ func (update *Updater) DownloadTargetContext(ctx context.Context, targetFile *me
 	consistentSnapshot := update.trusted.Root.Signed.ConsistentSnapshot
 	if consistentSnapshot && update.cfg.PrefixTargetsWithHash {
 		hashPrefix := hex.EncodeToString(targetFile.Hashes[selectTargetHashAlgorithm(targetFile.Hashes)])
-		baseName := filepath.Base(targetFilePath)
-		dirName, ok := strings.CutSuffix(targetFilePath, "/"+baseName)
-		if !ok {
+		if i := strings.LastIndex(targetFilePath, "/"); i < 0 {
 			// <hash>.<target-name>
-			targetRemotePath = fmt.Sprintf("%s.%s", hashPrefix, baseName)
+			targetRemotePath = fmt.Sprintf("%s.%s", hashPrefix, targetFilePath)
 		} else {
 			// <dir-prefix>/<hash>.<target-name>
-			targetRemotePath = fmt.Sprintf("%s/%s.%s", dirName, hashPrefix, baseName)
+			targetRemotePath = fmt.Sprintf("%s/%s.%s", targetFilePath[:i], hashPrefix, targetFilePath[i+1:])
 		}
 	}
 	fullURL := fmt.Sprintf("%s%s", targetBaseURL, targetRemotePath)
