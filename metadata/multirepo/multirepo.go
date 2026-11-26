@@ -21,7 +21,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -31,9 +33,27 @@ import (
 	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
 
-// ErrInvalidRepoName is returned when a repository name contains path traversal
-// components or is otherwise invalid for use as a directory name.
-var ErrInvalidRepoName = errors.New("invalid repository name")
+var (
+	// ErrNoMapFile is returned when no map file is provided
+	ErrNoMapFile = errors.New("no map file provided")
+	// ErrNoTrustedRoots is returned when no trusted root metadata is provided
+	ErrNoTrustedRoots = errors.New("no trusted root metadata provided")
+	// ErrInvalidRepoName is returned when a repository name contains path traversal
+	// components or is otherwise invalid for use as a directory name.
+	ErrInvalidRepoName = errors.New("invalid repository name")
+)
+
+// ErrMissingRepoURL is returned when a repository listed in the map file has no
+// usable URL, i.e. an empty URL list or an empty first URL.
+var ErrMissingRepoURL = errors.New("repository has no URL configured")
+
+// ErrUnknownMappingRepo is returned when a mapping in the map file references a
+// repository that is not declared in the top-level repositories object.
+var ErrUnknownMappingRepo = errors.New("mapping references an unknown repository")
+
+// ErrMissingTrustedRoot is returned when a repository listed in the map file
+// has no corresponding trusted root metadata provided.
+var ErrMissingTrustedRoot = errors.New("no trusted root metadata provided for repository")
 
 // validRepoNamePattern defines the allowed characters for repository names.
 // Names must start with an alphanumeric character and may contain alphanumeric
@@ -82,24 +102,41 @@ type targetMatch struct {
 
 // NewConfig returns configuration for a multi-repo TUF client
 func NewConfig(repoMap []byte, roots map[string][]byte) (*MultiRepoConfig, error) {
-	// error if we don't have the necessary arguments
-	if len(repoMap) == 0 || len(roots) == 0 {
-		return nil, fmt.Errorf("failed to create multi-repository config: no map file and/or trusted root metadata is provided")
+	// error if we don't have the necessary arguments. Wrap only the
+	// sentinel that actually corresponds to the missing input so callers
+	// can use errors.Is(err, ErrNoMapFile) or errors.Is(err, ErrNoTrustedRoots)
+	// to discriminate.
+	switch {
+	case len(repoMap) == 0 && len(roots) == 0:
+		return nil, fmt.Errorf("failed to create multi-repository config: %w and %w", ErrNoMapFile, ErrNoTrustedRoots)
+	case len(repoMap) == 0:
+		return nil, fmt.Errorf("failed to create multi-repository config: %w", ErrNoMapFile)
+	case len(roots) == 0:
+		return nil, fmt.Errorf("failed to create multi-repository config: %w", ErrNoTrustedRoots)
 	}
 
 	// unmarshal the map file (note: should we expect/support unrecognized values here?)
 	var mapFile *MultiRepoMapType
 	if err := json.Unmarshal(repoMap, &mapFile); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal map file: %w", err)
+	}
+	if mapFile == nil {
+		return nil, errors.New("map file is null")
 	}
 
-	// make sure we have enough trusted root metadata files provided based on the repository list
+	// make sure we have enough trusted root metadata files provided
+	// based on the repository list
 	for repo := range mapFile.Repositories {
-		// check if we have a trusted root metadata for this repository
+		// check if we have a trusted root metadata for this
+		// repository
 		_, ok := roots[repo]
 		if !ok {
-			return nil, fmt.Errorf("no trusted root metadata provided for repository - %s", repo)
+			return nil, fmt.Errorf("%w - %s", ErrMissingTrustedRoot, repo)
 		}
+	}
+
+	if err := validateRepoMap(mapFile); err != nil {
+		return nil, fmt.Errorf("invalid repo map provided: %w", err)
 	}
 
 	return &MultiRepoConfig{
@@ -110,17 +147,21 @@ func NewConfig(repoMap []byte, roots map[string][]byte) (*MultiRepoConfig, error
 
 // New returns a multi-repository TUF client. All repositories described in the provided map file are initialized too
 func New(config *MultiRepoConfig) (*MultiRepoClient, error) {
+	if config == nil {
+		return nil, fmt.Errorf("no multi-repository config provided")
+	}
+
+	// validate the map file before initializing anything, so that a malformed map
+	// file is reported as such instead of surfacing later as an obscure
+	// initialization failure or a panic during target lookup
+	if err := validateRepoMap(config.RepoMap); err != nil {
+		return nil, err
+	}
+
 	// create a multi repo client instance
 	client := &MultiRepoClient{
 		Config:     config,
 		TUFClients: map[string]*updater.Updater{},
-	}
-
-	// validate repository names before using them as filesystem paths
-	for repoName := range config.RepoMap.Repositories {
-		if err := validateRepoName(repoName); err != nil {
-			return nil, fmt.Errorf("repository %q: %w", repoName, err)
-		}
 	}
 
 	// create TUF clients for each repository listed in the map file
@@ -135,6 +176,8 @@ func (client *MultiRepoClient) initTUFClients() error {
 	log := metadata.GetLogger()
 
 	// loop through each repository listed in the map file and initialize it
+	// note: the map file has already been validated by validateRepoMap, so each
+	// repository is guaranteed to have a usable URL at index 0
 	for repoName, repoURL := range client.Config.RepoMap.Repositories {
 		log.Info("Initializing", "name", repoName, "url", repoURL[0])
 
@@ -185,34 +228,55 @@ func (client *MultiRepoClient) initTUFClients() error {
 	return nil
 }
 
-// Refresh refreshes all repository clients
+// Refresh refreshes all repository clients.
+//
+// A repository that fails to refresh does not stop the remaining repositories
+// from being refreshed: TAP 4 trusts a target once a threshold of repositories
+// agree on it, so one unavailable repository should not take the others down
+// with it. Repositories are refreshed in name order and the error returned
+// joins the error of every repository that failed, each naming its repository.
 func (client *MultiRepoClient) Refresh() error {
 	log := metadata.GetLogger()
 
-	// loop through each initialized TUF client and refresh it
-	for name, repoTUFClient := range client.TUFClients {
+	var errs []error
+	for _, name := range slices.Sorted(maps.Keys(client.TUFClients)) {
 		log.Info("Refreshing", "name", name)
-		err := repoTUFClient.Refresh()
-		if err != nil {
-			return err
+		if err := client.TUFClients[name].Refresh(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to refresh repository %q: %w", name, err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
-// GetTopLevelTargets returns the top-level target files for all repositories
+// GetTopLevelTargets returns the top-level target files for all repositories.
+// Each of them is looked up with the TAP 4 search algorithm, and an error is
+// returned if any of them does not satisfy its mapping.
+//
+// Only the repositories whose top-level targets metadata is loaded take part.
+// A repository that is not refreshed, for example because its refresh failed,
+// lists no targets, does not count towards a threshold and is not contacted.
 func (client *MultiRepoClient) GetTopLevelTargets() (map[string]*metadata.TargetFiles, error) {
 	// collection of all target files for all clients
 	result := map[string]*metadata.TargetFiles{}
+
+	// repositories whose top-level targets metadata is not loaded. They are
+	// determined once, so that the result does not depend on a repository
+	// becoming available while the targets are being collected
+	notLoaded := map[string]bool{}
+	for repoName, tufClient := range client.TUFClients {
+		if tufClient.GetTrustedMetadataSet().Targets[metadata.TARGETS] == nil {
+			notLoaded[repoName] = true
+		}
+	}
 
 	// loop through each repository
 	for _, tufClient := range client.TUFClients {
 		// loop through the top level targets for each repository
 		for targetName := range tufClient.GetTopLevelTargets() {
 			// see if this target should be kept, this goes through the TAP4 search algorithm
-			targetInfo, _, err := client.GetTargetInfo(targetName)
+			targetInfo, _, err := client.searchTargetInfo(targetName, notLoaded)
 			if err != nil {
-				// we skip saving this target since there's no way/policy do download it with this map.json file
+				// there's no way/policy to download this target with this map.json file
 				// possible causes like not enough repositories for that threshold, target info mismatch, etc.
 				return nil, err
 			}
@@ -239,13 +303,22 @@ func (client *MultiRepoClient) GetTopLevelTargets() (map[string]*metadata.Target
 // for targetPath and a list of repositories that serve the matching target.
 // It implements the TAP 4 search algorithm.
 func (client *MultiRepoClient) GetTargetInfo(targetPath string) (*metadata.TargetFiles, []string, error) {
+	return client.searchTargetInfo(targetPath, nil)
+}
+
+// searchTargetInfo implements GetTargetInfo. The repositories in skip are not
+// asked for the target, as if they did not list it.
+func (client *MultiRepoClient) searchTargetInfo(targetPath string, skip map[string]bool) (*metadata.TargetFiles, []string, error) {
 	terminated := false
 	// loop through each mapping
 	for _, eachMap := range client.Config.RepoMap.Mapping {
 		// loop through each path for this mapping
 		for _, pathPattern := range eachMap.Paths {
 			// check if the targetPath matches each path mapping
-			patternMatched, err := filepath.Match(pathPattern, targetPath)
+			// We use path.Match (not filepath.Match) so matching is
+			// independent of the host OS: TAP 4 map.json paths are always
+			// "/"-separated and "\" is a glob escape, not a separator.
+			patternMatched, err := path.Match(pathPattern, targetPath)
 			if err != nil {
 				// error looking for a match
 				return nil, nil, err
@@ -255,6 +328,9 @@ func (client *MultiRepoClient) GetTargetInfo(targetPath string) (*metadata.Targe
 					// and see if we can find a consensus among them to cover the threshold for that mapping
 					var matchedTargetGroups []targetMatch
 					for _, repoName := range eachMap.Repositories {
+						if skip[repoName] {
+							continue
+						}
 						// get target info from that repository
 						newTargetInfo, err := client.TUFClients[repoName].GetTargetInfo(targetPath)
 						if err != nil {
@@ -381,6 +457,50 @@ func (cfg *MultiRepoConfig) EnsurePathsExist() error {
 			return err
 		}
 	}
+	return nil
+}
+
+// validateRepoMap checks that a map file is internally consistent before any
+// repository is initialized. It enforces that every repository name is safe to
+// use as a filesystem path, that every repository has a usable URL, and that
+// every repository referenced by a mapping is actually declared.
+//
+// Validating up front keeps New atomic: it either returns a fully initialized
+// client or fails without having created cache directories for a subset of the
+// repositories. It also makes the reported error deterministic, which map
+// iteration order alone would not guarantee.
+func validateRepoMap(repoMap *MultiRepoMapType) error {
+	if repoMap == nil {
+		return fmt.Errorf("no repository map provided")
+	}
+
+	// sort the repository names so that a map file with more than one problem
+	// always reports the same error rather than a random one
+	for _, repoName := range slices.Sorted(maps.Keys(repoMap.Repositories)) {
+		if err := validateRepoName(repoName); err != nil {
+			return fmt.Errorf("repository %q: %w", repoName, err)
+		}
+
+		// only the first URL is used, as the client supports a single mirror per
+		// repository for the time being
+		if repoURL := repoMap.Repositories[repoName]; len(repoURL) == 0 || repoURL[0] == "" {
+			return fmt.Errorf("repository %q: %w", repoName, ErrMissingRepoURL)
+		}
+	}
+
+	// every repository named in a mapping must have a corresponding TUF client,
+	// otherwise GetTargetInfo would dereference a nil client during target lookup
+	for i, eachMap := range repoMap.Mapping {
+		if eachMap == nil {
+			return fmt.Errorf("mapping at index %d is null", i)
+		}
+		for _, repoName := range eachMap.Repositories {
+			if _, ok := repoMap.Repositories[repoName]; !ok {
+				return fmt.Errorf("mapping at index %d: %w - %s", i, ErrUnknownMappingRepo, repoName)
+			}
+		}
+	}
+
 	return nil
 }
 

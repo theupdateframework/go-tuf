@@ -19,8 +19,140 @@ package multirepo
 
 import (
 	"errors"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/theupdateframework/go-tuf/v2/internal/testutils/simulator"
+	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
+
+func TestNewConfig(t *testing.T) {
+	validMapJSON := []byte(`{
+		"repositories": {
+			"test-repo": ["https://example.com/repo"]
+		},
+		"mapping": []
+	}`)
+
+	tests := []struct {
+		name    string
+		desc    string
+		repoMap []byte
+		roots   map[string][]byte
+		wantErr bool
+	}{
+		{
+			name:    "empty map file returns error",
+			desc:    "Creating config with empty map file should fail",
+			repoMap: []byte(""),
+			roots:   map[string][]byte{},
+			wantErr: true,
+		},
+		{
+			name:    "empty roots returns error",
+			desc:    "Creating config with empty roots should fail",
+			repoMap: validMapJSON,
+			roots:   map[string][]byte{},
+			wantErr: true,
+		},
+		{
+			name:    "valid config succeeds",
+			desc:    "Creating config with valid map and roots should succeed",
+			repoMap: validMapJSON,
+			roots:   map[string][]byte{"test-repo": []byte(`{"signatures":[],"signed":{}}`)},
+			wantErr: false,
+		},
+		{
+			name:    "missing root for repo returns error",
+			desc:    "Creating config with missing root metadata for a repository should fail",
+			repoMap: validMapJSON,
+			roots:   map[string][]byte{"other-repo": []byte(`{"signatures":[],"signed":{}}`)},
+			wantErr: true,
+		},
+		{
+			name:    "invalid JSON map file returns error",
+			desc:    "Creating config with invalid JSON should fail",
+			repoMap: []byte(`{invalid json}`),
+			roots:   map[string][]byte{"test-repo": []byte(`{"signatures":[],"signed":{}}`)},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Logf("Desc: %s", tt.desc)
+
+			cfg, err := NewConfig(tt.repoMap, tt.roots)
+
+			if tt.wantErr {
+				assert.Error(t, err, "expected error but got none")
+				return
+			}
+
+			assert.NoError(t, err, "expected no error but got %v", err)
+			assert.NotNil(t, cfg, "expected config to be non-nil")
+		})
+	}
+}
+
+// TestNewConfigErrorWrapping asserts that NewConfig's input-validation
+// error wraps only the sentinel matching the actually-missing input, so
+// callers can use errors.Is to discriminate.
+func TestNewConfigErrorWrapping(t *testing.T) {
+	validMapJSON := []byte(`{
+		"repositories": {
+			"test-repo": ["https://example.com/repo"]
+		},
+		"mapping": []
+	}`)
+	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
+
+	tests := []struct {
+		name          string
+		repoMap       []byte
+		roots         map[string][]byte
+		shouldWrap    []error
+		shouldNotWrap []error
+	}{
+		{
+			name:          "only map file missing",
+			repoMap:       nil,
+			roots:         map[string][]byte{"test-repo": rootBytes},
+			shouldWrap:    []error{ErrNoMapFile},
+			shouldNotWrap: []error{ErrNoTrustedRoots},
+		},
+		{
+			name:          "only trusted roots missing",
+			repoMap:       validMapJSON,
+			roots:         map[string][]byte{},
+			shouldWrap:    []error{ErrNoTrustedRoots},
+			shouldNotWrap: []error{ErrNoMapFile},
+		},
+		{
+			name:       "both missing",
+			repoMap:    nil,
+			roots:      map[string][]byte{},
+			shouldWrap: []error{ErrNoMapFile, ErrNoTrustedRoots},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewConfig(tt.repoMap, tt.roots)
+			assert.Error(t, err)
+			for _, target := range tt.shouldWrap {
+				assert.ErrorIs(t, err, target, "error should wrap %v", target)
+			}
+			for _, target := range tt.shouldNotWrap {
+				assert.NotErrorIs(t, err, target, "error must not wrap %v", target)
+			}
+		})
+	}
+}
 
 func TestValidateRepoName(t *testing.T) {
 	tests := []struct {
@@ -107,18 +239,403 @@ func TestNewRejectsInvalidRepoNames(t *testing.T) {
 
 			rootBytes := []byte(`{"signatures":[],"signed":{}}`)
 
-			cfg, err := NewConfig(mapJSON, map[string][]byte{tt.repoName: rootBytes})
-			if err != nil {
-				t.Fatalf("NewConfig() unexpected error: %v", err)
-			}
-
-			_, err = New(cfg)
+			_, err := NewConfig(mapJSON, map[string][]byte{tt.repoName: rootBytes})
 			if err == nil {
 				t.Fatalf("New() should reject repository name %q", tt.repoName)
 			}
 
 			if !errors.Is(err, ErrInvalidRepoName) {
 				t.Errorf("New() error should wrap ErrInvalidRepoName, got: %v", err)
+			}
+		})
+	}
+}
+
+func TestNewRejectsRepositoriesWithoutURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		repoURLs string
+	}{
+		{"empty URL list", `[]`},
+		{"null URL list", `null`},
+		{"empty URL string", `[""]`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mapJSON := []byte(`{
+				"repositories": {
+					"my-repo": ` + tt.repoURLs + `
+				},
+				"mapping": []
+			}`)
+
+			rootBytes := []byte(`{"signatures":[],"signed":{}}`)
+
+			_, err := NewConfig(mapJSON, map[string][]byte{"my-repo": rootBytes})
+			if err == nil {
+				t.Fatalf("New() should reject repository with URLs %s", tt.repoURLs)
+			}
+
+			if !errors.Is(err, ErrMissingRepoURL) {
+				t.Errorf("New() error should wrap ErrMissingRepoURL, got: %v", err)
+			}
+		})
+	}
+}
+
+func TestNewRejectsMappingWithUnknownRepository(t *testing.T) {
+	// A mapping that references a repository absent from the top-level
+	// "repositories" object leaves no TUF client for that name, which makes
+	// GetTargetInfo dereference a nil *updater.Updater.
+	mapJSON := []byte(`{
+		"repositories": {
+			"real-repo": ["https://example.com/repo"]
+		},
+		"mapping": [
+			{
+				"paths": ["*"],
+				"repositories": ["typo-repo"],
+				"threshold": 1,
+				"terminating": true
+			}
+		]
+	}`)
+
+	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
+
+	_, err := NewConfig(mapJSON, map[string][]byte{"real-repo": rootBytes})
+	if err == nil {
+		t.Fatal("NewConfig() should reject a mapping referencing an unknown repository")
+	}
+
+	if !errors.Is(err, ErrUnknownMappingRepo) {
+		t.Errorf("NewConfig() error should wrap ErrUnknownMappingRepo, got: %v", err)
+	}
+}
+
+func TestNewRejectsNullMapping(t *testing.T) {
+	// "mapping": [null] unmarshals into a []*Mapping holding a nil element,
+	// which GetTargetInfo would dereference while walking the mappings.
+	mapJSON := []byte(`{
+		"repositories": {
+			"real-repo": ["https://example.com/repo"]
+		},
+		"mapping": [null]
+	}`)
+
+	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
+
+	_, err := NewConfig(mapJSON, map[string][]byte{"real-repo": rootBytes})
+	if err == nil {
+		t.Fatal("NewConfig() should reject a null mapping entry")
+	}
+}
+
+func TestNewRejectsMissingTrustedRoot(t *testing.T) {
+	// every repository listed in the map file must come with a trusted root
+	// metadata file, otherwise its TUF client cannot be bootstrapped
+	mapJSON := []byte(`{
+		"repositories": {
+			"repo-with-root": ["https://example.com/repo"],
+			"repo-without-root": ["https://example.com/other"]
+		},
+		"mapping": [
+			{
+				"paths": ["*"],
+				"repositories": ["repo-with-root"],
+				"threshold": 1,
+				"terminating": true
+			}
+		]
+	}`)
+
+	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
+
+	_, err := NewConfig(mapJSON, map[string][]byte{"repo-with-root": rootBytes})
+	if err == nil {
+		t.Fatal("NewConfig() should reject a repository without trusted root metadata")
+	}
+
+	if !errors.Is(err, ErrMissingTrustedRoot) {
+		t.Errorf("NewConfig() error should wrap ErrMissingTrustedRoot, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "repo-without-root") {
+		t.Errorf("NewConfig() error should name the offending repository, got: %v", err)
+	}
+}
+
+func TestNewRejectsConfigWithoutRepoMap(t *testing.T) {
+	// MultiRepoConfig has exported fields, so callers can build one directly
+	// without going through NewConfig and leave RepoMap unset.
+	_, err := New(&MultiRepoConfig{})
+	if err == nil {
+		t.Fatal("New() should reject a config with no repository map")
+	}
+}
+
+func TestNewRejectsNilConfig(t *testing.T) {
+	// NewConfig returns a nil config alongside its error, so a caller that
+	// ignores the error passes nil straight into New.
+	_, err := New(nil)
+	if err == nil {
+		t.Fatal("New() should reject a nil config")
+	}
+}
+
+// TestEnsurePathsExistTable exercises MultiRepoConfig.EnsurePathsExist
+// directly: it's the one method that has no dependence on the
+// per-repository updater plumbing, so we can hit every branch with a
+// plain config struct.
+func TestEnsurePathsExistTable(t *testing.T) {
+	tests := []struct {
+		name        string
+		buildCfg    func(t *testing.T) *MultiRepoConfig
+		expectError bool
+		errorIs     error
+	}{
+		{
+			name: "creates metadata and targets directories",
+			buildCfg: func(t *testing.T) *MultiRepoConfig {
+				t.Helper()
+				tmp := t.TempDir()
+				return &MultiRepoConfig{
+					LocalMetadataDir: filepath.Join(tmp, "metadata"),
+					LocalTargetsDir:  filepath.Join(tmp, "targets"),
+				}
+			},
+		},
+		{
+			name: "no-op when local cache is disabled",
+			buildCfg: func(t *testing.T) *MultiRepoConfig {
+				t.Helper()
+				return &MultiRepoConfig{
+					DisableLocalCache: true,
+					LocalMetadataDir:  "", // would otherwise fail
+					LocalTargetsDir:   "",
+				}
+			},
+		},
+		{
+			name: "already-existing directories succeed",
+			buildCfg: func(t *testing.T) *MultiRepoConfig {
+				t.Helper()
+				tmp := t.TempDir()
+				md := filepath.Join(tmp, "metadata")
+				td := filepath.Join(tmp, "targets")
+				assert.NoError(t, os.MkdirAll(md, 0700))
+				assert.NoError(t, os.MkdirAll(td, 0700))
+				return &MultiRepoConfig{LocalMetadataDir: md, LocalTargetsDir: td}
+			},
+		},
+		{
+			name: "fails when paths are empty and cache is enabled",
+			buildCfg: func(t *testing.T) *MultiRepoConfig {
+				t.Helper()
+				return &MultiRepoConfig{LocalMetadataDir: "", LocalTargetsDir: ""}
+			},
+			expectError: true,
+			errorIs:     os.ErrNotExist,
+		},
+		{
+			name: "fails when a path collides with an existing file",
+			buildCfg: func(t *testing.T) *MultiRepoConfig {
+				t.Helper()
+				tmp := t.TempDir()
+				file := filepath.Join(tmp, "blocking_file")
+				assert.NoError(t, os.WriteFile(file, []byte("x"), 0600))
+				return &MultiRepoConfig{
+					LocalMetadataDir: file,
+					LocalTargetsDir:  filepath.Join(tmp, "targets"),
+				}
+			},
+			expectError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := tt.buildCfg(t)
+			err := cfg.EnsurePathsExist()
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorIs != nil {
+					assert.ErrorIs(t, err, tt.errorIs)
+				}
+				return
+			}
+			assert.NoError(t, err)
+			if !cfg.DisableLocalCache {
+				assert.DirExists(t, cfg.LocalMetadataDir)
+				assert.DirExists(t, cfg.LocalTargetsDir)
+			}
+		})
+	}
+}
+
+// TestNewFailureCases covers the New() construction error paths that
+// fire before any per-repository updater is created. The happy path
+// requires a working network of TUF repositories and is out of scope
+// for this unit-level test.
+func TestNewFailureCases(t *testing.T) {
+	validMapJSON := []byte(`{
+		"repositories": {
+			"test-repo": ["https://example.com/repo"]
+		},
+		"mapping": []
+	}`)
+	rootBytes := []byte(`{"signatures":[],"signed":{}}`)
+
+	t.Run("invalid root bytes fail updater construction", func(t *testing.T) {
+		cfg, err := NewConfig(validMapJSON, map[string][]byte{"test-repo": rootBytes})
+		assert.NoError(t, err)
+		cfg.LocalMetadataDir = t.TempDir()
+		cfg.LocalTargetsDir = t.TempDir()
+
+		// The root bytes pass NewConfig (which only checks "is the key
+		// present") but fail when updater.New tries to parse them.
+		_, err = New(cfg)
+		assert.ErrorContains(t, err, "failed to create Updater instance")
+	})
+
+	t.Run("empty trusted roots after NewConfig", func(t *testing.T) {
+		cfg, err := NewConfig(validMapJSON, map[string][]byte{"test-repo": rootBytes})
+		assert.NoError(t, err)
+		cfg.LocalMetadataDir = t.TempDir()
+		cfg.LocalTargetsDir = t.TempDir()
+		// Sabotage the trusted-roots map after config construction so
+		// initTUFClients hits the "trusted root missing" branch.
+		cfg.TrustedRoots = map[string][]byte{}
+
+		_, err = New(cfg)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get trusted root metadata from config")
+	})
+}
+
+// newBareMultiRepoClient constructs a MultiRepoClient with the given repo map
+// mapping and no initialized repository clients. GetTargetInfo walks the
+// mappings before it consults TUFClients, so a terminating mapping lets us
+// exercise the path-pattern matching behavior without any TUF repository.
+func newBareMultiRepoClient(mapping []*Mapping) *MultiRepoClient {
+	return &MultiRepoClient{
+		TUFClients: map[string]*updater.Updater{},
+		Config: &MultiRepoConfig{
+			RepoMap: &MultiRepoMapType{
+				Repositories: map[string][]string{"repo": {"https://example.com"}},
+				Mapping:      mapping,
+			},
+		},
+	}
+}
+
+func TestGetTargetInfoInvalidPattern(t *testing.T) {
+	// A malformed glob in a map.json mapping (an unterminated character
+	// class) must surface an error to the caller instead of being silently
+	// treated as a non-match. GetTargetInfo must never claim "target info
+	// not found" for a reason it never checked.
+	client := newBareMultiRepoClient([]*Mapping{
+		{
+			Paths:        []string{"targets/["},
+			Repositories: []string{"repo"},
+			Threshold:    1,
+			Terminating:  true,
+		},
+	})
+	_, _, err := client.GetTargetInfo("targets/foo")
+	if err == nil {
+		t.Fatal("GetTargetInfo() succeeded for a mapping whose path pattern is malformed, want path.ErrBadPattern")
+	}
+	if !errors.Is(err, path.ErrBadPattern) {
+		t.Errorf("GetTargetInfo() error = %v, want it to wrap path.ErrBadPattern", err)
+	}
+}
+
+// TestGetTargetInfoMatchIsOSIndependent verifies that map.json path patterns
+// match "/"-separated target paths the same way on every OS, and that "\" in
+// a pattern is a glob escape rather than a host path separator. Before this
+// fix the multirepo client used filepath.Match, whose separator handling
+// depends on the host OS, so a pattern like "a\/c" or a target name that
+// contains a literal backslash resolved differently on Windows than on
+// POSIX systems, breaking the TAP 4 mapping consensus (see #747).
+func TestGetTargetInfoMatchIsOSIndependent(t *testing.T) {
+	repo := simulator.NewTestRepository(t)
+	defer repo.Cleanup()
+	content := []byte("target content")
+	repo.AddTarget("targets", content, "sigstore-tuf-root/root.json")
+	repo.AddTarget("targets", content, `a/\`)
+	repo.UpdateSnapshot()
+
+	cfg, err := repo.GetUpdaterConfig()
+	require.NoError(t, err)
+	repoUpdater, err := updater.New(cfg)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		pattern string
+		target  string
+		want    bool // whether the TAP 4 search should reach the target
+	}{
+		{
+			name:    "escaped separator in pattern matches a plain target",
+			pattern: `sigstore-tuf-root\/root.json`,
+			target:  "sigstore-tuf-root/root.json",
+			want:    true,
+		},
+		{
+			name:    "wildcard with escaped separator matches",
+			pattern: `*\/*`,
+			target:  "sigstore-tuf-root/root.json",
+			want:    true,
+		},
+		{
+			name:    "literal backslash in target matched by a wildcard",
+			pattern: "a/?",
+			target:  `a/\`,
+			want:    true,
+		},
+		{
+			name:    "control single-segment glob matches same-segment target",
+			pattern: "sigstore-tuf-root/*",
+			target:  "sigstore-tuf-root/root.json",
+			want:    true,
+		},
+		{
+			name:    "single-segment wildcard does not cross slash separator",
+			pattern: "*",
+			target:  "sigstore-tuf-root/root.json",
+			want:    false,
+		},
+		{
+			name:    "control unrelated pattern does not match",
+			pattern: "x/*",
+			target:  "sigstore-tuf-root/root.json",
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &MultiRepoClient{
+				TUFClients: map[string]*updater.Updater{"repo": repoUpdater},
+				Config: &MultiRepoConfig{
+					RepoMap: &MultiRepoMapType{
+						Repositories: map[string][]string{"repo": {"https://example.com"}},
+						Mapping: []*Mapping{
+							{
+								Paths:        []string{tt.pattern},
+								Repositories: []string{"repo"},
+								Threshold:    1,
+								Terminating:  true,
+							},
+						},
+					},
+				},
+			}
+			_, _, err := client.GetTargetInfo(tt.target)
+			gotMatch := err == nil
+			if gotMatch != tt.want {
+				t.Errorf("GetTargetInfo(%q) with pattern %q: err = %v, want match = %v", tt.target, tt.pattern, err, tt.want)
 			}
 		})
 	}
