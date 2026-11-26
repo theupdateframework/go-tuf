@@ -2519,6 +2519,93 @@ func TestMetadataVerifyDelegate(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestVerifyDelegateDuplicateSignatureKeyIDs(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	assert.NoError(t, err)
+	key, err := KeyFromPublicKey(pub)
+	assert.NoError(t, err)
+	keyID, err := key.ID()
+	assert.NoError(t, err)
+	signer, err := signature.LoadSignerVerifier(priv, crypto.Hash(0))
+	assert.NoError(t, err)
+
+	root := Root(fixedExpire)
+	for _, role := range []string{ROOT, SNAPSHOT, TIMESTAMP, TARGETS} {
+		assert.NoError(t, root.Signed.AddKey(key, role))
+	}
+
+	validRootSig, err := root.Sign(signer)
+	assert.NoError(t, err)
+	snapshot := Snapshot(fixedExpire)
+	validSnapshotSig, err := snapshot.Sign(signer)
+	assert.NoError(t, err)
+	timestamp := Timestamp(fixedExpire)
+	validTimestampSig, err := timestamp.Sign(signer)
+	assert.NoError(t, err)
+	targets := Targets(fixedExpire)
+	validTargetsSig, err := targets.Sign(signer)
+	assert.NoError(t, err)
+
+	badSig := Signature{KeyID: keyID, Signature: []byte("invalid")}
+
+	for _, tc := range []struct {
+		name string
+		sigs []Signature
+		want string
+	}{
+		{"identical valid signatures", []Signature{*validTargetsSig, *validTargetsSig}, keyID},
+		{"invalid then valid for same keyID", []Signature{badSig, *validTargetsSig}, keyID},
+		{"valid then invalid for same keyID", []Signature{*validTargetsSig, badSig}, keyID},
+		{"duplicate unrelated keyID", []Signature{*validTargetsSig, {KeyID: "other", Signature: []byte("a")}, {KeyID: "other", Signature: []byte("b")}}, "other"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			targets.Signatures = tc.sigs
+			err := root.VerifyDelegate(TARGETS, targets)
+			assert.ErrorIs(t, err, &ErrValue{})
+			assert.EqualError(t, err, fmt.Sprintf("value error: multiple signatures found for key ID %s", tc.want))
+		})
+	}
+
+	// Verify all four top-level metadata types enforce signature keyID uniqueness.
+	root.Signatures = []Signature{*validRootSig, *validRootSig}
+	assert.ErrorIs(t, root.VerifyDelegate(ROOT, root), &ErrValue{})
+	snapshot.Signatures = []Signature{*validSnapshotSig, *validSnapshotSig}
+	assert.ErrorIs(t, root.VerifyDelegate(SNAPSHOT, snapshot), &ErrValue{})
+	timestamp.Signatures = []Signature{*validTimestampSig, *validTimestampSig}
+	assert.ErrorIs(t, root.VerifyDelegate(TIMESTAMP, timestamp), &ErrValue{})
+}
+
+func TestVerifyDelegateTypedNilMetadata(t *testing.T) {
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	assert.NoError(t, err)
+	key, err := KeyFromPublicKey(pub)
+	assert.NoError(t, err)
+
+	root := Root(fixedExpire)
+	for _, role := range []string{ROOT, SNAPSHOT, TIMESTAMP, TARGETS} {
+		assert.NoError(t, root.Signed.AddKey(key, role))
+	}
+
+	for _, tc := range []struct {
+		role string
+		meta any
+	}{
+		{ROOT, (*Metadata[RootType])(nil)},
+		{SNAPSHOT, (*Metadata[SnapshotType])(nil)},
+		{TIMESTAMP, (*Metadata[TimestampType])(nil)},
+		{TARGETS, (*Metadata[TargetsType])(nil)},
+	} {
+		t.Run(tc.role, func(t *testing.T) {
+			err := root.VerifyDelegate(tc.role, tc.meta)
+			assert.ErrorIs(t, err, &ErrValue{})
+			assert.EqualError(t, err, "value error: delegated metadata must not be nil")
+		})
+	}
+
+	err = root.VerifyDelegate(TARGETS, nil)
+	assert.ErrorIs(t, err, &ErrType{})
+}
+
 func TestRootAddKeyAndRevokeKey(t *testing.T) {
 	root, err := Root().FromFile(filepath.Join(testutils.RepoDir, "root.json"))
 	assert.NoError(t, err)

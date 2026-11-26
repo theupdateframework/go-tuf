@@ -426,26 +426,41 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 			delegatedRole)}
 	}
 
-	var payload []byte
+	var signed any
 	var allSignatures []Signature
-	var err error
 
 	switch d := delegatedMetadata.(type) {
 	case *Metadata[RootType]:
-		payload, err = cjson.EncodeCanonical(d.Signed)
+		if d == nil {
+			return &ErrValue{Msg: "delegated metadata must not be nil"}
+		}
+		signed = d.Signed
 		allSignatures = d.Signatures
 	case *Metadata[SnapshotType]:
-		payload, err = cjson.EncodeCanonical(d.Signed)
+		if d == nil {
+			return &ErrValue{Msg: "delegated metadata must not be nil"}
+		}
+		signed = d.Signed
 		allSignatures = d.Signatures
 	case *Metadata[TimestampType]:
-		payload, err = cjson.EncodeCanonical(d.Signed)
+		if d == nil {
+			return &ErrValue{Msg: "delegated metadata must not be nil"}
+		}
+		signed = d.Signed
 		allSignatures = d.Signatures
 	case *Metadata[TargetsType]:
-		payload, err = cjson.EncodeCanonical(d.Signed)
+		if d == nil {
+			return &ErrValue{Msg: "delegated metadata must not be nil"}
+		}
+		signed = d.Signed
 		allSignatures = d.Signatures
 	default:
 		return &ErrType{Msg: "unknown delegated metadata type"}
 	}
+	if err := checkUniqueSignatures(allSignatures); err != nil {
+		return err
+	}
+	payload, err := cjson.EncodeCanonical(signed)
 	if err != nil {
 		return err
 	}
@@ -461,6 +476,7 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 		for _, signature := range allSignatures {
 			if signature.KeyID == keyID {
 				sign = signature
+				break
 			}
 		}
 		if len(sign.Signature) == 0 {
@@ -1017,20 +1033,20 @@ func fromBytes[T Roles](data []byte) (*Metadata[T], error) {
 		return nil, &ErrDeserialization{Err: err}
 	}
 	// Make sure signature key IDs are unique
-	if err := checkUniqueSignatures(*meta); err != nil {
+	if err := checkUniqueSignatures(meta.Signatures); err != nil {
 		return nil, &ErrDeserialization{Err: err}
 	}
 	return meta, nil
 }
 
-// checkUniqueSignatures verifies if the signature key IDs are unique for that metadata
-func checkUniqueSignatures[T Roles](meta Metadata[T]) error {
-	signatures := []string{}
-	for _, sig := range meta.Signatures {
-		if slices.Contains(signatures, sig.KeyID) {
+// checkUniqueSignatures verifies if the signature key IDs are unique.
+func checkUniqueSignatures(sigs []Signature) error {
+	seen := make(map[string]struct{}, len(sigs))
+	for _, sig := range sigs {
+		if _, ok := seen[sig.KeyID]; ok {
 			return &ErrValue{Msg: fmt.Sprintf("multiple signatures found for key ID %s", sig.KeyID)}
 		}
-		signatures = append(signatures, sig.KeyID)
+		seen[sig.KeyID] = struct{}{}
 	}
 	return nil
 }
