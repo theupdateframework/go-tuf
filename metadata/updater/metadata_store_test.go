@@ -230,6 +230,15 @@ func TestMetadataStoreFailuresFailClosed(t *testing.T) {
 	assert.ErrorIs(t, err, diskErr)
 	delete(store.loadErr, metadata.ROOT)
 
+	// 2b. Empty stored "root" with nil error (e.g. a store returning (nil, nil)
+	// instead of fs.ErrNotExist) fails closed with a clear deserialization error.
+	savedRoot := store.docs[metadata.ROOT]
+	store.docs[metadata.ROOT] = nil
+	_, err = New(cfg)
+	assert.ErrorIs(t, err, &metadata.ErrDeserialization{})
+	assert.ErrorContains(t, err, "stored root metadata is empty")
+	store.docs[metadata.ROOT] = savedRoot
+
 	// 3. Non-ErrNotExist Load failures on timestamp, snapshot, and targets abort
 	// Refresh instead of silently treating cached rollback state as empty.
 	for _, role := range []string{metadata.TIMESTAMP, metadata.SNAPSHOT, metadata.TARGETS} {
@@ -267,4 +276,11 @@ func TestMetadataStoreRespectsDisableLocalCache(t *testing.T) {
 
 	assert.Zero(t, store.reads, "DisableLocalCache must skip MetadataStore.Load")
 	assert.Zero(t, store.writes, "DisableLocalCache must skip MetadataStore.Persist")
+
+	offlineCfg := *cfg
+	offlineCfg.UnsafeLocalMode = true
+	uOffline, err := New(&offlineCfg)
+	require.NoError(t, err)
+	assert.ErrorIs(t, uOffline.Refresh(), os.ErrNotExist)
+	assert.Zero(t, store.reads)
 }

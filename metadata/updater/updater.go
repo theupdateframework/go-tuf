@@ -101,6 +101,9 @@ func New(config *config.UpdaterConfig) (*Updater, error) {
 	if config.MetadataStore != nil && !config.DisableLocalCache {
 		storedRoot, err := config.MetadataStore.Load(metadata.ROOT)
 		if err == nil {
+			if len(storedRoot) == 0 {
+				return nil, &metadata.ErrDeserialization{Err: &metadata.ErrValue{Msg: "stored root metadata is empty"}}
+			}
 			rootBytes = storedRoot
 			persistInitialRoot = false
 		} else if !errors.Is(err, fs.ErrNotExist) {
