@@ -393,6 +393,9 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 		if i.Signed.Delegations == nil {
 			return &ErrValue{Msg: "no delegations found"}
 		}
+		if err := ValidateDelegatedRoleName(delegatedRole); err != nil {
+			return err
+		}
 		keys = i.Signed.Delegations.Keys
 		if i.Signed.Delegations.Roles != nil {
 			found := false
@@ -409,6 +412,9 @@ func (meta *Metadata[T]) VerifyDelegate(delegatedRole string, delegatedMetadata 
 				return &ErrValue{Msg: fmt.Sprintf("no delegation found for %s", delegatedRole)}
 			}
 		} else if i.Signed.Delegations.SuccinctRoles != nil {
+			if !i.Signed.Delegations.SuccinctRoles.IsDelegatedRole(delegatedRole) {
+				return &ErrValue{Msg: fmt.Sprintf("no delegation found for %s", delegatedRole)}
+			}
 			roleKeyIDs = i.Signed.Delegations.SuccinctRoles.KeyIDs
 			roleThreshold = i.Signed.Delegations.SuccinctRoles.Threshold
 		}
@@ -792,12 +798,13 @@ func (role *SuccinctRoles) IsDelegatedRole(roleName string) bool {
 
 	// make sure suffix is hex value and get bin number
 	value, err := strconv.ParseInt(suffix, 16, 64)
-	if err != nil {
+	if err != nil || value < 0 || value >= int64(numberOfBins) {
 		return false
 	}
 
-	// check if the bin we calculated is indeed within the range of what we support
-	return (value >= 0) && (value < int64(numberOfBins))
+	// ParseInt also accepts uppercase hex digits and a leading '+' sign;
+	// only accept the exact canonical lowercase suffix GetRoles produces.
+	return suffix == fmt.Sprintf("%0*x", suffixLen, value)
 }
 
 // AddKey adds new signing key for delegated role "role"
@@ -878,6 +885,9 @@ func (signed *TargetsType) AddKey(key *Key, role string) error {
 	}
 	// standard delegated roles
 	if signed.Delegations.Roles != nil {
+		if err := ValidateDelegatedRoleName(role); err != nil {
+			return err
+		}
 		// loop through all delegated roles
 		isDelegatedRole := false
 		for i, d := range signed.Delegations.Roles {
@@ -1047,6 +1057,21 @@ func checkUniqueSignatures(sigs []Signature) error {
 			return &ErrValue{Msg: fmt.Sprintf("multiple signatures found for key ID %s", sig.KeyID)}
 		}
 		seen[sig.KeyID] = struct{}{}
+	}
+	return nil
+}
+
+// ValidateDelegatedRoleName rejects empty delegated role names and names that
+// match any top-level role name, including case-folded variants that collide
+// in "<role>.json" caches on case-insensitive filesystems.
+func ValidateDelegatedRoleName(name string) error {
+	if name == "" {
+		return &ErrValue{Msg: "delegated role name must not be empty"}
+	}
+	for _, top := range TOP_LEVEL_ROLE_NAMES {
+		if strings.EqualFold(name, top) {
+			return &ErrValue{Msg: fmt.Sprintf("delegated role name %q conflicts with top-level role %q", name, top)}
+		}
 	}
 	return nil
 }

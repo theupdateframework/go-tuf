@@ -620,6 +620,9 @@ func (role *DelegatedRole) UnmarshalJSON(data []byte) error {
 	if err := unmarshalExact(data, &a); err != nil {
 		return err
 	}
+	if err := ValidateDelegatedRoleName(a.Name); err != nil {
+		return err
+	}
 	// make sure we have only one of the two (per spec)
 	if a.Paths != nil && a.PathHashPrefixes != nil {
 		return &ErrValue{Msg: "failed to unmarshal: not allowed to have both \"paths\" and \"path_hash_prefixes\" present"}

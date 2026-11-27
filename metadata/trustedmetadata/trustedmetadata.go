@@ -300,6 +300,13 @@ func (trusted *TrustedMetadata) UpdateDelegatedTargets(targetsData []byte, roleN
 	if !ok {
 		return nil, &metadata.ErrRuntime{Msg: "cannot load targets before delegator"}
 	}
+	if delegatorName == metadata.ROOT {
+		if roleName != metadata.TARGETS {
+			return nil, &metadata.ErrValue{Msg: fmt.Sprintf("expected role %s when delegator is %s, got %q", metadata.TARGETS, metadata.ROOT, roleName)}
+		}
+	} else if err := metadata.ValidateDelegatedRoleName(roleName); err != nil {
+		return nil, err
+	}
 	log.Info("Updating delegated role", "role", roleName, "delegator", delegatorName)
 	// Verify against the hashes in snapshot, if any
 	meta, ok := trusted.Snapshot.Signed.Meta[fmt.Sprintf("%s.json", roleName)]

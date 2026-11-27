@@ -2606,6 +2606,111 @@ func TestVerifyDelegateTypedNilMetadata(t *testing.T) {
 	assert.ErrorIs(t, err, &ErrType{})
 }
 
+func TestDelegatedRoleRejectsEmptyAndTopLevelNames(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	assert.NoError(t, err)
+	key, err := KeyFromPublicKey(pub)
+	assert.NoError(t, err)
+	keyID, err := key.ID()
+	assert.NoError(t, err)
+	signer, err := signature.LoadSignerVerifier(priv, crypto.Hash(0))
+	assert.NoError(t, err)
+
+	delegate := Targets(fixedExpire)
+	_, err = delegate.Sign(signer)
+	assert.NoError(t, err)
+
+	assert.NoError(t, ValidateDelegatedRoleName("team-a"))
+
+	invalidNames := []string{
+		"",
+		"root", "snapshot", "timestamp", "targets",
+		"Root", "SNAPSHOT", "Timestamp", "Targets",
+		"\u017fnapshot", // Unicode Latin small letter long s folds to 's'
+	}
+
+	for _, name := range invalidNames {
+		t.Run("role_"+name, func(t *testing.T) {
+			assert.ErrorIs(t, ValidateDelegatedRoleName(name), &ErrValue{})
+
+			rawJSON := fmt.Sprintf(`{
+				"signatures": [],
+				"signed": {
+					"_type": "targets",
+					"spec_version": %q,
+					"version": 1,
+					"expires": "2030-01-01T00:00:00Z",
+					"targets": {},
+					"delegations": {
+						"keys": {},
+						"roles": [{
+							"name": %q,
+							"keyids": [%q],
+							"threshold": 1,
+							"terminating": false,
+							"paths": ["*"]
+						}]
+					}
+				}
+			}`, SPECIFICATION_VERSION, name, keyID)
+
+			_, err := Targets().FromBytes([]byte(rawJSON))
+			assert.ErrorIs(t, err, &ErrDeserialization{})
+			assert.ErrorIs(t, err, &ErrValue{})
+
+			inMem := Targets(fixedExpire)
+			inMem.Signed.Delegations = &Delegations{
+				Keys: map[string]*Key{keyID: key},
+				Roles: []DelegatedRole{{
+					Name:      name,
+					KeyIDs:    []string{keyID},
+					Threshold: 1,
+					Paths:     []string{"*"},
+				}},
+			}
+			err = inMem.VerifyDelegate(name, delegate)
+			assert.ErrorIs(t, err, &ErrValue{})
+
+			err = inMem.Signed.AddKey(key, name)
+			assert.ErrorIs(t, err, &ErrValue{})
+		})
+	}
+}
+
+func TestVerifyDelegateSuccinctRolesRequiresMatchingBin(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	assert.NoError(t, err)
+	key, err := KeyFromPublicKey(pub)
+	assert.NoError(t, err)
+	keyID, err := key.ID()
+	assert.NoError(t, err)
+	signer, err := signature.LoadSignerVerifier(priv, crypto.Hash(0))
+	assert.NoError(t, err)
+
+	delegator := Targets(fixedExpire)
+	delegator.Signed.Delegations = &Delegations{
+		Keys: map[string]*Key{keyID: key},
+		SuccinctRoles: &SuccinctRoles{
+			KeyIDs:     []string{keyID},
+			Threshold:  1,
+			BitLength:  4,
+			NamePrefix: "bin",
+		},
+	}
+
+	binRole := Targets(fixedExpire)
+	_, err = binRole.Sign(signer)
+	assert.NoError(t, err)
+
+	assert.NoError(t, delegator.VerifyDelegate("bin-0", binRole))
+	assert.NoError(t, delegator.VerifyDelegate("bin-f", binRole))
+
+	for _, bad := range []string{"other-role", "bin-00", "bin-10", "bin-F", "snapshot"} {
+		err := delegator.VerifyDelegate(bad, binRole)
+		assert.ErrorIs(t, err, &ErrValue{}, "expected error for role %q", bad)
+	}
+}
+
 func TestRootAddKeyAndRevokeKey(t *testing.T) {
 	root, err := Root().FromFile(filepath.Join(testutils.RepoDir, "root.json"))
 	assert.NoError(t, err)
@@ -3428,7 +3533,7 @@ func TestDelegationsRejectDuplicateRoleNames(t *testing.T) {
 		{name: "differ by whitespace", roles: []string{"dup", "dup "}},
 		{name: "adjacent", roles: []string{"dup", "dup"}, wantErr: `duplicate delegated role name "dup"`},
 		{name: "not adjacent", roles: []string{"dup", "a", "b", "dup"}, wantErr: `duplicate delegated role name "dup"`},
-		{name: "empty names", roles: []string{"", ""}, wantErr: `duplicate delegated role name ""`},
+		{name: "empty names", roles: []string{"", ""}, wantErr: `delegated role name must not be empty`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

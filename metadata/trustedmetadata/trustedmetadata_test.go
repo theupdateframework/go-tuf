@@ -969,3 +969,18 @@ func TestUpdateTargetsTable(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateDelegatedTargetsRejectsReservedRoleNames(t *testing.T) {
+	ts := newTrustedSetT(t)
+	require.NoError(t, updateAllBesidesTargets(ts, allRoles[metadata.TIMESTAMP], allRoles[metadata.SNAPSHOT]))
+	_, err := ts.UpdateTargets(allRoles[metadata.TARGETS])
+	require.NoError(t, err)
+
+	_, err = ts.UpdateDelegatedTargets(allRoles[metadata.TARGETS], "role1", metadata.ROOT)
+	assert.ErrorIs(t, err, &metadata.ErrValue{})
+
+	for _, reserved := range []string{"", "root", "snapshot", "timestamp", "targets", "Root", "Snapshot", "Timestamp", "Targets"} {
+		_, err := ts.UpdateDelegatedTargets(allRoles["role1"], reserved, metadata.TARGETS)
+		assert.ErrorIs(t, err, &metadata.ErrValue{}, "expected ErrValue for reserved role %q", reserved)
+	}
+}

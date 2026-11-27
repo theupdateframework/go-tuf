@@ -540,6 +540,13 @@ func (update *Updater) cachedTargets(roleName, parentName string) (*metadata.Met
 // loadTargets load local (and if needed remote) metadata for roleName
 func (update *Updater) loadTargets(ctx context.Context, roleName, parentName string) (*metadata.Metadata[metadata.TargetsType], error) {
 	log := metadata.GetLogger()
+	if parentName == metadata.ROOT {
+		if roleName != metadata.TARGETS {
+			return nil, &metadata.ErrValue{Msg: fmt.Sprintf("expected role %s when delegator is %s, got %q", metadata.TARGETS, metadata.ROOT, roleName)}
+		}
+	} else if err := metadata.ValidateDelegatedRoleName(roleName); err != nil {
+		return nil, err
+	}
 	// avoid loading "roleName" more than once during "GetTargetInfo", as
 	// long as the trusted copy is verified by "parentName"
 	role, ok := update.cachedTargets(roleName, parentName)
