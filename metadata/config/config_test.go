@@ -18,6 +18,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"io"
 	"math"
@@ -264,6 +265,33 @@ func TestEnsurePathsExistTable(t *testing.T) {
 			},
 			expectError: false,
 		},
+		{
+			name: "skips metadata dir when MetadataStore is set and LocalTargetsDir is empty",
+			buildConfig: func(t *testing.T) *UpdaterConfig {
+				t.Helper()
+				cfg, err := New("https://example.com", helpers.CreateTestRootJSON(t))
+				assert.NoError(t, err)
+				cfg.MetadataStore = noopMetadataStore{}
+				cfg.LocalMetadataDir = ""
+				cfg.LocalTargetsDir = ""
+				return cfg
+			},
+			expectError: false,
+		},
+		{
+			name: "creates only LocalTargetsDir when MetadataStore is set",
+			buildConfig: func(t *testing.T) *UpdaterConfig {
+				t.Helper()
+				tmp := t.TempDir()
+				cfg, err := New("https://example.com", helpers.CreateTestRootJSON(t))
+				assert.NoError(t, err)
+				cfg.MetadataStore = noopMetadataStore{}
+				cfg.LocalMetadataDir = ""
+				cfg.LocalTargetsDir = filepath.Join(tmp, "targets")
+				return cfg
+			},
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -283,12 +311,21 @@ func TestEnsurePathsExistTable(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			if !cfg.DisableLocalCache {
-				assert.DirExists(t, cfg.LocalMetadataDir)
-				assert.DirExists(t, cfg.LocalTargetsDir)
+				if cfg.MetadataStore == nil {
+					assert.DirExists(t, cfg.LocalMetadataDir)
+					assert.DirExists(t, cfg.LocalTargetsDir)
+				} else if cfg.LocalTargetsDir != "" {
+					assert.DirExists(t, cfg.LocalTargetsDir)
+				}
 			}
 		})
 	}
 }
+
+type noopMetadataStore struct{}
+
+func (noopMetadataStore) Load(context.Context, string) ([]byte, error)  { return nil, os.ErrNotExist }
+func (noopMetadataStore) Persist(context.Context, string, []byte) error { return nil }
 
 // nonDefaultFetcher implements fetcher.Fetcher but is intentionally not a
 // *fetcher.DefaultFetcher, so it triggers the type-assertion failure path

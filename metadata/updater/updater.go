@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"net/http"
 	"net/url"
@@ -92,12 +93,39 @@ type roleParentCopies struct {
 
 // New creates a new Updater instance and loads trusted root metadata
 func New(config *config.UpdaterConfig) (*Updater, error) {
-	// make sure the trusted root metadata and remote URL were provided
-	if len(config.LocalTrustedRoot) == 0 || len(config.RemoteMetadataURL) == 0 {
+	return NewContext(context.Background(), config)
+}
+
+// NewContext is New with a context: ctx is passed to MetadataStore.Load and
+// MetadataStore.Persist when MetadataStore is configured. A nil or already-done
+// ctx returns an error before any work.
+func NewContext(ctx context.Context, config *config.UpdaterConfig) (*Updater, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	if len(config.RemoteMetadataURL) == 0 {
+		return nil, fmt.Errorf("no initial trusted root metadata or remote URL provided")
+	}
+	rootBytes := config.LocalTrustedRoot
+	persistInitialRoot := true
+	if config.MetadataStore != nil && !config.DisableLocalCache {
+		storedRoot, err := config.MetadataStore.Load(ctx, metadata.ROOT)
+		if err == nil {
+			if len(storedRoot) == 0 {
+				return nil, &metadata.ErrDeserialization{Err: &metadata.ErrValue{Msg: "stored root metadata is empty"}}
+			}
+			rootBytes = storedRoot
+			persistInitialRoot = false
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			return nil, err
+		}
+	}
+	// make sure the trusted root metadata was provided
+	if len(rootBytes) == 0 {
 		return nil, fmt.Errorf("no initial trusted root metadata or remote URL provided")
 	}
 	// create a new trusted metadata instance using the trusted root.json
-	trustedMetadataSet, err := trustedmetadata.New(config.LocalTrustedRoot)
+	trustedMetadataSet, err := trustedmetadata.New(rootBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -112,10 +140,12 @@ func New(config *config.UpdaterConfig) (*Updater, error) {
 	if err != nil {
 		return nil, err
 	}
-	// persist the initial root metadata to the local metadata folder
-	err = updater.persistMetadata(metadata.ROOT, updater.cfg.LocalTrustedRoot)
-	if err != nil {
-		return nil, err
+	if persistInitialRoot {
+		// persist the initial root metadata to the local metadata folder
+		err = updater.persistMetadata(ctx, metadata.ROOT, rootBytes)
+		if err != nil {
+			return nil, err
+		}
 	}
 	// all okay, return the updater instance
 	return updater, nil
@@ -152,7 +182,7 @@ func (update *Updater) RefreshContext(ctx context.Context) error {
 		return err
 	}
 	if update.cfg.UnsafeLocalMode {
-		return update.unsafeLocalRefresh()
+		return update.unsafeLocalRefresh(ctx)
 	}
 	return update.onlineRefresh(ctx)
 }
@@ -184,10 +214,10 @@ func (update *Updater) onlineRefresh(ctx context.Context) error {
 // TUF specification section 5.3 to 5.7 (update phases).
 // The metadata on disk are verified against the provided root though,
 // and expiration dates are verified.
-func (update *Updater) unsafeLocalRefresh() error {
+func (update *Updater) unsafeLocalRefresh(ctx context.Context) error {
 	// Root is already loaded
 	// load timestamp
-	data, err := update.loadLocalMetadata(metadata.TIMESTAMP)
+	data, err := update.loadLocalMetadata(ctx, metadata.TIMESTAMP)
 	if err != nil {
 		return err
 	}
@@ -197,7 +227,7 @@ func (update *Updater) unsafeLocalRefresh() error {
 	}
 
 	// load snapshot
-	data, err = update.loadLocalMetadata(metadata.SNAPSHOT)
+	data, err = update.loadLocalMetadata(ctx, metadata.SNAPSHOT)
 	if err != nil {
 		return err
 	}
@@ -207,7 +237,7 @@ func (update *Updater) unsafeLocalRefresh() error {
 	}
 
 	// targets
-	data, err = update.loadLocalMetadata(metadata.TARGETS)
+	data, err = update.loadLocalMetadata(ctx, metadata.TARGETS)
 	if err != nil {
 		return err
 	}
@@ -349,8 +379,11 @@ func (update *Updater) FindCachedTarget(targetFile *metadata.TargetFiles, filePa
 func (update *Updater) loadTimestamp(ctx context.Context) error {
 	log := metadata.GetLogger()
 	// try to read local timestamp
-	data, err := update.loadLocalMetadata(metadata.TIMESTAMP)
+	data, ok, err := update.loadCachedMetadata(ctx, metadata.TIMESTAMP)
 	if err != nil {
+		return err
+	}
+	if !ok {
 		// this means there's no existing local timestamp so we should proceed downloading it without the need to UpdateTimestamp
 		log.Info("Local timestamp does not exist")
 	} else {
@@ -386,7 +419,7 @@ func (update *Updater) loadTimestamp(ctx context.Context) error {
 		}
 	}
 	// proceed with persisting the new timestamp
-	err = update.persistMetadata(metadata.TIMESTAMP, data)
+	err = update.persistMetadata(ctx, metadata.TIMESTAMP, data)
 	if err != nil {
 		return err
 	}
@@ -397,8 +430,11 @@ func (update *Updater) loadTimestamp(ctx context.Context) error {
 func (update *Updater) loadSnapshot(ctx context.Context) error {
 	log := metadata.GetLogger()
 	// try to read local snapshot
-	data, err := update.loadLocalMetadata(metadata.SNAPSHOT)
+	data, ok, err := update.loadCachedMetadata(ctx, metadata.SNAPSHOT)
 	if err != nil {
+		return err
+	}
+	if !ok {
 		// this means there's no existing local snapshot so we should proceed downloading it without the need to UpdateSnapshot
 		log.Info("Local snapshot does not exist")
 	} else {
@@ -450,7 +486,7 @@ func (update *Updater) loadSnapshot(ctx context.Context) error {
 		return err
 	}
 	// persist the new snapshot
-	err = update.persistMetadata(metadata.SNAPSHOT, data)
+	err = update.persistMetadata(ctx, metadata.SNAPSHOT, data)
 	if err != nil {
 		return err
 	}
@@ -511,8 +547,11 @@ func (update *Updater) loadTargets(ctx context.Context, roleName, parentName str
 		return role, nil
 	}
 	// try to read local targets
-	data, err := update.loadLocalMetadata(roleName)
+	data, ok, err := update.loadCachedMetadata(ctx, roleName)
 	if err != nil {
+		return nil, err
+	}
+	if !ok {
 		// this means there's no existing local target file so we should proceed downloading it without the need to UpdateDelegatedTargets
 		log.Info("Local role does not exist", "role", roleName)
 	} else {
@@ -566,7 +605,7 @@ func (update *Updater) loadTargets(ctx context.Context, roleName, parentName str
 	}
 	update.markVerified(roleName, parentName)
 	// persist the new target metadata
-	err = update.persistMetadata(roleName, data)
+	err = update.persistMetadata(ctx, roleName, data)
 	if err != nil {
 		return nil, err
 	}
@@ -604,7 +643,7 @@ func (update *Updater) loadRoot(ctx context.Context) error {
 				return err
 			}
 			// persist root metadata to disk
-			err = update.persistMetadata(metadata.ROOT, data)
+			err = update.persistMetadata(ctx, metadata.ROOT, data)
 			if err != nil {
 				return err
 			}
@@ -709,11 +748,17 @@ func (update *Updater) localMetadataPath(roleName string) string {
 }
 
 // persistMetadata writes metadata to disk atomically to avoid data loss
-func (update *Updater) persistMetadata(roleName string, data []byte) error {
+func (update *Updater) persistMetadata(ctx context.Context, roleName string, data []byte) error {
 	log := metadata.GetLogger()
 	// do not persist the metadata if we have disabled local caching
 	if update.cfg.DisableLocalCache {
 		return nil
+	}
+	if update.cfg.MetadataStore != nil {
+		if err := checkContext(ctx); err != nil {
+			return err
+		}
+		return update.cfg.MetadataStore.Persist(ctx, roleName, data)
 	}
 	// caching enabled, proceed with persisting the metadata locally
 	fileName := update.localMetadataPath(roleName)
@@ -841,8 +886,45 @@ func selectTargetHashAlgorithm(hashes metadata.Hashes) string {
 	return slices.Min(slices.Collect(maps.Keys(hashes)))
 }
 
+// loadCachedMetadata reads cached metadata for roleName. A missing cache entry
+// returns (nil, false, nil). When MetadataStore is configured, any error other
+// than fs.ErrNotExist is returned so storage or decryption failures do not
+// silently bypass cached rollback state.
+func (update *Updater) loadCachedMetadata(ctx context.Context, roleName string) ([]byte, bool, error) {
+	if update.cfg.MetadataStore != nil {
+		if update.cfg.DisableLocalCache {
+			return nil, false, nil
+		}
+		if err := checkContext(ctx); err != nil {
+			return nil, false, err
+		}
+		data, err := update.cfg.MetadataStore.Load(ctx, roleName)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil, false, nil
+			}
+			return nil, false, err
+		}
+		return data, true, nil
+	}
+	data, err := update.loadLocalMetadata(ctx, roleName)
+	if err != nil {
+		return nil, false, nil
+	}
+	return data, true, nil
+}
+
 // loadLocalMetadata reads the cached metadata file for roleName
-func (update *Updater) loadLocalMetadata(roleName string) ([]byte, error) {
+func (update *Updater) loadLocalMetadata(ctx context.Context, roleName string) ([]byte, error) {
+	if update.cfg.MetadataStore != nil {
+		if update.cfg.DisableLocalCache {
+			return nil, fs.ErrNotExist
+		}
+		if err := checkContext(ctx); err != nil {
+			return nil, err
+		}
+		return update.cfg.MetadataStore.Load(ctx, roleName)
+	}
 	return os.ReadFile(update.localMetadataPath(roleName))
 }
 
