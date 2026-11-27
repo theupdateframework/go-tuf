@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"maps"
 	"math"
 	"os"
 	"path"
@@ -368,7 +369,10 @@ func (meta *Metadata[T]) VerifyDelegateWithVerifier(delegatedRole string, delega
 			continue
 		}
 
-		verifier, err := newVerifier(key)
+		keyCopy := *key
+		keyCopy.UnrecognizedFields = maps.Clone(key.UnrecognizedFields)
+		keyCopy.Value.UnrecognizedFields = maps.Clone(key.Value.UnrecognizedFields)
+		verifier, err := newVerifier(&keyCopy)
 		if err != nil {
 			log.Info("Failed to construct verifier for key ID", "role", delegatedRole, "ID", keyID, "err", err)
 			verifierErrs = append(verifierErrs, err)
