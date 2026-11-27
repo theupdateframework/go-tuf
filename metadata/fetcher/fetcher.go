@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
@@ -152,10 +153,26 @@ func NewDefaultFetcher() *DefaultFetcher {
 	}
 }
 
+func (f *DefaultFetcher) inheritedHTTPUserAgent() string {
+	if f != nil {
+		return f.httpUserAgent
+	}
+	return ""
+}
+
+func (f *DefaultFetcher) inheritedRetryOptions() []backoff.RetryOption {
+	if f != nil && len(f.retryOptions) > 0 {
+		return slices.Clone(f.retryOptions)
+	}
+	return []backoff.RetryOption{backoff.WithMaxTries(1)}
+}
+
 // NewFetcherWithHTTPClient creates a new DefaultFetcher with a custom httpClient
 func (f *DefaultFetcher) NewFetcherWithHTTPClient(hc httpClient) *DefaultFetcher {
 	return &DefaultFetcher{
-		client: hc,
+		httpUserAgent: f.inheritedHTTPUserAgent(),
+		client:        hc,
+		retryOptions:  f.inheritedRetryOptions(),
 	}
 }
 
@@ -163,7 +180,9 @@ func (f *DefaultFetcher) NewFetcherWithHTTPClient(hc httpClient) *DefaultFetcher
 // The function will create a default http.Client and replace the transport with the provided RoundTripper implementation
 func (f *DefaultFetcher) NewFetcherWithRoundTripper(rt http.RoundTripper) *DefaultFetcher {
 	return &DefaultFetcher{
-		client: &http.Client{Transport: rt},
+		httpUserAgent: f.inheritedHTTPUserAgent(),
+		client:        &http.Client{Transport: rt},
+		retryOptions:  f.inheritedRetryOptions(),
 	}
 }
 
