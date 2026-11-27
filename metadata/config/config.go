@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v5"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
 
@@ -47,6 +48,10 @@ type MetadataStore interface {
 }
 
 type UpdaterConfig struct {
+	// NewVerifier optionally supplies a verifier for each key. Nil uses
+	// metadata.NewVerifier; callers can wrap it to restrict algorithms or
+	// supply another implementation. TUF thresholds remain enforced.
+	NewVerifier func(*metadata.Key) (metadata.Verifier, error)
 	// MetadataStore takes precedence over the filesystem metadata cache when
 	// DisableLocalCache is false. On startup, Updater loads "root" from the
 	// store if present and only falls back to LocalTrustedRoot when Load("root")

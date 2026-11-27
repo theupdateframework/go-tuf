@@ -77,6 +77,9 @@ type MultiRepoMapType struct {
 
 // MultiRepoConfig represents the configuration for a set of trusted TUF clients
 type MultiRepoConfig struct {
+	// NewVerifier optionally supplies a verifier for each key across all
+	// configured repository clients (see config.UpdaterConfig.NewVerifier).
+	NewVerifier       func(*metadata.Key) (metadata.Verifier, error)
 	RepoMap           *MultiRepoMapType
 	TrustedRoots      map[string][]byte
 	LocalMetadataDir  string
@@ -214,6 +217,7 @@ func (client *MultiRepoClient) initTUFClients() error {
 		cfg.LocalMetadataDir = metadataDir
 		cfg.LocalTargetsDir = targetsDir
 		cfg.DisableLocalCache = client.Config.DisableLocalCache // propagate global cache policy
+		cfg.NewVerifier = client.Config.NewVerifier             // propagate verifier policy
 
 		// create a new Updater instance for each repository
 		repoTUFClient, err := updater.New(cfg)

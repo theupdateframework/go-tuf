@@ -82,7 +82,7 @@ type roleParentTuple struct {
 
 // delegator is the trusted metadata of a role that delegates to other roles
 type delegator interface {
-	VerifyDelegate(delegatedRole string, delegatedMetadata any) error
+	VerifyDelegateWithVerifier(delegatedRole string, delegatedMetadata any, newVerifier func(*metadata.Key) (metadata.Verifier, error)) error
 }
 
 // roleParentCopies holds the trusted copies of a role and of its parent
@@ -125,7 +125,7 @@ func NewContext(ctx context.Context, config *config.UpdaterConfig) (*Updater, er
 		return nil, fmt.Errorf("no initial trusted root metadata or remote URL provided")
 	}
 	// create a new trusted metadata instance using the trusted root.json
-	trustedMetadataSet, err := trustedmetadata.New(rootBytes)
+	trustedMetadataSet, err := trustedmetadata.NewWithVerifier(rootBytes, config.NewVerifier)
 	if err != nil {
 		return nil, err
 	}
@@ -529,7 +529,7 @@ func (update *Updater) cachedTargets(roleName, parentName string) (*metadata.Met
 	pair := roleParentTuple{Role: roleName, Parent: parentName}
 	// a replaced role or parent does not match the recorded copies
 	if update.verified[pair] != current {
-		if err := current.parent.VerifyDelegate(roleName, current.role); err != nil {
+		if err := current.parent.VerifyDelegateWithVerifier(roleName, current.role, update.cfg.NewVerifier); err != nil {
 			return nil, false
 		}
 		update.verified[pair] = current
