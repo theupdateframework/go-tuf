@@ -226,7 +226,7 @@ func TestClientProfilePolicyIsPerTrustInstanceAndChecksRootRotation(t *testing.T
 	if err := root.Signed.AddKey(pqKey, metadata.ROOT); err != nil {
 		t.Fatal(err)
 	}
-	data = sign() // old root still authorizes this signature using its own key table
+	_ = sign() // old root still authorizes this signature using its own key table
 	pqID, err := pqKey.ID()
 	if err != nil {
 		t.Fatal(err)
