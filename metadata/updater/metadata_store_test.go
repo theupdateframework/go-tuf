@@ -19,6 +19,7 @@ package updater
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"maps"
 	"os"
@@ -34,11 +35,13 @@ import (
 )
 
 type memoryMetadataStore struct {
-	docs       map[string][]byte
-	loadErr    map[string]error
-	persistErr map[string]error
-	reads      int
-	writes     int
+	docs         map[string][]byte
+	loadErr      map[string]error
+	persistErr   map[string]error
+	lastLoadCtx  context.Context
+	lastWriteCtx context.Context
+	reads        int
+	writes       int
 }
 
 func newMemoryMetadataStore() *memoryMetadataStore {
@@ -49,8 +52,12 @@ func newMemoryMetadataStore() *memoryMetadataStore {
 	}
 }
 
-func (s *memoryMetadataStore) Load(role string) ([]byte, error) {
+func (s *memoryMetadataStore) Load(ctx context.Context, role string) ([]byte, error) {
 	s.reads++
+	s.lastLoadCtx = ctx
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if err, ok := s.loadErr[role]; ok && err != nil {
 		return nil, err
 	}
@@ -61,8 +68,12 @@ func (s *memoryMetadataStore) Load(role string) ([]byte, error) {
 	return bytes.Clone(data), nil
 }
 
-func (s *memoryMetadataStore) Persist(role string, data []byte) error {
+func (s *memoryMetadataStore) Persist(ctx context.Context, role string, data []byte) error {
 	s.writes++
+	s.lastWriteCtx = ctx
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err, ok := s.persistErr[role]; ok && err != nil {
 		return err
 	}
@@ -283,4 +294,64 @@ func TestMetadataStoreRespectsDisableLocalCache(t *testing.T) {
 	require.NoError(t, err)
 	assert.ErrorIs(t, uOffline.Refresh(), os.ErrNotExist)
 	assert.Zero(t, store.reads)
+}
+
+func TestMetadataStoreContextPropagationAndCancellation(t *testing.T) {
+	repo := simulator.NewTestRepository(t)
+	defer repo.Cleanup()
+
+	delegate(repo, metadata.TARGETS, "role1", "*")
+	repo.AddTarget("role1", []byte("hello"), "item.txt")
+	repo.UpdateSnapshot()
+
+	type ctxKey struct{}
+	store := newMemoryMetadataStore()
+	cfg := newStoreConfig(t, repo, store)
+
+	// Nil and already-cancelled contexts fail before calling MetadataStore.
+	//nolint:staticcheck // testing nil context guard explicitly
+	_, err := NewContext(nil, cfg)
+	assert.ErrorIs(t, err, &metadata.ErrValue{})
+
+	cancelledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = NewContext(cancelledCtx, cfg)
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Zero(t, store.reads)
+	assert.Zero(t, store.writes)
+
+	// Caller context flows through NewContext, RefreshContext, GetTargetInfoContext,
+	// and UnsafeLocalMode into MetadataStore.Load and Persist.
+	ctxA := context.WithValue(context.Background(), ctxKey{}, "new-ctx")
+	u, err := NewContext(ctxA, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "new-ctx", store.lastLoadCtx.Value(ctxKey{}))
+	assert.Equal(t, "new-ctx", store.lastWriteCtx.Value(ctxKey{}))
+
+	ctxB := context.WithValue(context.Background(), ctxKey{}, "refresh-ctx")
+	require.NoError(t, u.RefreshContext(ctxB))
+	assert.Equal(t, "refresh-ctx", store.lastLoadCtx.Value(ctxKey{}))
+	assert.Equal(t, "refresh-ctx", store.lastWriteCtx.Value(ctxKey{}))
+
+	ctxC := context.WithValue(context.Background(), ctxKey{}, "target-ctx")
+	info, err := u.GetTargetInfoContext(ctxC, "item.txt")
+	require.NoError(t, err)
+	require.NotNil(t, info)
+	assert.Equal(t, "target-ctx", store.lastLoadCtx.Value(ctxKey{}))
+	assert.Equal(t, "target-ctx", store.lastWriteCtx.Value(ctxKey{}))
+
+	offlineCfg := *cfg
+	offlineCfg.UnsafeLocalMode = true
+	uOffline, err := NewContext(ctxA, &offlineCfg)
+	require.NoError(t, err)
+	ctxD := context.WithValue(context.Background(), ctxKey{}, "offline-ctx")
+	require.NoError(t, uOffline.RefreshContext(ctxD))
+	assert.Equal(t, "offline-ctx", store.lastLoadCtx.Value(ctxKey{}))
+
+	// Cancelled context aborts RefreshContext before reading or writing store.
+	readsBefore := store.reads
+	writesBefore := store.writes
+	assert.ErrorIs(t, uOffline.RefreshContext(cancelledCtx), context.Canceled)
+	assert.Equal(t, readsBefore, store.reads)
+	assert.Equal(t, writesBefore, store.writes)
 }

@@ -18,6 +18,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"io"
 	"math"
@@ -323,8 +324,8 @@ func TestEnsurePathsExistTable(t *testing.T) {
 
 type noopMetadataStore struct{}
 
-func (noopMetadataStore) Load(string) ([]byte, error)  { return nil, os.ErrNotExist }
-func (noopMetadataStore) Persist(string, []byte) error { return nil }
+func (noopMetadataStore) Load(context.Context, string) ([]byte, error)  { return nil, os.ErrNotExist }
+func (noopMetadataStore) Persist(context.Context, string, []byte) error { return nil }
 
 // nonDefaultFetcher implements fetcher.Fetcher but is intentionally not a
 // *fetcher.DefaultFetcher, so it triggers the type-assertion failure path

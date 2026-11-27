@@ -18,6 +18,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -41,8 +42,8 @@ import (
 // "/" or ".."). Implementations backed by file paths or hierarchical keys must
 // encode or escape role rather than joining it directly as a relative path.
 type MetadataStore interface {
-	Load(role string) ([]byte, error)
-	Persist(role string, data []byte) error
+	Load(ctx context.Context, role string) ([]byte, error)
+	Persist(ctx context.Context, role string, data []byte) error
 }
 
 type UpdaterConfig struct {
