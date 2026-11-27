@@ -18,6 +18,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -29,11 +30,35 @@ import (
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
 
+// MetadataStore optionally replaces the default filesystem metadata cache.
+//
+// Implementations must preserve accepted metadata across restarts, persist each
+// document atomically before returning, and return an error matching
+// fs.ErrNotExist (such as os.ErrNotExist) when a role has not been stored yet.
+// Any other error from Load is treated as a storage failure and aborts the
+// operation rather than treating the cache as empty.
+//
+// The role argument is the raw TUF role name (for example "root", "timestamp",
+// "snapshot", "targets", or an unescaped delegated role name which may contain
+// "/" or ".."). Implementations backed by file paths or hierarchical keys must
+// encode or escape role rather than joining it directly as a relative path.
+type MetadataStore interface {
+	Load(ctx context.Context, role string) ([]byte, error)
+	Persist(ctx context.Context, role string, data []byte) error
+}
+
 type UpdaterConfig struct {
 	// NewVerifier optionally supplies a verifier for each key. Nil uses
 	// metadata.NewVerifier; callers can wrap it to restrict algorithms or
 	// supply another implementation. TUF thresholds remain enforced.
 	NewVerifier func(*metadata.Key) (metadata.Verifier, error)
+	// MetadataStore takes precedence over the filesystem metadata cache when
+	// DisableLocalCache is false. On startup, Updater loads "root" from the
+	// store if present and only falls back to LocalTrustedRoot when Load("root")
+	// returns fs.ErrNotExist, preserving root rotations across restarts. The
+	// caller owns synchronization and store lifetime. Target storage remains
+	// controlled by LocalTargetsDir.
+	MetadataStore MetadataStore
 	// TUF configuration
 	MaxRootRotations   int64
 	MaxDelegations     int
@@ -88,7 +113,14 @@ func (cfg *UpdaterConfig) EnsurePathsExist() error {
 		return nil
 	}
 
-	for _, path := range []string{cfg.LocalMetadataDir, cfg.LocalTargetsDir} {
+	paths := []string{cfg.LocalMetadataDir, cfg.LocalTargetsDir}
+	if cfg.MetadataStore != nil {
+		paths = nil
+		if cfg.LocalTargetsDir != "" {
+			paths = append(paths, cfg.LocalTargetsDir)
+		}
+	}
+	for _, path := range paths {
 		// Use 0700 for cache directories: only the owner can read, write, and
 		// access the directory. This prevents other users on shared systems from
 		// reading or writing to the TUF cache, which could be a security risk.

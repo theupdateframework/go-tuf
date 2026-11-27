@@ -22,6 +22,20 @@ The example highlights the following functionality supported by the metadata API
 * writing and reading metadata files
 * root key rotation
 
+## Signing with external keys and key files
+
+----------------------------
+
+The examples above sign with keys generated in memory, but `Metadata.Sign` accepts any
+[`signature.Signer`](https://pkg.go.dev/github.com/sigstore/sigstore/pkg/signature#Signer).
+The following testable examples live next to the `metadata` package, so they are compiled and run with its tests
+(`go test -v -run ExampleMetadata_Sign ./metadata/`):
+
+* [example_external_signer_test.go](../metadata/example_external_signer_test.go) - signs with a key go-tuf has no access to (HSM, YubiKey, TPM, KMS) through a small `crypto.Signer` adapter
+* [example_key_from_file_test.go](../metadata/example_key_from_file_test.go) - loads PEM encoded private and public keys from files and converts them to a signer and to a TUF key
+
+See [Signing and keys](../README.md#signing-and-keys) for the details.
+
 ## Client
 
 ----------------------------

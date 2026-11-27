@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/theupdateframework/go-tuf/v2/internal/testutils/simulator"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
@@ -89,18 +90,17 @@ func TestDownloadTargetHashPrefixIsDeterministic(t *testing.T) {
 	// A target listing more than one hash must always resolve to the same
 	// hash-prefixed URL (ref. https://github.com/theupdateframework/go-tuf/issues/746)
 
-	err := loadOrResetTrustedRootMetadata()
-	assert.NoError(t, err)
-	simulator.Sim.MDRoot.Signed.ConsistentSnapshot = true
-	simulator.Sim.MDRoot.Signed.Version += 1
-	simulator.Sim.PublishRoot()
+	repo := simulator.NewTestRepository(t)
+	repo.Simulator.MDRoot.Signed.ConsistentSnapshot = true
+	repo.BumpVersion(metadata.ROOT)
 
-	updaterConfig, err := loadUpdaterConfig()
-	assert.NoError(t, err)
+	updaterConfig, err := repo.GetUpdaterConfig()
+	require.NoError(t, err)
 	updaterConfig.DisableLocalCache = true
 	updaterConfig.PrefixTargetsWithHash = true
-	updater, err := runRefresh(updaterConfig, time.Now())
-	assert.NoError(t, err)
+	updater, err := New(updaterConfig)
+	require.NoError(t, err)
+	require.NoError(t, updater.Refresh())
 
 	content := []byte("target content")
 	sha256Hash := sha256.Sum256(content)
@@ -125,5 +125,69 @@ func TestDownloadTargetHashPrefixIsDeterministic(t *testing.T) {
 		_, _, err := updater.DownloadTarget(targetFile, "ignored", "https://example.com/targets")
 		assert.NoError(t, err)
 		assert.Equal(t, []string{expectedURL}, fetcher.urls)
+	}
+}
+
+func TestDownloadTargetHashPrefixSplitsOnForwardSlashOnly(t *testing.T) {
+	// Target paths in TUF metadata and URLs are always "/"-separated. Building
+	// the hash-prefixed remote URL must not use filepath.Base, which on Windows
+	// treats ":" as a drive designator and "\" as a path separator (#824).
+	repo := simulator.NewTestRepository(t)
+	repo.Simulator.MDRoot.Signed.ConsistentSnapshot = true
+	repo.BumpVersion(metadata.ROOT)
+
+	updaterConfig, err := repo.GetUpdaterConfig()
+	require.NoError(t, err)
+	updaterConfig.DisableLocalCache = true
+	updaterConfig.PrefixTargetsWithHash = true
+	up, err := New(updaterConfig)
+	require.NoError(t, err)
+	require.NoError(t, up.Refresh())
+
+	content := []byte("payload")
+	digest := sha256.Sum256(content)
+	hashHex := hex.EncodeToString(digest[:])
+
+	tests := []struct {
+		name       string
+		targetPath string
+		wantURL    string
+	}{
+		{
+			name:       "colon in flat target name",
+			targetPath: "a:b",
+			wantURL:    fmt.Sprintf("https://example.com/targets/%s.a:b", hashHex),
+		},
+		{
+			name:       "colon in nested target name",
+			targetPath: "dir/a:b",
+			wantURL:    fmt.Sprintf("https://example.com/targets/dir/%s.a:b", hashHex),
+		},
+		{
+			name:       "literal backslash after slash",
+			targetPath: `a/\`,
+			wantURL:    fmt.Sprintf(`https://example.com/targets/a/%s.\`, hashHex),
+		},
+		{
+			name:       "literal backslash inside filename",
+			targetPath: `dir/sub\file.txt`,
+			wantURL:    fmt.Sprintf(`https://example.com/targets/dir/%s.sub\file.txt`, hashHex),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := &urlRecordingFetcher{data: content}
+			updaterConfig.Fetcher = rec
+			tf := &metadata.TargetFiles{
+				Length: int64(len(content)),
+				Hashes: metadata.Hashes{"sha256": digest[:]},
+				Path:   tt.targetPath,
+			}
+
+			_, _, err := up.DownloadTarget(tf, "ignored", "https://example.com/targets")
+			require.NoError(t, err)
+			assert.Equal(t, []string{tt.wantURL}, rec.urls)
+		})
 	}
 }

@@ -36,15 +36,24 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup - Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
 
       - name: Run tests
-        env:
-          GO_TUF_NETWORK_TESTS: "1"
+        # PowerShell, the default shell on Windows runners, splits arguments
+        # such as -coverpkg=./metadata/... at the first dot. That silently
+        # limited the Windows run to the ./metadata/... packages and dropped
+        # the -coverpkg setting.
+        shell: bash
         run: go test -race -covermode=atomic -coverpkg=./metadata/... -coverprofile=coverage.out ./...
+
+      - name: Run tuf_client profile tests and build check
+        shell: bash
+        run: |
+          go test -race -tags tuf_client ./metadata/clientprofile ./metadata/config ./metadata/fetcher
+          go build -tags tuf_client ./metadata ./metadata/config ./metadata/fetcher ./metadata/trustedmetadata ./metadata/updater ./metadata/multirepo ./cmd/tuf-conformance-client
 
       - name: Send coverage
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1

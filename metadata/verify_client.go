@@ -34,13 +34,22 @@ import (
 func verifyMetadataSignature(publicKey crypto.PublicKey, hash crypto.Hash, _ string, sig, payload []byte) error {
 	switch key := publicKey.(type) {
 	case *mldsa.PublicKey:
+		if _, err := validateMLDSAPublicKey(key); err != nil {
+			return err
+		}
 		return mldsa.Verify(key, payload, sig, &mldsa.Options{})
 	case ed25519.PublicKey:
+		if len(key) != ed25519.PublicKeySize {
+			return fmt.Errorf("invalid ed25519 public key length %d, expected %d", len(key), ed25519.PublicKeySize)
+		}
 		if ed25519.Verify(key, payload, sig) {
 			return nil
 		}
 		return fmt.Errorf("invalid Ed25519 signature")
 	case *ecdsa.PublicKey:
+		if key == nil {
+			return fmt.Errorf("nil ECDSA public key")
+		}
 		if !hash.Available() {
 			return fmt.Errorf("unsupported ECDSA hash")
 		}
@@ -51,6 +60,9 @@ func verifyMetadataSignature(publicKey crypto.PublicKey, hash crypto.Hash, _ str
 		}
 		return fmt.Errorf("invalid ECDSA signature")
 	case *rsa.PublicKey:
+		if key == nil {
+			return fmt.Errorf("nil RSA public key")
+		}
 		if !hash.Available() {
 			return fmt.Errorf("unsupported RSA-PSS hash")
 		}

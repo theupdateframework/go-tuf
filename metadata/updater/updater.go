@@ -18,9 +18,11 @@
 package updater
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"net/http"
 	"net/url"
@@ -34,6 +36,7 @@ import (
 
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"github.com/theupdateframework/go-tuf/v2/metadata/config"
+	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 	"github.com/theupdateframework/go-tuf/v2/metadata/trustedmetadata"
 )
 
@@ -67,6 +70,9 @@ import (
 type Updater struct {
 	trusted *trustedmetadata.TrustedMetadata
 	cfg     *config.UpdaterConfig
+	// verified records, for a (role, parent) pair, the trusted copies of
+	// both for which the role passed verification by the parent
+	verified map[roleParentTuple]roleParentCopies
 }
 
 type roleParentTuple struct {
@@ -74,31 +80,72 @@ type roleParentTuple struct {
 	Parent string
 }
 
+// delegator is the trusted metadata of a role that delegates to other roles
+type delegator interface {
+	VerifyDelegateWithVerifier(delegatedRole string, delegatedMetadata any, newVerifier func(*metadata.Key) (metadata.Verifier, error)) error
+}
+
+// roleParentCopies holds the trusted copies of a role and of its parent
+type roleParentCopies struct {
+	role   *metadata.Metadata[metadata.TargetsType]
+	parent delegator
+}
+
 // New creates a new Updater instance and loads trusted root metadata
 func New(config *config.UpdaterConfig) (*Updater, error) {
-	// make sure the trusted root metadata and remote URL were provided
-	if len(config.LocalTrustedRoot) == 0 || len(config.RemoteMetadataURL) == 0 {
+	return NewContext(context.Background(), config)
+}
+
+// NewContext is New with a context: ctx is passed to MetadataStore.Load and
+// MetadataStore.Persist when MetadataStore is configured. A nil or already-done
+// ctx returns an error before any work.
+func NewContext(ctx context.Context, config *config.UpdaterConfig) (*Updater, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	if len(config.RemoteMetadataURL) == 0 {
+		return nil, fmt.Errorf("no initial trusted root metadata or remote URL provided")
+	}
+	rootBytes := config.LocalTrustedRoot
+	persistInitialRoot := true
+	if config.MetadataStore != nil && !config.DisableLocalCache {
+		storedRoot, err := config.MetadataStore.Load(ctx, metadata.ROOT)
+		if err == nil {
+			if len(storedRoot) == 0 {
+				return nil, &metadata.ErrDeserialization{Err: &metadata.ErrValue{Msg: "stored root metadata is empty"}}
+			}
+			rootBytes = storedRoot
+			persistInitialRoot = false
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			return nil, err
+		}
+	}
+	// make sure the trusted root metadata was provided
+	if len(rootBytes) == 0 {
 		return nil, fmt.Errorf("no initial trusted root metadata or remote URL provided")
 	}
 	// create a new trusted metadata instance using the trusted root.json
-	trustedMetadataSet, err := trustedmetadata.NewWithVerifier(config.LocalTrustedRoot, config.NewVerifier)
+	trustedMetadataSet, err := trustedmetadata.NewWithVerifier(rootBytes, config.NewVerifier)
 	if err != nil {
 		return nil, err
 	}
 	// create an updater instance
 	updater := &Updater{
-		cfg:     config,
-		trusted: trustedMetadataSet, // save trusted metadata set
+		cfg:      config,
+		trusted:  trustedMetadataSet, // save trusted metadata set
+		verified: map[roleParentTuple]roleParentCopies{},
 	}
 	// ensure paths exist, doesn't do anything if caching is disabled
 	err = updater.cfg.EnsurePathsExist()
 	if err != nil {
 		return nil, err
 	}
-	// persist the initial root metadata to the local metadata folder
-	err = updater.persistMetadata(metadata.ROOT, updater.cfg.LocalTrustedRoot)
-	if err != nil {
-		return nil, err
+	if persistInitialRoot {
+		// persist the initial root metadata to the local metadata folder
+		err = updater.persistMetadata(ctx, metadata.ROOT, rootBytes)
+		if err != nil {
+			return nil, err
+		}
 	}
 	// all okay, return the updater instance
 	return updater, nil
@@ -120,28 +167,42 @@ func New(config *config.UpdaterConfig) (*Updater, error) {
 // the cached files on disk are used. If the cached data is not complete,
 // this call will fail.
 func (update *Updater) Refresh() error {
-	if update.cfg.UnsafeLocalMode {
-		return update.unsafeLocalRefresh()
+	return update.RefreshContext(context.Background())
+}
+
+// RefreshContext is Refresh with a context: cancelling ctx aborts the refresh, including
+// an in-flight download when the Fetcher implements fetcher.ContextFetcher (DefaultFetcher does).
+// A nil or already-done ctx returns an error before any work, in local mode too.
+//
+// The trusted metadata only moves forward, so a refresh that fails or is cancelled
+// part-way (for example after timestamp and snapshot are loaded) may leave the Updater
+// unable to refresh again; construct a new Updater to retry. Refresh behaves the same.
+func (update *Updater) RefreshContext(ctx context.Context) error {
+	if err := checkContext(ctx); err != nil {
+		return err
 	}
-	return update.onlineRefresh()
+	if update.cfg.UnsafeLocalMode {
+		return update.unsafeLocalRefresh(ctx)
+	}
+	return update.onlineRefresh(ctx)
 }
 
 // onlineRefresh implements the TUF client workflow as described for
 // the Refresh function.
-func (update *Updater) onlineRefresh() error {
-	err := update.loadRoot()
+func (update *Updater) onlineRefresh(ctx context.Context) error {
+	err := update.loadRoot(ctx)
 	if err != nil {
 		return err
 	}
-	err = update.loadTimestamp()
+	err = update.loadTimestamp(ctx)
 	if err != nil {
 		return err
 	}
-	err = update.loadSnapshot()
+	err = update.loadSnapshot(ctx)
 	if err != nil {
 		return err
 	}
-	_, err = update.loadTargets(metadata.TARGETS, metadata.ROOT)
+	_, err = update.loadTargets(ctx, metadata.TARGETS, metadata.ROOT)
 	if err != nil {
 		return err
 	}
@@ -153,11 +214,10 @@ func (update *Updater) onlineRefresh() error {
 // TUF specification section 5.3 to 5.7 (update phases).
 // The metadata on disk are verified against the provided root though,
 // and expiration dates are verified.
-func (update *Updater) unsafeLocalRefresh() error {
+func (update *Updater) unsafeLocalRefresh(ctx context.Context) error {
 	// Root is already loaded
 	// load timestamp
-	var p = filepath.Join(update.cfg.LocalMetadataDir, metadata.TIMESTAMP)
-	data, err := update.loadLocalMetadata(p)
+	data, err := update.loadLocalMetadata(ctx, metadata.TIMESTAMP)
 	if err != nil {
 		return err
 	}
@@ -167,8 +227,7 @@ func (update *Updater) unsafeLocalRefresh() error {
 	}
 
 	// load snapshot
-	p = filepath.Join(update.cfg.LocalMetadataDir, metadata.SNAPSHOT)
-	data, err = update.loadLocalMetadata(p)
+	data, err = update.loadLocalMetadata(ctx, metadata.SNAPSHOT)
 	if err != nil {
 		return err
 	}
@@ -178,8 +237,7 @@ func (update *Updater) unsafeLocalRefresh() error {
 	}
 
 	// targets
-	p = filepath.Join(update.cfg.LocalMetadataDir, metadata.TARGETS)
-	data, err = update.loadLocalMetadata(p)
+	data, err = update.loadLocalMetadata(ctx, metadata.TARGETS)
 	if err != nil {
 		return err
 	}
@@ -200,18 +258,38 @@ func (update *Updater) unsafeLocalRefresh() error {
 // As a side-effect this method downloads all the additional (delegated
 // targets) metadata it needs to return the target information.
 func (update *Updater) GetTargetInfo(targetPath string) (*metadata.TargetFiles, error) {
+	return update.GetTargetInfoContext(context.Background(), targetPath)
+}
+
+// GetTargetInfoContext is GetTargetInfo with a context (see RefreshContext). A nil or
+// already-done ctx returns an error, even when the answer would come from cached metadata.
+// If it runs the implicit refresh and that refresh fails or is cancelled part-way, the
+// Updater may be unable to refresh again; construct a new Updater to retry.
+func (update *Updater) GetTargetInfoContext(ctx context.Context, targetPath string) (*metadata.TargetFiles, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
 	// do a Refresh() in case there's no trusted targets.json yet
 	if update.trusted.Targets[metadata.TARGETS] == nil {
-		err := update.Refresh()
+		err := update.RefreshContext(ctx)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return update.preOrderDepthFirstWalk(targetPath)
+	return update.preOrderDepthFirstWalk(ctx, targetPath)
 }
 
 // DownloadTarget downloads the target file specified by targetFile
 func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath, targetBaseURL string) (string, []byte, error) {
+	return update.DownloadTargetContext(context.Background(), targetFile, filePath, targetBaseURL)
+}
+
+// DownloadTargetContext is DownloadTarget with a context (see RefreshContext). A nil or
+// already-done ctx returns an error before any work.
+func (update *Updater) DownloadTargetContext(ctx context.Context, targetFile *metadata.TargetFiles, filePath, targetBaseURL string) (string, []byte, error) {
+	if err := checkContext(ctx); err != nil {
+		return "", nil, err
+	}
 	log := metadata.GetLogger()
 
 	var err error
@@ -235,18 +313,16 @@ func (update *Updater) DownloadTarget(targetFile *metadata.TargetFiles, filePath
 	consistentSnapshot := update.trusted.Root.Signed.ConsistentSnapshot
 	if consistentSnapshot && update.cfg.PrefixTargetsWithHash {
 		hashPrefix := hex.EncodeToString(targetFile.Hashes[selectTargetHashAlgorithm(targetFile.Hashes)])
-		baseName := filepath.Base(targetFilePath)
-		dirName, ok := strings.CutSuffix(targetFilePath, "/"+baseName)
-		if !ok {
+		if i := strings.LastIndex(targetFilePath, "/"); i < 0 {
 			// <hash>.<target-name>
-			targetRemotePath = fmt.Sprintf("%s.%s", hashPrefix, baseName)
+			targetRemotePath = fmt.Sprintf("%s.%s", hashPrefix, targetFilePath)
 		} else {
 			// <dir-prefix>/<hash>.<target-name>
-			targetRemotePath = fmt.Sprintf("%s/%s.%s", dirName, hashPrefix, baseName)
+			targetRemotePath = fmt.Sprintf("%s/%s.%s", targetFilePath[:i], hashPrefix, targetFilePath[i+1:])
 		}
 	}
 	fullURL := fmt.Sprintf("%s%s", targetBaseURL, targetRemotePath)
-	data, err := update.cfg.Fetcher.DownloadFile(fullURL, targetFile.Length, 0)
+	data, err := update.download(ctx, fullURL, targetFile.Length)
 	if err != nil {
 		return "", nil, err
 	}
@@ -300,11 +376,14 @@ func (update *Updater) FindCachedTarget(targetFile *metadata.TargetFiles, filePa
 }
 
 // loadTimestamp load local and remote timestamp metadata
-func (update *Updater) loadTimestamp() error {
+func (update *Updater) loadTimestamp(ctx context.Context) error {
 	log := metadata.GetLogger()
 	// try to read local timestamp
-	data, err := update.loadLocalMetadata(filepath.Join(update.cfg.LocalMetadataDir, metadata.TIMESTAMP))
+	data, ok, err := update.loadCachedMetadata(ctx, metadata.TIMESTAMP)
 	if err != nil {
+		return err
+	}
+	if !ok {
 		// this means there's no existing local timestamp so we should proceed downloading it without the need to UpdateTimestamp
 		log.Info("Local timestamp does not exist")
 	} else {
@@ -323,7 +402,7 @@ func (update *Updater) loadTimestamp() error {
 		// all okay, local timestamp exists and it is valid, nevertheless proceed with downloading from remote
 	}
 	// load from remote (whether local load succeeded or not)
-	data, err = update.downloadMetadata(metadata.TIMESTAMP, update.cfg.TimestampMaxLength, "")
+	data, err = update.downloadMetadata(ctx, metadata.TIMESTAMP, update.cfg.TimestampMaxLength, "")
 	if err != nil {
 		return err
 	}
@@ -340,7 +419,7 @@ func (update *Updater) loadTimestamp() error {
 		}
 	}
 	// proceed with persisting the new timestamp
-	err = update.persistMetadata(metadata.TIMESTAMP, data)
+	err = update.persistMetadata(ctx, metadata.TIMESTAMP, data)
 	if err != nil {
 		return err
 	}
@@ -348,11 +427,14 @@ func (update *Updater) loadTimestamp() error {
 }
 
 // loadSnapshot load local (and if needed remote) snapshot metadata
-func (update *Updater) loadSnapshot() error {
+func (update *Updater) loadSnapshot(ctx context.Context) error {
 	log := metadata.GetLogger()
 	// try to read local snapshot
-	data, err := update.loadLocalMetadata(filepath.Join(update.cfg.LocalMetadataDir, metadata.SNAPSHOT))
+	data, ok, err := update.loadCachedMetadata(ctx, metadata.SNAPSHOT)
 	if err != nil {
+		return err
+	}
+	if !ok {
 		// this means there's no existing local snapshot so we should proceed downloading it without the need to UpdateSnapshot
 		log.Info("Local snapshot does not exist")
 	} else {
@@ -394,7 +476,7 @@ func (update *Updater) loadSnapshot() error {
 		version = strconv.FormatInt(snapshotMeta.Version, 10)
 	}
 	// download snapshot metadata
-	data, err = update.downloadMetadata(metadata.SNAPSHOT, length, version)
+	data, err = update.downloadMetadata(ctx, metadata.SNAPSHOT, length, version)
 	if err != nil {
 		return err
 	}
@@ -404,24 +486,72 @@ func (update *Updater) loadSnapshot() error {
 		return err
 	}
 	// persist the new snapshot
-	err = update.persistMetadata(metadata.SNAPSHOT, data)
+	err = update.persistMetadata(ctx, metadata.SNAPSHOT, data)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// loadTargets load local (and if needed remote) metadata for roleName
-func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metadata[metadata.TargetsType], error) {
-	log := metadata.GetLogger()
-	// avoid loading "roleName" more than once during "GetTargetInfo"
+// trustedCopies returns the trusted copies of roleName and of its parent
+// parentName, if both are loaded
+func (update *Updater) trustedCopies(roleName, parentName string) (roleParentCopies, bool) {
 	role, ok := update.trusted.Targets[roleName]
+	if !ok {
+		return roleParentCopies{}, false
+	}
+	if parentName == metadata.ROOT {
+		return roleParentCopies{role: role, parent: update.trusted.Root}, true
+	}
+	parent, ok := update.trusted.Targets[parentName]
+	if !ok {
+		return roleParentCopies{}, false
+	}
+	return roleParentCopies{role: role, parent: parent}, true
+}
+
+// markVerified records that the trusted copy of roleName passed
+// verification by the trusted copy of parentName
+func (update *Updater) markVerified(roleName, parentName string) {
+	if current, ok := update.trustedCopies(roleName, parentName); ok {
+		update.verified[roleParentTuple{Role: roleName, Parent: parentName}] = current
+	}
+}
+
+// cachedTargets returns the trusted copy of roleName if it is verified by
+// the trusted copy of parentName. A copy that parentName has not verified
+// yet, such as one loaded through another parent, is verified first.
+func (update *Updater) cachedTargets(roleName, parentName string) (*metadata.Metadata[metadata.TargetsType], bool) {
+	current, ok := update.trustedCopies(roleName, parentName)
+	if !ok {
+		return nil, false
+	}
+	pair := roleParentTuple{Role: roleName, Parent: parentName}
+	// a replaced role or parent does not match the recorded copies
+	if update.verified[pair] != current {
+		if err := current.parent.VerifyDelegateWithVerifier(roleName, current.role, update.cfg.NewVerifier); err != nil {
+			return nil, false
+		}
+		update.verified[pair] = current
+	}
+	return current.role, true
+}
+
+// loadTargets load local (and if needed remote) metadata for roleName
+func (update *Updater) loadTargets(ctx context.Context, roleName, parentName string) (*metadata.Metadata[metadata.TargetsType], error) {
+	log := metadata.GetLogger()
+	// avoid loading "roleName" more than once during "GetTargetInfo", as
+	// long as the trusted copy is verified by "parentName"
+	role, ok := update.cachedTargets(roleName, parentName)
 	if ok {
 		return role, nil
 	}
 	// try to read local targets
-	data, err := update.loadLocalMetadata(filepath.Join(update.cfg.LocalMetadataDir, roleName))
+	data, ok, err := update.loadCachedMetadata(ctx, roleName)
 	if err != nil {
+		return nil, err
+	}
+	if !ok {
 		// this means there's no existing local target file so we should proceed downloading it without the need to UpdateDelegatedTargets
 		log.Info("Local role does not exist", "role", roleName)
 	} else {
@@ -439,6 +569,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 		} else {
 			// this means targets verification/loading succeeded
 			log.Info("Local role is valid: not downloading new one", "role", roleName)
+			update.markVerified(roleName, parentName)
 			return delegatedTargets, nil
 		}
 	}
@@ -463,7 +594,7 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 		version = strconv.FormatInt(metaInfo.Version, 10)
 	}
 	// download targets metadata
-	data, err = update.downloadMetadata(roleName, length, version)
+	data, err = update.downloadMetadata(ctx, roleName, length, version)
 	if err != nil {
 		return nil, err
 	}
@@ -472,8 +603,9 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 	if err != nil {
 		return nil, err
 	}
+	update.markVerified(roleName, parentName)
 	// persist the new target metadata
-	err = update.persistMetadata(roleName, data)
+	err = update.persistMetadata(ctx, roleName, data)
 	if err != nil {
 		return nil, err
 	}
@@ -483,14 +615,14 @@ func (update *Updater) loadTargets(roleName, parentName string) (*metadata.Metad
 // loadRoot load remote root metadata. Sequentially load and
 // persist on local disk every newer root metadata version
 // available on the remote
-func (update *Updater) loadRoot() error {
+func (update *Updater) loadRoot(ctx context.Context) error {
 	// calculate boundaries
 	lowerBound := update.trusted.Root.Signed.Version + 1
 	upperBound := lowerBound + update.cfg.MaxRootRotations
 
 	// loop until we find the latest available version of root (download -> verify -> load -> persist)
 	for nextVersion := lowerBound; nextVersion < upperBound; nextVersion++ {
-		data, err := update.downloadMetadata(metadata.ROOT, update.cfg.RootMaxLength, strconv.FormatInt(nextVersion, 10))
+		data, err := update.downloadMetadata(ctx, metadata.ROOT, update.cfg.RootMaxLength, strconv.FormatInt(nextVersion, 10))
 		if err != nil {
 			// downloading the root metadata failed for some reason
 			var tmpErr *metadata.ErrDownloadHTTP
@@ -502,7 +634,7 @@ func (update *Updater) loadRoot() error {
 				// 404 means current root is newest available, so we can stop the loop and move forward
 				break
 			}
-			// some other error ocurred
+			// some other error occurred
 			return err
 		} else {
 			// downloading root metadata succeeded, so let's try to verify and load it
@@ -511,7 +643,7 @@ func (update *Updater) loadRoot() error {
 				return err
 			}
 			// persist root metadata to disk
-			err = update.persistMetadata(metadata.ROOT, data)
+			err = update.persistMetadata(ctx, metadata.ROOT, data)
 			if err != nil {
 				return err
 			}
@@ -520,32 +652,46 @@ func (update *Updater) loadRoot() error {
 	return nil
 }
 
+// delegationToVisit is a delegated role to interrogate during the
+// pre-order depth-first walk and the delegation path taken to reach it
+type delegationToVisit struct {
+	roleParentTuple
+	// path lists the roles walked through to reach Role, from the
+	// top-level targets role to Parent. It is empty for the top-level
+	// targets role
+	path []string
+}
+
 // preOrderDepthFirstWalk interrogates the tree of target delegations
 // in order of appearance (which implicitly order trustworthiness),
 // and returns the matching target found in the most trusted role.
-func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.TargetFiles, error) {
+func (update *Updater) preOrderDepthFirstWalk(ctx context.Context, targetFilePath string) (*metadata.TargetFiles, error) {
 	log := metadata.GetLogger()
 	// list of delegations to be interrogated. A (role, parent role) pair
-	// is needed to load and verify the delegated targets metadata
-	delegationsToVisit := []roleParentTuple{{
-		Role:   metadata.TARGETS,
-		Parent: metadata.ROOT,
+	// is needed to load and verify the delegated targets metadata, and the
+	// delegation path taken to reach the role is needed to detect cycles
+	delegationsToVisit := []delegationToVisit{{
+		roleParentTuple: roleParentTuple{
+			Role:   metadata.TARGETS,
+			Parent: metadata.ROOT,
+		},
 	}}
-	visitedRoleNames := map[string]bool{}
+	visitedRoles := 0
 	// pre-order depth-first traversal of the graph of target delegations
-	for len(visitedRoleNames) <= update.cfg.MaxDelegations && len(delegationsToVisit) > 0 {
+	for visitedRoles <= update.cfg.MaxDelegations && len(delegationsToVisit) > 0 {
 		// pop the role name from the top of the stack
 		delegation := delegationsToVisit[len(delegationsToVisit)-1]
 		delegationsToVisit = delegationsToVisit[:len(delegationsToVisit)-1]
-		// skip any visited current role to prevent cycles
-		_, ok := visitedRoleNames[delegation.Role]
-		if ok {
-			log.Info("Skipping visited current role", "role", delegation.Role)
+		// skip a role already visited on the delegation path used to reach
+		// it to prevent cycles. A role reached through another delegation
+		// path is visited again and verified by the delegator on that path
+		if slices.Contains(delegation.path, delegation.Role) {
+			log.Info("Skipping role visited on the current delegation path", "role", delegation.Role)
 			continue
 		}
 		// the metadata for delegation.Role must be downloaded/updated before
 		// its targets, delegations, and child roles can be inspected
-		targets, err := update.loadTargets(delegation.Role, delegation.Parent)
+		targets, err := update.loadTargets(ctx, delegation.Role, delegation.Parent)
 		if err != nil {
 			return nil, err
 		}
@@ -554,19 +700,25 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 			log.Info("Found target in current role", "role", delegation.Role)
 			return target, nil
 		}
-		// after pre-order check, add current role to set of visited roles
-		visitedRoleNames[delegation.Role] = true
+		// after pre-order check, count the current role as visited. A role
+		// visited again through another delegation path counts again
+		visitedRoles++
 		if targets.Signed.Delegations != nil {
-			var childRolesToVisit []roleParentTuple
+			var childRolesToVisit []delegationToVisit
 			// note that this may be a slow operation if there are many
 			// delegated roles
 			roles := targets.Signed.Delegations.GetRolesForTarget(targetFilePath)
+			// the delegation path taken to reach the child roles
+			childPath := slices.Concat(delegation.path, []string{delegation.Role})
 			for _, rolesForTarget := range roles {
 				log.Info("Adding child role", "role", rolesForTarget.Name)
-				childRolesToVisit = append(childRolesToVisit, roleParentTuple{Role: rolesForTarget.Name, Parent: delegation.Role})
+				childRolesToVisit = append(childRolesToVisit, delegationToVisit{
+					roleParentTuple: roleParentTuple{Role: rolesForTarget.Name, Parent: delegation.Role},
+					path:            childPath,
+				})
 				if rolesForTarget.Terminating {
 					log.Info("Not backtracking to other roles")
-					delegationsToVisit = []roleParentTuple{}
+					delegationsToVisit = []delegationToVisit{}
 					break
 				}
 			}
@@ -586,15 +738,30 @@ func (update *Updater) preOrderDepthFirstWalk(targetFilePath string) (*metadata.
 	return nil, fmt.Errorf("target %s not found", targetFilePath)
 }
 
+// localMetadataPath returns the on-disk path of the cached metadata for
+// roleName. The role name is URL-path-escaped before it is used as a path
+// component, so a delegated role name cannot escape LocalMetadataDir. This is
+// the same encoding persistMetadata writes with and downloadMetadata requests
+// with, so reads and writes always agree on the file name.
+func (update *Updater) localMetadataPath(roleName string) string {
+	return filepath.Join(update.cfg.LocalMetadataDir, fmt.Sprintf("%s.json", url.PathEscape(roleName)))
+}
+
 // persistMetadata writes metadata to disk atomically to avoid data loss
-func (update *Updater) persistMetadata(roleName string, data []byte) error {
+func (update *Updater) persistMetadata(ctx context.Context, roleName string, data []byte) error {
 	log := metadata.GetLogger()
 	// do not persist the metadata if we have disabled local caching
 	if update.cfg.DisableLocalCache {
 		return nil
 	}
+	if update.cfg.MetadataStore != nil {
+		if err := checkContext(ctx); err != nil {
+			return err
+		}
+		return update.cfg.MetadataStore.Persist(ctx, roleName, data)
+	}
 	// caching enabled, proceed with persisting the metadata locally
-	fileName := filepath.Join(update.cfg.LocalMetadataDir, fmt.Sprintf("%s.json", url.PathEscape(roleName)))
+	fileName := update.localMetadataPath(roleName)
 	// create a temporary file
 	file, err := os.CreateTemp(update.cfg.LocalMetadataDir, "tuf_tmp")
 	if err != nil {
@@ -644,7 +811,7 @@ func (update *Updater) persistMetadata(roleName string, data []byte) error {
 }
 
 // downloadMetadata download a metadata file and return it as bytes
-func (update *Updater) downloadMetadata(roleName string, length int64, version string) ([]byte, error) {
+func (update *Updater) downloadMetadata(ctx context.Context, roleName string, length int64, version string) ([]byte, error) {
 	urlPath := ensureTrailingSlash(update.cfg.RemoteMetadataURL)
 	// build urlPath
 	if version == "" {
@@ -652,7 +819,29 @@ func (update *Updater) downloadMetadata(roleName string, length int64, version s
 	} else {
 		urlPath = fmt.Sprintf("%s%s.%s.json", urlPath, version, url.PathEscape(roleName))
 	}
-	return update.cfg.Fetcher.DownloadFile(urlPath, length, 0)
+	return update.download(ctx, urlPath, length)
+}
+
+// download fetches urlPath with the configured Fetcher. A Fetcher that also implements
+// fetcher.ContextFetcher gets ctx, so cancelling it aborts the download; any other
+// Fetcher is called as before and ctx only takes effect between downloads.
+func (update *Updater) download(ctx context.Context, urlPath string, maxLength int64) ([]byte, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	if cf, ok := update.cfg.Fetcher.(fetcher.ContextFetcher); ok {
+		return cf.DownloadFileContext(ctx, urlPath, maxLength)
+	}
+	return update.cfg.Fetcher.DownloadFile(urlPath, maxLength, 0)
+}
+
+// checkContext rejects a nil ctx with an error rather than a panic, as
+// http.NewRequestWithContext does, and otherwise returns ctx.Err().
+func checkContext(ctx context.Context) error {
+	if ctx == nil {
+		return &metadata.ErrValue{Msg: "nil context"}
+	}
+	return ctx.Err()
 }
 
 // generateTargetFilePath generates path from TargetFiles
@@ -697,14 +886,59 @@ func selectTargetHashAlgorithm(hashes metadata.Hashes) string {
 	return slices.Min(slices.Collect(maps.Keys(hashes)))
 }
 
-// loadLocalMetadata reads a local <roleName>.json file and returns its bytes
-func (update *Updater) loadLocalMetadata(roleName string) ([]byte, error) {
-	return os.ReadFile(fmt.Sprintf("%s.json", roleName))
+// loadCachedMetadata reads cached metadata for roleName. A missing cache entry
+// returns (nil, false, nil). When MetadataStore is configured, any error other
+// than fs.ErrNotExist is returned so storage or decryption failures do not
+// silently bypass cached rollback state.
+func (update *Updater) loadCachedMetadata(ctx context.Context, roleName string) ([]byte, bool, error) {
+	if update.cfg.MetadataStore != nil {
+		if update.cfg.DisableLocalCache {
+			return nil, false, nil
+		}
+		if err := checkContext(ctx); err != nil {
+			return nil, false, err
+		}
+		data, err := update.cfg.MetadataStore.Load(ctx, roleName)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil, false, nil
+			}
+			return nil, false, err
+		}
+		return data, true, nil
+	}
+	data, err := update.loadLocalMetadata(ctx, roleName)
+	if err != nil {
+		return nil, false, nil
+	}
+	return data, true, nil
 }
 
-// GetTopLevelTargets returns the top-level target files
+// loadLocalMetadata reads the cached metadata file for roleName
+func (update *Updater) loadLocalMetadata(ctx context.Context, roleName string) ([]byte, error) {
+	if update.cfg.MetadataStore != nil {
+		if update.cfg.DisableLocalCache {
+			return nil, fs.ErrNotExist
+		}
+		if err := checkContext(ctx); err != nil {
+			return nil, err
+		}
+		return update.cfg.MetadataStore.Load(ctx, roleName)
+	}
+	return os.ReadFile(update.localMetadataPath(roleName))
+}
+
+// GetTopLevelTargets returns the top-level target files.
+//
+// It returns an empty map if the top-level targets metadata is not loaded,
+// which is the case until Refresh() or GetTargetInfo() has succeeded. It
+// does not load any metadata itself.
 func (update *Updater) GetTopLevelTargets() map[string]*metadata.TargetFiles {
-	return update.trusted.Targets[metadata.TARGETS].Signed.Targets
+	targets := update.trusted.Targets[metadata.TARGETS]
+	if targets == nil {
+		return map[string]*metadata.TargetFiles{}
+	}
+	return targets.Signed.Targets
 }
 
 // GetTrustedMetadataSet returns the trusted metadata set

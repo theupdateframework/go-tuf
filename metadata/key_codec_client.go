@@ -20,21 +20,29 @@
 package metadata
 
 import (
-	"bytes"
 	"crypto"
 	"crypto/mldsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 )
 
 func unmarshalPEMToPublicKey(data []byte) (crypto.PublicKey, error) {
-	block, rest := pem.Decode(data)
-	if block == nil || block.Type != "PUBLIC KEY" || len(block.Headers) != 0 || len(bytes.TrimSpace(rest)) != 0 {
-		return nil, fmt.Errorf("invalid SubjectPublicKeyInfo")
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return nil, errors.New("PEM decoding failed")
 	}
-	return x509.ParsePKIXPublicKey(block.Bytes)
+	switch block.Type {
+	case "PUBLIC KEY":
+		return x509.ParsePKIXPublicKey(block.Bytes)
+	case "RSA PUBLIC KEY":
+		return x509.ParsePKCS1PublicKey(block.Bytes)
+	default:
+		return nil, fmt.Errorf("unknown Public key PEM file type: %v", block.Type)
+	}
 }
+
 func marshalPublicKeyToPEM(key crypto.PublicKey) ([]byte, error) {
 	data, err := x509.MarshalPKIXPublicKey(key)
 	if err != nil {
@@ -42,10 +50,16 @@ func marshalPublicKeyToPEM(key crypto.PublicKey) ([]byte, error) {
 	}
 	return pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: data}), nil
 }
-func validateMLDSAPublicKey(key *mldsa.PublicKey) (mldsa.Parameters, error) {
+
+func validateMLDSAPublicKey(key *mldsa.PublicKey) (params mldsa.Parameters, err error) {
 	if key == nil {
-		return mldsa.Parameters{}, fmt.Errorf("nil ML-DSA key")
+		return mldsa.Parameters{}, errors.New("ML-DSA public key must not be nil")
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("invalid ML-DSA public key: %v", r)
+		}
+	}()
 	switch key.Parameters() {
 	case mldsa.MLDSA44(), mldsa.MLDSA65(), mldsa.MLDSA87():
 		return key.Parameters(), nil

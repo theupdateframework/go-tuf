@@ -6,16 +6,23 @@ a restriction on TUF's workflow: an application can supply another adapter for a
 new key type or codec without changing this library's state machine.
 
 The extension is one small `metadata.Verifier` interface and an ordinary
-constructor function. `UpdaterConfig.NewVerifier` and
-`trustedmetadata.NewWithVerifier` accept that constructor; nil selects
+constructor function. `UpdaterConfig.NewVerifier`, `MultiRepoConfig.NewVerifier`,
+and `trustedmetadata.NewWithVerifier` accept that constructor; nil selects
 `metadata.NewVerifier`. `VerifyDelegateWithVerifier` is available for direct use.
 No registry, global setting or algorithm policy framework is added.
 
 Applications can wrap the default constructor to require their chosen algorithm
 or allow a migration set. They can also construct a different implementation.
 The same constructor applies to bootstrap, both sides of root rotation, and all
-top-level/delegated metadata. TUF still owns signature thresholds, key alias
-deduplication, rotation, expiry and rollback checks.
+top-level and delegated metadata (including diamond-delegation cache checks).
+When `NewVerifier` rejects a key, that key does not contribute toward the role's
+threshold while other allowed keys on the role can still satisfy it; if the
+threshold is not met, `VerifyDelegateWithVerifier` returns `*metadata.ErrUnsignedMetadata`
+wrapping the constructor error(s). Note that a per-client `NewVerifier` policy
+only constrains what that client accepts—on a shared repository, clients using
+the default verifier will still accept any key authorized by the role unless the
+role's threshold requires all required key types. TUF still owns signature
+thresholds, key alias deduplication, rotation, expiry and rollback checks.
 
 An adapter must verify the signature over canonical metadata using its scheme's
 required domain separation. PublicKeyBytes must return a canonical encoding of
