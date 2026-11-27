@@ -476,3 +476,121 @@ func TestDownloadFileContext_CancelledContextNeverCallsTheClient(t *testing.T) {
 	assert.ErrorIs(t, err, context.Canceled)
 	assert.Zero(t, hc.calls, "the http client was called with a cancelled context")
 }
+
+// countingStatusClient counts requests and returns a fixed HTTP status code.
+// It implements both httpClient and http.RoundTripper so both custom-client
+// constructors can be exercised with identical expectations.
+type countingStatusClient struct {
+	calls      int
+	statusCode int
+}
+
+func (c *countingStatusClient) Do(*http.Request) (*http.Response, error) {
+	c.calls++
+	return &http.Response{
+		StatusCode: c.statusCode,
+		Body:       io.NopCloser(bytes.NewReader(nil)),
+	}, nil
+}
+
+func (c *countingStatusClient) RoundTrip(req *http.Request) (*http.Response, error) {
+	return c.Do(req)
+}
+
+// NewFetcherWithHTTPClient and NewFetcherWithRoundTripper must default to a
+// single attempt (matching NewDefaultFetcher) rather than leaving retryOptions
+// nil and falling into backoff/v5's 15-minute default retry loop on HTTP 404.
+func TestNewFetcherWithCustomClient_DefaultSingleTryOn404(t *testing.T) {
+	tests := []struct {
+		name  string
+		build func(c *countingStatusClient) *DefaultFetcher
+	}{
+		{
+			name: "NewDefaultFetcher().NewFetcherWithHTTPClient",
+			build: func(c *countingStatusClient) *DefaultFetcher {
+				return NewDefaultFetcher().NewFetcherWithHTTPClient(c)
+			},
+		},
+		{
+			name: "zero-value DefaultFetcher.NewFetcherWithHTTPClient",
+			build: func(c *countingStatusClient) *DefaultFetcher {
+				return (&DefaultFetcher{}).NewFetcherWithHTTPClient(c)
+			},
+		},
+		{
+			name: "NewDefaultFetcher().NewFetcherWithRoundTripper",
+			build: func(c *countingStatusClient) *DefaultFetcher {
+				return NewDefaultFetcher().NewFetcherWithRoundTripper(c)
+			},
+		},
+		{
+			name: "zero-value DefaultFetcher.NewFetcherWithRoundTripper",
+			build: func(c *countingStatusClient) *DefaultFetcher {
+				return (&DefaultFetcher{}).NewFetcherWithRoundTripper(c)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &countingStatusClient{statusCode: http.StatusNotFound}
+			f := tt.build(client)
+
+			ctx, cancel := context.WithTimeout(t.Context(), 150*time.Millisecond)
+			defer cancel()
+
+			_, err := f.DownloadFileContext(ctx, mockURL, 1024)
+			var httpErr *metadata.ErrDownloadHTTP
+			if assert.ErrorAs(t, err, &httpErr) {
+				assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
+			}
+			assert.Equal(t, 1, client.calls, "expected a single attempt on 404")
+		})
+	}
+}
+
+// NewFetcherWithHTTPClient and NewFetcherWithRoundTripper inherit a cloned copy
+// of the receiver's configured retryOptions so subsequent mutations on the base
+// fetcher do not affect the derived fetcher.
+func TestNewFetcherWithCustomClient_InheritsRetryOptions(t *testing.T) {
+	tests := []struct {
+		name  string
+		build func(base *DefaultFetcher, c *countingStatusClient) *DefaultFetcher
+	}{
+		{
+			name: "NewFetcherWithHTTPClient",
+			build: func(base *DefaultFetcher, c *countingStatusClient) *DefaultFetcher {
+				return base.NewFetcherWithHTTPClient(c)
+			},
+		},
+		{
+			name: "NewFetcherWithRoundTripper",
+			build: func(base *DefaultFetcher, c *countingStatusClient) *DefaultFetcher {
+				return base.NewFetcherWithRoundTripper(c)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			base := NewDefaultFetcher()
+			base.SetRetry(time.Millisecond, 3)
+
+			client := &countingStatusClient{statusCode: http.StatusNotFound}
+			derived := tt.build(base, client)
+
+			// Mutate base after deriving to verify retryOptions were cloned.
+			base.SetRetry(time.Millisecond, 1)
+
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+
+			_, err := derived.DownloadFileContext(ctx, mockURL, 1024)
+			var httpErr *metadata.ErrDownloadHTTP
+			if assert.ErrorAs(t, err, &httpErr) {
+				assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
+			}
+			assert.Equal(t, 3, client.calls, "expected derived fetcher to keep inherited 3 tries")
+		})
+	}
+}
