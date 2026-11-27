@@ -481,12 +481,14 @@ func TestDownloadFileContext_CancelledContextNeverCallsTheClient(t *testing.T) {
 // It implements both httpClient and http.RoundTripper so both custom-client
 // constructors can be exercised with identical expectations.
 type countingStatusClient struct {
-	calls      int
-	statusCode int
+	calls         int
+	statusCode    int
+	lastUserAgent string
 }
 
-func (c *countingStatusClient) Do(*http.Request) (*http.Response, error) {
+func (c *countingStatusClient) Do(req *http.Request) (*http.Response, error) {
 	c.calls++
+	c.lastUserAgent = req.Header.Get("User-Agent")
 	return &http.Response{
 		StatusCode: c.statusCode,
 		Body:       io.NopCloser(bytes.NewReader(nil)),
@@ -518,6 +520,12 @@ func TestNewFetcherWithCustomClient_DefaultSingleTryOn404(t *testing.T) {
 			},
 		},
 		{
+			name: "nil DefaultFetcher.NewFetcherWithHTTPClient",
+			build: func(c *countingStatusClient) *DefaultFetcher {
+				return (*DefaultFetcher)(nil).NewFetcherWithHTTPClient(c)
+			},
+		},
+		{
 			name: "NewDefaultFetcher().NewFetcherWithRoundTripper",
 			build: func(c *countingStatusClient) *DefaultFetcher {
 				return NewDefaultFetcher().NewFetcherWithRoundTripper(c)
@@ -527,6 +535,12 @@ func TestNewFetcherWithCustomClient_DefaultSingleTryOn404(t *testing.T) {
 			name: "zero-value DefaultFetcher.NewFetcherWithRoundTripper",
 			build: func(c *countingStatusClient) *DefaultFetcher {
 				return (&DefaultFetcher{}).NewFetcherWithRoundTripper(c)
+			},
+		},
+		{
+			name: "nil DefaultFetcher.NewFetcherWithRoundTripper",
+			build: func(c *countingStatusClient) *DefaultFetcher {
+				return (*DefaultFetcher)(nil).NewFetcherWithRoundTripper(c)
 			},
 		},
 	}
@@ -550,8 +564,8 @@ func TestNewFetcherWithCustomClient_DefaultSingleTryOn404(t *testing.T) {
 }
 
 // NewFetcherWithHTTPClient and NewFetcherWithRoundTripper inherit a cloned copy
-// of the receiver's configured retryOptions so subsequent mutations on the base
-// fetcher do not affect the derived fetcher.
+// of the receiver's configured retryOptions so subsequent mutations on the
+// backing slice or the base fetcher do not affect the derived fetcher.
 func TestNewFetcherWithCustomClient_InheritsRetryOptions(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -574,12 +588,18 @@ func TestNewFetcherWithCustomClient_InheritsRetryOptions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			base := NewDefaultFetcher()
-			base.SetRetry(time.Millisecond, 3)
+			opts := []backoff.RetryOption{
+				backoff.WithBackOff(backoff.NewConstantBackOff(time.Millisecond)),
+				backoff.WithMaxTries(3),
+			}
+			base.SetRetryOptions(opts...)
 
 			client := &countingStatusClient{statusCode: http.StatusNotFound}
 			derived := tt.build(base, client)
 
-			// Mutate base after deriving to verify retryOptions were cloned.
+			// Mutate both the backing slice passed to SetRetryOptions and base
+			// after deriving to verify retryOptions were cloned.
+			opts[1] = backoff.WithMaxTries(1)
 			base.SetRetry(time.Millisecond, 1)
 
 			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
@@ -591,6 +611,95 @@ func TestNewFetcherWithCustomClient_InheritsRetryOptions(t *testing.T) {
 				assert.Equal(t, http.StatusNotFound, httpErr.StatusCode)
 			}
 			assert.Equal(t, 3, client.calls, "expected derived fetcher to keep inherited 3 tries")
+		})
+	}
+}
+
+// NewFetcherWithHTTPClient and NewFetcherWithRoundTripper inherit the
+// receiver's configured HTTP User-Agent and default to an empty User-Agent on
+// unset, zero-value, and nil receivers.
+func TestNewFetcherWithCustomClient_HTTPUserAgent(t *testing.T) {
+	tests := []struct {
+		name          string
+		build         func(c *countingStatusClient) *DefaultFetcher
+		wantUserAgent string
+	}{
+		{
+			name: "NewFetcherWithHTTPClient inherits configured user agent",
+			build: func(c *countingStatusClient) *DefaultFetcher {
+				base := NewDefaultFetcher()
+				base.SetHTTPUserAgent("custom-agent/1.0")
+				derived := base.NewFetcherWithHTTPClient(c)
+				base.SetHTTPUserAgent("mutated-agent/2.0")
+				return derived
+			},
+			wantUserAgent: "custom-agent/1.0",
+		},
+		{
+			name: "NewFetcherWithRoundTripper inherits configured user agent",
+			build: func(c *countingStatusClient) *DefaultFetcher {
+				base := NewDefaultFetcher()
+				base.SetHTTPUserAgent("custom-agent/1.0")
+				derived := base.NewFetcherWithRoundTripper(c)
+				base.SetHTTPUserAgent("mutated-agent/2.0")
+				return derived
+			},
+			wantUserAgent: "custom-agent/1.0",
+		},
+		{
+			name: "NewDefaultFetcher().NewFetcherWithHTTPClient defaults empty",
+			build: func(c *countingStatusClient) *DefaultFetcher {
+				return NewDefaultFetcher().NewFetcherWithHTTPClient(c)
+			},
+			wantUserAgent: "",
+		},
+		{
+			name: "NewDefaultFetcher().NewFetcherWithRoundTripper defaults empty",
+			build: func(c *countingStatusClient) *DefaultFetcher {
+				return NewDefaultFetcher().NewFetcherWithRoundTripper(c)
+			},
+			wantUserAgent: "",
+		},
+		{
+			name: "zero-value DefaultFetcher.NewFetcherWithHTTPClient defaults empty",
+			build: func(c *countingStatusClient) *DefaultFetcher {
+				return (&DefaultFetcher{}).NewFetcherWithHTTPClient(c)
+			},
+			wantUserAgent: "",
+		},
+		{
+			name: "zero-value DefaultFetcher.NewFetcherWithRoundTripper defaults empty",
+			build: func(c *countingStatusClient) *DefaultFetcher {
+				return (&DefaultFetcher{}).NewFetcherWithRoundTripper(c)
+			},
+			wantUserAgent: "",
+		},
+		{
+			name: "nil DefaultFetcher.NewFetcherWithHTTPClient defaults empty",
+			build: func(c *countingStatusClient) *DefaultFetcher {
+				return (*DefaultFetcher)(nil).NewFetcherWithHTTPClient(c)
+			},
+			wantUserAgent: "",
+		},
+		{
+			name: "nil DefaultFetcher.NewFetcherWithRoundTripper defaults empty",
+			build: func(c *countingStatusClient) *DefaultFetcher {
+				return (*DefaultFetcher)(nil).NewFetcherWithRoundTripper(c)
+			},
+			wantUserAgent: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &countingStatusClient{statusCode: http.StatusOK}
+			f := tt.build(client)
+
+			_, err := f.DownloadFileContext(t.Context(), mockURL, 1024)
+			assert.NoError(t, err)
+			assert.Equal(t, 1, client.calls)
+			assert.Equal(t, tt.wantUserAgent, f.httpUserAgent)
+			assert.Equal(t, tt.wantUserAgent, client.lastUserAgent)
 		})
 	}
 }
