@@ -41,6 +41,7 @@ The go-tuf v2 project provides a lightweight library with the following function
 * consistent snapshots
 * signing and verifying TUF metadata
 * ED25519, RSA, and ECDSA key types referenced by the latest TUF specification
+* `sha256`, `sha512`, `blake2b` (64-byte digest) and `blake2b-256` (32-byte digest) hashes for target files and metadata; the BLAKE2b names match the ones used by python-tuf
 * top-level role delegation
 * target delegation via standard and hash bin delegations
 * support of [succinct hash bin delegations](https://github.com/theupdateframework/taps/blob/master/tap15.md) which significantly reduce the size of the TUF metadata
