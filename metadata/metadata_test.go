@@ -27,6 +27,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -3014,6 +3015,39 @@ func TestTargetFileFromBytes(t *testing.T) {
 	assert.NoError(t, err)
 	err = targetFileFromDataWithNoAlg.VerifyLengthHashes(data)
 	assert.NoError(t, err)
+}
+
+func TestTargetFileBlake2bHashes(t *testing.T) {
+	data := []byte("abc")
+	// digests of "abc" from Python's hashlib.blake2b() and
+	// hashlib.blake2b(digest_size=32), which python-tuf uses for "blake2b"
+	// and "blake2b-256"
+	blake2b512, err := hex.DecodeString("ba80a53f981c4d0d6a2797b69f12f6e94c212f14685ac4b74b12bb6fdbffa2d17d87c5392aab792dc252d5de4533cc9518d38aa8dbf1925ab92386edd4009923")
+	assert.NoError(t, err)
+	blake2b256, err := hex.DecodeString("bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319")
+	assert.NoError(t, err)
+
+	targetFile, err := TargetFile().FromBytes("abc.txt", data, "blake2b", "blake2b-256")
+	assert.NoError(t, err)
+	assert.Equal(t, Hashes{"blake2b": blake2b512, "blake2b-256": blake2b256}, targetFile.Hashes)
+	assert.NoError(t, targetFile.VerifyLengthHashes(data))
+
+	err = targetFile.VerifyLengthHashes([]byte("abd"))
+	assert.ErrorIs(t, err, &ErrLengthOrHashMismatch{})
+
+	for _, algorithm := range []string{"blake2b", "blake2b-256"} {
+		metaFile := MetaFile(1)
+		metaFile.Hashes = Hashes{algorithm: targetFile.Hashes[algorithm]}
+		assert.NoError(t, metaFile.VerifyLengthHashes(data))
+		err = metaFile.VerifyLengthHashes([]byte("abd"))
+		assert.ErrorIs(t, err, &ErrLengthOrHashMismatch{})
+		assert.ErrorContains(t, err, "mismatch for algorithm "+algorithm)
+	}
+
+	// only the python-tuf names are recognised
+	_, err = TargetFile().FromBytes("abc.txt", data, "blake2b-512")
+	assert.ErrorIs(t, err, &ErrValue{})
+	assert.ErrorContains(t, err, "unsupported hashing algorithm - blake2b-512")
 }
 
 func TestIsDelegatedRole(t *testing.T) {

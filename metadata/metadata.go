@@ -41,6 +41,7 @@ import (
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/sigstore/sigstore/pkg/signature"
+	"golang.org/x/crypto/blake2b"
 )
 
 // resolveExpires returns the first entry of expires (or time.Now().UTC() when
@@ -609,7 +610,6 @@ func (t *TargetFiles) FromFile(localPath string, hashes ...string) (*TargetFiles
 // FromBytes generate TargetFiles from bytes
 func (t *TargetFiles) FromBytes(localPath string, data []byte, hashes ...string) (*TargetFiles, error) {
 	log.Info("Generating target file from bytes", "path", localPath)
-	var hasher hash.Hash
 	targetFile := &TargetFiles{
 		Hashes: map[string]HexBytes{},
 	}
@@ -624,12 +624,8 @@ func (t *TargetFiles) FromBytes(localPath string, data []byte, hashes ...string)
 	}
 	targetFile.Length = len
 	for _, v := range hashes {
-		switch v {
-		case "sha256":
-			hasher = sha256.New()
-		case "sha512":
-			hasher = sha512.New()
-		default:
+		hasher := newHasher(v)
+		if hasher == nil {
 			return nil, &ErrValue{Msg: fmt.Sprintf("failed generating TargetFile - unsupported hashing algorithm - %s", v)}
 		}
 		_, err := hasher.Write(data)
@@ -1012,14 +1008,9 @@ func verifyLength(data []byte, length int64) error {
 
 // verifyHashes verifies if the hash of the passed data corresponds to it
 func verifyHashes(data []byte, hashes Hashes) error {
-	var hasher hash.Hash
 	for k, v := range hashes {
-		switch k {
-		case "sha256":
-			hasher = sha256.New()
-		case "sha512":
-			hasher = sha512.New()
-		default:
+		hasher := newHasher(k)
+		if hasher == nil {
 			return &ErrLengthOrHashMismatch{Msg: fmt.Sprintf("hash verification failed - unknown hashing algorithm - %s", k)}
 		}
 		hasher.Write(data)
@@ -1028,6 +1019,29 @@ func verifyHashes(data []byte, hashes Hashes) error {
 		}
 	}
 	return nil
+}
+
+// newHasher returns a new hash.Hash for the given hash algorithm name, or nil
+// if the algorithm is not supported. The supported names are "sha256",
+// "sha512", "blake2b" (BLAKE2b with a 64-byte digest) and "blake2b-256"
+// (BLAKE2b with a 32-byte digest). The BLAKE2b names match the ones used by
+// python-tuf, so metadata using them is portable between the implementations.
+func newHasher(algorithm string) hash.Hash {
+	switch algorithm {
+	case "sha256":
+		return sha256.New()
+	case "sha512":
+		return sha512.New()
+	case "blake2b":
+		// New512 and New256 only fail for keys longer than 64 bytes
+		hasher, _ := blake2b.New512(nil)
+		return hasher
+	case "blake2b-256":
+		hasher, _ := blake2b.New256(nil)
+		return hasher
+	default:
+		return nil
+	}
 }
 
 // fromBytes return a *Metadata[T] object from bytes and verifies
